@@ -2,7 +2,12 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
-import { buildDecisionUpdate, parseDecision, runApprovalAction } from "@/lib/queue";
+import {
+  approvalModelForType,
+  buildDecisionUpdate,
+  parseDecision,
+  runApprovalAction,
+} from "@/lib/queue";
 import ApprovalItem from "@/models/ApprovalItem";
 import type { IFollowupDraftApproval } from "@/models/approvals/FollowupDraftApproval";
 import "@/models/approvals/FollowupDraftApproval"; // register the discriminator
@@ -54,7 +59,8 @@ export async function POST(
   }
 
   const { filter, update } = buildDecisionUpdate(parsed.value, new Date());
-  const updated = await ApprovalItem.findOneAndUpdate({ _id: item._id, ...filter }, update, {
+  const Model = approvalModelForType(item.type);
+  const updated = await Model.findOneAndUpdate({ _id: item._id, ...filter }, update, {
     new: true,
   });
   if (!updated) {

@@ -14,6 +14,7 @@
  * data (ARCHITECTURE.md §3.1).
  */
 
+import type { Model } from "mongoose";
 import ApprovalItem, { IApprovalItemBase } from "@/models/ApprovalItem";
 import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftApproval";
 
@@ -148,6 +149,26 @@ export function buildExpirySweep(now: Date): {
     filter: { status: "pending", staleAt: { $lte: now } },
     update: { $set: { status: "expired", decidedAt: now } },
   };
+}
+
+/**
+ * Resolves the model an item must be written through.
+ *
+ * Per-type fields (payload, editedPayload) live on the discriminator schema,
+ * never on the strict base schema. A guarded update issued through the base
+ * model with a filter that omits the discriminator key has those fields
+ * SILENTLY STRIPPED by Mongoose's update casting — the write succeeds and the
+ * data is lost. Always write through the discriminator model.
+ *
+ * Do not "simplify" this away: verified against mongoose 9.7.3, a base-model
+ * findOneAndUpdate filtered on { _id, status } casts an edit update down to
+ * $set { status, decidedAt }, dropping editedPayload with no error. Base-schema
+ * paths only (actionStatus, actionError, actionAt) are safe either way.
+ */
+export function approvalModelForType(type: string): Model<IApprovalItemBase> {
+  return (
+    (ApprovalItem.discriminators?.[type] as Model<IApprovalItemBase> | undefined) ?? ApprovalItem
+  );
 }
 
 type ActionExecutor = (item: IApprovalItemBase) => Promise<void>;

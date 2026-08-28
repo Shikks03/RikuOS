@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { buildDecisionUpdate, buildExpirySweep, parseDecision } from "@/lib/queue";
+import {
+  approvalModelForType,
+  buildDecisionUpdate,
+  buildExpirySweep,
+  parseDecision,
+} from "@/lib/queue";
 import type { Decision } from "@/lib/queue";
+import ApprovalItem from "@/models/ApprovalItem";
+import FollowupDraftApproval from "@/models/approvals/FollowupDraftApproval";
 import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftApproval";
 
 const payload: IFollowupDraftPayload = {
@@ -136,5 +143,32 @@ describe("buildExpirySweep", () => {
     // items without a staleAt are untouched by design.
     expect(filter).toEqual({ status: "pending", staleAt: { $lte: now } });
     expect(update).toEqual({ $set: { status: "expired", decidedAt: now } });
+  });
+});
+
+describe("approvalModelForType", () => {
+  // These tests pin the trap that makes the resolver necessary. Do not delete
+  // them to "simplify" the resolver away — a decide route that writes through
+  // the base model loses the human's edit silently.
+  it("documents the trap: editedPayload exists only on the discriminator schema", () => {
+    expect(ApprovalItem.schema.path("editedPayload")).toBeUndefined();
+    expect(FollowupDraftApproval.schema.path("editedPayload")).toBeDefined();
+    // Base-schema paths are on both, which is why runApprovalAction's
+    // actionStatus updates are safe through the base model.
+    expect(ApprovalItem.schema.path("status")).toBeDefined();
+    expect(FollowupDraftApproval.schema.path("status")).toBeDefined();
+  });
+
+  it("resolves followup-draft to the discriminator model, not the base", () => {
+    const model = approvalModelForType("followup-draft");
+    expect(model.modelName).toBe("followup-draft");
+    expect(model.modelName).not.toBe(ApprovalItem.modelName);
+    expect(model.schema.path("editedPayload")).toBeDefined();
+  });
+
+  it("falls back to the base model for an unregistered type", () => {
+    const model = approvalModelForType("some-unregistered-type");
+    expect(model.modelName).toBe(ApprovalItem.modelName);
+    expect(model.schema.path("editedPayload")).toBeUndefined();
   });
 });
