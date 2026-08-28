@@ -1,0 +1,140 @@
+import { describe, it, expect } from "vitest";
+import { buildDecisionUpdate, buildExpirySweep, parseDecision } from "@/lib/queue";
+import type { Decision } from "@/lib/queue";
+import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftApproval";
+
+const payload: IFollowupDraftPayload = {
+  contactId: "c1",
+  contactName: "Sample Bakery",
+  channel: "facebook",
+  draftBody: "Original body",
+  replySnippet: "Magkano po?",
+};
+
+describe("parseDecision", () => {
+  it("parses approve", () => {
+    const res = parseDecision({ decision: "approve" }, "followup-draft", payload);
+    expect(res).toEqual({ ok: true, value: { kind: "approve" } });
+  });
+
+  it("parses reject without a note", () => {
+    const res = parseDecision({ decision: "reject" }, "followup-draft", payload);
+    expect(res).toEqual({ ok: true, value: { kind: "reject", rejectNote: undefined } });
+  });
+
+  it("parses reject with a bounded note", () => {
+    const res = parseDecision(
+      { decision: "reject", rejectNote: "wrong tone" },
+      "followup-draft",
+      payload
+    );
+    expect(res).toEqual({ ok: true, value: { kind: "reject", rejectNote: "wrong tone" } });
+  });
+
+  it("rejects an over-length rejectNote", () => {
+    const res = parseDecision(
+      { decision: "reject", rejectNote: "x".repeat(1001) },
+      "followup-draft",
+      payload
+    );
+    expect(res.ok).toBe(false);
+  });
+
+  it("parses edit into a full editedPayload preserving identity fields", () => {
+    const res = parseDecision(
+      { decision: "edit", draftBody: "New body" },
+      "followup-draft",
+      payload
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok && res.value.kind === "edit") {
+      expect(res.value.editedPayload.draftBody).toBe("New body");
+      expect(res.value.editedPayload.contactId).toBe("c1");
+      expect(res.value.editedPayload.contactName).toBe("Sample Bakery");
+      expect(res.value.editedPayload.channel).toBe("facebook");
+      expect(res.value.editedPayload.replySnippet).toBe("Magkano po?");
+    }
+  });
+
+  it("rejects edit for a type with no edit support", () => {
+    const res = parseDecision({ decision: "edit", draftBody: "x" }, "skill-edit", undefined);
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects edit with an empty draftBody", () => {
+    const res = parseDecision(
+      { decision: "edit", draftBody: "   " },
+      "followup-draft",
+      payload
+    );
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects edit with an over-length draftBody", () => {
+    const res = parseDecision(
+      { decision: "edit", draftBody: "x".repeat(8001) },
+      "followup-draft",
+      payload
+    );
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects an unknown decision", () => {
+    const res = parseDecision({ decision: "maybe" }, "followup-draft", payload);
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects a non-object body", () => {
+    expect(parseDecision(null, "followup-draft", payload).ok).toBe(false);
+    expect(parseDecision("approve", "followup-draft", payload).ok).toBe(false);
+  });
+});
+
+describe("buildDecisionUpdate", () => {
+  const now = new Date("2026-08-28T10:00:00Z");
+
+  it("always guards on status pending (the state-machine invariant)", () => {
+    const decisions: Decision[] = [
+      { kind: "approve" },
+      { kind: "reject" },
+      { kind: "edit", editedPayload: payload },
+    ];
+    for (const d of decisions) {
+      expect(buildDecisionUpdate(d, now).filter).toEqual({ status: "pending" });
+    }
+  });
+
+  it("approve sets status approved and decidedAt", () => {
+    const { update } = buildDecisionUpdate({ kind: "approve" }, now);
+    expect(update).toEqual({ $set: { status: "approved", decidedAt: now } });
+  });
+
+  it("edit sets edited_approved and stores the editedPayload", () => {
+    const { update } = buildDecisionUpdate({ kind: "edit", editedPayload: payload }, now);
+    expect(update).toEqual({
+      $set: { status: "edited_approved", decidedAt: now, editedPayload: payload },
+    });
+  });
+
+  it("reject stores the note only when given", () => {
+    expect(buildDecisionUpdate({ kind: "reject" }, now).update).toEqual({
+      $set: { status: "rejected", decidedAt: now },
+    });
+    expect(
+      buildDecisionUpdate({ kind: "reject", rejectNote: "off-brand" }, now).update
+    ).toEqual({
+      $set: { status: "rejected", decidedAt: now, rejectNote: "off-brand" },
+    });
+  });
+});
+
+describe("buildExpirySweep", () => {
+  it("matches only pending items whose staleAt has passed", () => {
+    const now = new Date("2026-08-28T00:00:00Z");
+    const { filter, update } = buildExpirySweep(now);
+    // Range operators do not match documents where the field is missing, so
+    // items without a staleAt are untouched by design.
+    expect(filter).toEqual({ status: "pending", staleAt: { $lte: now } });
+    expect(update).toEqual({ $set: { status: "expired", decidedAt: now } });
+  });
+});
