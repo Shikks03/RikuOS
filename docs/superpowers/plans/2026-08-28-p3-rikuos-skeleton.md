@@ -3784,9 +3784,20 @@ Run: `npm run migrate:indexes` — review the diff (everything should be CREATE;
 Run: `npm run migrate:indexes:apply`
 Expected: per-model "applied" lines; re-running the dry run reports everything in sync. Confirm in the output that `LoginAttempt` has `ttl=900s` and `AgentRun` has `ttl=7776000s`.
 
-- [ ] **Step 4: Local smoke test**
+- [x] **Step 4: Local smoke test**
 
 Run: `npm run dev` and open http://localhost:3000 — expect a redirect to `/login`. Log in with the password → lands on `/queue` (empty). Run `npm run seed:approval` in a second terminal → refresh → the Sample Bakery card appears. Approve it → status flips to `approved · action done` (visible under the `approved` filter). Wrong password → 401; five wrong attempts → 429.
+
+**Verified 2026-08-29** against `npm run dev` + the real Atlas `rikuos` database. Every assertion passed at the HTTP layer:
+`GET /` → 307 `/login?from=%2F` (confirmed in Chrome too) · `GET /queue` → 307 `/login?from=%2Fqueue` · `GET /api/queue` without a cookie → 401 ·
+login with the correct password → 200 + `__Host-session` · `GET /api/queue?status=pending` → `{"items":[]}` ·
+after `npm run seed:approval` → 1 pending item with the Taglish draft intact · `POST /api/queue/:id/decide {"decision":"approve"}` → 200 with
+`status=approved`, `actionStatus=done` (which `src/app/queue/page.tsx` renders as the badge `approved · action done`), and the item moved out of the
+`pending` filter into `approved` · six wrong passwords → 401 ×5 then 429 (`LOGIN_MAX_PER_IP` default 5 / 15 min).
+
+Not observed by eye: the rendered card and the Approve button click. The queue page is a client component, so `curl` only sees its `Loading…`
+shell; the browser pass was cut short and the visual check was deliberately deferred — **P8** owns UI/UX (D10/D11), and Step 7–9 exercise the
+same screens on the iPhone anyway.
 
 - [ ] **Step 5: Deploy to Vercel** — create the Vercel project (`vercel link`, or the dashboard's Import), set all env vars from Step 2 on it (plus `APP_BASE_URL` = the production URL once known), and deploy (`vercel --prod` or git push if connected). Confirm in the Vercel dashboard that the cron `/api/cron/expire @ 0 21 * * *` was picked up from `vercel.json`.
 
