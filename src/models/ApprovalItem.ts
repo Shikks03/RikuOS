@@ -1,5 +1,11 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
-import { AGENTS } from "@/models/AgentRun";
+// Relative, not the "@/" alias, and with an explicit .ts extension on purpose:
+// scripts/*.mts run under `node --experimental-strip-types`, which strips types
+// but does NOT resolve tsconfig "paths" — an "@/" import here breaks
+// `npm run migrate:indexes` and `npm run seed:approval` with ERR_MODULE_NOT_FOUND.
+// Keep model-to-model imports relative so both the bundler and plain Node can
+// resolve them.
+import { AGENTS } from "./AgentRun.ts";
 
 /** Who proposed the item — the agents, plus "manual" for seeded/test items. */
 export const APPROVAL_SOURCES = [...AGENTS, "manual"] as const;

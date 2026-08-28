@@ -1,5 +1,11 @@
 import { Model, Schema } from "mongoose";
-import ApprovalItem, { IApprovalItemBase } from "@/models/ApprovalItem";
+// Relative + explicit .ts extension — see the note in ApprovalItem.ts. The
+// scripts import this file under `node --experimental-strip-types`, which does
+// not resolve the "@/" tsconfig path alias.
+// `type` modifier required: strip-types erases annotations without type
+// analysis, so an interface imported as a value becomes a runtime import of an
+// export that does not exist.
+import ApprovalItem, { type IApprovalItemBase } from "../ApprovalItem.ts";
 
 export const DRAFT_CHANNELS = ["email", "facebook"] as const;
 export type DraftChannel = (typeof DRAFT_CHANNELS)[number];
