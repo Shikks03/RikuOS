@@ -3799,12 +3799,37 @@ Not observed by eye: the rendered card and the Approve button click. The queue p
 shell; the browser pass was cut short and the visual check was deliberately deferred — **P8** owns UI/UX (D10/D11), and Step 7–9 exercise the
 same screens on the iPhone anyway.
 
-- [ ] **Step 5: Deploy to Vercel** — create the Vercel project (`vercel link`, or the dashboard's Import), set all env vars from Step 2 on it (plus `APP_BASE_URL` = the production URL once known), and deploy (`vercel --prod` or git push if connected). Confirm in the Vercel dashboard that the cron `/api/cron/expire @ 0 21 * * *` was picked up from `vercel.json`.
+- [x] **Step 5: Deploy to Vercel** — create the Vercel project (`vercel link`, or the dashboard's Import), set all env vars from Step 2 on it (plus `APP_BASE_URL` = the production URL once known), and deploy (`vercel --prod` or git push if connected). Confirm in the Vercel dashboard that the cron `/api/cron/expire @ 0 21 * * *` was picked up from `vercel.json`.
 
-- [ ] **Step 6: Verify the deployed cron gate**
+- [x] **Step 6: Verify the deployed cron gate**
 
 Run: `curl -s -H "x-cron-secret: <CRON_SECRET>" https://<app>.vercel.app/api/cron/expire`
 Expected: `{"ok":true,"expired":0}`. Without the header: 401.
+
+**Verified 2026-08-29** at https://riku-os.vercel.app (project `riku-os`, production branch `master`).
+Results: no secret -> 401 `{"error":"Unauthorized: missing or invalid cron secret."}` · wrong secret -> 401 ·
+`x-cron-secret` -> `{"ok":true,"expired":0}` in 0.46s · **`Authorization: Bearer` -> same 200**, which is the
+header Vercel's native crons actually send, so the real scheduled invocation is proven, not just the curl form.
+Both authorized runs wrote an `AgentRun` (`agent=expiry-sweep`, `ok=true`, `itemsProcessed=0`), confirmed
+directly in Atlas.
+
+Also verified beyond the step, since deployment was the first chance to: production login returns 200 with the
+`__Host-session` cookie (so the Mongo-backed rate limiter works on Vercel), the queue reads back the seeded item,
+and the Origin guard behaves — a POST with the correct `Origin` reaches id validation (400), a hostile `Origin`
+is rejected (403). That pair confirms `APP_BASE_URL` matches the deployed host without mutating any data.
+
+**Two deployment traps hit on the way, both fixed:**
+1. `master` held only the spec docs; the app lived on `p3-skeleton`, and Vercel deploys the repo default branch.
+   Fixed by fast-forwarding `master` (commit `81ef902`).
+2. The project was imported with **Framework Preset "Other"**, whose output directory is `public` when that
+   folder exists — and it exists to hold `sw.js`. Every deploy therefore ran `next build`, discarded `.next`,
+   and published a one-file static site: `/sw.js` returned 200 while `/`, `/login` and all `/api/*` returned
+   Vercel's platform 404, with a completely healthy-looking build log. Fixed by pinning `"framework": "nextjs"`
+   in `vercel.json` (commit `f6ed5cc`) rather than in the dashboard, so it is committed and survives a re-import.
+
+**One prerequisite that is not in this plan and should be:** Atlas Network Access must allow Vercel
+(`0.0.0.0/0`; serverless egress IPs are dynamic). Until that entry was Active the authorized cron returned
+500 with Atlas's whitelist error after ~20s, and login would have failed the same way.
 
 - [ ] **Step 7: Install the PWA on the iPhone** — open the production URL in Safari, log in, then Share → **Add to Home Screen**, and open the app **from its icon** (required for iOS push). It should launch standalone (no Safari chrome) straight into the queue.
 
