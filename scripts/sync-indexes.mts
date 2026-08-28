@@ -65,7 +65,16 @@ async function main(): Promise<number> {
 
   // Short server-selection timeout so a wrong/unreachable URI fails in
   // seconds rather than hanging on the driver's default.
-  await mongoose.connect(uri, { bufferCommands: false, serverSelectionTimeoutMS: 10_000 });
+  // autoIndex MUST be false here. Mongoose defaults it to true, and it builds
+  // missing indexes in the background as soon as the connection is established
+  // -- which would make the DRY RUN mutate the database before anyone reads the
+  // diff, defeating the entire point of this script. Index changes happen only
+  // through the explicit syncIndexes() call below, under --apply.
+  await mongoose.connect(uri, {
+    bufferCommands: false,
+    serverSelectionTimeoutMS: 10_000,
+    autoIndex: false,
+  });
   console.log(`Database:      ${mongoose.connection.db?.databaseName ?? "(unknown)"}`);
 
   let pendingChanges = 0;
