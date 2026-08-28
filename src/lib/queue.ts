@@ -17,6 +17,13 @@
 import type { Model } from "mongoose";
 import ApprovalItem, { IApprovalItemBase } from "@/models/ApprovalItem";
 import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftApproval";
+// Side-effect import: registers the followup-draft discriminator so
+// approvalModelForType() below can resolve it. This must be a VALUE import —
+// the type-only import above is erased at compile time, which would leave the
+// resolver silently falling back to the base model in any bundle that does not
+// happen to import the discriminator itself (e.g. a cron route). Every future
+// discriminator needs a line here too.
+import "@/models/approvals/FollowupDraftApproval";
 
 export type Decision =
   | { kind: "approve" }
@@ -160,15 +167,25 @@ export function buildExpirySweep(now: Date): {
  * SILENTLY STRIPPED by Mongoose's update casting — the write succeeds and the
  * data is lost. Always write through the discriminator model.
  *
- * Do not "simplify" this away: verified against mongoose 9.7.3, a base-model
- * findOneAndUpdate filtered on { _id, status } casts an edit update down to
- * $set { status, decidedAt }, dropping editedPayload with no error. Base-schema
- * paths only (actionStatus, actionError, actionAt) are safe either way.
+ * Do not "simplify" this away: verified against mongoose 9.7.3 and 9.9.4, a
+ * base-model findOneAndUpdate filtered on { _id, status } casts an edit update
+ * down to $set { status, decidedAt }, dropping editedPayload with no error.
+ * Base-schema paths only (actionStatus, actionError, actionAt) are safe either
+ * way — which is why runApprovalAction and the expiry sweeps stay on the base
+ * model deliberately (they are cross-type and touch no per-type field).
+ *
+ * Note: mongoose injects the discriminator key into the filter at exec time, so
+ * the effective guard becomes { type, _id, status } — harmless, since `type` is
+ * read from the very document being updated and cannot be changed by an update.
+ *
+ * hasOwn, not a bare index: `discriminators` is a plain object, so a `type` of
+ * "toString" would otherwise resolve up the prototype chain to a function with
+ * no findOneAndUpdate.
  */
 export function approvalModelForType(type: string): Model<IApprovalItemBase> {
-  return (
-    (ApprovalItem.discriminators?.[type] as Model<IApprovalItemBase> | undefined) ?? ApprovalItem
-  );
+  const registered = ApprovalItem.discriminators ?? {};
+  if (!Object.hasOwn(registered, type)) return ApprovalItem;
+  return registered[type] as Model<IApprovalItemBase>;
 }
 
 type ActionExecutor = (item: IApprovalItemBase) => Promise<void>;

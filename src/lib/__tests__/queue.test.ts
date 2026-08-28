@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import mongoose from "mongoose";
+import type { Model } from "mongoose";
 import {
   approvalModelForType,
   buildDecisionUpdate,
@@ -7,6 +9,7 @@ import {
 } from "@/lib/queue";
 import type { Decision } from "@/lib/queue";
 import ApprovalItem from "@/models/ApprovalItem";
+import type { IApprovalItemBase } from "@/models/ApprovalItem";
 import FollowupDraftApproval from "@/models/approvals/FollowupDraftApproval";
 import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftApproval";
 
@@ -170,5 +173,45 @@ describe("approvalModelForType", () => {
     const model = approvalModelForType("some-unregistered-type");
     expect(model.modelName).toBe(ApprovalItem.modelName);
     expect(model.schema.path("editedPayload")).toBeUndefined();
+  });
+
+  it("does not resolve inherited Object.prototype keys as models", () => {
+    expect(approvalModelForType("toString").modelName).toBe(ApprovalItem.modelName);
+    expect(approvalModelForType("constructor").modelName).toBe(ApprovalItem.modelName);
+  });
+});
+
+describe("edit survives the guarded write (the invariant the resolver protects)", () => {
+  // The three tests above pin the resolver; this one pins the thing that
+  // actually matters — that an edit decision, cast for the wire through the
+  // resolved model, still carries editedPayload. It is the only test here that
+  // exercises Mongoose's update casting, which is where the field was being
+  // silently dropped.
+  //
+  // _castUpdate is Mongoose private API (verified on 9.7.3 and 9.9.4). If a
+  // major upgrade breaks this test, re-verify the behaviour before relaxing it:
+  // a green suite with a stripped editedPayload is exactly the failure mode
+  // this test exists to prevent.
+  function castSetKeys(model: Model<IApprovalItemBase>): string[] {
+    const { filter, update } = buildDecisionUpdate(
+      { kind: "edit", editedPayload: payload },
+      new Date()
+    );
+    const query = model.findOneAndUpdate({ _id: new mongoose.Types.ObjectId(), ...filter }, update);
+    const casted = (
+      query as unknown as { _castUpdate: (u: unknown) => { $set?: Record<string, unknown> } }
+    )._castUpdate(query.getUpdate());
+    return Object.keys(casted.$set ?? {});
+  }
+
+  it("retains editedPayload when written through the resolved model", () => {
+    expect(castSetKeys(approvalModelForType("followup-draft"))).toContain("editedPayload");
+  });
+
+  it("negative control: the base model silently drops editedPayload", () => {
+    const keys = castSetKeys(ApprovalItem);
+    expect(keys).not.toContain("editedPayload");
+    // The write still "succeeds" with the other fields — that silence is the bug.
+    expect(keys).toEqual(expect.arrayContaining(["status", "decidedAt"]));
   });
 });
