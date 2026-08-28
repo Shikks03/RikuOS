@@ -94,7 +94,7 @@ The repo currently contains only docs (`ARCHITECTURE.md`, `CLAUDE.md`, `RIKUOS_C
 - Create: `src/lib/constants.ts`, `src/app/layout.tsx`, `src/app/globals.css`, `src/app/page.tsx`, `src/app/manifest.ts`, `src/app/icon.tsx`, `src/app/apple-icon.tsx`
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Write `package.json`**
+- [x] **Step 1: Write `package.json`**
 
 ```json
 {
@@ -131,7 +131,7 @@ The repo currently contains only docs (`ARCHITECTURE.md`, `CLAUDE.md`, `RIKUOS_C
 }
 ```
 
-- [ ] **Step 2: Write `tsconfig.json`** (ported from ShikksTracker; the `allowImportingTsExtensions` comment applies to our `scripts/*.mts` too)
+- [x] **Step 2: Write `tsconfig.json`** (ported from ShikksTracker; the `allowImportingTsExtensions` comment applies to our `scripts/*.mts` too)
 
 ```json
 {
@@ -165,7 +165,7 @@ The repo currently contains only docs (`ARCHITECTURE.md`, `CLAUDE.md`, `RIKUOS_C
 }
 ```
 
-- [ ] **Step 3: Write `next.config.ts`** (ported — security headers + CSP; the dev-only `unsafe-eval` conditional must stay conditional)
+- [x] **Step 3: Write `next.config.ts`** (ported — security headers + CSP; the dev-only `unsafe-eval` conditional must stay conditional)
 
 ```ts
 import type { NextConfig } from "next";
@@ -276,7 +276,7 @@ next-env.d.ts
 .DS_Store
 ```
 
-- [ ] **Step 7: Write `.env.example`** (names and comments only — never values; CLAUDE.md)
+- [x] **Step 7: Write `.env.example`** (names and comments only — never values; CLAUDE.md)
 
 ```
 # --- Database ---
@@ -315,7 +315,7 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=   # SAME value as VAPID_PUBLIC_KEY (inlined into t
 # ANTHROPIC_API_KEY=
 ```
 
-- [ ] **Step 8: Write `src/lib/constants.ts`**
+- [x] **Step 8: Write `src/lib/constants.ts`**
 
 ```ts
 /**
@@ -326,7 +326,7 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=   # SAME value as VAPID_PUBLIC_KEY (inlined into t
 export const APP_NAME = "RikuOS";
 ```
 
-- [ ] **Step 9: Write `src/app/globals.css`** (plain and dense on purpose — D10; the visual pass is P8)
+- [x] **Step 9: Write `src/app/globals.css`** (plain and dense on purpose — D10; the visual pass is P8)
 
 ```css
 * { box-sizing: border-box; }
@@ -373,7 +373,7 @@ label { display: block; font-size: 13px; margin-bottom: 4px; color: #444; }
 pre.body { white-space: pre-wrap; font: inherit; background: #f6f6f6; padding: 8px; border-radius: 4px; margin: 8px 0 0; }
 ```
 
-- [ ] **Step 10: Write `src/app/layout.tsx`**
+- [x] **Step 10: Write `src/app/layout.tsx`**
 
 ```tsx
 import type { Metadata, Viewport } from "next";
@@ -3784,6 +3784,8 @@ Run: `npm run migrate:indexes` — review the diff (everything should be CREATE;
 Run: `npm run migrate:indexes:apply`
 Expected: per-model "applied" lines; re-running the dry run reports everything in sync. Confirm in the output that `LoginAttempt` has `ttl=900s` and `AgentRun` has `ttl=7776000s`.
 
+**Re-verified 2026-08-29:** `npm test` 94/94, `tsc --noEmit` clean, `npm run build` clean (14 routes), and the index dry run reports all five collections "in sync — nothing to do" with both TTLs correct.
+
 - [x] **Step 4: Local smoke test**
 
 Run: `npm run dev` and open http://localhost:3000 — expect a redirect to `/login`. Log in with the password → lands on `/queue` (empty). Run `npm run seed:approval` in a second terminal → refresh → the Sample Bakery card appears. Approve it → status flips to `approved · action done` (visible under the `approved` filter). Wrong password → 401; five wrong attempts → 429.
@@ -3844,6 +3846,38 @@ is rejected (403). That pair confirms `APP_BASE_URL` matches the deployed host w
 - [ ] **Step 10: Expiry check** — seed one more item, then set its `staleAt` into the past (Atlas UI or `mongosh`), reload the queue → it must show under `expired`, not `pending` (the lazy sweep), and the next cron run's response/`AgentRun` should count it.
 
 **Done when** (ROADMAP P3, verbatim): installed on the iPhone, logged in, a manually seeded ApprovalItem shows up, approving it flips states correctly, and a push lands on the lock screen.
+
+---
+
+### Task 14 closed — 2026-08-29
+
+All ten steps pass. Live at https://riku-os.vercel.app.
+
+**Steps 7-8 (on device):** PWA installed from Safari and launched standalone from the icon;
+notifications enabled and a test push landed on the lock screen and opened the queue.
+Corroborated server-side: `pushsubscriptions` holds 1 document.
+
+**Step 9:** approve -> `approved · action done`; edit -> `edited_approved · action done`;
+reject -> `rejected`. The edit leg was checked in Atlas rather than by badge: `editedPayload`
+persisted with all five fields, the original `payload` retained beside it, bodies genuinely
+differing. **First proof against production data that the 2ac819e discriminator fix holds** --
+the plan's original code produced this exact status while silently discarding the edit.
+9.4 was verified as a true *concurrent* race rather than two taps: two simultaneous approvals
+returned exactly one 200 and one 409.
+
+**Step 10:** verified as two independent paths, deliberately not in one pass -- a single test
+lets the lazy sweep expire the item before the cron sees it, and the cron then reports 0 while
+looking healthy. Cron: `{"ok":true,"expired":1}` with a matching `AgentRun`
+(`itemsProcessed=1`). Lazy sweep: a separate backdated item vanished from `pending` on a plain
+read and appeared under `expired`. `AgentRun` TTL confirmed at 7776000s.
+
+Final data state: 3 approved, 1 edited_approved, 1 rejected, 3 expired, 0 pending; 3 AgentRuns.
+
+**Observation for the findings register (not a bug):** a rejected item keeps
+`actionStatus: "pending"` forever, since rejections run no action. Invisible in the UI -- the
+badge omits the `· action` suffix for rejected -- but a future query for
+`actionStatus: "pending"` will match rejected rows. CLAUDE.md's "never leave an in-flight state
+behind" rule points at exactly this shape. Worth a decision before P4 adds sweeps.
 
 ---
 

@@ -60,6 +60,8 @@ P1 ──► P8 (dashboard pages)          P1, P2, P3 have no dependencies on ea
 
 **Done when:** installed on the iPhone, logged in, a manually seeded ApprovalItem shows up, approving it flips states correctly, and a push lands on the lock screen.
 
+**DONE 2026-08-29** — live at https://riku-os.vercel.app. All six tasks shipped and every acceptance criterion above observed against real data. Evidence: Task 14 in the P3 plan.
+
 ## P4 — Follow-up chaser → **v0 finish line** — repo: RikuOS
 
 *Needs P1 (attention API) + P3 (queue + push).*
