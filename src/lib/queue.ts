@@ -24,6 +24,9 @@ import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftAppr
 // happen to import the discriminator itself (e.g. a cron route). Every future
 // discriminator needs a line here too.
 import "@/models/approvals/FollowupDraftApproval";
+import { createDraft } from "@/lib/stApi";
+import type { DraftOutcome, DraftRequest } from "@/lib/stApi";
+import type { IFollowupDraftApproval } from "@/models/approvals/FollowupDraftApproval";
 
 export type Decision =
   | { kind: "approve" }
@@ -310,9 +313,64 @@ export function buildActionRetry(): {
 }
 
 /**
+ * The one outward action in P4: create the response draft in ShikksTracker.
+ *
+ * `send` is injected so the mapping is unit-testable without a network call;
+ * production passes stApi.createDraft, which is TOTAL (never throws) and
+ * returns a classified DraftOutcome.
+ *
+ * The edited payload wins when Riku edited the draft — that is the version he
+ * approved, and it is what must reach the lead.
+ */
+export async function executeFollowupDraft(
+  item: IApprovalItemBase,
+  send: (request: DraftRequest) => Promise<DraftOutcome> = createDraft
+): Promise<ActionOutcome> {
+  const typed = item as unknown as IFollowupDraftApproval;
+  const payload = typed.editedPayload ?? typed.payload;
+
+  if (!payload || !payload.contactId || !payload.draftBody) {
+    return {
+      status: "failed",
+      note: "The item has no usable payload; nothing was sent.",
+    };
+  }
+
+  const request: DraftRequest = {
+    contactId: payload.contactId,
+    channel: payload.channel,
+    body: payload.draftBody,
+    // `subject` is deliberately omitted: the attention feed does not expose the
+    // anchor's subject, so ShikksTracker derives "Re: <anchor subject>" itself
+    // and the email threads correctly. See "Contract gaps" in the P4 plan.
+    ...(payload.replyToLogId ? { replyToLogId: payload.replyToLogId } : {}),
+  };
+
+  const outcome = await send(request);
+
+  switch (outcome.kind) {
+    case "created":
+      return { status: "done", note: undefined };
+    case "duplicate":
+      // The draft is already in ShikksTracker's lane; the desired end state
+      // holds. Recording the reason keeps the retry path honest.
+      return { status: "done", note: `Already present in ShikksTracker: ${outcome.message}` };
+    case "rejected":
+      return {
+        status: "failed",
+        note: `ShikksTracker refused the draft (HTTP ${outcome.status}): ${outcome.message}`,
+      };
+    case "unknown":
+      return { status: "needs_verification", note: outcome.message };
+  }
+}
+
+/**
  * One executor per discriminator type. Task 7 fills in followup-draft.
  */
-const executors: Record<string, ActionExecutor> = {};
+const executors: Record<string, ActionExecutor> = {
+  "followup-draft": (item) => executeFollowupDraft(item),
+};
 
 /**
  * Claims, runs, and records the action for a just-approved item.

@@ -9,6 +9,7 @@ import {
   buildActionSweep,
   buildDecisionUpdate,
   buildExpirySweep,
+  executeFollowupDraft,
   parseDecision,
   STALE_ACTION_MS,
 } from "@/lib/queue";
@@ -327,5 +328,90 @@ describe("P4 — the action state machine builders", () => {
 
   it("STALE_ACTION_MS is comfortably above the route's maxDuration", () => {
     expect(STALE_ACTION_MS).toBeGreaterThanOrEqual(5 * 60 * 1000);
+  });
+});
+
+describe("P4 — the followup-draft executor maps outcomes to action states", () => {
+  const base = {
+    contactId: "64b7f0c2e1a2b3c4d5e6f6ff",
+    contactName: "Sample Bakery",
+    channel: "email" as const,
+    draftBody: "Thanks for getting back to me.",
+    replyToLogId: "64b7f0c2e1a2b3c4d5e6f700",
+  };
+
+  function item(payload = base, editedPayload?: typeof base) {
+    return {
+      type: "followup-draft",
+      payload,
+      ...(editedPayload ? { editedPayload } : {}),
+    } as unknown as IApprovalItemBase;
+  }
+
+  it("created -> done", async () => {
+    const out = await executeFollowupDraft(item(), async () => ({
+      kind: "created",
+      logId: "l1",
+    }));
+    expect(out).toEqual({ status: "done", note: undefined });
+  });
+
+  it("duplicate -> done, with the reason kept as a note", async () => {
+    const out = await executeFollowupDraft(item(), async () => ({
+      kind: "duplicate",
+      message: "A pending reply to that message already exists (log l1).",
+    }));
+    expect(out.status).toBe("done");
+    expect(out.note).toMatch(/already exists/);
+  });
+
+  it("rejected -> failed (retryable: proven no side effect)", async () => {
+    const out = await executeFollowupDraft(item(), async () => ({
+      kind: "rejected",
+      status: 422,
+      message: "Contact has no email address.",
+    }));
+    expect(out.status).toBe("failed");
+    expect(out.note).toMatch(/422/);
+  });
+
+  it("unknown -> needs_verification (never failed, never done)", async () => {
+    const out = await executeFollowupDraft(item(), async () => ({
+      kind: "unknown",
+      message: "TimeoutError",
+    }));
+    expect(out.status).toBe("needs_verification");
+  });
+
+  it("sends the EDITED payload when Riku edited the draft", async () => {
+    let sent: unknown = null;
+    await executeFollowupDraft(
+      item(base, { ...base, draftBody: "Riku's own words" }),
+      async (req) => {
+        sent = req;
+        return { kind: "created", logId: "l1" };
+      }
+    );
+    expect((sent as { body: string }).body).toBe("Riku's own words");
+  });
+
+  it("omits subject entirely so ShikksTracker derives Re: from the anchor", async () => {
+    let sent: Record<string, unknown> = {};
+    await executeFollowupDraft(item(), async (req) => {
+      sent = req as unknown as Record<string, unknown>;
+      return { kind: "created", logId: "l1" };
+    });
+    expect("subject" in sent).toBe(false);
+    expect(sent.replyToLogId).toBe("64b7f0c2e1a2b3c4d5e6f700");
+  });
+
+  it("fails closed with no network call when the payload is missing", async () => {
+    let called = false;
+    const out = await executeFollowupDraft({ type: "followup-draft" } as IApprovalItemBase, async () => {
+      called = true;
+      return { kind: "created", logId: null };
+    });
+    expect(out.status).toBe("failed");
+    expect(called).toBe(false);
   });
 });
