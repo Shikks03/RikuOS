@@ -87,9 +87,11 @@ The route returns a per-job JSON summary. Only a failure of the route itself (no
 | `expiry-sweep` | items expired + unstuck | — | — |
 | `watchdog` | agents checked | anomalies found | — |
 | `site-health` | sites checked | checks that errored | checks returning `unknown` |
-| `dispatcher` | digest lines composed | 1 if the push failed, else 0 | — |
+| `dispatcher` | problems reported | — | — |
 
 The watchdog is deliberately not in its own expectations table, so recording anomalies in `itemsFailed` cannot make it flag itself as `degraded` in a loop.
+
+A **failed push** is not counted; it makes the dispatcher's whole run `ok: false`, which the next day's watchdog reports as `failed` rather than the weaker `degraded`. That is the correct severity: a digest nobody received is a total failure of that run's purpose, not a partial one.
 
 ---
 
