@@ -59,7 +59,7 @@ export default function PushControls() {
       });
       if (!res.ok) throw new Error("subscribe failed");
       setStatus("subscribed");
-      setMessage("Notifications enabled on this device.");
+      setMessage("This device is registered for notifications.");
     } catch {
       setMessage("Could not enable notifications.");
     }
@@ -91,9 +91,24 @@ export default function PushControls() {
         <div className="row">
           {status === "idle" && <button onClick={() => void enable()}>Enable notifications</button>}
           {status === "subscribed" && (
-            <button className="secondary" onClick={() => void sendTest()}>
-              Send test push
-            </button>
+            <>
+              <button className="secondary" onClick={() => void sendTest()}>
+                Send test push
+              </button>
+              {/*
+                This device can be "subscribed" here while the SERVER has no row
+                for it: the push service returns 410 for a lapsed endpoint and
+                sendPushToAll prunes it, but the browser keeps its own
+                subscription object, so the enable button above stays hidden.
+                Without this the morning digest would report reaching no device
+                every day with no way to recover from the UI. Re-registering is
+                idempotent — pushManager.subscribe returns the existing
+                subscription and /api/push/subscribe upserts by endpoint.
+              */}
+              <button className="secondary" onClick={() => void enable()}>
+                Re-register this device
+              </button>
+            </>
           )}
         </div>
       )}

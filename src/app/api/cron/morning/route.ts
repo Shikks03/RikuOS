@@ -96,9 +96,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const dispatch = await runJob("dispatcher", async () => {
       const pending = await ApprovalItem.countDocuments({ status: "pending" });
 
-      // A dependency being down must not cost the whole digest.
+      // A dependency being down must not cost the whole digest. The reason is
+      // logged rather than discarded: the digest can only say "unavailable",
+      // which cannot distinguish a rotated secret from an outage from DNS.
       const attention = await fetchAttention(settings.chaserNDays, ATTENTION_LIMIT).catch(
-        () => null
+        (attentionErr: unknown) => {
+          console.error("[cron/morning] attention check failed:", attentionErr);
+          return null;
+        }
       );
 
       const problems = buildProblems({
@@ -141,7 +146,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       expiry: { ok: expiry.ok, ...(expiry.data ?? {}) },
       watchdog: { ok: watch.ok, anomalies: watch.data?.length ?? 0 },
       siteHealth: { ok: health.ok, down: (health.data ?? []).filter((s) => !s.up).length },
-      dispatcher: { ok: dispatch.ok, title: dispatch.data?.title ?? null },
+      dispatcher: {
+        ok: dispatch.ok,
+        title: dispatch.data?.title ?? null,
+        ...(dispatch.ok ? {} : { error: dispatch.error }),
+      },
     });
   } catch (err) {
     // Only a failure of the route itself lands here — job failures are records,
