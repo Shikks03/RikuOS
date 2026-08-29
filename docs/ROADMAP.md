@@ -45,6 +45,8 @@ P1 ──► P8 (dashboard pages)          P1, P2, P3 have no dependencies on ea
 
 **Done when:** a real reply to the RIKU page appears in `/messenger` within a minute, and confirming a suggested link marks the contact replied with score bumped.
 
+**Handoff brief for the ShikksTracker session:** `docs/handoffs/2026-08-30-p2-messenger-webhook.md` — paste-ready, plus the Meta setup steps only Riku can do. Disposable; delete it and this line in the post-v0 cleanup.
+
 ## P3 — RikuOS skeleton: auth, queue, push — repo: RikuOS (here)
 
 *No dependencies. Can start immediately, in parallel with P1/P2.*
