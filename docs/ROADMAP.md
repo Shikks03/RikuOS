@@ -154,6 +154,7 @@ subject>` itself; the proposed fix is one field in one `.select()`.
 | 8.2 | Personal page: GCal live read with sub-calendar layers, write-through event creation (D5); morning brief view | P3 |
 | 8.3 | Academics page: Canvas courses/assignments/due dates; manual modules/reviewers with per-course counters; Classes sub-calendar auto-population; sentence-to-schedule planner | 8.2 |
 | 8.4 | PWA polish + the proper visual design pass across all pages | 8.1–8.3 |
+| 8.5 | **Feature re-review before the design pass:** walk every shipped feature (P3–P7) with Riku for improvements and quality-of-life fixes, and fold the accepted ones into 8.4 rather than shipping a coat of paint over v0 ergonomics | 8.1–8.3 |
 
 **Done when:** all three pages live on real feeds (D11 satisfied), calendar layers toggle, and the app looks intentional.
 
@@ -162,3 +163,7 @@ subject>` itself; the proposed fix is one field in one `.select()`.
 ## Deferred (v1+, unchanged from concept)
 
 Voice commands (D8) · GCash/Maya statement import / receipt OCR (D7) · per-lead click links (D3) · Work page (D9) · passkey login (S3) · case-study/brand pipeline.
+
+**Sectioned to-do store** (added 2026-08-29) — a to-do list per OS section (Personal, Freelance, Academics; Work stays parked per D9), consolidated into the morning digest: everything due within 3 days, plus anything overdue. Agreed shape: title, section, optional due date, done — undated items live on the page but never enter the digest. Deliberately deferred past v0 (Riku, 2026-08-29) so P5a stays cheap protective work. Likely the missing source of truth the quest tracker needs.
+
+**Quest-style project tracker** (added 2026-08-29) — a page that renders currently-open projects as visible, persistent quests, because a project that stops being worked on currently stops being remembered. Needs a source of truth for "what projects exist and which are open" first; that source does not exist yet in either repo. Revisit alongside P8.
