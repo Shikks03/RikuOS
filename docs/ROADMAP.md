@@ -115,11 +115,28 @@ subject>` itself; the proposed fix is one field in one `.select()`.
 | # | Task | Depends on |
 |---|------|-----------|
 | 5.1 | Watchdog cron: `AgentRun` freshness per expected schedule, OS-API webhook `lastEventAt`, Graph API ping → push alert with one-line diagnosis | P3 (P2 for webhook checks) |
-| 5.2 | Site health cron: uptime + SSL expiry + domain expiry for AzeroTech, Meowchi → on issue, drafts client email → queue | P3 |
+| 5.2 | Site health cron: uptime for AzeroTech, Meowchi, ShikksTracker → findings named in the morning digest | P3 |
 | 5.3 | Lead sweep as Claude scheduled task (M/W/F pre-dawn): run existing prospecting skills → import qualified leads via ShikksTracker's import; results summarized in morning push | P1 |
 | 5.4 | Morning dispatcher cron: one daily digest push (queue count, attention count, health, today's failures) | P3, 5.1 |
 
 **Done when:** killing the webhook (or a cron) produces a push alert within one watchdog cycle, and a Monday sweep lands qualified leads before breakfast.
+
+**P5a DONE 2026-08-30** — tasks 5.1, 5.2 and 5.4 shipped as `/api/cron/morning`, live at
+https://riku-os.vercel.app. 272 tests, `tsc` and `build` green. All three acceptance criteria
+observed against real data: a real run delivered a push to the iPhone; adding a never-run agent to
+the expectations table produced `triage has never run`; pointing a watched site at an
+unresolvable host produced `AzeroTech unreachable` — both in one `2 problems · 0 to review` push,
+with `site-health` still reporting `ok: true`, confirming a down client site is a finding rather
+than a broken monitor. Probes reverted (`8188f91`) and production confirmed back to `All clear`.
+
+Scope trimmed on evidence during design — see `docs/superpowers/specs/2026-08-29-p5a-monitoring-design.md`:
+webhook freshness and the Graph ping wait for ShikksTracker's P2 (P5a-1); SSL and domain expiry were
+dropped because all three hosts are `*.vercel.app` subdomains whose certificate and registration are
+Vercel's, not Riku's (P5a-9, P5a-10); site health notifies only and does not draft client emails
+(P5a-5). Vercel Hobby's two-cron limit is why one route multiplexes four jobs (P5a-3).
+
+**5.3 (lead sweep) remains open as P5b** — parked until a prospecting skill exists and one manual
+run has been measured.
 
 ## P6 — Inbound Messenger triage — repo: RikuOS
 
