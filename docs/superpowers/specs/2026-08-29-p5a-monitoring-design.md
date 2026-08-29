@@ -38,9 +38,10 @@ Ratified with Riku 2026-08-29. These are closed; an executing session implements
 | P5a-3 | **One multiplexed daily route**, not an external pinger. | Staying inside Vercel avoids a second control plane and a deviation from the `CLAUDE.md` rule that cron agents are Vercel crons. cron-job.org was considered — Riku already runs it for ShikksTracker — and declined. |
 | P5a-4 | The **digest fires every day**, including when nothing is wrong. | Riku chose "the missing push is enough" as the outer safety net. That only works if the push is unconditional; a digest that fires only on problems has an absence that means nothing. |
 | P5a-5 | Site health **notifies only**. It does not draft client emails. | Roadmap 5.2 originally drafted a client email into the queue. A flaky check would then produce an embarrassing draft. Revisit once the false-alarm rate is known. |
-| P5a-6 | Sites watched: **AzeroTech, Meowchi, ShikksTracker**. Checks: uptime, certificate expiry, domain expiry. | ShikksTracker was added because the whole outreach pipeline depends on it and nothing currently watches it. |
+| P5a-6 | Sites watched: **AzeroTech, Meowchi, ShikksTracker**. Checks: uptime and certificate expiry. | ShikksTracker was added because the whole outreach pipeline depends on it and nothing currently watches it. |
 | P5a-7 | **No "Today" section in the digest.** | It needs a store of self-set deadlines, which does not exist. A sectioned to-do store is recorded in `ROADMAP.md` Deferred and is explicitly post-v0 work. |
 | P5a-8 | **No per-site history** is stored. | Deliberate gap; P8's Freelance page needs a health view anyway and can add the model then. |
+| P5a-9 | **Domain expiry is dropped**, not deferred. | Checked all three on 2026-08-29: `.ph` serves no RDAP at all; `vercel.app` is Vercel's registration, not Riku's, so its expiry is neither actionable nor his to renew; and the `.dev` registry returned 404 for `azerotech.dev` (see Manual steps). Zero of three yield an actionable date, so the check would ship as a permanently-unknown line — worse than absent. Revisit only if a domain Riku actually controls joins the list. |
 
 ---
 
@@ -127,12 +128,14 @@ Four anomaly conditions:
 |---|---|---|
 | Reachable | `fetch` GET, 8s timeout, follows redirects | no response, or status ≥ 400 |
 | Certificate expiry | raw TLS socket to :443, read `getPeerCertificate().valid_to`, 5s timeout | fewer than 14 days remaining |
-| Domain expiry | RDAP (`rdap.org`), no API key, 5s timeout, read the `expiration` event | fewer than 30 days remaining |
 
-Two constraints this creates:
+Domain expiry was specified and then dropped on evidence — see P5a-9.
+
+Three constraints this creates:
 
 - **The route must run on the Node runtime, not Edge** — reading a certificate needs a real TLS socket. This is the default here; it is recorded because the route may not drift away from it.
-- **RDAP is not universal.** Some registries (`.ph` notably) serve nothing usable. A lookup that cannot be parsed yields **`unknown`**, which is reported in the digest as unknown — never silently treated as healthy, never treated as broken. If all three domains turn out to fail RDAP, drop the check rather than ship a permanently-unknown line.
+- **A failed TLS handshake is a finding, not a crash.** `meowchi.ph` was in exactly this state when the design was written: the host accepted TCP, then sent a fatal TLS alert and offered no certificate. The check must report that as unreachable-with-a-reason and carry on to the next site, never throw out of the job.
+- **Certificate expiry is unknowable when the handshake fails.** Report it as `unknown` for that site rather than as expiring — a site with no certificate at all is already covered by the reachability finding, and a second alarm saying "0 days remaining" would be noise.
 
 **`ok` means the check ran, not that the sites are healthy.** A client site being down is a *finding*, reported in the digest; it does not make the `site-health` run `ok: false`. Conflating them would make the watchdog report the monitoring as broken for as long as a client's site stayed down, and both signals would be learned-ignored. Only an error in the checking itself sets `ok: false`.
 
@@ -174,7 +177,7 @@ Default off, so deploying never silently activates an agent — the same rule th
 Tests live on the logic layer (`src/lib/__tests__/`); routes stay thin.
 
 - **watchdog** — each anomaly condition, a healthy agent, a switched-off agent producing no anomaly, an agent absent from the table being ignored
-- **siteHealth** — status classification, certificate day-count arithmetic, RDAP parsing against recorded fixtures including a registry returning nothing usable, timeout handling, and that a down site does not set `ok: false`
+- **siteHealth** — status classification, certificate day-count arithmetic, a failed TLS handshake reported as a finding with certificate expiry `unknown`, timeout handling, and that a down site does not set `ok: false`
 - **digest** — composition from each combination of inputs, the "all clear" branch, and the attention-unavailable branch
 - **expirySweep** — existing P3/P4 coverage moves with the extracted module, unchanged
 
@@ -190,10 +193,11 @@ Verification trio before "done": `npm test` + `npx tsc --noEmit` + `npm run buil
 
 ## Manual steps — Riku's hands only
 
-1. **Provide the three domains** for the site list (AzeroTech, Meowchi, ShikksTracker). Nothing in either repo records them; the plan cannot invent them.
-2. **Confirm the two client domains' registries answer RDAP.** If neither does, decision P5a-6's domain-expiry check gets dropped rather than shipped permanently-unknown.
-3. **Deploy the `vercel.json` schedule change** — removing the `expire` entry, adding `morning`, moving the chaser to 22:00 UTC — then verify both crons appear in the Vercel dashboard afterwards.
-4. **Flip `monitoringEnabled` on in `/settings`** once acceptance step 1 passes.
+1. **Supply AzeroTech's real domain.** Riku gave `azerotech.dev` on 2026-08-29; it does not exist — `NXDOMAIN`, and the `.dev` registry's RDAP returns 404. Either the domain is different or the registration lapsed. The site list cannot be written until this is answered, and if the domain genuinely lapsed that is a client-facing problem well outside P5a.
+2. ~~Confirm the domains answer RDAP.~~ **Done 2026-08-29** — none of the three do, in an actionable sense. Resolved as P5a-9.
+3. **Decide what to do about `meowchi.ph`, which is down right now.** Verified 2026-08-29 from two independent TLS clients: the host accepts TCP, then sends a fatal TLS alert with no certificate, and port 80 returns an empty reply. This is a live client-site outage, not a monitoring question, and it does not block P5a — but shipping a monitor whose first run alerts on a fault already known is worth expecting rather than being surprised by.
+4. **Deploy the `vercel.json` schedule change** — removing the `expire` entry, adding `morning`, moving the chaser to 22:00 UTC — then verify both crons appear in the Vercel dashboard afterwards.
+5. **Flip `monitoringEnabled` on in `/settings`** once acceptance step 1 passes.
 
 ---
 
