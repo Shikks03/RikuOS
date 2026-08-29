@@ -68,6 +68,11 @@ export async function checkSite(
       redirect: "follow",
       signal: AbortSignal.timeout(timeoutMs),
     });
+    // Release the socket now. Only the status is read, and undici keeps the
+    // connection pinned open while a body goes unconsumed — so a check that
+    // already finished in milliseconds would otherwise hold a handle until the
+    // abort timer fires seconds later.
+    void response.body?.cancel().catch(() => {});
     return classifyStatus(target.name, response.status);
   } catch (err) {
     return classifyError(target.name, err);

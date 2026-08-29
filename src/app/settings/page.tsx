@@ -117,25 +117,25 @@ export default function SettingsPage() {
           </div>
         </div>
 
-          <div className="card">
-            <p className="meta">Monitoring</p>
-            <p>
-              Currently <strong>{settings.monitoringEnabled ? "on" : "off"}</strong>. When on, each
-              morning it checks that every agent actually ran, that the client sites are up, and
-              sends you one summary — even when nothing is wrong, so a missing notification is
-              itself a warning. Turning it off silences that summary; stale queue items are still
-              cleared either way.
-            </p>
-            <div className="row">
-              <button
-                disabled={busy}
-                className={settings.monitoringEnabled ? "danger" : ""}
-                onClick={() => void patch({ monitoringEnabled: !settings.monitoringEnabled })}
-              >
-                {settings.monitoringEnabled ? "Turn monitoring off" : "Turn monitoring on"}
-              </button>
-            </div>
+        <div className="card">
+          <p className="meta">Monitoring</p>
+          <p>
+            Currently <strong>{settings.monitoringEnabled ? "on" : "off"}</strong>. When on, each
+            morning it checks that every agent actually ran, that the client sites are up, and
+            sends you one summary — even when nothing is wrong, so a missing notification is
+            itself a warning. Turning it off silences that summary; stale queue items are still
+            cleared either way.
+          </p>
+          <div className="row">
+            <button
+              disabled={busy}
+              className={settings.monitoringEnabled ? "danger" : ""}
+              onClick={() => void patch({ monitoringEnabled: !settings.monitoringEnabled })}
+            >
+              {settings.monitoringEnabled ? "Turn monitoring off" : "Turn monitoring on"}
+            </button>
           </div>
+        </div>
         </>
       )}
     </main>
