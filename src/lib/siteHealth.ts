@@ -25,8 +25,7 @@ export interface SiteTarget {
  * nothing else watches it.
  */
 export const SITES: SiteTarget[] = [
-  // TEMPORARY — P5a acceptance test 3. REVERT IMMEDIATELY AFTER.
-  { name: "AzeroTech", url: "https://azerotech.invalid" },
+  { name: "AzeroTech", url: "https://azerotech.vercel.app" },
   { name: "Meowchi", url: "https://meowchi.vercel.app" },
   { name: "ShikksTracker", url: "https://shikkstracker.vercel.app" },
 ];
