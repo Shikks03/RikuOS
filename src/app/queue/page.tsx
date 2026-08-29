@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { APP_NAME } from "@/lib/constants";
 import PushControls from "./PushControls";
 
@@ -100,9 +101,12 @@ export default function QueuePage() {
     <main>
       <header className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
         <h1>{APP_NAME} — Queue</h1>
-        <button className="secondary" onClick={() => void logout()}>
-          Log out
-        </button>
+        <span className="row">
+          <Link href="/settings">Settings</Link>
+          <button className="secondary" onClick={() => void logout()}>
+            Log out
+          </button>
+        </span>
       </header>
 
       <div className="row">
