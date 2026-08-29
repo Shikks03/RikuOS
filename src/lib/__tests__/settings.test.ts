@@ -42,3 +42,20 @@ describe("parseSettingsPatch", () => {
     expect(parseSettingsPatch("chaserEnabled=true").ok).toBe(false);
   });
 });
+
+describe("parseSettingsPatch — monitoringEnabled", () => {
+  it("accepts a boolean", () => {
+    const result = parseSettingsPatch({ monitoringEnabled: true });
+    expect(result).toEqual({ ok: true, value: { monitoringEnabled: true } });
+  });
+
+  it("rejects a non-boolean", () => {
+    const result = parseSettingsPatch({ monitoringEnabled: "yes" });
+    expect(result.ok).toBe(false);
+  });
+
+  it("still rejects unknown keys", () => {
+    const result = parseSettingsPatch({ monitoringEnable: true });
+    expect(result.ok).toBe(false);
+  });
+});

@@ -7,6 +7,7 @@ import { APP_NAME } from "@/lib/constants";
 interface Settings {
   chaserEnabled: boolean;
   chaserNDays: number;
+  monitoringEnabled: boolean;
 }
 
 export default function SettingsPage() {
@@ -74,6 +75,7 @@ export default function SettingsPage() {
       {!settings && !error && <p className="meta">Loading…</p>}
 
       {settings && (
+        <>
         <div className="card">
           <p className="meta">Follow-up chaser</p>
           <p>
@@ -114,6 +116,27 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+          <div className="card">
+            <p className="meta">Monitoring</p>
+            <p>
+              Currently <strong>{settings.monitoringEnabled ? "on" : "off"}</strong>. When on, each
+              morning it checks that every agent actually ran, that the client sites are up, and
+              sends you one summary — even when nothing is wrong, so a missing notification is
+              itself a warning. Turning it off silences that summary; stale queue items are still
+              cleared either way.
+            </p>
+            <div className="row">
+              <button
+                disabled={busy}
+                className={settings.monitoringEnabled ? "danger" : ""}
+                onClick={() => void patch({ monitoringEnabled: !settings.monitoringEnabled })}
+              >
+                {settings.monitoringEnabled ? "Turn monitoring off" : "Turn monitoring on"}
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </main>
   );

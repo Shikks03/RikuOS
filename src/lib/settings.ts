@@ -14,7 +14,7 @@ export type SettingsPatchResult =
   | { ok: true; value: OsSettingsPatch }
   | { ok: false; error: string };
 
-const ALLOWED_KEYS = new Set(["chaserEnabled", "chaserNDays"]);
+const ALLOWED_KEYS = new Set(["chaserEnabled", "chaserNDays", "monitoringEnabled"]);
 
 export const CHASER_N_DAYS_MIN = 1;
 export const CHASER_N_DAYS_MAX = 30;
@@ -54,6 +54,13 @@ export function parseSettingsPatch(body: unknown): SettingsPatchResult {
       };
     }
     value.chaserNDays = n;
+  }
+
+  if ("monitoringEnabled" in b) {
+    if (typeof b.monitoringEnabled !== "boolean") {
+      return { ok: false, error: "monitoringEnabled must be a boolean." };
+    }
+    value.monitoringEnabled = b.monitoringEnabled;
   }
 
   if (Object.keys(value).length === 0) {

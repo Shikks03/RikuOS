@@ -3,6 +3,7 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 export interface IOsSettings extends Document {
   chaserEnabled: boolean;
   chaserNDays: number;
+  monitoringEnabled: boolean;
   updatedAt: Date;
 }
 
@@ -19,6 +20,7 @@ const OsSettingsSchema = new Schema<IOsSettings>(
   {
     chaserEnabled: { type: Boolean, required: true, default: false },
     chaserNDays: { type: Number, required: true, default: 4, min: 1, max: 30 },
+    monitoringEnabled: { type: Boolean, required: true, default: false },
   },
   { timestamps: { createdAt: false, updatedAt: true }, strict: true }
 );

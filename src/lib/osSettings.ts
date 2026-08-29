@@ -21,6 +21,7 @@ import type { IOsSettings } from "@/models/OsSettings";
 export interface OsSettingsPatch {
   chaserEnabled?: boolean;
   chaserNDays?: number;
+  monitoringEnabled?: boolean;
 }
 
 export async function updateOsSettings(patch: OsSettingsPatch): Promise<IOsSettings> {

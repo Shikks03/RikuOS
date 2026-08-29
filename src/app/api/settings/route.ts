@@ -12,7 +12,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   await connectDB();
   const settings = await getOsSettings();
   return NextResponse.json({
-    settings: { chaserEnabled: settings.chaserEnabled, chaserNDays: settings.chaserNDays },
+    settings: {
+      chaserEnabled: settings.chaserEnabled,
+      chaserNDays: settings.chaserNDays,
+      monitoringEnabled: settings.monitoringEnabled,
+    },
   });
 }
 
@@ -36,6 +40,10 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   await connectDB();
   const settings = await updateOsSettings(parsed.value);
   return NextResponse.json({
-    settings: { chaserEnabled: settings.chaserEnabled, chaserNDays: settings.chaserNDays },
+    settings: {
+      chaserEnabled: settings.chaserEnabled,
+      chaserNDays: settings.chaserNDays,
+      monitoringEnabled: settings.monitoringEnabled,
+    },
   });
 }
