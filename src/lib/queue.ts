@@ -89,6 +89,12 @@ export function parseDecision(
       }
       // Explicit field copy, not a spread — the payload may be a Mongoose
       // subdocument, and spreading one drags internal state along.
+      //
+      // EVERY new IFollowupDraftPayload field must be added here by hand.
+      // A field missing from this list is silently dropped the moment Riku
+      // edits a draft. replyToLogId in particular is the threading anchor and
+      // the 409 dedup key — losing it produces an unthreaded reply that can
+      // also be duplicated by a retry.
       const editedPayload: IFollowupDraftPayload = {
         contactId: payload.contactId,
         contactName: payload.contactName,
@@ -96,6 +102,7 @@ export function parseDecision(
         draftSubject: (b.draftSubject as string | undefined) ?? payload.draftSubject,
         draftBody: b.draftBody,
         replySnippet: payload.replySnippet,
+        replyToLogId: payload.replyToLogId,
       };
       return { ok: true, value: { kind: "edit", editedPayload } };
     }

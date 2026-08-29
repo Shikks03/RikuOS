@@ -20,6 +20,7 @@ interface QueuePayload {
   draftSubject?: string;
   draftBody?: string;
   replySnippet?: string;
+  replyToLogId?: string;
 }
 
 interface QueueItem {

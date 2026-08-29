@@ -215,3 +215,43 @@ describe("edit survives the guarded write (the invariant the resolver protects)"
     expect(keys).toEqual(expect.arrayContaining(["status", "decidedAt"]));
   });
 });
+
+describe("P4 — an edit must not drop the reply anchor", () => {
+  // If replyToLogId is lost, the resulting ShikksTracker draft is unthreaded
+  // (no In-Reply-To / threadId) and loses the 409 dedup key that makes a retry
+  // safe. The field copy in parseDecision is explicit, so every new payload
+  // field has to be added there by hand — this test is the reminder.
+  const withAnchor: IFollowupDraftPayload = {
+    contactId: "c1",
+    contactName: "Sample Bakery",
+    channel: "facebook",
+    draftBody: "original",
+    replySnippet: "Magkano po?",
+    replyToLogId: "64b7f0c2e1a2b3c4d5e6f700",
+  };
+
+  it("copies replyToLogId from the original payload into editedPayload", () => {
+    const parsed = parseDecision(
+      { decision: "edit", draftBody: "rewritten by hand" },
+      "followup-draft",
+      withAnchor
+    );
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok && parsed.value.kind === "edit") {
+      expect(parsed.value.editedPayload.replyToLogId).toBe("64b7f0c2e1a2b3c4d5e6f700");
+      expect(parsed.value.editedPayload.draftBody).toBe("rewritten by hand");
+      // identity fields still come from the original — Riku edits the message,
+      // not the lead
+      expect(parsed.value.editedPayload.contactId).toBe("c1");
+      expect(parsed.value.editedPayload.replySnippet).toBe("Magkano po?");
+    }
+  });
+
+  it("leaves replyToLogId undefined when the original had none (P3 seeds)", () => {
+    const { replyToLogId: _drop, ...noAnchor } = withAnchor;
+    const parsed = parseDecision({ decision: "edit", draftBody: "x" }, "followup-draft", noAnchor);
+    if (parsed.ok && parsed.value.kind === "edit") {
+      expect(parsed.value.editedPayload.replyToLogId).toBeUndefined();
+    }
+  });
+});
