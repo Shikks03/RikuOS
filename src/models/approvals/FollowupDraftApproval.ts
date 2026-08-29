@@ -22,6 +22,13 @@ export interface IFollowupDraftPayload {
   draftSubject?: string; // email only
   draftBody: string;
   replySnippet?: string; // what the lead said — shown in the queue card
+  /**
+   * The ShikksTracker EmailLog id of the message being answered. Optional
+   * because P3-seeded items have none, but the chaser ALWAYS sets it (P4-d):
+   * it is the Gmail threading anchor and the dedup key behind ShikksTracker's
+   * 409, which is what makes a retried approve action safe.
+   */
+  replyToLogId?: string;
 }
 
 export interface IFollowupDraftApproval extends IApprovalItemBase {
@@ -38,6 +45,7 @@ const FollowupDraftPayloadSchema = new Schema<IFollowupDraftPayload>(
     draftSubject: { type: String, maxlength: 300 },
     draftBody: { type: String, required: true, maxlength: 8000 },
     replySnippet: { type: String, maxlength: 2000 },
+    replyToLogId: { type: String, maxlength: 64 },
   },
   { _id: false, strict: true }
 );

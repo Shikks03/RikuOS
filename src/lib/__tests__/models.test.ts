@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import FollowupDraftApproval from "@/models/approvals/FollowupDraftApproval";
+import ApprovalItem from "@/models/ApprovalItem";
 import AgentRun from "@/models/AgentRun";
 import PushSubscription from "@/models/PushSubscription";
 import OsSettings from "@/models/OsSettings";
@@ -126,5 +127,110 @@ describe("OsSettings", () => {
   it("bounds chaserNDays to [1, 30]", () => {
     const doc = new OsSettings({ chaserNDays: 45 });
     expect(doc.validateSync()?.errors["chaserNDays"]).toBeDefined();
+  });
+});
+
+describe("P4 — followup-draft payload carries the reply anchor", () => {
+  it("accepts a payload with replyToLogId", () => {
+    const doc = new FollowupDraftApproval({
+      ...validItem(),
+      payload: { ...validPayload, replyToLogId: "64b7f0c2e1a2b3c4d5e6f700" },
+    });
+    expect(doc.validateSync()).toBeUndefined();
+  });
+
+  it("rejects an over-length replyToLogId", () => {
+    const doc = new FollowupDraftApproval({
+      ...validItem(),
+      payload: { ...validPayload, replyToLogId: "x".repeat(65) },
+    });
+    expect(doc.validateSync()?.errors["payload.replyToLogId"]).toBeDefined();
+  });
+
+  it("keeps replyToLogId optional — P3 seeds have none", () => {
+    const doc = new FollowupDraftApproval(validItem());
+    expect(doc.validateSync()).toBeUndefined();
+  });
+
+  it("carries replyToLogId on editedPayload too, so an edit cannot lose the anchor", () => {
+    const doc = new FollowupDraftApproval({
+      ...validItem(),
+      editedPayload: { ...validPayload, replyToLogId: "64b7f0c2e1a2b3c4d5e6f700" },
+    });
+    expect(doc.validateSync()).toBeUndefined();
+  });
+});
+
+describe("P4 — the action state machine", () => {
+  it.each(["pending", "running", "done", "failed", "needs_verification"])(
+    "accepts actionStatus %s",
+    (s) => {
+      const doc = new FollowupDraftApproval({ ...validItem(), actionStatus: s });
+      expect(doc.validateSync()?.errors["actionStatus"]).toBeUndefined();
+    }
+  );
+
+  it("rejects an unknown actionStatus", () => {
+    const doc = new FollowupDraftApproval({ ...validItem(), actionStatus: "maybe" });
+    expect(doc.validateSync()?.errors["actionStatus"]).toBeDefined();
+  });
+
+  it("accepts actionStartedAt — the claim timestamp the stale sweep reads", () => {
+    const doc = new FollowupDraftApproval({ ...validItem(), actionStartedAt: new Date() });
+    expect(doc.validateSync()).toBeUndefined();
+  });
+});
+
+describe("P4 — the idempotency index", () => {
+  // P4-e/P4-f: declared on the BASE schema even though the path lives on the
+  // discriminator, because sync-indexes.mts iterates base models and
+  // syncIndexes() drops any index it does not see declared there.
+  function indexOn(path: string) {
+    return ApprovalItem.schema
+      .indexes()
+      .find(([keys]) => Object.prototype.hasOwnProperty.call(keys, path));
+  }
+
+  it("declares a unique partial index on payload.replyToLogId scoped to pending", () => {
+    const found = indexOn("payload.replyToLogId");
+    expect(found).toBeDefined();
+    const [, options] = found!;
+    expect(options.unique).toBe(true);
+    expect(options.partialFilterExpression).toEqual({
+      status: "pending",
+      "payload.replyToLogId": { $exists: true },
+    });
+  });
+
+  it("is NOT declared on the discriminator schema", () => {
+    const onDiscriminator = FollowupDraftApproval.schema
+      .indexes()
+      .find(([keys]) => Object.prototype.hasOwnProperty.call(keys, "payload.replyToLogId"));
+    expect(onDiscriminator).toBeUndefined();
+  });
+
+  it("declares the stale-action sweep index", () => {
+    expect(indexOn("actionStatus")).toBeDefined();
+  });
+});
+
+describe("P4 — AgentRun counts", () => {
+  it("defaults every count to zero", () => {
+    const run = new AgentRun({ agent: "chaser", startedAt: new Date(), durationMs: 1, ok: true });
+    expect(run.validateSync()).toBeUndefined();
+    expect(run.counts.itemsCreated).toBe(0);
+    expect(run.counts.itemsSkipped).toBe(0);
+    expect(run.counts.itemsFailed).toBe(0);
+  });
+
+  it("rejects a negative skip count", () => {
+    const run = new AgentRun({
+      agent: "chaser",
+      startedAt: new Date(),
+      durationMs: 1,
+      ok: true,
+      counts: { itemsCreated: 0, itemsProcessed: 0, itemsSkipped: -1, itemsFailed: 0 },
+    });
+    expect(run.validateSync()?.errors["counts.itemsSkipped"]).toBeDefined();
   });
 });

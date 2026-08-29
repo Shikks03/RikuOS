@@ -20,12 +20,18 @@ export type Agent = (typeof AGENTS)[number];
 export interface IAgentRunCounts {
   itemsCreated: number;
   itemsProcessed: number;
+  /** Candidates deliberately not acted on (P4: wrong channel, already queued, out of time). */
+  itemsSkipped: number;
+  /** Candidates that were attempted and failed. Never silent (CLAUDE.md). */
+  itemsFailed: number;
 }
 
 const AgentRunCountsSchema = new Schema<IAgentRunCounts>(
   {
     itemsCreated: { type: Number, required: true, default: 0, min: 0 },
     itemsProcessed: { type: Number, required: true, default: 0, min: 0 },
+    itemsSkipped: { type: Number, required: true, default: 0, min: 0 },
+    itemsFailed: { type: Number, required: true, default: 0, min: 0 },
   },
   { _id: false, strict: true }
 );
@@ -50,7 +56,7 @@ const AgentRunSchema = new Schema<IAgentRun>(
     counts: {
       type: AgentRunCountsSchema,
       required: true,
-      default: () => ({ itemsCreated: 0, itemsProcessed: 0 }),
+      default: () => ({ itemsCreated: 0, itemsProcessed: 0, itemsSkipped: 0, itemsFailed: 0 }),
     },
     error: { type: String, maxlength: 2000 },
   },
