@@ -29,6 +29,8 @@ export const EXPECTATIONS: Expectation[] = [
   { agent: "expiry-sweep", everyHours: 24, graceHours: 6 },
   { agent: "site-health", everyHours: 24, graceHours: 6 },
   { agent: "dispatcher", everyHours: 24, graceHours: 6 },
+  // TEMPORARY — P5a acceptance test 2. REVERT IMMEDIATELY AFTER.
+  { agent: "triage", everyHours: 24, graceHours: 6 },
 ];
 
 export interface LatestRun {
