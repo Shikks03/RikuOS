@@ -10,9 +10,11 @@
     "test": "vitest run",
     "migrate:indexes": "node --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/sync-indexes.mts",
     "migrate:indexes:apply": "node --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/sync-indexes.mts --apply",
-    "seed:approval": "node --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/seed-approval.mts"
+    "seed:approval": "node --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/seed-approval.mts",
+    "action:resolve": "node --env-file=.env.local --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/resolve-action.mts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
     "mongoose": "^9.7.3",
     "next": "16.2.10",
     "react": "19.2.4",
