@@ -28,7 +28,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   await connectDB();
 
   // Lazy sweep before listing so a stale item can never render as pending
-  // between cron runs; /api/cron/expire remains the scheduled guarantee.
+  // between cron runs; /api/cron/morning remains the scheduled guarantee.
   const sweep = buildExpirySweep(new Date());
   await ApprovalItem.updateMany(sweep.filter, sweep.update);
 

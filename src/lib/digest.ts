@@ -64,7 +64,7 @@ export function composeDigest(input: DigestInput): Digest {
       : `All clear · ${reviewPart}`;
 
   const lines: string[] = [];
-  lines.push(problemCount > 0 ? problems.map(short).join("; ") : "All clear.");
+  lines.push(problemCount > 0 ? `${problems.map(short).join("; ")}.` : "All clear.");
 
   if (input.attention !== null) {
     lines.push(
@@ -77,4 +77,51 @@ export function composeDigest(input: DigestInput): Digest {
   }
 
   return { title, body: lines.join(" ") };
+}
+
+/** The four job outcomes a morning run produces, as `runJob` reports them. */
+export interface MorningOutcomes {
+  expiry: { ok: boolean; error?: string; unstuck: number };
+  watchdog: { ok: boolean; error?: string; anomalies: { agent: string; detail: string }[] };
+  siteHealth: { ok: boolean; error?: string; sites: { up: boolean; detail: string }[] };
+}
+
+/**
+ * Pure. Turns one morning's job outcomes into the lines the digest reports.
+ *
+ * This lives here rather than in the route because it is the only branching
+ * logic in the phase that decides what Riku is actually TOLD — inverting one
+ * condition would report every healthy site as down, and a route is not
+ * testable (CLAUDE.md: handlers stay thin, the logic layer holds behaviour).
+ *
+ * A job that failed in THIS run is reported from its in-memory outcome, not
+ * from the watchdog: the watchdog reads run records, so it would otherwise
+ * only notice tomorrow. The expiry sweep is the one job that both runs before
+ * the watchdog and writes its record first, so the watchdog re-reads the row
+ * that was just written — hence the filter, without which a single failed
+ * sweep is counted as two problems and the title's count is wrong.
+ */
+export function buildProblems(outcomes: MorningOutcomes): string[] {
+  const { expiry, watchdog, siteHealth } = outcomes;
+  const problems: string[] = [];
+
+  if (!expiry.ok) problems.push(`expiry sweep failed: ${expiry.error ?? "unknown"}`);
+  if (!watchdog.ok) problems.push(`watchdog failed: ${watchdog.error ?? "unknown"}`);
+  if (!siteHealth.ok) problems.push(`site health failed: ${siteHealth.error ?? "unknown"}`);
+
+  if (expiry.unstuck > 0) {
+    problems.push(
+      `${expiry.unstuck} approved item${expiry.unstuck === 1 ? "" : "s"} could not confirm their result`
+    );
+  }
+
+  for (const anomaly of watchdog.anomalies) {
+    if (anomaly.agent === "expiry-sweep") continue;
+    problems.push(anomaly.detail);
+  }
+  for (const site of siteHealth.sites) {
+    if (!site.up) problems.push(site.detail);
+  }
+
+  return problems;
 }

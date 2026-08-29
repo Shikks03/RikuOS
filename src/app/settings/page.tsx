@@ -123,8 +123,9 @@ export default function SettingsPage() {
             Currently <strong>{settings.monitoringEnabled ? "on" : "off"}</strong>. When on, each
             morning it checks that every agent actually ran, that the client sites are up, and
             sends you one summary — even when nothing is wrong, so a missing notification is
-            itself a warning. Turning it off silences that summary; stale queue items are still
-            cleared either way.
+            itself a warning. Turning it off silences that summary. Stale queue items are still
+            cleared either way, and you are still told if that clean-up fails or leaves an
+            approved action it could not confirm.
           </p>
           <div className="row">
             <button

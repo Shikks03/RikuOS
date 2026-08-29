@@ -6,7 +6,7 @@ import { runJob } from "@/lib/jobs/runJob";
 import { runExpirySweep } from "@/lib/jobs/expirySweep";
 import { EXPECTATIONS, evaluateWatchdog, fetchLatestRuns } from "@/lib/watchdog";
 import { checkSites } from "@/lib/siteHealth";
-import { composeDigest } from "@/lib/digest";
+import { buildProblems, composeDigest } from "@/lib/digest";
 import { fetchAttention } from "@/lib/stApi";
 import { buildPushPayload, sendPushToAll } from "@/lib/push";
 import ApprovalItem from "@/models/ApprovalItem";
@@ -53,7 +53,29 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       for (const agent of ["watchdog", "site-health", "dispatcher"] as const) {
         await runJob(agent, async () => ({ data: null }), note);
       }
-      return NextResponse.json({ ok: true, monitoring: "disabled", expiry: expiry.data });
+
+      // The sweep's OWN alerts survive the toggle. Switching monitoring off
+      // silences the daily digest — that is the point of the switch — but the
+      // digest is not what carried these two. They are P4's safety net, and
+      // this route is now the only scheduled sweep, so without them a failed
+      // sweep or an interrupted action would be silent (CLAUDE.md forbids it).
+      // Alerts last: every run record above is already written.
+      const strandedItems = expiry.data?.unstuck ?? 0;
+      if (!expiry.ok) {
+        await notify("Expiry sweep failed", expiry.error ?? "Unknown error");
+      } else if (strandedItems > 0) {
+        await notify(
+          "Interrupted actions need checking",
+          `${strandedItems} approved item${strandedItems === 1 ? "" : "s"} could not confirm their result.`
+        );
+      }
+
+      return NextResponse.json({
+        ok: expiry.ok,
+        monitoring: "disabled",
+        expiry: expiry.data,
+        ...(expiry.ok ? {} : { error: expiry.error }),
+      });
     }
 
     const watch = await runJob("watchdog", async () => {
@@ -79,22 +101,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         () => null
       );
 
-      const problems: string[] = [];
-      if (!expiry.ok) problems.push(`expiry sweep failed: ${expiry.error ?? "unknown"}`);
-      if (!watch.ok) problems.push(`watchdog failed: ${watch.error ?? "unknown"}`);
-      if (!health.ok) problems.push(`site health failed: ${health.error ?? "unknown"}`);
-
-      const unstuck = expiry.data?.unstuck ?? 0;
-      if (unstuck > 0) {
-        problems.push(
-          `${unstuck} approved item${unstuck === 1 ? "" : "s"} could not confirm their result`
-        );
-      }
-
-      for (const anomaly of watch.data ?? []) problems.push(anomaly.detail);
-      for (const site of health.data ?? []) {
-        if (!site.up) problems.push(site.detail);
-      }
+      const problems = buildProblems({
+        expiry: { ok: expiry.ok, error: expiry.error, unstuck: expiry.data?.unstuck ?? 0 },
+        watchdog: { ok: watch.ok, error: watch.error, anomalies: watch.data ?? [] },
+        siteHealth: { ok: health.ok, error: health.error, sites: health.data ?? [] },
+      });
 
       const digest = composeDigest({
         pending,
@@ -108,7 +119,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         offAgents: settings.chaserEnabled ? [] : ["chaser"],
       });
 
-      await sendPushToAll(buildPushPayload(digest.title, digest.body));
+      // A digest nobody received is a total failure of this run's purpose, not
+      // a partial one — so it fails the run rather than being counted (design
+      // §"Run-record counts per job"). sendPushToAll swallows per-device
+      // errors and deletes subscriptions the push service reports as gone, so
+      // without this an invalidated iPhone subscription would file a healthy
+      // run every morning while reaching nobody, and the absent push — the
+      // outer safety net this whole phase rests on — would be all that is left.
+      const delivery = await sendPushToAll(buildPushPayload(digest.title, digest.body));
+      if (delivery.sent === 0) {
+        throw new Error(
+          `the digest reached no device (failed ${delivery.failed}, removed ${delivery.removed}). ` +
+            "Re-subscribe from /queue."
+        );
+      }
       return { counts: { itemsProcessed: problems.length }, data: digest };
     });
 
@@ -129,5 +153,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       console.error("[cron/morning] failure alert could not be sent:", pushErr);
     }
     return NextResponse.json({ ok: false, error }, { status: 500 });
+  }
+}
+
+/** Alerts are queued and sent last, and their failure never fails the run. */
+async function notify(title: string, body: string): Promise<void> {
+  try {
+    await sendPushToAll(buildPushPayload(title, body));
+  } catch (pushErr) {
+    console.error("[cron/morning] push could not be sent:", pushErr);
   }
 }
