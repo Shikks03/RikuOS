@@ -12,6 +12,9 @@
  * characters and a lock-screen preview is shorter still.
  */
 
+import type { Anomaly } from "@/lib/watchdog";
+import type { SiteResult } from "@/lib/siteHealth";
+
 export interface DigestInput {
   /** ApprovalItems waiting on a decision. */
   pending: number;
@@ -36,6 +39,11 @@ export interface Digest {
  * unreachable") is far shorter, so only the pathological case is touched.
  */
 const MAX_PROBLEM_CHARS = 80;
+
+/** Closes the problems line, without doubling a period `short` already added. */
+function end(line: string): string {
+  return /[.…!?]$/.test(line) ? line : `${line}.`;
+}
 
 function short(problem: string): string {
   return problem.length > MAX_PROBLEM_CHARS
@@ -64,7 +72,7 @@ export function composeDigest(input: DigestInput): Digest {
       : `All clear · ${reviewPart}`;
 
   const lines: string[] = [];
-  lines.push(problemCount > 0 ? `${problems.map(short).join("; ")}.` : "All clear.");
+  lines.push(problemCount > 0 ? end(problems.map(short).join("; ")) : "All clear.");
 
   if (input.attention !== null) {
     lines.push(
@@ -79,11 +87,17 @@ export function composeDigest(input: DigestInput): Digest {
   return { title, body: lines.join(" ") };
 }
 
-/** The four job outcomes a morning run produces, as `runJob` reports them. */
+/**
+ * The job outcomes a morning run produces, as `runJob` reports them. Typed
+ * against the real Anomaly/SiteResult so the "expiry-sweep" comparison below
+ * is checked by the compiler — a renamed agent would otherwise disable the
+ * de-duplication silently. `import type` keeps this module free of runtime
+ * imports, so it stays pure.
+ */
 export interface MorningOutcomes {
   expiry: { ok: boolean; error?: string; unstuck: number };
-  watchdog: { ok: boolean; error?: string; anomalies: { agent: string; detail: string }[] };
-  siteHealth: { ok: boolean; error?: string; sites: { up: boolean; detail: string }[] };
+  watchdog: { ok: boolean; error?: string; anomalies: Anomaly[] };
+  siteHealth: { ok: boolean; error?: string; sites: SiteResult[] };
 }
 
 /**
@@ -100,6 +114,11 @@ export interface MorningOutcomes {
  * the watchdog and writes its record first, so the watchdog re-reads the row
  * that was just written — hence the filter, without which a single failed
  * sweep is counted as two problems and the title's count is wrong.
+ *
+ * That filter is deliberately as narrow as the duplicate it removes: only a
+ * `failed` anomaly, and only when the sweep really did fail here. A `stale` or
+ * `degraded` expiry-sweep anomaly still gets through, so a broader skip cannot
+ * quietly punch a hole in the monitor.
  */
 export function buildProblems(outcomes: MorningOutcomes): string[] {
   const { expiry, watchdog, siteHealth } = outcomes;
@@ -116,7 +135,8 @@ export function buildProblems(outcomes: MorningOutcomes): string[] {
   }
 
   for (const anomaly of watchdog.anomalies) {
-    if (anomaly.agent === "expiry-sweep") continue;
+    const alreadyReported = !expiry.ok && anomaly.agent === "expiry-sweep" && anomaly.kind === "failed";
+    if (alreadyReported) continue;
     problems.push(anomaly.detail);
   }
   for (const site of siteHealth.sites) {

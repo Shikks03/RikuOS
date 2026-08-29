@@ -87,4 +87,17 @@ describe("composeDigest", () => {
     expect(digest.body).toContain("Meowchi unreachable");
     expect(digest.body.length).toBeLessThanOrEqual(200);
   });
+
+  it("ends the problems line once, without doubling a period or an ellipsis", () => {
+    expect(composeDigest({ ...base, problems: ["Meowchi unreachable"] }).body).toContain(
+      "Meowchi unreachable. "
+    );
+    expect(composeDigest({ ...base, problems: ["sweep failed."] }).body).not.toContain("..");
+    const truncated = composeDigest({
+      ...base,
+      problems: [`expiry sweep failed: ${"x".repeat(300)}`],
+    }).body;
+    expect(truncated).toContain("…");
+    expect(truncated).not.toContain("….");
+  });
 });

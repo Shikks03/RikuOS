@@ -171,7 +171,9 @@ If the attention call fails, the digest still sends with that line marked unavai
 Default off, so deploying never silently activates an agent — the same rule the chaser follows. Riku flips it on after the first manual run looks right. Two deliberate exceptions:
 
 1. **The expiry sweep always runs**, regardless of the toggle. It is data hygiene, it predates P5a, and switching monitoring off must not quietly stop stale items from expiring.
-2. **When monitoring is off, the jobs still write run records** carrying that fact, exactly as the chaser does — otherwise the watchdog could never distinguish "off" from "dead". They do no work and the dispatcher sends nothing, so the every-day push guarantee of P5a-4 holds **only while monitoring is on**. Switching it off deliberately silences the digest; that is the point of the switch, and the run records remain the evidence that the route is alive.
+2. **When monitoring is off, the jobs still write run records** carrying that fact, exactly as the chaser does — otherwise the watchdog could never distinguish "off" from "dead". They do no work and the dispatcher sends no digest, so the every-day push guarantee of P5a-4 holds **only while monitoring is on**. Switching it off deliberately silences the digest; that is the point of the switch, and the run records remain the evidence that the route is alive.
+
+   *Amended during implementation (2026-08-30):* the expiry sweep's **own** two alerts — "Expiry sweep failed" and "Interrupted actions need checking" — are sent even while monitoring is off. They were P4's safety net rather than part of the digest, and removing the `expire` cron left this route as the only scheduled sweep, so suppressing them would have meant a stranded approved action — possibly a duplicate message to a real client — going entirely unreported. "The dispatcher sends nothing" was always about the digest, not about those.
 
 ---
 

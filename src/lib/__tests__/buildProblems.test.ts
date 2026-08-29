@@ -11,7 +11,7 @@ import type { MorningOutcomes } from "@/lib/digest";
 const healthy: MorningOutcomes = {
   expiry: { ok: true, unstuck: 0 },
   watchdog: { ok: true, anomalies: [] },
-  siteHealth: { ok: true, sites: [{ up: true, detail: "Meowchi ok" }] },
+  siteHealth: { ok: true, sites: [{ name: "Meowchi", up: true, detail: "Meowchi ok" }] },
 };
 
 describe("buildProblems", () => {
@@ -25,8 +25,8 @@ describe("buildProblems", () => {
       siteHealth: {
         ok: true,
         sites: [
-          { up: true, detail: "Meowchi ok" },
-          { up: false, detail: "AzeroTech unreachable" },
+          { name: "Meowchi", up: true, detail: "Meowchi ok" },
+          { name: "AzeroTech", up: false, detail: "AzeroTech unreachable" },
         ],
       },
     });
@@ -42,24 +42,43 @@ describe("buildProblems", () => {
       expiry: { ok: false, error: "mongo down", unstuck: 0 },
       watchdog: {
         ok: true,
-        anomalies: [{ agent: "expiry-sweep", detail: "expiry-sweep failed" }],
+        anomalies: [
+          { agent: "expiry-sweep", kind: "failed", detail: "expiry-sweep failed" },
+        ],
       },
     });
     expect(problems).toEqual(["expiry sweep failed: mongo down"]);
   });
 
-  it("still reports anomalies for agents other than the expiry sweep", () => {
+  it("keeps an expiry-sweep anomaly that is NOT the duplicate", () => {
+    // Only a `failed` anomaly from a sweep that failed here is a duplicate.
+    // A stale record, or a degraded one, is real news and must survive.
     const problems = buildProblems({
       ...healthy,
+      expiry: { ok: true, unstuck: 0 },
       watchdog: {
         ok: true,
         anomalies: [
-          { agent: "chaser", detail: "chaser has never run" },
-          { agent: "expiry-sweep", detail: "expiry-sweep failed" },
+          { agent: "expiry-sweep", kind: "stale", detail: "expiry-sweep last ran 31h ago" },
         ],
       },
     });
-    expect(problems).toEqual(["chaser has never run"]);
+    expect(problems).toEqual(["expiry-sweep last ran 31h ago"]);
+  });
+
+  it("still reports anomalies for agents other than the expiry sweep", () => {
+    const problems = buildProblems({
+      ...healthy,
+      expiry: { ok: false, error: "mongo down", unstuck: 0 },
+      watchdog: {
+        ok: true,
+        anomalies: [
+          { agent: "chaser", kind: "never-ran", detail: "chaser has never run" },
+          { agent: "expiry-sweep", kind: "failed", detail: "expiry-sweep failed" },
+        ],
+      },
+    });
+    expect(problems).toEqual(["expiry sweep failed: mongo down", "chaser has never run"]);
   });
 
   it("raises interrupted actions, pluralised", () => {
