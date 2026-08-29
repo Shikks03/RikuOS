@@ -1,0 +1,133 @@
+import { NextRequest, NextResponse } from "next/server";
+import { connectDB } from "@/lib/db";
+import { requireCronSecret } from "@/lib/auth";
+import { getOsSettings } from "@/lib/osSettings";
+import { runJob } from "@/lib/jobs/runJob";
+import { runExpirySweep } from "@/lib/jobs/expirySweep";
+import { EXPECTATIONS, evaluateWatchdog, fetchLatestRuns } from "@/lib/watchdog";
+import { checkSites } from "@/lib/siteHealth";
+import { composeDigest } from "@/lib/digest";
+import { fetchAttention } from "@/lib/stApi";
+import { buildPushPayload, sendPushToAll } from "@/lib/push";
+import ApprovalItem from "@/models/ApprovalItem";
+
+/**
+ * GET /api/cron/morning
+ *
+ * The multiplexer. Vercel Hobby allows two cron jobs, each once per day, and
+ * the chaser owns the other slot — so the watchdog, the site check and the
+ * daily digest share this one invocation rather than getting crons of their
+ * own (design P5a-3).
+ *
+ * Ordering rules this route obeys (CLAUDE.md):
+ *  - every job writes its own AgentRun record, success or failure, via runJob;
+ *  - one job's failure never stops the next — it becomes an ok:false row that
+ *    tomorrow's watchdog reports, and today's dispatcher names immediately;
+ *  - the push is sent by the LAST job, after every other job's data state is
+ *    settled, so a notification failure can never corrupt anything.
+ */
+export const maxDuration = 60;
+
+/** Bounded, per CLAUDE.md's rule on list endpoints. */
+const ATTENTION_LIMIT = 50;
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const guard = requireCronSecret(request);
+  if (guard) return guard;
+
+  try {
+    await connectDB();
+    const settings = await getOsSettings();
+
+    // Data hygiene runs whatever the monitoring toggle says: it predates P5a,
+    // and switching monitoring off must not quietly stop stale items expiring.
+    const expiry = await runJob("expiry-sweep", async () => {
+      const swept = await runExpirySweep(new Date());
+      return { counts: { itemsProcessed: swept.expired + swept.unstuck }, data: swept };
+    });
+
+    if (!settings.monitoringEnabled) {
+      // Still record a run per agent, exactly as the chaser does when disabled,
+      // so the watchdog can tell "switched off" from "cron never fired".
+      const note = "monitoring is disabled in OsSettings";
+      for (const agent of ["watchdog", "site-health", "dispatcher"] as const) {
+        await runJob(agent, async () => ({ data: null }), note);
+      }
+      return NextResponse.json({ ok: true, monitoring: "disabled", expiry: expiry.data });
+    }
+
+    const watch = await runJob("watchdog", async () => {
+      const latest = await fetchLatestRuns(EXPECTATIONS.map((e) => e.agent));
+      const anomalies = evaluateWatchdog(new Date(), latest);
+      return {
+        counts: { itemsProcessed: EXPECTATIONS.length, itemsFailed: anomalies.length },
+        data: anomalies,
+      };
+    });
+
+    const health = await runJob("site-health", async () => {
+      const results = await checkSites();
+      return { counts: { itemsProcessed: results.length }, data: results };
+    });
+
+    // Dispatcher last: every other record is written by now.
+    const dispatch = await runJob("dispatcher", async () => {
+      const pending = await ApprovalItem.countDocuments({ status: "pending" });
+
+      // A dependency being down must not cost the whole digest.
+      const attention = await fetchAttention(settings.chaserNDays, ATTENTION_LIMIT).catch(
+        () => null
+      );
+
+      const problems: string[] = [];
+      if (!expiry.ok) problems.push(`expiry sweep failed: ${expiry.error ?? "unknown"}`);
+      if (!watch.ok) problems.push(`watchdog failed: ${watch.error ?? "unknown"}`);
+      if (!health.ok) problems.push(`site health failed: ${health.error ?? "unknown"}`);
+
+      const unstuck = expiry.data?.unstuck ?? 0;
+      if (unstuck > 0) {
+        problems.push(
+          `${unstuck} approved item${unstuck === 1 ? "" : "s"} could not confirm their result`
+        );
+      }
+
+      for (const anomaly of watch.data ?? []) problems.push(anomaly.detail);
+      for (const site of health.data ?? []) {
+        if (!site.up) problems.push(site.detail);
+      }
+
+      const digest = composeDigest({
+        pending,
+        attention: attention
+          ? {
+              repliedUnanswered: attention.repliedUnanswered.length,
+              overdue: attention.overdueActions?.length ?? 0,
+            }
+          : null,
+        problems,
+        offAgents: settings.chaserEnabled ? [] : ["chaser"],
+      });
+
+      await sendPushToAll(buildPushPayload(digest.title, digest.body));
+      return { counts: { itemsProcessed: problems.length }, data: digest };
+    });
+
+    return NextResponse.json({
+      ok: true,
+      expiry: { ok: expiry.ok, ...(expiry.data ?? {}) },
+      watchdog: { ok: watch.ok, anomalies: watch.data?.length ?? 0 },
+      siteHealth: { ok: health.ok, down: (health.data ?? []).filter((s) => !s.up).length },
+      dispatcher: { ok: dispatch.ok, title: dispatch.data?.title ?? null },
+    });
+  } catch (err) {
+    // Only a failure of the route itself lands here — job failures are records,
+    // not exceptions.
+    const error = (err instanceof Error ? err.message : String(err)).slice(0, 2000);
+    try {
+      await sendPushToAll(buildPushPayload("Morning run failed", error));
+    } catch (pushErr) {
+      console.error("[cron/morning] failure alert could not be sent:", pushErr);
+    }
+    return NextResponse.json({ ok: false, error }, { status: 500 });
+  }
+}
