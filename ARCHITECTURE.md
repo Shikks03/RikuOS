@@ -117,11 +117,21 @@ Contract stability rule: ShikksTracker may change its internals freely; these re
 | Service | Used by | Auth | Notes |
 |---|---|---|---|
 | Meta Messenger Platform | ShikksTracker (webhook in), triage agent (send within 24h window) | Dev-mode app: verify token, app secret (signature), page token | Dev mode suffices — Riku admins the page. Cold sends stay manual forever (D2) |
-| Anthropic API | Draft generation (both apps), cron agents | API key per app | Model pinned via env |
+| Anthropic API | Draft generation (both apps), cron agents | API key per app | Model pinned via env. **Must not be called from Vercel's `hkg1` region** — see below |
 | Gmail API | ShikksTracker (existing send/poll) | OAuth refresh token | Unchanged |
 | Google Calendar API | RikuOS phase 8 | OAuth (same Google Cloud project pattern) | Read live + write-through only (D5) |
 | Canvas LMS API | RikuOS phase 8 | Personal access token | Read-only |
 | Web Push (VAPID) | RikuOS notifications | VAPID keypair in env | iOS ≥ 16.4 PWA |
+
+**Deployment region — do not "optimise" this back.** RikuOS deploys to **`sin1` (Singapore)**, not
+`hkg1` (Hong Kong), even though `hkg1` is nearer Manila. The Anthropic API refuses requests
+originating from Hong Kong with `403 forbidden — "Request not allowed"`. This is not an auth
+failure; a bad key returns `401 authentication_error`. It cost P4 a failed first production run
+(both leads, 2026-08-29) and is invisible locally, because a laptop in Manila reaches the API fine.
+Any future latency tuning that moves a region must keep every function that calls Anthropic out of
+`hkg1`. **ShikksTracker is still on `hkg1` and its `src/lib/draft.ts` also calls Anthropic — it will
+hit this the first time cold-outreach drafting runs in production.** That fix belongs in its own
+repo (S4).
 
 ---
 

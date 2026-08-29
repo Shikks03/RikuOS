@@ -76,6 +76,38 @@ P1 ──► P8 (dashboard pages)          P1, P2, P3 have no dependencies on ea
 
 **Done when (v0 🏁, ratified S1):** the chaser catches one *real* missed follow-up, Riku approves it on the phone, and the message goes out to the lead.
 
+**DONE 2026-08-29** — v0 🏁. All five tasks shipped; 218 tests, `tsc` and `build` green. Observed
+against real production data: the chaser found two replied-but-unanswered leads that had been
+waiting 53 days, drafted a Taglish reply for each via the Anthropic API, queued both, and pushed to
+the phone. Riku approved on the phone; the action reported `approved · action done` and the draft
+appeared in ShikksTracker correctly threaded with `origin: "rikuos"`. Re-running the chaser
+proposed nothing new (`processed: 0`, attention feed empty), proving both idempotency guards — the
+feed's own dedup and RikuOS's reply-anchor check — independently. Evidence: Task 17 in the P4 plan.
+
+Two honest qualifications on the acceptance bar:
+
+1. **The two subjects were test contacts, not paying clients.** Nothing was fabricated to pass the
+   test — both replies had sat unanswered in the production database since early July, and the
+   chaser found them unaided — but the "real lead" half of S1 is satisfied in machinery, not in
+   business value. The first genuine client chase will happen on its own the next time one replies.
+2. **The messages had not left ShikksTracker at time of writing.** Both sat in its send queue as
+   `approved`. Its `engine.lastRunAt` reads 2026-08-01, 28 days stale, so its send cron appears not
+   to be firing. That is a ShikksTracker fault in ShikksTracker's repo (S4), not a P4 defect:
+   RikuOS's responsibility ends at creating the approved draft, which it did.
+
+Deviation from the plan text: the deployment region moved from `hkg1` to `sin1` (commit `3e1554d`).
+The Anthropic API refuses requests originating from Hong Kong with
+`403 forbidden — "Request not allowed"`, which failed the chaser's first production run on both
+leads. P4 is the first thing in either repo to call an external AI API from a deployed function, so
+this had never surfaced. **ShikksTracker is still pinned to `hkg1` and its `src/lib/draft.ts` also
+calls Anthropic — it will hit the same wall the first time cold-outreach drafting runs in
+production.** Fix belongs in that repo.
+
+Also handed to a ShikksTracker session (S4): `GET /api/os/attention` does not expose the anchor
+log's `subject`, so the queue card cannot show the subject line an email reply will use. P4 works
+around this correctly by omitting `subject` entirely so ShikksTracker derives `Re: <anchor
+subject>` itself; the proposed fix is one field in one `.select()`.
+
 ## P5 — Watchdog + site health + lead-sweep schedule — repos: RikuOS + skills
 
 *Needs P3. Webhook freshness checks need P2. Built before P6–P8 on purpose.*
