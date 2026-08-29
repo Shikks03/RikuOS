@@ -92,6 +92,22 @@ export default function QueuePage() {
     }
   }
 
+  async function retry(id: string) {
+    setBusyId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/queue/${id}/retry`, { method: "POST" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Retry failed.");
+        return;
+      }
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
@@ -149,7 +165,28 @@ export default function QueuePage() {
             )}
             {effective?.draftSubject && <p className="meta">Subject: {effective.draftSubject}</p>}
             {effective?.draftBody && <pre className="body">{effective.draftBody}</pre>}
-            {item.actionError && <p className="error">Action error: {item.actionError}</p>}
+            {item.actionError && (
+              <p className={item.actionStatus === "done" ? "meta" : "error"}>
+                {item.actionStatus === "done" ? "Note: " : "Action error: "}
+                {item.actionError}
+              </p>
+            )}
+
+            {item.actionStatus === "failed" && (
+              <div className="row">
+                <button className="secondary" disabled={busyId === item._id} onClick={() => void retry(item._id)}>
+                  Retry action
+                </button>
+              </div>
+            )}
+
+            {item.actionStatus === "needs_verification" && (
+              <p className="error">
+                This may or may not have reached ShikksTracker. Open the contact there and check
+                whether the draft exists before doing anything else. There is no retry button on
+                purpose.
+              </p>
+            )}
 
             {item.status === "pending" && editingId !== item._id && (
               <div className="row">
