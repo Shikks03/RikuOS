@@ -28,8 +28,34 @@ export interface Digest {
   body: string;
 }
 
+/**
+ * One problem's worth of body text. A job failure carries a raw exception
+ * message bounded only by runJob's 2000-character cap, and the body is sliced
+ * at 200 — so without this, one long Mongo error silently evicts every finding
+ * behind it. Every real finding ("expiry-sweep last ran 31h ago", "Meowchi
+ * unreachable") is far shorter, so only the pathological case is touched.
+ */
+const MAX_PROBLEM_CHARS = 80;
+
+function short(problem: string): string {
+  return problem.length > MAX_PROBLEM_CHARS
+    ? `${problem.slice(0, MAX_PROBLEM_CHARS - 1)}…`
+    : problem;
+}
+
 export function composeDigest(input: DigestInput): Digest {
-  const problemCount = input.problems.length;
+  // A pipeline check that could not run is itself a problem. Reporting it as
+  // "All clear" would make a total ShikksTracker outage — the one dependency
+  // every outreach feature rests on — read as reassurance, every morning, for
+  // as long as it lasted. The route cannot count it either: it downgrades the
+  // failed call to null rather than letting it fail the run, so this is the
+  // only place the outage can still be named.
+  const problems =
+    input.attention === null
+      ? [...input.problems, "pipeline check unavailable"]
+      : input.problems;
+
+  const problemCount = problems.length;
   const reviewPart = `${input.pending} to review`;
 
   const title =
@@ -38,11 +64,9 @@ export function composeDigest(input: DigestInput): Digest {
       : `All clear · ${reviewPart}`;
 
   const lines: string[] = [];
-  lines.push(problemCount > 0 ? input.problems.join("; ") : "All clear.");
+  lines.push(problemCount > 0 ? problems.map(short).join("; ") : "All clear.");
 
-  if (input.attention === null) {
-    lines.push("Pipeline check unavailable.");
-  } else {
+  if (input.attention !== null) {
     lines.push(
       `${input.attention.repliedUnanswered} waiting on you, ${input.attention.overdue} overdue.`
     );

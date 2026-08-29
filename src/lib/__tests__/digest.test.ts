@@ -51,4 +51,40 @@ describe("composeDigest", () => {
     expect(digest.title).toContain("1 problem");
     expect(digest.title).not.toContain("problems");
   });
+
+  it("counts an unreachable pipeline as a problem instead of saying all clear", () => {
+    const digest = composeDigest({ ...base, pending: 5, attention: null });
+    expect(digest.title).toContain("1 problem");
+    expect(digest.title).not.toContain("All clear");
+    expect(digest.body).not.toContain("All clear");
+  });
+
+  it("adds the pipeline failure to problems that already exist", () => {
+    const digest = composeDigest({
+      ...base,
+      attention: null,
+      problems: ["Meowchi unreachable"],
+    });
+    expect(digest.title).toContain("2 problems");
+    expect(digest.body).toContain("Meowchi unreachable");
+    expect(digest.body).toContain("unavailable");
+  });
+
+  it("states the attention line exactly, so the two counts cannot be swapped", () => {
+    const digest = composeDigest({
+      ...base,
+      attention: { repliedUnanswered: 3, overdue: 1 },
+    });
+    expect(digest.body).toContain("3 waiting on you, 1 overdue.");
+  });
+
+  it("caps one long problem so it cannot evict the findings behind it", () => {
+    const long = `expiry sweep failed: ${"x".repeat(300)}`;
+    const digest = composeDigest({
+      ...base,
+      problems: [long, "Meowchi unreachable"],
+    });
+    expect(digest.body).toContain("Meowchi unreachable");
+    expect(digest.body.length).toBeLessThanOrEqual(200);
+  });
 });
