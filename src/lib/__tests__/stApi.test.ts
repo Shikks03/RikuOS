@@ -11,6 +11,7 @@ import {
   classifyFetchError,
   createDraft,
   fetchAttention,
+  fetchSummary,
   ST_TIMEOUT_MS,
 } from "@/lib/stApi";
 
@@ -282,6 +283,87 @@ describe("fetchAttention", () => {
       new Response(JSON.stringify({ repliedUnanswered: [] }), { status: 200 })) as typeof fetch;
     const out = await fetchAttention(3, 50);
     expect(out.overdueActions).toBeUndefined();
+  });
+});
+
+describe("fetchSummary", () => {
+  const original = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = original;
+    vi.unstubAllEnvs();
+  });
+
+  function respond(body: unknown, status = 200) {
+    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
+    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(body), { status })) as typeof fetch;
+  }
+
+  it("throws with a diagnosable message on a non-200", async () => {
+    respond({}, 401);
+    await expect(fetchSummary()).rejects.toThrow(/401/);
+  });
+
+  it("sends the secret in the x-os-secret header and never in the URL", async () => {
+    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
+    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
+    let seenUrl = "";
+    let seenHeaders: Record<string, string> = {};
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      seenUrl = String(url);
+      seenHeaders = init.headers as Record<string, string>;
+      return new Response(JSON.stringify({}), { status: 200 });
+    }) as unknown as typeof fetch;
+    await fetchSummary();
+    expect(seenUrl).toBe("https://st.example.com/api/os/summary");
+    expect(seenUrl).not.toContain(GOOD_SECRET);
+    expect(seenHeaders["x-os-secret"]).toBe(GOOD_SECRET);
+  });
+
+  it("carries every consumed field through — widening the type alone is not enough", async () => {
+    // The trap this file has already sprung once: the return value is
+    // RECONSTRUCTED, so a field added to the interface but not to the object
+    // below arrives undefined at runtime and the check silently reads clean.
+    respond({
+      queue: { drafts: 24, approved: 2 },
+      engine: { lastRunAt: "2026-08-01T07:06:27.319Z", lastRunErrors: 3 },
+      messenger: { lastEventAt: "2026-08-29T00:00:00.000Z", unlinkedCount: 1, unansweredCount: 2 },
+      contacts: { total: 30 },
+    });
+    expect(await fetchSummary()).toEqual({
+      queue: { drafts: 24, approved: 2 },
+      engine: { lastRunAt: "2026-08-01T07:06:27.319Z", lastRunErrors: 3 },
+      messenger: { lastEventAt: "2026-08-29T00:00:00.000Z", unlinkedCount: 1, unansweredCount: 2 },
+    });
+  });
+
+  it("reads a missing count as null, never as a real zero", async () => {
+    // "The engine reported no errors" and "the engine reported nothing" are
+    // different findings, and only one of them is reassuring.
+    respond({ queue: {}, engine: {}, messenger: {} });
+    const out = await fetchSummary();
+    expect(out.engine).toEqual({ lastRunAt: null, lastRunErrors: null });
+    expect(out.queue).toEqual({ drafts: null, approved: null });
+  });
+
+  it("survives a response missing whole sections rather than throwing", async () => {
+    respond({});
+    const out = await fetchSummary();
+    expect(out.engine.lastRunAt).toBeNull();
+    expect(out.messenger.unansweredCount).toBeNull();
+  });
+
+  it("rejects a non-numeric count and an empty timestamp", async () => {
+    respond({
+      queue: { drafts: "24", approved: null },
+      engine: { lastRunAt: "", lastRunErrors: Number.NaN },
+      messenger: {},
+    });
+    const out = await fetchSummary();
+    expect(out.queue.drafts).toBeNull();
+    expect(out.engine.lastRunAt).toBeNull();
+    expect(out.engine.lastRunErrors).toBeNull();
   });
 });
 

@@ -143,6 +143,34 @@ decision **S8** in `ARCHITECTURE.md` §7. Do not re-propose it without a new dec
 
 With 5.3 gone, **P5 is complete.**
 
+**5.5 — outreach pipeline monitor, added 2026-08-30 after P5 closed.** Not scope creep and not a
+re-opening: a read of `GET /api/os/summary` that day found ShikksTracker's send engine had not run
+since 2026-08-01 — 29 days — while `queue.approved` showed messages waiting on it, and *nothing in
+either repo was watching*. RikuOS consumed only `/attention` and `/drafts`, so the one system the
+whole outreach side depends on was the one system the monitor could not see. Shipped as a fourth
+job in `/api/cron/morning` (`outreach-health`, `src/lib/outreachHealth.ts`), alarming on a stalled
+or never-reporting engine, on engine errors, and on approved messages stranded by a stall.
+
+**Root cause, found the same day by reading ShikksTracker's source (read-only, S4).** Its engine is
+driven by an **external hourly pinger that was never set up** — `vercel.json` there has no `crons`
+key by design, and `docs/cron-setup.md` describes a third-party pinger as a manual step. Nothing has
+ever called `/api/cron/sequence` on a schedule. The staleness reading is sound because
+`CronRun.create` is unconditional at the end of `runSequenceEngine`: a run that fires with sending
+disabled, outside the send window, or at its daily cap still stamps `lastRunAt`, so a frozen
+timestamp always means "did not run", never "ran with nothing to do". **If that write ever moves
+behind a condition, this check silently becomes a lie.** The threshold is 36 h: the pinger is
+scheduled only for UTC hours 0–9 (Manila's send window), so the longest legitimate gap is the ~14 h
+overnight one. Expect this to report every morning until Riku wires the pinger — a real fault stays
+reported until it is fixed.
+
+Three deliberate silences, each pinned by a test: a **draft backlog is not a fault** (that queue is
+Riku's own to work); **approved messages beside a healthy engine are not stranded**, they are about
+to be sent; and **no `summary.messenger` field is judged at all** until ShikksTracker's P2 ships —
+`lastEventAt: null` still means "no webhook yet", not "the webhook is dead" (P5a-1). The fields are
+carried through `fetchSummary` so that check becomes a pure addition later. On the first morning
+after deploy the watchdog reports `outreach-health has never run` once, because it runs before the
+new job writes its first record — the same one-off `site-health` had.
+
 ## P6 — Inbound Messenger triage — repo: RikuOS
 
 *Needs P2 + P3.*

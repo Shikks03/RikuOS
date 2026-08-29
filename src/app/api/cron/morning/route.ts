@@ -6,8 +6,9 @@ import { runJob } from "@/lib/jobs/runJob";
 import { runExpirySweep } from "@/lib/jobs/expirySweep";
 import { EXPECTATIONS, evaluateWatchdog, fetchLatestRuns } from "@/lib/watchdog";
 import { checkSites } from "@/lib/siteHealth";
+import { evaluateOutreach } from "@/lib/outreachHealth";
 import { buildProblems, composeDigest } from "@/lib/digest";
-import { fetchAttention } from "@/lib/stApi";
+import { fetchAttention, fetchSummary } from "@/lib/stApi";
 import { buildPushPayload, sendPushToAll } from "@/lib/push";
 import ApprovalItem from "@/models/ApprovalItem";
 
@@ -15,9 +16,9 @@ import ApprovalItem from "@/models/ApprovalItem";
  * GET /api/cron/morning
  *
  * The multiplexer. Vercel Hobby allows two cron jobs, each once per day, and
- * the chaser owns the other slot — so the watchdog, the site check and the
- * daily digest share this one invocation rather than getting crons of their
- * own (design P5a-3).
+ * the chaser owns the other slot — so the watchdog, the site check, the
+ * outreach-pipeline check and the daily digest share this one invocation
+ * rather than getting crons of their own (design P5a-3).
  *
  * Ordering rules this route obeys (CLAUDE.md):
  *  - every job writes its own AgentRun record, success or failure, via runJob;
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // Still record a run per agent, exactly as the chaser does when disabled,
       // so the watchdog can tell "switched off" from "cron never fired".
       const note = "monitoring is disabled in OsSettings";
-      for (const agent of ["watchdog", "site-health", "dispatcher"] as const) {
+      for (const agent of ["watchdog", "site-health", "outreach-health", "dispatcher"] as const) {
         await runJob(agent, async () => ({ data: null }), note);
       }
 
@@ -92,6 +93,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return { counts: { itemsProcessed: results.length }, data: results };
     });
 
+    // Its own job, not part of the watchdog: this one makes a network call to
+    // another system, so a ShikksTracker outage must fail THIS row and leave
+    // the watchdog's verdict on RikuOS's agents untouched.
+    const outreach = await runJob("outreach-health", async () => {
+      const summary = await fetchSummary();
+      const findings = evaluateOutreach(new Date(), summary);
+      // itemsFailed stays 0 even with findings, exactly as site-health does: a
+      // stalled engine is a finding about ShikksTracker, not a failed item in
+      // this job. Counting it would make tomorrow's watchdog re-report today's
+      // stall as "outreach-health: 2 items failed" — the same fault, named
+      // wrongly, every morning until it is fixed.
+      return { counts: { itemsProcessed: 1 }, data: findings };
+    });
+
     // Dispatcher last: every other record is written by now.
     const dispatch = await runJob("dispatcher", async () => {
       const pending = await ApprovalItem.countDocuments({ status: "pending" });
@@ -110,6 +125,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         expiry: { ok: expiry.ok, error: expiry.error, unstuck: expiry.data?.unstuck ?? 0 },
         watchdog: { ok: watch.ok, error: watch.error, anomalies: watch.data ?? [] },
         siteHealth: { ok: health.ok, error: health.error, sites: health.data ?? [] },
+        outreachHealth: {
+          ok: outreach.ok,
+          error: outreach.error,
+          findings: outreach.data ?? [],
+        },
       });
 
       const digest = composeDigest({
@@ -146,6 +166,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       expiry: { ok: expiry.ok, ...(expiry.data ?? {}) },
       watchdog: { ok: watch.ok, anomalies: watch.data?.length ?? 0 },
       siteHealth: { ok: health.ok, down: (health.data ?? []).filter((s) => !s.up).length },
+      outreachHealth: {
+        ok: outreach.ok,
+        findings: outreach.data?.length ?? 0,
+        ...(outreach.ok ? {} : { error: outreach.error }),
+      },
       dispatcher: {
         ok: dispatch.ok,
         title: dispatch.data?.title ?? null,

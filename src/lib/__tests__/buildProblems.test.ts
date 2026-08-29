@@ -12,6 +12,7 @@ const healthy: MorningOutcomes = {
   expiry: { ok: true, unstuck: 0 },
   watchdog: { ok: true, anomalies: [] },
   siteHealth: { ok: true, sites: [{ name: "Meowchi", up: true, detail: "Meowchi ok" }] },
+  outreachHealth: { ok: true, findings: [] },
 };
 
 describe("buildProblems", () => {
@@ -97,5 +98,46 @@ describe("buildProblems", () => {
       siteHealth: { ok: false, error: "boom", sites: [] },
     });
     expect(problems).toEqual(["watchdog failed: unknown", "site health failed: boom"]);
+  });
+
+  it("passes outreach findings straight through", () => {
+    const problems = buildProblems({
+      ...healthy,
+      outreachHealth: {
+        ok: true,
+        findings: [
+          { kind: "engine-stale", detail: "ShikksTracker send engine last ran 29d ago" },
+          { kind: "stranded-approved", detail: "2 approved messages are stranded, unsent" },
+        ],
+      },
+    });
+    expect(problems).toEqual([
+      "ShikksTracker send engine last ran 29d ago",
+      "2 approved messages are stranded, unsent",
+    ]);
+  });
+
+  it("names a failed outreach check distinctly from the attention failure", () => {
+    // composeDigest adds "pipeline check unavailable" when /attention fails.
+    // Both endpoints live behind one API and can fail together; if this line
+    // read the same, one outage would look like the same bug reported twice.
+    const problems = buildProblems({
+      ...healthy,
+      outreachHealth: { ok: false, error: "HTTP 503", findings: [] },
+    });
+    expect(problems).toEqual(["outreach check failed: HTTP 503"]);
+    expect(problems[0]).not.toContain("pipeline check unavailable");
+  });
+
+  it("does not drop other problems when the outreach check also fails", () => {
+    const problems = buildProblems({
+      ...healthy,
+      siteHealth: {
+        ok: true,
+        sites: [{ name: "AzeroTech", up: false, detail: "AzeroTech unreachable" }],
+      },
+      outreachHealth: { ok: false, findings: [] },
+    });
+    expect(problems).toEqual(["outreach check failed: unknown", "AzeroTech unreachable"]);
   });
 });

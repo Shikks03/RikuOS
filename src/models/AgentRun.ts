@@ -10,6 +10,7 @@ export const AGENTS = [
   "lead-sweep",
   "triage",
   "site-health",
+  "outreach-health",
   "dispatcher",
   "retro",
   "watchdog",

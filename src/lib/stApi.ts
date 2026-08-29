@@ -68,6 +68,50 @@ export interface AttentionResponse {
   overdueActions?: OverdueActionItem[];
 }
 
+/**
+ * GET /api/os/summary — only the fields RikuOS acts on.
+ *
+ * `contacts` and `campaigns` are returned too and are deliberately left
+ * unmodelled: nothing reads them yet, and the Freelance page (roadmap 8.1) is
+ * where they earn a type. Widening this interface is never sufficient on its
+ * own — `fetchSummary` RECONSTRUCTS its return value, so a new field must be
+ * carried through there in the same change or it silently arrives undefined.
+ * That exact pair was missed once already, in P4's `overdueActions`.
+ *
+ * `number | null` throughout, and it matters: a field ShikksTracker did not
+ * send must never read as a real zero. "The engine reported no errors" and
+ * "the engine reported nothing" are different findings, and the second one is
+ * the interesting one.
+ */
+export interface SummaryEngine {
+  /** ISO date, or null when ShikksTracker has no run recorded at all. */
+  lastRunAt: string | null;
+  lastRunErrors: number | null;
+}
+
+export interface SummaryQueue {
+  /** Drafts awaiting Riku's approval inside ShikksTracker. Not monitored. */
+  drafts: number | null;
+  /** Approved and waiting for the send engine to pick them up. */
+  approved: number | null;
+}
+
+/**
+ * Not evaluated until ShikksTracker's P2 ships — see outreachHealth.ts.
+ * Carried through now so that check is a pure addition later.
+ */
+export interface SummaryMessenger {
+  lastEventAt: string | null;
+  unlinkedCount: number | null;
+  unansweredCount: number | null;
+}
+
+export interface SummaryResponse {
+  queue: SummaryQueue;
+  engine: SummaryEngine;
+  messenger: SummaryMessenger;
+}
+
 /** Request body for POST /api/os/drafts. */
 export interface DraftRequest {
   contactId: string;
@@ -222,6 +266,65 @@ export async function fetchAttention(days: number, limit: number): Promise<Atten
   return {
     repliedUnanswered: Array.isArray(parsed.repliedUnanswered) ? parsed.repliedUnanswered : [],
     ...(Array.isArray(parsed.overdueActions) ? { overdueActions: parsed.overdueActions } : {}),
+  };
+}
+
+/**
+ * A count ShikksTracker did not send, or sent as something other than a finite
+ * number, becomes null rather than 0. Silently defaulting to zero is how a
+ * monitor learns to report "all clear" about a field it never received.
+ */
+function readCount(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** Same rule for dates: only a non-empty string is a reported timestamp. */
+function readStamp(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/**
+ * GET /api/os/summary. Throws on any failure, exactly as fetchAttention does
+ * and for the same reason: a GET has no side effect to protect, so the
+ * caller's ordinary error path (AgentRun + digest line) is the right handling.
+ */
+export async function fetchSummary(): Promise<SummaryResponse> {
+  const { baseUrl, secret } = readStConfig();
+
+  const res = await fetch(`${baseUrl}/api/os/summary`, {
+    headers: { "x-os-secret": secret },
+    signal: AbortSignal.timeout(ST_TIMEOUT_MS),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `GET /api/os/summary returned ${res.status}. ` +
+        "503 = OS_API_SECRET unset or under 32 chars on ShikksTracker; " +
+        "401 = secret mismatch; 404 = the deployment predates the P1 merge."
+    );
+  }
+
+  const parsed = (await res.json()) as {
+    queue?: Record<string, unknown>;
+    engine?: Record<string, unknown>;
+    messenger?: Record<string, unknown>;
+  };
+
+  return {
+    queue: {
+      drafts: readCount(parsed.queue?.drafts),
+      approved: readCount(parsed.queue?.approved),
+    },
+    engine: {
+      lastRunAt: readStamp(parsed.engine?.lastRunAt),
+      lastRunErrors: readCount(parsed.engine?.lastRunErrors),
+    },
+    messenger: {
+      lastEventAt: readStamp(parsed.messenger?.lastEventAt),
+      unlinkedCount: readCount(parsed.messenger?.unlinkedCount),
+      unansweredCount: readCount(parsed.messenger?.unansweredCount),
+    },
   };
 }
 

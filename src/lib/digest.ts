@@ -14,6 +14,7 @@
 
 import type { Anomaly } from "@/lib/watchdog";
 import type { SiteResult } from "@/lib/siteHealth";
+import type { OutreachFinding } from "@/lib/outreachHealth";
 
 export interface DigestInput {
   /** ApprovalItems waiting on a decision. */
@@ -98,6 +99,7 @@ export interface MorningOutcomes {
   expiry: { ok: boolean; error?: string; unstuck: number };
   watchdog: { ok: boolean; error?: string; anomalies: Anomaly[] };
   siteHealth: { ok: boolean; error?: string; sites: SiteResult[] };
+  outreachHealth: { ok: boolean; error?: string; findings: OutreachFinding[] };
 }
 
 /**
@@ -121,12 +123,18 @@ export interface MorningOutcomes {
  * quietly punch a hole in the monitor.
  */
 export function buildProblems(outcomes: MorningOutcomes): string[] {
-  const { expiry, watchdog, siteHealth } = outcomes;
+  const { expiry, watchdog, siteHealth, outreachHealth } = outcomes;
   const problems: string[] = [];
 
   if (!expiry.ok) problems.push(`expiry sweep failed: ${expiry.error ?? "unknown"}`);
   if (!watchdog.ok) problems.push(`watchdog failed: ${watchdog.error ?? "unknown"}`);
   if (!siteHealth.ok) problems.push(`site health failed: ${siteHealth.error ?? "unknown"}`);
+  // Distinct wording from composeDigest's "pipeline check unavailable", which
+  // means the /attention call failed. Both can be true at once — one API, two
+  // endpoints — and two identical lines would read as one duplicated bug.
+  if (!outreachHealth.ok) {
+    problems.push(`outreach check failed: ${outreachHealth.error ?? "unknown"}`);
+  }
 
   if (expiry.unstuck > 0) {
     problems.push(
@@ -141,6 +149,9 @@ export function buildProblems(outcomes: MorningOutcomes): string[] {
   }
   for (const site of siteHealth.sites) {
     if (!site.up) problems.push(site.detail);
+  }
+  for (const finding of outreachHealth.findings) {
+    problems.push(finding.detail);
   }
 
   return problems;

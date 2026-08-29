@@ -10,8 +10,12 @@
  * is the proof. A watchdog that dies mid-run is instead reported by the
  * dispatcher, which sees the outcome of every job in the same invocation.
  *
- * P5a scope: agent freshness only. Messenger webhook freshness and the Meta
- * token ping wait for ShikksTracker's P2 (design P5a-1) — until that ships,
+ * Scope: RikuOS agent freshness only. ShikksTracker's own health — a stalled
+ * send engine, stranded approved messages — is NOT judged here; it lives in
+ * outreachHealth.ts and runs as its own job, so that a ShikksTracker outage
+ * fails that job rather than making the watchdog claim RikuOS's agents are
+ * broken. Messenger webhook freshness and the Meta token ping still wait for
+ * ShikksTracker's P2 (design P5a-1) — until that ships,
  * `messenger.lastEventAt` means "no webhook yet", not "the webhook is dead".
  */
 
@@ -28,6 +32,7 @@ export const EXPECTATIONS: Expectation[] = [
   { agent: "chaser", everyHours: 24, graceHours: 6 },
   { agent: "expiry-sweep", everyHours: 24, graceHours: 6 },
   { agent: "site-health", everyHours: 24, graceHours: 6 },
+  { agent: "outreach-health", everyHours: 24, graceHours: 6 },
   { agent: "dispatcher", everyHours: 24, graceHours: 6 },
 ];
 
