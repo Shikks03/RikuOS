@@ -3,9 +3,14 @@ import mongoose from "mongoose";
 import type { Model } from "mongoose";
 import {
   approvalModelForType,
+  buildActionClaim,
+  buildActionOutcomeUpdate,
+  buildActionRetry,
+  buildActionSweep,
   buildDecisionUpdate,
   buildExpirySweep,
   parseDecision,
+  STALE_ACTION_MS,
 } from "@/lib/queue";
 import type { Decision } from "@/lib/queue";
 import ApprovalItem from "@/models/ApprovalItem";
@@ -253,5 +258,74 @@ describe("P4 — an edit must not drop the reply anchor", () => {
     if (parsed.ok && parsed.value.kind === "edit") {
       expect(parsed.value.editedPayload.replyToLogId).toBeUndefined();
     }
+  });
+});
+
+describe("P4 — the action state machine builders", () => {
+  const now = new Date("2026-08-29T00:00:00.000Z");
+
+  it("the claim guards on actionStatus pending — an executor can never run twice", () => {
+    const { filter, update } = buildActionClaim(now);
+    expect(filter).toEqual({ actionStatus: "pending" });
+    expect(update.$set).toMatchObject({ actionStatus: "running", actionStartedAt: now });
+  });
+
+  it("the claim clears any stale actionError from a previous attempt", () => {
+    expect(buildActionClaim(now).update.$unset).toEqual({ actionError: "" });
+  });
+
+  it("every outcome write guards on actionStatus running", () => {
+    for (const status of ["done", "failed", "needs_verification"] as const) {
+      const { filter } = buildActionOutcomeUpdate({ status }, now);
+      expect(filter).toEqual({ actionStatus: "running" });
+    }
+  });
+
+  it("a done outcome records the time and no error", () => {
+    const { update } = buildActionOutcomeUpdate({ status: "done" }, now);
+    expect(update.$set).toEqual({ actionStatus: "done", actionAt: now });
+  });
+
+  it("a done outcome with a note keeps the note (the 409 duplicate case)", () => {
+    const { update } = buildActionOutcomeUpdate(
+      { status: "done", note: "A pending reply already exists." },
+      now
+    );
+    expect(update.$set).toMatchObject({
+      actionStatus: "done",
+      actionError: "A pending reply already exists.",
+    });
+  });
+
+  it("truncates a runaway note to the schema bound", () => {
+    const { update } = buildActionOutcomeUpdate(
+      { status: "failed", note: "x".repeat(5000) },
+      now
+    );
+    expect(((update.$set as Record<string, string>).actionError).length).toBe(2000);
+  });
+
+  it("the stale sweep only touches running actions older than the threshold", () => {
+    const { filter, update } = buildActionSweep(now, 10 * 60 * 1000);
+    expect(filter).toEqual({
+      actionStatus: "running",
+      actionStartedAt: { $lte: new Date(now.getTime() - 10 * 60 * 1000) },
+    });
+    expect((update.$set as Record<string, unknown>).actionStatus).toBe("needs_verification");
+    // Never `failed`: a claim that vanished mid-flight is the definition of
+    // "we do not know whether the side effect happened".
+    expect((update.$set as Record<string, unknown>).actionStatus).not.toBe("failed");
+    expect((update.$set as Record<string, string>).actionError).toMatch(/interrupted/i);
+  });
+
+  it("a retry only leaves the `failed` state, never needs_verification", () => {
+    const { filter, update } = buildActionRetry();
+    expect(filter).toEqual({ actionStatus: "failed" });
+    expect(update.$set).toEqual({ actionStatus: "pending" });
+    expect(update.$unset).toEqual({ actionError: "", actionAt: "", actionStartedAt: "" });
+  });
+
+  it("STALE_ACTION_MS is comfortably above the route's maxDuration", () => {
+    expect(STALE_ACTION_MS).toBeGreaterThanOrEqual(5 * 60 * 1000);
   });
 });
