@@ -38,10 +38,11 @@ Ratified with Riku 2026-08-29. These are closed; an executing session implements
 | P5a-3 | **One multiplexed daily route**, not an external pinger. | Staying inside Vercel avoids a second control plane and a deviation from the `CLAUDE.md` rule that cron agents are Vercel crons. cron-job.org was considered — Riku already runs it for ShikksTracker — and declined. |
 | P5a-4 | The **digest fires every day**, including when nothing is wrong. | Riku chose "the missing push is enough" as the outer safety net. That only works if the push is unconditional; a digest that fires only on problems has an absence that means nothing. |
 | P5a-5 | Site health **notifies only**. It does not draft client emails. | Roadmap 5.2 originally drafted a client email into the queue. A flaky check would then produce an embarrassing draft. Revisit once the false-alarm rate is known. |
-| P5a-6 | Sites watched: **AzeroTech, Meowchi, ShikksTracker**. Checks: uptime and certificate expiry. | ShikksTracker was added because the whole outreach pipeline depends on it and nothing currently watches it. |
+| P5a-6 | Sites watched: `azerotech.vercel.app`, `meowchi.vercel.app`, `shikkstracker.vercel.app`. Check: **uptime only**. | ShikksTracker was added because the whole outreach pipeline depends on it and nothing currently watches it. Riku confirmed the three hostnames on 2026-08-30; all were reachable (HTTP 200) when checked. |
 | P5a-7 | **No "Today" section in the digest.** | It needs a store of self-set deadlines, which does not exist. A sectioned to-do store is recorded in `ROADMAP.md` Deferred and is explicitly post-v0 work. |
 | P5a-8 | **No per-site history** is stored. | Deliberate gap; P8's Freelance page needs a health view anyway and can add the model then. |
-| P5a-9 | **Domain expiry is dropped**, not deferred. | Checked all three on 2026-08-29: `.ph` serves no RDAP at all; `vercel.app` is Vercel's registration, not Riku's, so its expiry is neither actionable nor his to renew; and the `.dev` registry returned 404 for `azerotech.dev` (see Manual steps). Zero of three yield an actionable date, so the check would ship as a permanently-unknown line — worse than absent. Revisit only if a domain Riku actually controls joins the list. |
+| P5a-9 | **Domain expiry is dropped**, not deferred. | All three sites are `*.vercel.app` subdomains. The registrable domain is `vercel.app`, which belongs to Vercel — its expiry is neither actionable nor Riku's to renew. (The first pass checked `azerotech.dev` and `meowchi.ph`, which turned out not to be the real hostnames; `.ph` serves no RDAP either way.) Revisit only if a domain Riku actually controls joins the list. |
+| P5a-10 | **Certificate expiry is dropped** too. Site health is a single uptime check. | Same root cause: `*.vercel.app` hosts share one wildcard certificate that Vercel renews automatically — observed 2026-08-30, issued by Google Trust Services on a ~90-day rotation. Checking it would return an identical, unactionable date for all three sites, and a certificate that actually broke would already fail the reachability check. This restores the "uptime only" option Riku first declined; it is chosen now because the sites turned out not to be domains he controls. |
 
 ---
 
@@ -127,19 +128,19 @@ Four anomaly conditions:
 | Check | Mechanism | Flags when |
 |---|---|---|
 | Reachable | `fetch` GET, 8s timeout, follows redirects | no response, or status ≥ 400 |
-| Certificate expiry | raw TLS socket to :443, read `getPeerCertificate().valid_to`, 5s timeout | fewer than 14 days remaining |
 
-Domain expiry was specified and then dropped on evidence — see P5a-9.
+**One check, not three.** Certificate expiry and domain expiry were both specified, then both dropped on evidence — see P5a-9 and P5a-10. All three watched sites are `*.vercel.app` subdomains, which means neither a registration nor a certificate is Riku's to hold or renew.
 
-Three constraints this creates:
+Two properties this relies on:
 
-- **The route must run on the Node runtime, not Edge** — reading a certificate needs a real TLS socket. This is the default here; it is recorded because the route may not drift away from it.
-- **A failed TLS handshake is a finding, not a crash.** `meowchi.ph` was in exactly this state when the design was written: the host accepted TCP, then sent a fatal TLS alert and offered no certificate. The check must report that as unreachable-with-a-reason and carry on to the next site, never throw out of the job.
-- **Certificate expiry is unknowable when the handshake fails.** Report it as `unknown` for that site rather than as expiring — a site with no certificate at all is already covered by the reachability finding, and a second alarm saying "0 days remaining" would be noise.
+- **A broken certificate already shows up as unreachable.** `fetch` rejects on a failed TLS handshake, so a certificate problem is reported by the one remaining check rather than needing its own. What is lost is only *advance* warning — and advance warning of an expiry nobody can act on is not worth a second network round trip per site.
+- **A failed handshake is a finding, not a crash.** Whatever the cause — expired certificate, a server sending a TLS alert, DNS gone — the check reports that site as unreachable with a reason and carries on to the next one. It must never throw out of the job.
 
 **`ok` means the check ran, not that the sites are healthy.** A client site being down is a *finding*, reported in the digest; it does not make the `site-health` run `ok: false`. Conflating them would make the watchdog report the monitoring as broken for as long as a client's site stayed down, and both signals would be learned-ignored. Only an error in the checking itself sets `ok: false`.
 
-Counts: `itemsProcessed` = sites checked · `itemsSkipped` = checks returning `unknown` · `itemsFailed` = checks that errored.
+Counts: `itemsProcessed` = sites checked · `itemsFailed` = checks that errored · `itemsSkipped` = unused, now that there is no check that can return `unknown`.
+
+**A limitation worth stating plainly:** every watched site, and RikuOS itself, is hosted on Vercel. A Vercel-wide outage takes down the sites *and* the cron that would report them, so the monitor shares a failure domain with everything it watches. Within P5a the only signal in that case is the absent morning push (P5a-4). Moving the schedule outside Vercel would fix it and was declined for good reasons (P5a-3); this is recorded so the trade-off stays visible rather than being rediscovered during an outage.
 
 ---
 
@@ -177,7 +178,7 @@ Default off, so deploying never silently activates an agent — the same rule th
 Tests live on the logic layer (`src/lib/__tests__/`); routes stay thin.
 
 - **watchdog** — each anomaly condition, a healthy agent, a switched-off agent producing no anomaly, an agent absent from the table being ignored
-- **siteHealth** — status classification, certificate day-count arithmetic, a failed TLS handshake reported as a finding with certificate expiry `unknown`, timeout handling, and that a down site does not set `ok: false`
+- **siteHealth** — status classification, a failed TLS handshake and a DNS failure both reported as unreachable-with-a-reason, timeout handling, and that a down site does not set `ok: false`
 - **digest** — composition from each combination of inputs, the "all clear" branch, and the attention-unavailable branch
 - **expirySweep** — existing P3/P4 coverage moves with the extracted module, unchanged
 
@@ -187,25 +188,26 @@ Verification trio before "done": `npm test` + `npx tsc --noEmit` + `npm run buil
 
 1. Trigger `/api/cron/morning` by hand with the cron secret → four run records appear → one push lands on the iPhone.
 2. Prove absence is detected: temporarily add an agent to the expectations table that has never run → trigger → the digest names it as `never-ran` → remove it.
-3. Point one site entry at a host known to be down → trigger → the digest names that site.
+3. Point one site entry at a hostname known not to resolve → trigger → the digest names that site as unreachable.
 
 ---
 
 ## Manual steps — Riku's hands only
 
-1. **Supply AzeroTech's real domain.** Riku gave `azerotech.dev` on 2026-08-29; it does not exist — `NXDOMAIN`, and the `.dev` registry's RDAP returns 404. Either the domain is different or the registration lapsed. The site list cannot be written until this is answered, and if the domain genuinely lapsed that is a client-facing problem well outside P5a.
-2. ~~Confirm the domains answer RDAP.~~ **Done 2026-08-29** — none of the three do, in an actionable sense. Resolved as P5a-9.
-3. **Decide what to do about `meowchi.ph`, which is down right now.** Verified 2026-08-29 from two independent TLS clients: the host accepts TCP, then sends a fatal TLS alert with no certificate, and port 80 returns an empty reply. This is a live client-site outage, not a monitoring question, and it does not block P5a — but shipping a monitor whose first run alerts on a fault already known is worth expecting rather than being surprised by.
-4. **Deploy the `vercel.json` schedule change** — removing the `expire` entry, adding `morning`, moving the chaser to 22:00 UTC — then verify both crons appear in the Vercel dashboard afterwards.
-5. **Flip `monitoringEnabled` on in `/settings`** once acceptance step 1 passes.
+1. ~~Supply the site hostnames.~~ **Done 2026-08-30** — `azerotech.vercel.app`, `meowchi.vercel.app`, `shikkstracker.vercel.app`, all verified reachable (HTTP 200). The first pass used `azerotech.dev` and `meowchi.ph`; neither is Riku's, so the findings recorded against them are withdrawn.
+2. ~~Confirm the domains answer RDAP.~~ **Done** — not applicable, the sites are Vercel subdomains. Resolved as P5a-9 and P5a-10.
+3. **Deploy the `vercel.json` schedule change** — removing the `expire` entry, adding `morning`, moving the chaser to 22:00 UTC — then verify both crons appear in the Vercel dashboard afterwards.
+4. **Flip `monitoringEnabled` on in `/settings`** once acceptance step 1 passes.
+
+Nothing in this list blocks writing the implementation plan.
 
 ---
 
 ## Non-goals
 
-Messenger webhook freshness and the Meta Graph ping (added when P2 deploys) · the lead sweep (P5b) · per-site history or uptime records (P8) · drafted client emails on health issues (P5a-5) · a to-do store or a "Today" digest section (post-v0) · any change to the chaser route's logic · upgrading to Vercel Pro.
+Messenger webhook freshness and the Meta Graph ping (added when P2 deploys) · the lead sweep (P5b) · certificate and domain expiry checks (P5a-9, P5a-10) · per-site history or uptime records (P8) · drafted client emails on health issues (P5a-5) · a to-do store or a "Today" digest section (post-v0) · any change to the chaser route's logic · upgrading to Vercel Pro.
 
 ## Open items for the executing session
 
 1. The exact wording and length limit of the push body — iOS truncates aggressively; the composer should be written against a measured limit rather than a guess.
-2. Whether the certificate check can share a connection with the reachability check, or whether two connections per site is simpler and cheap enough. Prefer simple.
+2. Whether the reachability check should treat a 3xx that lands on an error page as healthy. Following redirects and judging the final status is the assumption; revisit only if it produces a false reading against the real sites.
