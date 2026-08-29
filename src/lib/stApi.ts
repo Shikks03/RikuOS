@@ -50,8 +50,22 @@ export interface AttentionItem {
   replyToLogId: string;
 }
 
+/** A contact whose next-action date has passed. */
+export interface OverdueActionItem {
+  contactId: string;
+  businessName: string;
+  nextActionAt: string;
+  nextActionNote: string | null;
+}
+
 export interface AttentionResponse {
   repliedUnanswered: AttentionItem[];
+  /**
+   * Also returned by the OS API (verified in ShikksTracker's
+   * src/lib/os/attention.ts). Optional here because P4 shipped without it, so
+   * nothing may assume its presence at runtime — read it defensively.
+   */
+  overdueActions?: OverdueActionItem[];
 }
 
 /** Request body for POST /api/os/drafts. */
@@ -205,7 +219,10 @@ export async function fetchAttention(days: number, limit: number): Promise<Atten
   }
 
   const parsed = (await res.json()) as Partial<AttentionResponse>;
-  return { repliedUnanswered: Array.isArray(parsed.repliedUnanswered) ? parsed.repliedUnanswered : [] };
+  return {
+    repliedUnanswered: Array.isArray(parsed.repliedUnanswered) ? parsed.repliedUnanswered : [],
+    ...(Array.isArray(parsed.overdueActions) ? { overdueActions: parsed.overdueActions } : {}),
+  };
 }
 
 /**

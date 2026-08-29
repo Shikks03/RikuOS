@@ -251,6 +251,38 @@ describe("fetchAttention", () => {
     const out = await fetchAttention(3, 50);
     expect(out.repliedUnanswered).toHaveLength(1);
   });
+
+  it("carries overdueActions through — the digest's overdue count depends on it", async () => {
+    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
+    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          repliedUnanswered: [],
+          overdueActions: [
+            {
+              contactId: "c2",
+              businessName: "Acme",
+              nextActionAt: "2026-08-01T00:00:00.000Z",
+              nextActionNote: "call back",
+            },
+          ],
+        }),
+        { status: 200 }
+      )) as typeof fetch;
+    const out = await fetchAttention(3, 50);
+    expect(out.overdueActions).toHaveLength(1);
+    expect(out.overdueActions?.[0].businessName).toBe("Acme");
+  });
+
+  it("leaves overdueActions undefined when the API omits it, rather than throwing", async () => {
+    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
+    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ repliedUnanswered: [] }), { status: 200 })) as typeof fetch;
+    const out = await fetchAttention(3, 50);
+    expect(out.overdueActions).toBeUndefined();
+  });
 });
 
 describe("timeouts", () => {
