@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { requireCronSecret } from "@/lib/auth";
-import { buildExpirySweep } from "@/lib/queue";
+import { buildActionSweep, buildExpirySweep } from "@/lib/queue";
 import { buildPushPayload, sendPushToAll } from "@/lib/push";
 import ApprovalItem from "@/models/ApprovalItem";
 import AgentRun from "@/models/AgentRun";
@@ -20,14 +20,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const startedAt = new Date();
   let expired = 0;
+  let unstuck = 0;
   let ok = true;
   let error: string | undefined;
 
   try {
     await connectDB();
-    const { filter, update } = buildExpirySweep(new Date());
-    const result = await ApprovalItem.updateMany(filter, update);
-    expired = result.modifiedCount;
+    const now = new Date();
+
+    const expiry = buildExpirySweep(now);
+    expired = (await ApprovalItem.updateMany(expiry.filter, expiry.update)).modifiedCount;
+
+    // P4: an action claimed but never resolved means the function died between
+    // the outward call and recording its result — the side effect may or may
+    // not have landed. Park it for a human rather than leaving an in-flight
+    // state behind (CLAUDE.md).
+    const stuck = buildActionSweep(now);
+    unstuck = (await ApprovalItem.updateMany(stuck.filter, stuck.update)).modifiedCount;
   } catch (err) {
     ok = false;
     error = (err instanceof Error ? err.message : String(err)).slice(0, 2000);
@@ -40,7 +49,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       startedAt,
       durationMs: Date.now() - startedAt.getTime(),
       ok,
-      counts: { itemsCreated: 0, itemsProcessed: expired },
+      counts: { itemsCreated: 0, itemsProcessed: expired + unstuck },
       ...(error !== undefined ? { error } : {}),
     });
   } catch (runErr) {
@@ -58,5 +67,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, expired });
+  if (unstuck > 0) {
+    try {
+      await sendPushToAll(
+        buildPushPayload(
+          "Interrupted actions need checking",
+          `${unstuck} approved item${unstuck === 1 ? "" : "s"} could not confirm their result.`
+        )
+      );
+    } catch (pushErr) {
+      console.error("[cron/expire] stale-action alert could not be sent:", pushErr);
+    }
+  }
+
+  return NextResponse.json({ ok: true, expired, unstuck });
 }
