@@ -57,7 +57,7 @@ Agency = the system acts first, on triggers, within delegated authority, then re
 | # | Agent | Trigger | What it does | Runtime |
 |---|-------|---------|--------------|---------|
 | 1 | Follow-up chaser | Time + data state | "Replied to nobody in 4 days" → drafts follow-up → queue | Vercel cron + API |
-| 2 | Lead sweep | Schedule (M/W/F pre-dawn) | Runs A1/A2/A3 outreach skills → qualified queue by breakfast | Claude scheduled task |
+| 2 | ~~Lead sweep~~ | — | **Dropped 2026-08-30 — see `ARCHITECTURE.md` S8.** Lead acquisition is not a RikuOS job; prospecting stays manual. | — |
 | 3 | Inbound Messenger triage | Page webhook event | Inside legal 24h window: acknowledge, answer FAQs, propose call times | Vercel function + API |
 | 4 | Site health monitor | Threshold | Uptime/SSL/domain checks on client sites → drafts client email on issues | Vercel cron + API |
 | 5 | Morning dispatcher | Schedule | Compiles "what needs you today" across all pages → push notification | Vercel cron + API |
@@ -90,7 +90,7 @@ Agency = the system acts first, on triggers, within delegated authority, then re
 
 1. **ShikksTracker restructure** — UI/UX density fix, Messenger webhook + Email/Messenger tabs, send-log lane, API layer. *Everything downstream eats this data.*
 2. **Follow-up chaser** — first Vercel cron + Approval Queue (minimal version can be a simple list view before the full dashboard exists). *First moment the OS works while Riku sleeps.*
-3. **Lead sweep schedule + site health monitor** — existing skills on cadence; health checks.
+3. **Site health monitor + watchdog + morning digest** — health checks and heartbeat alerts. (The lead sweep that shared this step was dropped 2026-08-30 — see `ARCHITECTURE.md` S8.)
 4. **Retro agent** — weekly reply-rate scoreboard → proposed skill edits (always via approval).
 5. **RikuOS dashboard** — PWA with Personal + Freelance + Academics pages, Approval Queue as first-class UI, web push, calendar write-through.
 6. **v1+ (deferred):** voice commands, spending import, case-study/brand pipeline, per-lead click links, Work page.

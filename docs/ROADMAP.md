@@ -9,7 +9,7 @@ P1 (ST: OS API + variants) ──────────┬──► P4 (chaser
 P3 (RikuOS skeleton + queue + push) ─┘        │
 P2 (ST: webhook + tabs) ──► P6 (triage)       │
         │                                     ▼
-        └────────► P5 (watchdog + health + sweep schedule)
+        └────────► P5 (watchdog + health + digest)
 P1 + weeks of send data ──► P7 (retro)
 P1 ──► P8 (dashboard pages)          P1, P2, P3 have no dependencies on each other
 ```
@@ -108,7 +108,7 @@ log's `subject`, so the queue card cannot show the subject line an email reply w
 around this correctly by omitting `subject` entirely so ShikksTracker derives `Re: <anchor
 subject>` itself; the proposed fix is one field in one `.select()`.
 
-## P5 — Watchdog + site health + lead-sweep schedule — repos: RikuOS + skills
+## P5 — Watchdog + site health + morning digest — repo: RikuOS
 
 *Needs P3. Webhook freshness checks need P2. Built before P6–P8 on purpose.*
 
@@ -116,12 +116,11 @@ subject>` itself; the proposed fix is one field in one `.select()`.
 |---|------|-----------|
 | 5.1 | Watchdog cron: `AgentRun` freshness per expected schedule, OS-API webhook `lastEventAt`, Graph API ping → push alert with one-line diagnosis | P3 (P2 for webhook checks) |
 | 5.2 | Site health cron: uptime for AzeroTech, Meowchi, ShikksTracker → findings named in the morning digest | P3 |
-| 5.3 | Lead sweep as Claude scheduled task (M/W/F pre-dawn): run existing prospecting skills → import qualified leads via ShikksTracker's import; results summarized in morning push | P1 |
 | 5.4 | Morning dispatcher cron: one daily digest push (queue count, attention count, health, today's failures) | P3, 5.1 |
 
-**Done when:** killing the webhook (or a cron) produces a push alert within one watchdog cycle, and a Monday sweep lands qualified leads before breakfast.
+**Done when:** killing the webhook (or a cron) produces a push alert within one watchdog cycle.
 
-**P5a DONE 2026-08-30** — tasks 5.1, 5.2 and 5.4 shipped as `/api/cron/morning`, live at
+**P5 DONE 2026-08-30** (shipped as P5a) — tasks 5.1, 5.2 and 5.4 shipped as `/api/cron/morning`, live at
 https://riku-os.vercel.app. 272 tests, `tsc` and `build` green. All three acceptance criteria
 observed against real data: a real run delivered a push to the iPhone; adding a never-run agent to
 the expectations table produced `triage has never run`; pointing a watched site at an
@@ -135,8 +134,12 @@ dropped because all three hosts are `*.vercel.app` subdomains whose certificate 
 Vercel's, not Riku's (P5a-9, P5a-10); site health notifies only and does not draft client emails
 (P5a-5). Vercel Hobby's two-cron limit is why one route multiplexes four jobs (P5a-3).
 
-**5.3 (lead sweep) remains open as P5b** — parked until a prospecting skill exists and one manual
-run has been measured.
+**5.3 (lead sweep) is DROPPED, not deferred** (2026-08-30, Riku's call) — lead acquisition is not a
+RikuOS job; prospecting stays something he does by hand. Only acquisition leaves: the chaser, site
+health and the Freelance page are untouched. Reasoning and the three blocking facts are recorded as
+decision **S8** in `ARCHITECTURE.md` §7. Do not re-propose it without a new decision there.
+
+With 5.3 gone, **P5 is complete.**
 
 ## P6 — Inbound Messenger triage — repo: RikuOS
 

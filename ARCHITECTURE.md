@@ -26,7 +26,7 @@ Two applications, two repos, one MongoDB Atlas account with **two separate datab
         Atlas db: shikkstracker                     Atlas db: rikuos
                 │                                           │
         Meta Page webhook ──► ShikksTracker         Claude scheduled tasks
-        (RIKU Facebook page)                        (lead sweep, retro)
+        (RIKU Facebook page)                        (retro)
 ```
 
 **Boundary rules (hard):**
@@ -66,7 +66,7 @@ New Next.js App Router app, TypeScript strict, Mongoose, deployed on Vercel. Mob
 | # | Agent | Trigger | Runtime | What it does |
 |---|-------|---------|---------|--------------|
 | 1 | Follow-up chaser | Daily cron | Vercel cron (RikuOS) | Finds leads who **replied but got no answer** in N days (via OS API attention list), drafts the response (Anthropic API), queues it for approval. *ShikksTracker's own engine already automates pre-reply cold-sequence follow-ups; the chaser owns the post-reply gap.* |
-| 2 | Lead sweep | M/W/F pre-dawn | Claude scheduled task | Runs outreach prospecting skills → qualified leads imported by breakfast |
+| 2 | ~~Lead sweep~~ | — | — | **Dropped 2026-08-30 — see S8.** Lead acquisition is not a RikuOS job. |
 | 3 | Inbound Messenger triage | Page webhook event | Vercel function (RikuOS) | Inside the legal 24h window: acknowledge, answer FAQs, propose call times. Substantive replies go through the queue |
 | 4 | Site health monitor | Cron threshold | Vercel cron (RikuOS) | Uptime/SSL/domain checks on client sites (AzeroTech, Meowchi) → drafts client email on issues |
 | 5 | Morning dispatcher | Daily cron | Vercel cron (RikuOS) | Compiles "what needs you today" across all sources → one push notification |
@@ -165,6 +165,13 @@ Concept decisions **D1–D11** (see `RIKUOS_CONCEPT.md` §3) remain binding and 
 - **S5 — API endpoints over direct DB reads.** Rationale: schema freedom for ShikksTracker, one consistent door for reads and actions.
 - **S6 — The chaser owns the post-reply gap.** ShikksTracker's engine already automates pre-reply sequence follow-ups; the chaser chases replied-but-unanswered leads — the hottest part of the funnel and today's real memory hole.
 - **S7 — ShikksTracker cleanup rule: tidy what we touch.** Files edited for new features get split sanely; untouched working code stays untouched.
+
+Added 2026-08-30:
+
+- **S8 — The lead sweep is dropped. RikuOS does not acquire leads.** Roadmap 5.3 (and concept agent #2) proposed an M/W/F pre-dawn Claude scheduled task that would run prospecting skills and import qualified leads into ShikksTracker. It is cancelled, not deferred. Riku's call, 2026-08-30: *"I don't want to add a feature here to get leads. This OS is supposed to be for my personal life / personal use."* Prospecting stays a manual thing he does himself.
+  - **Scope of the cut is narrow.** Only lead *acquisition* leaves. The rest of the freelance side is unchanged: the chaser (P4) still drafts follow-ups, site health still watches client sites, and the Freelance page (8.1) still ships. This is not a retreat from D11 or from freelance generally.
+  - **Three facts found while scoping it, kept because they explain the cost of ever reversing this.** (a) No prospecting skill exists; the real prospecting tool is the Maps Lead Scraper Chrome extension, which by its own README is *"manual, human-in-the-loop — nothing runs on its own"* and works by scrolling Google Maps while Riku browses. A 4 a.m. cloud task has no browser and no session. (b) ShikksTracker's OS API exposes only `summary`, `attention`, `variant-stats` and `drafts`; `POST /api/contacts/import` is login-cookie authed, so no agent-callable import exists. Reviving the sweep would need a new OS-API endpoint — a ShikksTracker contract change (S4), never a change made from here. (c) The `AgentRun` → morning-digest reporting half was the only piece buildable in this repo today.
+  - **What stays unsolved, on purpose.** Concept §1 named *"Lead sweeps run when Riku remembers"* among the problems the OS would fix. It is not fixed and will not be. Recorded so the concept is not read later as having quietly achieved it.
 
 ---
 
