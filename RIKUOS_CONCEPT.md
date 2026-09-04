@@ -59,7 +59,7 @@ Agency = the system acts first, on triggers, within delegated authority, then re
 | 1 | Follow-up chaser | Time + data state | "Replied to nobody in 4 days" → drafts follow-up → queue | Vercel cron + API |
 | 2 | ~~Lead sweep~~ | — | **Dropped 2026-08-30 — see `ARCHITECTURE.md` S8.** Lead acquisition is not a RikuOS job; prospecting stays manual. | — |
 | 3 | Inbound Messenger triage | Page webhook event | Inside legal 24h window: acknowledge, answer FAQs, propose call times | Vercel function + API |
-| 4 | Site health monitor | Threshold | Uptime/SSL/domain checks on client sites → drafts client email on issues | Vercel cron + API |
+| 4 | Site health monitor | Threshold | ~~Uptime/SSL/domain checks → drafts client email~~ **Narrowed 2026-08-30 to uptime only, notify only** — SSL and domain expiry are Vercel's to renew, not Riku's, and a flaky check would draft an embarrassing client email. See `ARCHITECTURE.md` §2.3 and P5a-5/9/10 | Vercel cron + API |
 | 5 | Morning dispatcher | Schedule | Compiles "what needs you today" across all pages → push notification | Vercel cron + API |
 | 6 | Retro agent | Weekly schedule | Reads reply rates per message variant/niche → proposes edits to outreach skills | Claude scheduled task |
 | 7 | Watchdog | Anomaly | Detects dead webhooks / failed tasks → retries → alerts | Vercel cron |
@@ -122,10 +122,10 @@ Agency = the system acts first, on triggers, within delegated authority, then re
 
 ## 7. Open items
 
-- v0 finish line needs Riku's explicit ratification (§4).
-- Personal/Freelance page layouts to be designed properly (use the design-loop process) — this document specs *content*, not visual design.
-- Name "RikuOS" may change; keep it out of hardcoded strings.
-- Retro agent's edit-approval flow details (how a proposed skill edit is diffed and accepted) — design during step 4.
+- ~~v0 finish line needs Riku's explicit ratification (§4).~~ **Resolved** — ratified as S1 on 2026-08-28 and reached on 2026-08-29 (`ROADMAP.md`, P4).
+- ~~Personal/Freelance page layouts to be designed properly (use the design-loop process)~~ — **Resolved 2026-09-04.** "The design-loop process" was never defined anywhere: `ROADMAP.md` pointed here for it and this line pointed back. **S11 and S12** in `ARCHITECTURE.md` §7 replace it. In short: each page's *content and structure* is discussed with Riku at the start of its own phase, and *visual identity* is settled once, after the first real page ships, rather than in one pass at the very end. This document still specs content, not visual design — that part stands.
+- Name "RikuOS" may change; keep it out of hardcoded strings. **Still open.**
+- Retro agent's edit-approval flow details (how a proposed skill edit is diffed and accepted) — design during step 4. **Still open**, now P7.
 
 ---
 
