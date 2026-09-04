@@ -22,6 +22,12 @@ export interface OsSettingsPatch {
   chaserEnabled?: boolean;
   chaserNDays?: number;
   monitoringEnabled?: boolean;
+  triageEnabled?: boolean;
+  knowledgeBlock?: string;
+  knowledgeReviewedAt?: Date | null;
+  nameableProjects?: string[];
+  holdingText?: string;
+  demoSiteUrls?: { packageKey: string; url: string }[];
 }
 
 export async function updateOsSettings(patch: OsSettingsPatch): Promise<IOsSettings> {

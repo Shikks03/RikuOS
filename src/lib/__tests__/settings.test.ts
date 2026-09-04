@@ -59,3 +59,43 @@ describe("parseSettingsPatch — monitoringEnabled", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe("parseSettingsPatch — triage settings", () => {
+  it("accepts a knowledge block at the cap", () => {
+    const result = parseSettingsPatch({ knowledgeBlock: "x".repeat(4000) });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a knowledge block over the cap", () => {
+    // The block enters EVERY draft's prompt, so length is a per-message cost,
+    // not a storage concern. The cap is a budget, not a formality.
+    const result = parseSettingsPatch({ knowledgeBlock: "x".repeat(4001) });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/4000/);
+  });
+
+  it("accepts a nameable project list and rejects a non-array", () => {
+    expect(parseSettingsPatch({ nameableProjects: ["Azerotech"] }).ok).toBe(true);
+    expect(parseSettingsPatch({ nameableProjects: "Azerotech" }).ok).toBe(false);
+  });
+
+  it("rejects more nameable projects than the cap allows", () => {
+    const many = Array.from({ length: 21 }, (_, i) => `P${i}`);
+    expect(parseSettingsPatch({ nameableProjects: many }).ok).toBe(false);
+  });
+
+  it("accepts demo site urls as a flat string map and rejects nesting", () => {
+    expect(parseSettingsPatch({ demoSiteUrls: { A1: "https://a1.example" } }).ok).toBe(true);
+    expect(parseSettingsPatch({ demoSiteUrls: { A1: { url: "x" } } }).ok).toBe(false);
+  });
+
+  it("rejects a demo url that is not http(s)", () => {
+    // A javascript: or data: URL pasted into a client-facing message is the
+    // kind of thing that only gets noticed after it is sent.
+    expect(parseSettingsPatch({ demoSiteUrls: { A1: "javascript:alert(1)" } }).ok).toBe(false);
+  });
+
+  it("still rejects unknown keys", () => {
+    expect(parseSettingsPatch({ triageEnable: true }).ok).toBe(false);
+  });
+});
