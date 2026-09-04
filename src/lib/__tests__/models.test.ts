@@ -1,9 +1,13 @@
 /**
- * Schema-validation tests, DB-less: validateSync() exercises required/enum/
- * maxlength rules without a MongoDB connection.
+ * Schema-validation tests, DB-less: both validateSync() and validate()
+ * exercise required/enum/maxlength rules without a MongoDB connection —
+ * neither ever touches a database. validateSync() is deprecated in Mongoose
+ * 10, so newer blocks in this file use the async validate() instead; older
+ * blocks still use validateSync() and are left as-is.
  */
 import { describe, it, expect } from "vitest";
 import FollowupDraftApproval from "@/models/approvals/FollowupDraftApproval";
+import TriageResponseApproval from "@/models/approvals/TriageResponseApproval";
 import ApprovalItem from "@/models/ApprovalItem";
 import AgentRun from "@/models/AgentRun";
 import PushSubscription from "@/models/PushSubscription";
@@ -237,9 +241,6 @@ describe("P4 — AgentRun counts", () => {
 
 describe("TriageResponseApproval", () => {
   it("registers under the triage-response discriminator key", async () => {
-    const { default: TriageResponseApproval } = await import(
-      "@/models/approvals/TriageResponseApproval"
-    );
     expect(TriageResponseApproval.baseModelName).toBe("ApprovalItem");
     const doc = new TriageResponseApproval({
       source: "triage",
@@ -258,32 +259,48 @@ describe("TriageResponseApproval", () => {
     await expect(doc.validate()).resolves.toBeUndefined();
   });
 
-  it("rejects an unknown payload field rather than silently storing it", async () => {
+  it("drops an unknown payload field rather than storing it", async () => {
     // strict:true is what stops a drifting payload shape, which is the mistake
-    // ShikksTracker's Mixed run-summary made and this repo's rules exist to avoid.
-    const { default: TriageResponseApproval } = await import(
-      "@/models/approvals/TriageResponseApproval"
-    );
+    // ShikksTracker's Mixed run-summary made and this repo's rules exist to
+    // avoid. strict:true DROPS an unrecognized field silently — it does not
+    // reject it; "throw" is what rejects.
     const doc = new TriageResponseApproval({
       source: "triage",
       title: "t",
       summary: "s",
       payload: { conversationId: "c", messageId: "m", inboundText: "i", holdingText: "h", nope: 1 },
     });
-    const saved = doc.toObject() as unknown as { payload: Record<string, unknown> };
-    expect(saved.payload.nope).toBeUndefined();
+    // Asserting the whole shape at once, rather than just that `nope` is
+    // absent, proves BOTH drop-unknown and keep-known in one line — a schema
+    // that dropped every field (or misspelled a field name) would also leave
+    // `payload.nope` undefined, so that narrower assertion alone would not
+    // have caught it.
+    const saved = doc.toObject<{ payload: Record<string, unknown> }>();
+    expect(saved.payload).toEqual({
+      conversationId: "c",
+      messageId: "m",
+      inboundText: "i",
+      holdingText: "h",
+    });
   });
 
   it("requires the fields a send cannot happen without", async () => {
-    const { default: TriageResponseApproval } = await import(
-      "@/models/approvals/TriageResponseApproval"
-    );
     const doc = new TriageResponseApproval({
       source: "triage",
       title: "t",
       summary: "s",
       payload: { inboundText: "i", holdingText: "h" },
     });
-    await expect(doc.validate()).rejects.toThrow();
+    // Pin both error paths individually — conversationId and messageId are
+    // what the send call routes on, so a dropped `required: true` on either
+    // one must fail this test even though the other still throws on its own.
+    let error: { errors: Record<string, unknown> } | undefined;
+    try {
+      await doc.validate();
+    } catch (e) {
+      error = e as { errors: Record<string, unknown> };
+    }
+    expect(error?.errors["payload.conversationId"]).toBeDefined();
+    expect(error?.errors["payload.messageId"]).toBeDefined();
   });
 });

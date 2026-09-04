@@ -6,6 +6,11 @@ import { Model, Schema } from "mongoose";
 // analysis, so an interface imported as a value becomes a runtime import of an
 // export that does not exist.
 import ApprovalItem, { type IApprovalItemBase } from "../ApprovalItem.ts";
+// Same relative + .ts-extension requirement as above — src/models/OsSettings.ts
+// already imports from lib/settings.ts this same way, for the same reason.
+// HOLDING_TEXT_MAX is defined once in settings.ts (Task 1); importing it here
+// rather than redeclaring it is what keeps the two 500s from ever disagreeing.
+import { HOLDING_TEXT_MAX } from "../../lib/settings.ts";
 
 /**
  * Payload for an inbound Messenger triage draft.
@@ -13,8 +18,8 @@ import ApprovalItem, { type IApprovalItemBase } from "../ApprovalItem.ts";
  * TWO TEXTS, ONE ITEM (design D2). `holdingText` is a template — no model call,
  * no claims — so it survives an Anthropic outage and an unapproved knowledge
  * block. `answerText` is the substantive draft and is ABSENT whenever Riku has
- * not approved the knowledge block (D11): a draft quoting prices he has never
- * read is worse than no draft. `chosenText` records which one he actually sent,
+ * not approved the knowledge block (design D11): a draft quoting prices he has
+ * never read is worse than no draft. `chosenText` records which one he actually sent,
  * which is why one item can carry both without a second status enum.
  *
  * conversationId/messageId are opaque ShikksTracker and Meta identifiers.
@@ -38,13 +43,24 @@ export interface ITriageResponseApproval extends IApprovalItemBase {
   editedPayload?: ITriageResponsePayload;
 }
 
+/**
+ * The schema owns the hard limit on inbound text. Task 3's parser truncates
+ * to this same constant (`text.slice(0, INBOUND_TEXT_MAX)`) before a payload
+ * ever reaches `.create()` — importing it from here, rather than redeclaring
+ * it, is what keeps a raised truncation constant from ever exceeding this
+ * maxlength and turning a webhook call into a 500. Exported the same way
+ * FollowupDraftApproval.ts exports DRAFT_CHANNELS: the model owns the closed
+ * set / hard limit, callers import it rather than duplicating it.
+ */
+export const INBOUND_TEXT_MAX = 4000;
+
 const TriageResponsePayloadSchema = new Schema<ITriageResponsePayload>(
   {
     conversationId: { type: String, required: true, maxlength: 64 },
     messageId: { type: String, required: true, maxlength: 128 },
     senderName: { type: String, maxlength: 200 },
-    inboundText: { type: String, required: true, maxlength: 4000 },
-    holdingText: { type: String, required: true, maxlength: 500 },
+    inboundText: { type: String, required: true, maxlength: INBOUND_TEXT_MAX },
+    holdingText: { type: String, required: true, maxlength: HOLDING_TEXT_MAX },
     answerText: { type: String, maxlength: 4000 },
     answerWithheldReason: { type: String, maxlength: 300 },
     chosenText: { type: String, maxlength: 4000 },
