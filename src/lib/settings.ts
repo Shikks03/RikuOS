@@ -30,8 +30,11 @@ export const CHASER_N_DAYS_MIN = 1;
 export const CHASER_N_DAYS_MAX = 30;
 export const KNOWLEDGE_BLOCK_MAX = 4000;
 export const NAMEABLE_PROJECTS_MAX = 20;
+export const NAMEABLE_PROJECT_MAX_LENGTH = 200;
 export const HOLDING_TEXT_MAX = 500;
 export const DEMO_URLS_MAX = 20;
+export const DEMO_URL_PACKAGE_KEY_MAX_LENGTH = 20;
+export const DEMO_URL_MAX_LENGTH = 500;
 
 export function parseSettingsPatch(body: unknown): SettingsPatchResult {
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
@@ -95,26 +98,36 @@ export function parseSettingsPatch(body: unknown): SettingsPatchResult {
       };
     }
     value.knowledgeBlock = b.knowledgeBlock;
+    // The stamp means "Riku has read THIS text", not "Riku has read
+    // something once". Editing the block without also supplying a stamp
+    // re-opens the approval gate; otherwise a plain content edit would leave
+    // a stale approval standing over text he never reviewed. An explicit
+    // knowledgeReviewedAt in the same patch (handled below) still wins, so
+    // "edit and re-approve in one request" stays possible.
+    if (!("knowledgeReviewedAt" in b)) {
+      value.knowledgeReviewedAt = null;
+    }
   }
 
   if ("knowledgeReviewedAt" in b) {
-    // Riku's approval stamp. Accepts an ISO string or explicit null (un-approve).
+    // Riku's approval stamp. Accepts a date string or explicit null (un-approve).
     if (b.knowledgeReviewedAt === null) {
       value.knowledgeReviewedAt = null;
     } else if (typeof b.knowledgeReviewedAt === "string") {
       const d = new Date(b.knowledgeReviewedAt);
       if (Number.isNaN(d.getTime())) {
-        return { ok: false, error: "knowledgeReviewedAt must be an ISO date or null." };
+        return { ok: false, error: "knowledgeReviewedAt must be a date string or null." };
       }
       value.knowledgeReviewedAt = d;
     } else {
-      return { ok: false, error: "knowledgeReviewedAt must be an ISO date or null." };
+      return { ok: false, error: "knowledgeReviewedAt must be a date string or null." };
     }
   }
 
   if ("nameableProjects" in b) {
     const list = b.nameableProjects;
-    if (!Array.isArray(list) || list.some((p) => typeof p !== "string")) {
+    const isStringArray = Array.isArray(list) && list.every((p): p is string => typeof p === "string");
+    if (!isStringArray) {
       return { ok: false, error: "nameableProjects must be an array of strings." };
     }
     if (list.length > NAMEABLE_PROJECTS_MAX) {
@@ -123,10 +136,13 @@ export function parseSettingsPatch(body: unknown): SettingsPatchResult {
         error: `nameableProjects must have at most ${NAMEABLE_PROJECTS_MAX} entries.`,
       };
     }
-    if (list.some((p) => (p as string).length > 200)) {
-      return { ok: false, error: "Each nameable project must be at most 200 characters." };
+    if (list.some((p) => p.length > NAMEABLE_PROJECT_MAX_LENGTH)) {
+      return {
+        ok: false,
+        error: `Each nameable project must be at most ${NAMEABLE_PROJECT_MAX_LENGTH} characters.`,
+      };
     }
-    value.nameableProjects = list as string[];
+    value.nameableProjects = list;
   }
 
   if ("holdingText" in b) {
@@ -136,7 +152,9 @@ export function parseSettingsPatch(body: unknown): SettingsPatchResult {
     if (b.holdingText.length > HOLDING_TEXT_MAX) {
       return { ok: false, error: `holdingText must be at most ${HOLDING_TEXT_MAX} characters.` };
     }
-    value.holdingText = b.holdingText;
+    // Stored trimmed — the raw body is checked pre-trim only to still reject
+    // whitespace-only input above.
+    value.holdingText = b.holdingText.trim();
   }
 
   if ("demoSiteUrls" in b) {
@@ -153,13 +171,22 @@ export function parseSettingsPatch(body: unknown): SettingsPatchResult {
       if (typeof url !== "string") {
         return { ok: false, error: `demoSiteUrls.${packageKey} must be a string URL.` };
       }
+      if (packageKey.length > DEMO_URL_PACKAGE_KEY_MAX_LENGTH) {
+        return {
+          ok: false,
+          error: `demoSiteUrls key "${packageKey}" must be at most ${DEMO_URL_PACKAGE_KEY_MAX_LENGTH} characters.`,
+        };
+      }
+      if (url.length > DEMO_URL_MAX_LENGTH) {
+        return {
+          ok: false,
+          error: `demoSiteUrls.${packageKey} must be at most ${DEMO_URL_MAX_LENGTH} characters.`,
+        };
+      }
       // http(s) only. A javascript: or data: URL reaching a client-facing
       // draft is the kind of mistake that is only noticed after sending.
       if (!/^https?:\/\/\S+$/.test(url)) {
         return { ok: false, error: `demoSiteUrls.${packageKey} must be an http(s) URL.` };
-      }
-      if (packageKey.length > 20 || url.length > 500) {
-        return { ok: false, error: `demoSiteUrls.${packageKey} is too long.` };
       }
       parsed.push({ packageKey, url });
     }

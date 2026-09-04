@@ -1,4 +1,12 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
+// Relative + explicit .ts extension — sync-indexes.mts imports this file
+// under `node --experimental-strip-types`, which does not resolve the "@/"
+// tsconfig path alias (see the note in approvals/FollowupDraftApproval.ts).
+import {
+  NAMEABLE_PROJECT_MAX_LENGTH,
+  DEMO_URL_PACKAGE_KEY_MAX_LENGTH,
+  DEMO_URL_MAX_LENGTH,
+} from "../lib/settings.ts";
 
 export interface IOsSettings extends Document {
   chaserEnabled: boolean;
@@ -13,12 +21,12 @@ export interface IOsSettings extends Document {
   updatedAt: Date;
 }
 
-// Above the OsSettings schema. A Map of String would be unbounded per entry;
-// this keeps both halves capped and keeps CLAUDE.md's "no Mixed" rule.
+// A Map of String would be unbounded per entry; this keeps both halves
+// capped and keeps CLAUDE.md's "no Mixed" rule.
 const DemoSiteSchema = new Schema(
   {
-    packageKey: { type: String, required: true, maxlength: 20 },
-    url: { type: String, required: true, maxlength: 500 },
+    packageKey: { type: String, required: true, maxlength: DEMO_URL_PACKAGE_KEY_MAX_LENGTH },
+    url: { type: String, required: true, maxlength: DEMO_URL_MAX_LENGTH },
   },
   { _id: false, strict: true }
 );
@@ -44,7 +52,7 @@ const OsSettingsSchema = new Schema<IOsSettings>(
     // (design D11). Do NOT give this a default.
     knowledgeReviewedAt: { type: Date, default: null },
     nameableProjects: {
-      type: [{ type: String, maxlength: 200 }],
+      type: [{ type: String, maxlength: NAMEABLE_PROJECT_MAX_LENGTH }],
       default: [],
     },
     holdingText: {

@@ -34,7 +34,22 @@ export async function updateOsSettings(patch: OsSettingsPatch): Promise<IOsSetti
   const updated = await OsSettings.findOneAndUpdate(
     {},
     { $set: patch },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+      // Mongoose update validators are off by default — without this, every
+      // maxlength/required/min bound on OsSettingsSchema is decorative and
+      // parseSettingsPatch is the ONLY thing enforcing them. runValidators
+      // only checks the paths named in $set (it does not re-validate the
+      // whole document), and setDefaultsOnInsert above ensures the
+      // upsert-creates-a-new-doc path still has defaults for the required
+      // booleans to validate against. Verified against a scratch collection
+      // on the same cluster: a patch bypassing parseSettingsPatch with an
+      // over-length field is silently stored without this flag and rejected
+      // with it.
+      runValidators: true,
+    }
   );
   return updated as IOsSettings;
 }
