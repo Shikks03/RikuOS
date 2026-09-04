@@ -21,6 +21,7 @@
 import mongoose from "mongoose";
 import ApprovalItem from "../src/models/ApprovalItem.ts";
 import "../src/models/approvals/FollowupDraftApproval.ts"; // registers the discriminator's paths
+import "../src/models/approvals/TriageResponseApproval.ts"; // registers the discriminator's paths
 import AgentRun from "../src/models/AgentRun.ts";
 import PushSubscription from "../src/models/PushSubscription.ts";
 import OsSettings from "../src/models/OsSettings.ts";

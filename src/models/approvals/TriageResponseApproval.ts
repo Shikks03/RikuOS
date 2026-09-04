@@ -11,14 +11,23 @@ import ApprovalItem, { type IApprovalItemBase } from "../ApprovalItem.ts";
 // HOLDING_TEXT_MAX is defined once in settings.ts (Task 1); importing it here
 // rather than redeclaring it is what keeps the two 500s from ever disagreeing.
 import { HOLDING_TEXT_MAX } from "../../lib/settings.ts";
-// Same requirement again. INBOUND_TEXT_MAX is defined once in triage.ts
-// (Task 3), which owns it because it also drives a real truncation there
-// (`text.slice(0, INBOUND_TEXT_MAX)`) before a payload ever reaches
-// `.create()`. Importing it here rather than redeclaring it is what keeps a
-// raised truncation constant from ever exceeding this maxlength and turning a
-// webhook call into a 500. triage.ts has zero imports of its own, which is
-// what keeps this safe under strip-types.
-import { INBOUND_TEXT_MAX } from "../../lib/triage.ts";
+// Same requirement again. INBOUND_TEXT_MAX, CONVERSATION_ID_MAX,
+// MESSAGE_ID_MAX and SENDER_NAME_MAX are defined once in triage.ts (Task 3),
+// which owns them because they also drive real parsing decisions there —
+// INBOUND_TEXT_MAX truncates, CONVERSATION_ID_MAX/MESSAGE_ID_MAX reject an
+// over-long id outright (truncating either would corrupt the dedup key or
+// the send target), and SENDER_NAME_MAX clamps a cosmetic display name —
+// before a payload ever reaches `.create()`. Importing them here rather than
+// redeclaring them is what keeps a raised limit in the parser from ever
+// exceeding these maxlengths and turning a webhook call into a 500.
+// triage.ts has zero imports of its own, which is what keeps this safe under
+// strip-types.
+import {
+  INBOUND_TEXT_MAX,
+  CONVERSATION_ID_MAX,
+  MESSAGE_ID_MAX,
+  SENDER_NAME_MAX,
+} from "../../lib/triage.ts";
 
 /**
  * Payload for an inbound Messenger triage draft.
@@ -53,9 +62,9 @@ export interface ITriageResponseApproval extends IApprovalItemBase {
 
 const TriageResponsePayloadSchema = new Schema<ITriageResponsePayload>(
   {
-    conversationId: { type: String, required: true, maxlength: 64 },
-    messageId: { type: String, required: true, maxlength: 128 },
-    senderName: { type: String, maxlength: 200 },
+    conversationId: { type: String, required: true, maxlength: CONVERSATION_ID_MAX },
+    messageId: { type: String, required: true, maxlength: MESSAGE_ID_MAX },
+    senderName: { type: String, maxlength: SENDER_NAME_MAX },
     inboundText: { type: String, required: true, maxlength: INBOUND_TEXT_MAX },
     holdingText: { type: String, required: true, maxlength: HOLDING_TEXT_MAX },
     answerText: { type: String, maxlength: 4000 },

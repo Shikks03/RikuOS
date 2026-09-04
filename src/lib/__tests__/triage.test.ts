@@ -8,16 +8,36 @@
 import { describe, it, expect } from "vitest";
 import {
   WINDOW_HOURS,
+  INBOUND_TEXT_MAX,
+  CONVERSATION_ID_MAX,
+  MESSAGE_ID_MAX,
+  SENDER_NAME_MAX,
   parseInboundEvent,
   windowClosesAt,
   isWithinWindow,
   draftPolicy,
   buildTriageTitle,
+  buildTriageSummary,
+  type TriageSettingsView,
 } from "@/lib/triage";
+// Type-only: erased at compile time, so this brings in none of Mongoose's
+// runtime side effects. triage.ts cannot import the model itself (it must
+// stay import-free — see its file header), so this check lives here instead.
+import type { IOsSettings } from "@/models/OsSettings";
 
 const NOW = new Date("2026-09-04T12:00:00.000Z");
 
-function settings(over: Record<string, unknown> = {}) {
+// Compile-time only, no runtime effect: fails `tsc` if TriageSettingsView
+// drifts from IOsSettings — a field renamed or retyped on OsSettings now
+// breaks the build here instead of failing silently at runtime (e.g. a
+// draftPolicy call reading `undefined` off a renamed field).
+type AssertExtends<A extends B, B> = true;
+type _SettingsShapeStillMatchesOsSettings = AssertExtends<
+  TriageSettingsView,
+  Pick<IOsSettings, keyof TriageSettingsView>
+>;
+
+function settings(over: Partial<TriageSettingsView> = {}): TriageSettingsView {
   return {
     triageEnabled: true,
     knowledgeBlock: "SERVICES REFERENCE — A1 from 3,000.",
@@ -26,7 +46,7 @@ function settings(over: Record<string, unknown> = {}) {
     holdingText: "Thanks for messaging! I'll get back to you shortly.",
     demoSiteUrls: [{ packageKey: "A1", url: "https://a1.example" }],
     ...over,
-  } as Parameters<typeof draftPolicy>[0];
+  };
 }
 
 describe("parseInboundEvent", () => {
@@ -57,9 +77,84 @@ describe("parseInboundEvent", () => {
     expect(parsed?.senderName).toBeUndefined();
   });
 
+  it("collapses an empty-string sender name to undefined, same as missing", () => {
+    const parsed = parseInboundEvent({ ...valid, senderName: "" });
+    expect(parsed).not.toBeNull();
+    expect(parsed?.senderName).toBeUndefined();
+  });
+
   it("truncates an overlong message rather than rejecting it", () => {
     const parsed = parseInboundEvent({ ...valid, text: "x".repeat(9000) });
-    expect(parsed?.text.length).toBe(4000);
+    expect(parsed?.text.length).toBe(INBOUND_TEXT_MAX);
+  });
+
+  it("rejects a whitespace-only body instead of storing an empty card", () => {
+    expect(parseInboundEvent({ ...valid, text: "   \n\t  " })).toBeNull();
+  });
+
+  it("rejects an over-long conversationId rather than truncating it — truncating would corrupt the dedup key", () => {
+    const parsed = parseInboundEvent({
+      ...valid,
+      conversationId: "c".repeat(CONVERSATION_ID_MAX + 1),
+    });
+    expect(parsed).toBeNull();
+  });
+
+  it("rejects an over-long message id rather than truncating it — truncating would corrupt the send target", () => {
+    const parsed = parseInboundEvent({ ...valid, mid: "m".repeat(MESSAGE_ID_MAX + 1) });
+    expect(parsed).toBeNull();
+  });
+
+  it("clamps an over-long sender name instead of rejecting the event — it is cosmetic", () => {
+    const parsed = parseInboundEvent({ ...valid, senderName: "A".repeat(SENDER_NAME_MAX + 50) });
+    expect(parsed).not.toBeNull();
+    expect(parsed?.senderName?.length).toBe(SENDER_NAME_MAX);
+  });
+
+  it("drops unknown extra keys from the parsed result", () => {
+    const parsed = parseInboundEvent({ ...valid, extra: "not part of the contract" });
+    expect(parsed).toEqual({ ...valid, sentAt: new Date(valid.sentAt) });
+  });
+
+  describe("is total: returns null rather than throwing for a non-object body", () => {
+    it("null", () => {
+      expect(parseInboundEvent(null)).toBeNull();
+    });
+    it("an array", () => {
+      expect(parseInboundEvent([])).toBeNull();
+    });
+    it("a bare string", () => {
+      expect(parseInboundEvent("x")).toBeNull();
+    });
+    it("a number", () => {
+      expect(parseInboundEvent(42)).toBeNull();
+    });
+    it("undefined", () => {
+      expect(parseInboundEvent(undefined)).toBeNull();
+    });
+  });
+
+  describe("timestamp strictness — new Date() is too lenient to trust directly", () => {
+    it("accepts a strict ISO-8601 timestamp", () => {
+      const parsed = parseInboundEvent(valid);
+      expect(parsed?.sentAt).toEqual(new Date(valid.sentAt));
+    });
+
+    it('rejects a bare year ("2026") — new Date("2026") parses but means nothing useful here', () => {
+      expect(parseInboundEvent({ ...valid, sentAt: "2026" })).toBeNull();
+    });
+
+    it('rejects a non-ISO date string ("Sep 4 2026") — new Date() parses this in the SERVER\'S local zone, so the same string is a different instant on a laptop than on Vercel', () => {
+      expect(parseInboundEvent({ ...valid, sentAt: "Sep 4 2026" })).toBeNull();
+    });
+
+    it("rejects an epoch-milliseconds string — new Date() would parse it as a date-only string, not as an epoch", () => {
+      expect(parseInboundEvent({ ...valid, sentAt: "1757000000000" })).toBeNull();
+    });
+
+    it("rejects a parseable-but-insane year outside the sanity bound", () => {
+      expect(parseInboundEvent({ ...valid, sentAt: "9999-01-01T00:00:00.000Z" })).toBeNull();
+    });
   });
 });
 
@@ -98,6 +193,11 @@ describe("draftPolicy — what may be said", () => {
     expect(policy.withheldReason).toMatch(/not approved/i);
   });
 
+  it("never passes the withheld block's text through, even to a caller that forgets to check mayAnswer first", () => {
+    const policy = draftPolicy(settings({ knowledgeReviewedAt: null }));
+    expect(policy.knowledgeBlock).toBe("");
+  });
+
   it("withholds the answer when the block is approved but empty", () => {
     const policy = draftPolicy(settings({ knowledgeBlock: "   " }));
     expect(policy.mayAnswer).toBe(false);
@@ -123,5 +223,34 @@ describe("buildTriageTitle", () => {
 
   it("says so plainly when the conversation is not linked to a contact", () => {
     expect(buildTriageTitle(undefined)).toBe("New message from an unlinked conversation");
+  });
+});
+
+describe("buildTriageSummary", () => {
+  it("passes short single-line text through unchanged", () => {
+    expect(buildTriageSummary("magkano po ang website?")).toBe("magkano po ang website?");
+  });
+
+  it("collapses newlines and repeated whitespace into single spaces — it is not just the first line", () => {
+    expect(buildTriageSummary("hi po\n\ngusto ko\tmag  website")).toBe(
+      "hi po gusto ko mag website"
+    );
+  });
+
+  it("trims leading and trailing whitespace", () => {
+    expect(buildTriageSummary("   hello there   ")).toBe("hello there");
+  });
+
+  it("passes exactly 200 characters through unclipped", () => {
+    const exact = "a".repeat(200);
+    expect(buildTriageSummary(exact)).toBe(exact);
+    expect(buildTriageSummary(exact).length).toBe(200);
+  });
+
+  it("clips at 201 characters and appends an ellipsis", () => {
+    const over = "a".repeat(201);
+    const summary = buildTriageSummary(over);
+    expect(summary).toBe(`${"a".repeat(199)}…`);
+    expect(summary.length).toBe(200);
   });
 });
