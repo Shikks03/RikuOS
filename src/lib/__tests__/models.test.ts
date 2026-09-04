@@ -234,3 +234,56 @@ describe("P4 — AgentRun counts", () => {
     expect(run.validateSync()?.errors["counts.itemsSkipped"]).toBeDefined();
   });
 });
+
+describe("TriageResponseApproval", () => {
+  it("registers under the triage-response discriminator key", async () => {
+    const { default: TriageResponseApproval } = await import(
+      "@/models/approvals/TriageResponseApproval"
+    );
+    expect(TriageResponseApproval.baseModelName).toBe("ApprovalItem");
+    const doc = new TriageResponseApproval({
+      source: "triage",
+      title: "New message from Ana",
+      summary: "Asked how much a website costs",
+      payload: {
+        conversationId: "c1",
+        messageId: "m1",
+        senderName: "Ana",
+        inboundText: "magkano po ang website?",
+        holdingText: "Thanks for messaging!",
+        answerText: "A1 starts at 3,000.",
+      },
+    });
+    expect(doc.type).toBe("triage-response");
+    await expect(doc.validate()).resolves.toBeUndefined();
+  });
+
+  it("rejects an unknown payload field rather than silently storing it", async () => {
+    // strict:true is what stops a drifting payload shape, which is the mistake
+    // ShikksTracker's Mixed run-summary made and this repo's rules exist to avoid.
+    const { default: TriageResponseApproval } = await import(
+      "@/models/approvals/TriageResponseApproval"
+    );
+    const doc = new TriageResponseApproval({
+      source: "triage",
+      title: "t",
+      summary: "s",
+      payload: { conversationId: "c", messageId: "m", inboundText: "i", holdingText: "h", nope: 1 },
+    });
+    const saved = doc.toObject() as unknown as { payload: Record<string, unknown> };
+    expect(saved.payload.nope).toBeUndefined();
+  });
+
+  it("requires the fields a send cannot happen without", async () => {
+    const { default: TriageResponseApproval } = await import(
+      "@/models/approvals/TriageResponseApproval"
+    );
+    const doc = new TriageResponseApproval({
+      source: "triage",
+      title: "t",
+      summary: "s",
+      payload: { inboundText: "i", holdingText: "h" },
+    });
+    await expect(doc.validate()).rejects.toThrow();
+  });
+});
