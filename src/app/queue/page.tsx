@@ -22,6 +22,11 @@ interface QueuePayload {
   draftBody?: string;
   replySnippet?: string;
   replyToLogId?: string;
+  // triage-response only (GET /api/queue's .lean() already includes these —
+  // see the CRITICAL fix note below the render block).
+  holdingText?: string;
+  answerText?: string;
+  answerWithheldReason?: string;
 }
 
 interface QueueItem {
@@ -164,7 +169,45 @@ export default function QueuePage() {
               <p className="meta">Their reply: “{effective.replySnippet}”</p>
             )}
             {effective?.draftSubject && <p className="meta">Subject: {effective.draftSubject}</p>}
-            {effective?.draftBody && <pre className="body">{effective.draftBody}</pre>}
+            {item.type === "triage-response" ? (
+              <>
+                {item.staleAt && (
+                  <p className="meta">
+                    Reply window closes {new Date(item.staleAt).toLocaleString()}
+                  </p>
+                )}
+                {effective?.answerText ? (
+                  <>
+                    <p className="meta">Drafted answer — Approve sends this:</p>
+                    <pre className="body">{effective.answerText}</pre>
+                    {effective?.holdingText && (
+                      <>
+                        <p className="meta">
+                          Holding reply (not sent — the answer above takes precedence):
+                        </p>
+                        <pre className="body">{effective.holdingText}</pre>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {effective?.answerWithheldReason && (
+                      <p className="error">{effective.answerWithheldReason}</p>
+                    )}
+                    {effective?.holdingText && (
+                      <>
+                        <p className="meta">
+                          Holding reply — Approve sends this one-tap acknowledgment:
+                        </p>
+                        <pre className="body">{effective.holdingText}</pre>
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            ) : (
+              effective?.draftBody && <pre className="body">{effective.draftBody}</pre>
+            )}
             {item.actionError && (
               <p className={item.actionStatus === "done" ? "meta" : "error"}>
                 {item.actionStatus === "done" ? "Note: " : "Action error: "}
@@ -182,9 +225,9 @@ export default function QueuePage() {
 
             {item.actionStatus === "needs_verification" && (
               <p className="error">
-                This may or may not have reached ShikksTracker. Open the contact there and check
-                whether the draft exists before doing anything else. There is no retry button on
-                purpose.
+                {item.type === "triage-response"
+                  ? "This may or may not have reached the Messenger thread. Open the conversation there and check whether the reply was sent before doing anything else. There is no retry button on purpose."
+                  : "This may or may not have reached ShikksTracker. Open the contact there and check whether the draft exists before doing anything else. There is no retry button on purpose."}
               </p>
             )}
 
@@ -196,16 +239,18 @@ export default function QueuePage() {
                 >
                   Approve
                 </button>
-                <button
-                  className="secondary"
-                  disabled={busyId === item._id}
-                  onClick={() => {
-                    setEditingId(item._id);
-                    setEditBody(effective?.draftBody ?? "");
-                  }}
-                >
-                  Edit
-                </button>
+                {item.type !== "triage-response" && (
+                  <button
+                    className="secondary"
+                    disabled={busyId === item._id}
+                    onClick={() => {
+                      setEditingId(item._id);
+                      setEditBody(effective?.draftBody ?? "");
+                    }}
+                  >
+                    Edit
+                  </button>
+                )}
                 <button
                   className="danger"
                   disabled={busyId === item._id}

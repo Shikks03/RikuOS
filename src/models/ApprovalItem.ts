@@ -6,6 +6,16 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 // Keep model-to-model imports relative so both the bundler and plain Node can
 // resolve them.
 import { AGENTS } from "./AgentRun.ts";
+// Same relative + .ts-extension requirement as above. TITLE_MAX is defined
+// once in lib/triage.ts, which owns it because buildTriageTitle() there
+// structurally clamps an assembled "New message from <sender>" string to it
+// before a triage payload ever reaches `.create()` — see the comment on
+// TITLE_MAX. Importing it here rather than redeclaring `maxlength: 200`
+// keeps a raised bound in one place from ever exceeding the other and
+// throwing a ValidationError inside the messenger/inbound webhook handler.
+// triage.ts has zero imports of its own, which is what keeps this safe under
+// strip-types (see triage.ts's own header comment).
+import { TITLE_MAX } from "../lib/triage.ts";
 
 /** Who proposed the item — the agents, plus "manual" for seeded/test items. */
 export const APPROVAL_SOURCES = [...AGENTS, "manual"] as const;
@@ -70,7 +80,7 @@ export interface IApprovalItemBase extends Document {
 const ApprovalItemSchema = new Schema<IApprovalItemBase>(
   {
     source: { type: String, required: true, enum: APPROVAL_SOURCES },
-    title: { type: String, required: true, maxlength: 200 },
+    title: { type: String, required: true, maxlength: TITLE_MAX },
     summary: { type: String, required: true, maxlength: 2000 },
     status: { type: String, required: true, enum: APPROVAL_STATUSES, default: "pending" },
     staleAt: { type: Date },

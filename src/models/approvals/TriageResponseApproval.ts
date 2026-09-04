@@ -53,6 +53,17 @@ export interface ITriageResponsePayload {
   answerText?: string;
   /** Why the substantive answer is missing, shown on the queue card. */
   answerWithheldReason?: string;
+  /**
+   * NOTHING WRITES THIS YET. executeTriageResponse (queue.ts) already reads
+   * it as the highest-priority send candidate, and the field is documented
+   * above as recording which text Riku actually sent — but no code path sets
+   * it, because that requires a chooser control on the queue card (picking
+   * between the answer and the holding reply) that is explicitly out of
+   * scope for the P6 final review (queue-page design work, to be discussed
+   * with Riku first — CLAUDE.md S11). Until that ships, the retro agent will
+   * find this field undefined on every item, and the executor falls through
+   * to answerText/holdingText exactly as designed.
+   */
   chosenText?: string;
 }
 

@@ -28,20 +28,26 @@
  * for both `answerText` and `chosenText`) rather than redeclaring its own
  * copies — two copies that can drift is a live failure path (raise the
  * parser's limit without the schema's, or vice versa, and `.create()` throws
- * a ValidationError inside a webhook handler).
+ * a ValidationError inside a webhook handler). `TITLE_MAX` is the same idea
+ * one level up: it mirrors the BASE schema's `title` maxlength
+ * (ApprovalItem.ts imports it), and `buildTriageTitle` clamps the assembled
+ * "New message from <sender>" string to it directly, because `senderName`
+ * alone being under `SENDER_NAME_MAX` does not guarantee the string built
+ * from it stays under `TITLE_MAX` once the prefix is added.
  *
  * ZERO IMPORTS, DELIBERATELY. `scripts/sync-indexes.mts` loads model files
  * under `node --experimental-strip-types`, which cannot resolve the "@/"
- * alias. `TriageResponseApproval.ts` imports these constants from this file
- * with a relative, extensioned path — safe only because this file imports
- * nothing itself and so pulls in no unresolvable specifier. Keeping this
- * module import-free also keeps it a pure logic layer: every consumer and
- * every unit test can use it without dragging in Mongoose or registering a
- * discriminator as a side effect. `draftTriage.ts` is not subject to the
- * strip-types constraint (it value-imports the Anthropic SDK and is never
- * loaded by the sync script), so it imports `ANSWER_TEXT_MAX` and
- * `INBOUND_TEXT_MAX` from here the ordinary way, through the "@/lib/triage"
- * alias — still one source of truth, just reached by two different paths.
+ * alias. `TriageResponseApproval.ts` and `ApprovalItem.ts` import these
+ * constants from this file with a relative, extensioned path — safe only
+ * because this file imports nothing itself and so pulls in no unresolvable
+ * specifier. Keeping this module import-free also keeps it a pure logic
+ * layer: every consumer and every unit test can use it without dragging in
+ * Mongoose or registering a discriminator as a side effect. `draftTriage.ts`
+ * is not subject to the strip-types constraint (it value-imports the
+ * Anthropic SDK and is never loaded by the sync script), so it imports
+ * `ANSWER_TEXT_MAX` and `INBOUND_TEXT_MAX` from here the ordinary way,
+ * through the "@/lib/triage" alias — still one source of truth, just reached
+ * by two different paths.
  */
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -88,6 +94,22 @@ export const SENDER_NAME_MAX = 200;
  * for both the model and draftTriage.ts to depend on it safely.
  */
 export const ANSWER_TEXT_MAX = 4000;
+
+/**
+ * Mirrors the base ApprovalItem schema's `title` maxlength (ApprovalItem.ts
+ * imports this constant rather than redeclaring it — same consolidation as
+ * every other bound in this file, and the one the P6 final review found
+ * missing). `buildTriageTitle` below clamps to this STRUCTURALLY, not just by
+ * convention: `SENDER_NAME_MAX` (200) plus the "New message from " prefix (17
+ * chars) can assemble a 217-char title, which would throw a ValidationError
+ * inside `TriageResponseApproval.create()` — INSIDE the webhook handler,
+ * after the Anthropic call has already been spent, leaving no item for any
+ * retry to find. `senderName` is attacker-influenced (Meta's forwarded sender
+ * display name), so an over-length one is a reachable input, not a
+ * theoretical one, even though genuine Facebook display names never approach
+ * it today.
+ */
+export const TITLE_MAX = 200;
 
 /**
  * Sanity bound on the parsed year, independent of the ISO regex below. The
@@ -240,10 +262,18 @@ export function draftPolicy(s: TriageSettingsView): DraftPolicy {
   };
 }
 
+/**
+ * Clamps the ASSEMBLED title to TITLE_MAX, not just senderName in isolation —
+ * SENDER_NAME_MAX alone (200) is not enough here, because this function also
+ * adds a fixed prefix on top of it. See the comment on TITLE_MAX.
+ */
 export function buildTriageTitle(senderName: string | undefined): string {
-  return senderName
-    ? `New message from ${senderName}`
-    : "New message from an unlinked conversation";
+  if (!senderName) return "New message from an unlinked conversation";
+  const prefix = "New message from ";
+  const maxNameLength = Math.max(0, TITLE_MAX - prefix.length);
+  const clampedName =
+    senderName.length > maxNameLength ? senderName.slice(0, maxNameLength) : senderName;
+  return `${prefix}${clampedName}`;
 }
 
 /**

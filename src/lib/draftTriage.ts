@@ -46,10 +46,17 @@ import { ANSWER_TEXT_MAX, INBOUND_TEXT_MAX, type DraftPolicy } from "@/lib/triag
  * so a slow Anthropic call cannot be caught, logged, or turned into a
  * withheld reason — it just disappears, taking the ApprovalItem, the
  * AgentRun and the push with it, inside a window that can never be reopened.
- * maxRetries is pinned to 1 below (draftFollowup.ts:36 does the same, for
- * the same reason) and the timeout is kept well under the route budget so
- * the worst case — two attempts plus SDK backoff — still leaves comfortable
- * headroom for the DB writes and the push that run after this call returns.
+ *
+ * maxRetries is pinned to 0, NOT 1 (unlike draftFollowup.ts:36, which runs in
+ * a cron with no hard wall of its own). The route's own budget comment does
+ * the full arithmetic, but the short version: connectDB (up to 10s cold) +
+ * two queries + two writes + sendPushToAll (10s per subscription,
+ * SEQUENTIALLY — a phone and a laptop alone is 20s) leaves no room for a
+ * second Anthropic attempt inside 60s. An SDK retry buys little when the
+ * caller has a hard wall behind it anyway, and a failed draft degrades
+ * gracefully to the holding reply (decideIngest catches this call's throw) —
+ * losing the push because Vercel killed the function mid-loop is the actually
+ * costly failure, and it is uncatchable and unloggable when it happens.
  */
 export const TRIAGE_TIMEOUT_MS = 20_000;
 
@@ -181,7 +188,7 @@ export async function generateTriageDraft(
   // there is no meaningful connection reuse to buy, and keeping maxRetries
   // and timeout set right here — instead of behind a shared singleton — is
   // what makes them visible to whoever reads this file next.
-  const client = new Anthropic({ apiKey, timeout: TRIAGE_TIMEOUT_MS, maxRetries: 1 });
+  const client = new Anthropic({ apiKey, timeout: TRIAGE_TIMEOUT_MS, maxRetries: 0 });
 
   const response = await client.messages.create({
     model: MODEL,

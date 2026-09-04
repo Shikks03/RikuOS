@@ -10,14 +10,21 @@ import TriageResponseApproval from "@/models/approvals/TriageResponseApproval";
 import AgentRun, { type IAgentRunCounts } from "@/models/AgentRun";
 
 /**
- * draftTriage.ts's own timeout is 20s with maxRetries: 1 (TRIAGE_TIMEOUT_MS),
- * so the worst case is two attempts plus SDK backoff — close to 40s — before
- * decideIngest even returns. That leaves roughly the remaining 18-20s of this
- * budget for connectDB (which alone allows up to 10s of server selection),
- * the dedup lookup, the item write, the AgentRun write, and the push loop
- * (10s per subscription, sequential). Workable for the handful of devices a
- * single-user app actually has subscribed — not spacious headroom, and not
- * something to add more sequential I/O to without re-checking this budget.
+ * draftTriage.ts's own timeout is 20s with maxRetries: 0 (TRIAGE_TIMEOUT_MS)
+ * — pinned to zero specifically because this route has a hard wall and an
+ * SDK retry would eat into it, so the worst case is ONE attempt, roughly 20s,
+ * before decideIngest returns. That leaves roughly the remaining 40s of this
+ * 60s budget for connectDB (which alone allows up to 10s of server
+ * selection), the dedup lookup, the item write, the AgentRun write, and the
+ * push loop (10s per subscription, sequential — a phone and a laptop alone is
+ * 20s). Still not spacious headroom for a single-user app's handful of
+ * subscribed devices, and not something to add more sequential I/O to
+ * without re-checking this budget — but with maxRetries: 1 (the value this
+ * comment used to document) the same arithmetic left NEGATIVE headroom: a
+ * ~41s worst-case draft call plus ~20s of push alone already exceeded the 60s
+ * ceiling, and Vercel kills the function mid-push when that happens —
+ * uncatchable, unloggable, and silent because the ApprovalItem and AgentRun
+ * are already durable by then.
  */
 export const maxDuration = 60;
 
@@ -91,6 +98,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       "payload.messageId": event.mid,
     }).select({ _id: 1 });
     if (existing) {
+      // Same outcome as the E11000 branch below (a redelivery of a message
+      // already queued), so it gets the same AgentRun record — CLAUDE.md:
+      // every agent run writes one. Before this fix only the slower, rarer
+      // E11000 path did; this fast path (the common case, since it wins the
+      // findOne race almost every time) recorded nothing at all.
+      await writeRun(startedAt, true, { itemsProcessed: 1, itemsSkipped: 1 });
       return NextResponse.json({ ok: true, action: "duplicate" });
     }
 

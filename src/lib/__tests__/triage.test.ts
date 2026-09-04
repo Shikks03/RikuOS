@@ -12,6 +12,7 @@ import {
   CONVERSATION_ID_MAX,
   MESSAGE_ID_MAX,
   SENDER_NAME_MAX,
+  TITLE_MAX,
   parseInboundEvent,
   windowClosesAt,
   isWithinWindow,
@@ -223,6 +224,13 @@ describe("buildTriageTitle", () => {
 
   it("says so plainly when the conversation is not linked to a contact", () => {
     expect(buildTriageTitle(undefined)).toBe("New message from an unlinked conversation");
+  });
+
+  it("clamps a 200-char sender name so the assembled title never exceeds TITLE_MAX — an over-length one would otherwise throw a ValidationError inside the webhook handler (TriageResponseApproval's title maxlength mirrors TITLE_MAX)", () => {
+    const senderName = "A".repeat(SENDER_NAME_MAX); // the max parseInboundEvent allows through
+    const title = buildTriageTitle(senderName);
+    expect(title.length).toBeLessThanOrEqual(TITLE_MAX);
+    expect(title.startsWith("New message from A")).toBe(true);
   });
 });
 

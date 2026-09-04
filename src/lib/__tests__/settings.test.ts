@@ -252,3 +252,37 @@ describe("parseSettingsPatch — nameableProjects at the cap", () => {
     expect(parseSettingsPatch({ nameableProjects: at20 }).ok).toBe(true);
   });
 });
+
+describe("parseSettingsPatch — nameableProjects trimming and emptiness", () => {
+  it("trims each entry", () => {
+    expect(parseSettingsPatch({ nameableProjects: ["  Azerotech  "] })).toEqual({
+      ok: true,
+      value: { nameableProjects: ["Azerotech"] },
+    });
+  });
+
+  it("rejects an empty-string entry — it would render as a bare '- ' line in the prompt", () => {
+    expect(parseSettingsPatch({ nameableProjects: [""] }).ok).toBe(false);
+  });
+
+  it("rejects a whitespace-only entry", () => {
+    expect(parseSettingsPatch({ nameableProjects: ["   "] }).ok).toBe(false);
+  });
+});
+
+describe("parseSettingsPatch — demoSiteUrls key trimming and emptiness", () => {
+  it("trims a package key", () => {
+    expect(parseSettingsPatch({ demoSiteUrls: { " A1 ": "https://a1.example" } })).toEqual({
+      ok: true,
+      value: { demoSiteUrls: [{ packageKey: "A1", url: "https://a1.example" }] },
+    });
+  });
+
+  it("rejects an empty-string key — it would render as a bare '- : <url>' line in the prompt", () => {
+    expect(parseSettingsPatch({ demoSiteUrls: { "": "https://x.example" } }).ok).toBe(false);
+  });
+
+  it("rejects a whitespace-only key", () => {
+    expect(parseSettingsPatch({ demoSiteUrls: { "   ": "https://x.example" } }).ok).toBe(false);
+  });
+});

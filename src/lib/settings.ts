@@ -150,7 +150,17 @@ export function parseSettingsPatch(body: unknown): SettingsPatchResult {
         error: `Each nameable project must be at most ${NAMEABLE_PROJECT_MAX_LENGTH} characters.`,
       };
     }
-    value.nameableProjects = list;
+    // Trimmed and checked for emptiness AFTER the length check, on the same
+    // pattern as holdingText below: the cap holds on what was typed, not on
+    // what survives trimming. An untrimmed or empty entry isn't cosmetic here
+    // — it renders directly into the model's prompt as a bare "- " line
+    // (draftTriage.ts's buildTriageUserMessage), which reads as a nameable
+    // project with no name.
+    const trimmedProjects = list.map((p) => p.trim());
+    if (trimmedProjects.some((p) => p.length === 0)) {
+      return { ok: false, error: "nameableProjects entries must not be empty." };
+    }
+    value.nameableProjects = trimmedProjects;
   }
 
   if ("holdingText" in b) {
@@ -199,7 +209,15 @@ export function parseSettingsPatch(body: unknown): SettingsPatchResult {
       if (!/^https?:\/\/\S+$/.test(url)) {
         return { ok: false, error: `demoSiteUrls.${packageKey} must be an http(s) URL.` };
       }
-      parsed.push({ packageKey, url });
+      // Trimmed and checked for emptiness AFTER the length/format checks, same
+      // reasoning as nameableProjects above: an empty-after-trim key renders
+      // straight into the model's prompt as "- : https://x" — a package with
+      // no name paired with a link the model is told it may send.
+      const trimmedKey = packageKey.trim();
+      if (trimmedKey.length === 0) {
+        return { ok: false, error: "demoSiteUrls keys must not be empty." };
+      }
+      parsed.push({ packageKey: trimmedKey, url });
     }
     value.demoSiteUrls = parsed;
   }
