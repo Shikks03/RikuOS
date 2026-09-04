@@ -42,6 +42,35 @@ export function requireCronSecret(request: NextRequest): NextResponse | null {
   return null;
 }
 
+/**
+ * Validates the secret ShikksTracker sends when forwarding an inbound
+ * Messenger event. Separate from CRON_SECRET on purpose: this one is shared
+ * with another system, so rotating it must not also invalidate Vercel's cron
+ * authentication.
+ *
+ * Same shape as requireCronSecret — SHA-256 both sides so timingSafeEqual gets
+ * equal-length buffers, and fail closed when the variable is unset.
+ */
+export function requireForwardSecret(request: NextRequest): NextResponse | null {
+  const forwardSecret = process.env.MESSENGER_FORWARD_SECRET;
+  if (!forwardSecret) {
+    return NextResponse.json(
+      { error: "MESSENGER_FORWARD_SECRET environment variable is not set." },
+      { status: 500 }
+    );
+  }
+
+  const provided = request.headers.get("x-forward-secret") ?? "";
+  if (!timingSafeEqual(sha256(provided), sha256(forwardSecret))) {
+    return NextResponse.json(
+      { error: "Unauthorized: missing or invalid forward secret." },
+      { status: 401 }
+    );
+  }
+
+  return null;
+}
+
 const MUTATING_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 
 /**

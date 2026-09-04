@@ -8,11 +8,13 @@
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { NextRequest } from "next/server";
 import {
   createSessionToken,
   verifySessionToken,
   assertSessionSecret,
 } from "@/lib/session";
+import { requireForwardSecret } from "@/lib/auth";
 
 const SECRET_A = "a".repeat(32);
 const SECRET_B = "b".repeat(32);
@@ -111,5 +113,37 @@ describe("assertSessionSecret", () => {
   it("returns the secret when valid", () => {
     process.env.SESSION_SECRET = "s".repeat(32);
     expect(assertSessionSecret()).toBe("s".repeat(32));
+  });
+});
+
+describe("requireForwardSecret", () => {
+  const ORIGINAL = process.env.MESSENGER_FORWARD_SECRET;
+  afterEach(() => {
+    if (ORIGINAL === undefined) delete process.env.MESSENGER_FORWARD_SECRET;
+    else process.env.MESSENGER_FORWARD_SECRET = ORIGINAL;
+  });
+
+  const req = (headers: Record<string, string>) =>
+    new NextRequest("https://x.test/api/messenger/inbound", { method: "POST", headers });
+
+  it("fails closed with 500 when the secret is not configured", () => {
+    delete process.env.MESSENGER_FORWARD_SECRET;
+    const res = requireForwardSecret(req({ "x-forward-secret": "anything" }));
+    expect(res?.status).toBe(500);
+  });
+
+  it("rejects a wrong secret with 401", () => {
+    process.env.MESSENGER_FORWARD_SECRET = "a".repeat(32);
+    expect(requireForwardSecret(req({ "x-forward-secret": "b".repeat(32) }))?.status).toBe(401);
+  });
+
+  it("accepts the right secret", () => {
+    process.env.MESSENGER_FORWARD_SECRET = "a".repeat(32);
+    expect(requireForwardSecret(req({ "x-forward-secret": "a".repeat(32) }))).toBeNull();
+  });
+
+  it("rejects a missing header without throwing", () => {
+    process.env.MESSENGER_FORWARD_SECRET = "a".repeat(32);
+    expect(requireForwardSecret(req({}))?.status).toBe(401);
   });
 });
