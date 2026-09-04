@@ -14,8 +14,11 @@
  * downgrades a failure to `rejected`; everything else is `unknown` and parks
  * for human verification (CLAUDE.md asymmetric-failure rule).
  *
- * Two ShikksTracker behaviours this file depends on, both verified at plan time
- * against ../ShikksTracker/src/lib/os/drafts.ts:
+ * Three ShikksTracker behaviours this file's classifiers depend on. #1 and #2
+ * were verified at plan time against ../ShikksTracker/src/lib/os/drafts.ts;
+ * #3 is a REQUIREMENT this file is imposing on an endpoint that does not
+ * exist yet (Task 10), not an observed fact, and is being carried into that
+ * task's handoff so both repos agree on it before either side ships:
  *
  *  1. createOsDraft hard-codes `origin: "rikuos"` on every log, which is what
  *     permits delivery to a contact whose status is `replied`
@@ -25,6 +28,15 @@
  *     is why 400/404/422 are provably side-effect-free, and it is the single
  *     assumption the `rejected` rows in the table rest on. If that file ever
  *     grows a failure path after the write, this classifier must change with it.
+ *  3. POST /api/os/messenger-reply must emit every 4xx BEFORE calling the Meta
+ *     Graph API — a validation failure, never a delivery failure — so a 4xx
+ *     stays provably side-effect-free, the same way #2 does for drafts.
+ *     Anything that fails AFTER the Graph call, including a Graph error
+ *     relayed back to RikuOS, must be a 5xx. `failed` is the ONLY status the
+ *     retry route accepts; it re-enters `pending` and calls
+ *     sendMessengerReply again. If that ordering is ever violated, a
+ *     4xx-after-send means Retry sends the prospect the same message twice —
+ *     the exact failure this file exists to prevent.
  */
 
 /** Explicit timeout on every external call (CLAUDE.md). */
@@ -220,6 +232,17 @@ export type DraftOutcome =
   | { kind: "duplicate"; message: string }
   | { kind: "rejected"; status: number; message: string }
   | { kind: "unknown"; message: string };
+
+/**
+ * The status/note pair `sendMessengerReply` returns. Named, and exported,
+ * so Task 6's executor can bind it to `ActionOutcome` (src/lib/queue.ts,
+ * derived from `ACTION_STATUSES`) and let the compiler catch any future
+ * divergence between the two unions instead of the copies silently drifting.
+ */
+export type MessengerSendOutcome = {
+  status: "done" | "failed" | "needs_verification";
+  note: string;
+};
 
 function describeError(err: unknown): string {
   if (err instanceof Error) return `${err.name}: ${err.message}`;
@@ -439,17 +462,45 @@ export async function createDraft(request: DraftRequest): Promise<DraftOutcome> 
  * rather than catch an exception it cannot classify.
  *
  * The classification is the whole point and it is asymmetric on purpose:
- *   2xx        -> done. Confirmed.
- *   4xx        -> failed. The far side ANSWERED and refused, so nothing was
- *                 sent and a retry is safe. "Window closed" lands here.
- *   5xx / net  -> needs_verification. We do not know. A retry could send a
- *                 prospect the same message twice, which is worse than a late
- *                 reply. A human checks the thread.
+ *   200 + { ok: true } -> done. This exact combination is the ONLY thing
+ *                         read as confirmed — see "Accepted success shape".
+ *   4xx                -> failed. The far side ANSWERED and refused, so
+ *                         nothing was sent and a retry is safe. "Window
+ *                         closed" lands here. This assumes every 4xx is
+ *                         emitted BEFORE the Meta Graph call (file header,
+ *                         point 3) — if that ordering ever breaks, this
+ *                         classifier must change with it.
+ *   anything else      -> needs_verification. Any other 2xx (a 202 for a
+ *                         queued send, a bare 204, ...), a 200 whose body
+ *                         will not parse or does not say `{ ok: true }`, a
+ *                         5xx, or a network/timeout error: none of these is
+ *                         positive proof either way, so none may be read as
+ *                         `done` OR as `failed`. A retry could send a
+ *                         prospect the same message twice, which is worse
+ *                         than a late reply. A human checks the thread.
+ *
+ * Accepted success shape: exactly HTTP 200 with a JSON body `{ "ok": true }`.
+ * Deliberately narrower than "any 2xx" — the P6 design only promises the
+ * endpoint "returns a classified result", not a specific status code, so this
+ * pins the contract rather than inheriting whatever Task 10 picks. A bare 202
+ * for a queued send, or a 200 carrying `{ ok: false, reason: "window closed" }`,
+ * are both spec-compatible readings that must NOT be read as `done`. The body
+ * is parsed defensively: anything that fails to parse, or parses without
+ * `ok === true`, falls through to `needs_verification` rather than throwing or
+ * being treated as a refusal.
+ *
+ * Network/timeout errors deliberately do NOT use `classifyFetchError` (which
+ * distinguishes ECONNREFUSED-style "never connected" from everything else).
+ * That distinction is safe for createDraft, where getting it wrong wastes a
+ * retry; here, getting it wrong sends a prospect the same message twice, so
+ * every network failure parks as `needs_verification` regardless of cause —
+ * the error's name/message/cause code are carried in the note for a human to
+ * read, never used to decide the status.
  */
 export async function sendMessengerReply(
   conversationId: string,
   text: string
-): Promise<{ status: "done" | "failed" | "needs_verification"; note: string }> {
+): Promise<MessengerSendOutcome> {
   let baseUrl: string;
   let secret: string;
   try {
@@ -465,17 +516,33 @@ export async function sendMessengerReply(
       headers: { "content-type": "application/json", "x-os-secret": secret },
       body: JSON.stringify({ conversationId, text }),
       signal: AbortSignal.timeout(ST_TIMEOUT_MS),
+      cache: "no-store",
     });
 
-    if (res.ok) {
-      return { status: "done", note: "Sent by ShikksTracker." };
+    if (res.status === 200) {
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        body = undefined; // unparseable body — not proof of anything
+      }
+      const confirmed =
+        typeof body === "object" && body !== null && (body as { ok?: unknown }).ok === true;
+      if (confirmed) {
+        return { status: "done", note: "ShikksTracker confirmed the send." };
+      }
+      return {
+        status: "needs_verification",
+        note:
+          "ShikksTracker returned 200 without a parseable { ok: true } body. " +
+          "Check the Messenger thread before retrying.",
+      };
     }
 
     if (res.status >= 400 && res.status < 500) {
-      const body = await res.text().catch(() => "");
       return {
         status: "failed",
-        note: `ShikksTracker refused the send (${res.status}): ${body.slice(0, 300)}`,
+        note: `ShikksTracker did not send the reply (${res.status}): ${await readErrorMessage(res)}`,
       };
     }
 
@@ -484,7 +551,9 @@ export async function sendMessengerReply(
       note: `ShikksTracker returned ${res.status}. Check the Messenger thread before retrying.`,
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const cause = (err as { cause?: { code?: unknown } } | null)?.cause;
+    const code = typeof cause?.code === "string" ? ` (${cause.code})` : "";
+    const message = `${describeError(err)}${code}`;
     return {
       status: "needs_verification",
       note: `The send call did not complete (${message}). Check the Messenger thread before retrying.`,

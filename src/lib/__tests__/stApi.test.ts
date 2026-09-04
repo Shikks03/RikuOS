@@ -448,17 +448,58 @@ describe("sendMessengerReply", () => {
     vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
   }
 
-  it("reports done on a 200", async () => {
+  it("reports done on exactly 200 with { ok: true }", async () => {
     stubEnv();
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
     );
-    vi.stubGlobal("fetch", fetchMock);
     const out = await sendMessengerReply("c1", "hello");
     expect(out.status).toBe("done");
   });
 
-  it("reports FAILED (retry safe) on a 4xx refusal", async () => {
+  it("treats a 200 with ok:false as needs_verification, never done — a queued or refused send answered with 200 must not read as sent", async () => {
+    stubEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: false, reason: "window closed" }), { status: 200 })
+      )
+    );
+    const out = await sendMessengerReply("c1", "hello");
+    expect(out.status).toBe("needs_verification");
+  });
+
+  it("treats a 200 with an unparseable body as needs_verification, and never throws", async () => {
+    stubEnv();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not json", { status: 200 })));
+    const out = await sendMessengerReply("c1", "hello");
+    expect(out.status).toBe("needs_verification");
+  });
+
+  it.each([201, 202])(
+    "treats 2xx status %i as needs_verification, never done — only exactly 200 counts",
+    async (status) => {
+      stubEnv();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status }))
+      );
+      const out = await sendMessengerReply("c1", "hello");
+      expect(out.status).toBe("needs_verification");
+    }
+  );
+
+  it("treats a bodyless 204 as needs_verification, never done", async () => {
+    // 204 cannot carry a body at all (the Fetch spec forbids it), so this is
+    // the sharpest case of "a status we cannot interpret is not evidence".
+    stubEnv();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+    const out = await sendMessengerReply("c1", "hello");
+    expect(out.status).toBe("needs_verification");
+  });
+
+  it("reports FAILED (retry safe) on a 4xx refusal, using the structured error field", async () => {
     // The far side answered and declined. Provably nothing was sent.
     stubEnv();
     vi.stubGlobal(
@@ -472,20 +513,57 @@ describe("sendMessengerReply", () => {
     expect(out.note).toMatch(/window closed/);
   });
 
-  it("reports NEEDS_VERIFICATION on a timeout, never failed", async () => {
+  it.each([400, 401, 409, 429, 499])(
+    "treats %i as failed — every 4xx is provably side-effect-free",
+    async (status) => {
+      stubEnv();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "x" }), { status }))
+      );
+      const out = await sendMessengerReply("c1", "hello");
+      expect(out.status).toBe("failed");
+    }
+  );
+
+  it.each([500, 502, 504, 599])(
+    "treats %i as needs_verification — the send may have happened after the write",
+    async (status) => {
+      stubEnv();
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status })));
+      const out = await sendMessengerReply("c1", "hello");
+      expect(out.status).toBe("needs_verification");
+    }
+  );
+
+  it("reports needs_verification on a real timeout abort, never failed", async () => {
     // We do not know whether Meta sent it. Retrying could double-message a
     // prospect, which is worse than replying late (CLAUDE.md asymmetric rule).
+    // Rejects with the actual shape AbortSignal.timeout produces, not a
+    // generic Error, so this genuinely exercises the timeout path.
     stubEnv();
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("aborted")));
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValue(new DOMException("The operation was aborted due to timeout", "TimeoutError"))
+    );
     const out = await sendMessengerReply("c1", "hello");
     expect(out.status).toBe("needs_verification");
   });
 
-  it("reports needs_verification on a 5xx, because the send may have happened", async () => {
+  it("reports needs_verification even on ECONNREFUSED — classifyFetchError is deliberately not applied to sends", async () => {
+    // Pins the divergence from createDraft: getting this wrong for a send
+    // means a duplicate message to a prospect, not just a wasted retry, so
+    // every network failure parks regardless of cause. The cause code still
+    // reaches the note, for a human to read.
     stubEnv();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 502 })));
+    const err = new TypeError("fetch failed");
+    (err as TypeError & { cause?: { code: string } }).cause = { code: "ECONNREFUSED" };
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(err));
     const out = await sendMessengerReply("c1", "hello");
     expect(out.status).toBe("needs_verification");
+    expect(out.note).toContain("ECONNREFUSED");
   });
 
   it("returns failed without touching the network when config is missing", async () => {
@@ -510,5 +588,28 @@ describe("sendMessengerReply", () => {
       })
     );
     await expect(sendMessengerReply("c1", "hello")).resolves.toBeDefined();
+  });
+
+  it("POSTs JSON to the right path with the secret header and an abort signal", async () => {
+    stubEnv();
+    let seen: { url: string; init: RequestInit } | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (url: string, init: RequestInit) => {
+        seen = { url, init };
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      })
+    );
+    await sendMessengerReply("c1", "hello there");
+    expect(seen!.url).toBe("https://st.example.com/api/os/messenger-reply");
+    expect(seen!.init.method).toBe("POST");
+    const headers = seen!.init.headers as Record<string, string>;
+    expect(headers["x-os-secret"]).toBe(GOOD_SECRET);
+    expect(headers["content-type"]).toBe("application/json");
+    expect(JSON.parse(seen!.init.body as string)).toEqual({
+      conversationId: "c1",
+      text: "hello there",
+    });
+    expect(seen!.init.signal).toBeInstanceOf(AbortSignal);
   });
 });
