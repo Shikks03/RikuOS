@@ -45,7 +45,23 @@ P1 ──► P8 (dashboard pages)          P1, P2, P3 have no dependencies on ea
 
 **Done when:** a real reply to the RIKU page appears in `/messenger` within a minute, and confirming a suggested link marks the contact replied with score bumped.
 
-**Handoff brief for the ShikksTracker session:** `docs/handoffs/2026-08-30-p2-messenger-webhook.md` — paste-ready, plus the Meta setup steps only Riku can do. Disposable; delete it and this line in the post-v0 cleanup.
+**DONE 2026-09-04** (shipped in ShikksTracker; merged to `origin/main` as `cf87344`). Verified from
+here read-only, on the live API rather than on the claim: `GET /api/os/summary` returns
+`messenger.lastEventAt: "2026-09-04T07:56:56.282Z"` — real, same-day webhook traffic — with
+`unlinkedCount: 1`. That repo's `docs/os-api.md` has been rewritten as the handoff required, so
+`lastEventAt: null` now documents "no event has EVER been received" instead of "no webhook yet".
+
+**One half of the acceptance bar is not yet witnessed.** "A real reply appears in `/messenger`
+within a minute" is satisfied. "Confirming a suggested link marks the contact replied with the
+score bumped" is not — the standing `unlinkedCount: 1` is a conversation still awaiting that
+one-tap confirm, and only Riku can perform it. Left open rather than marked done by inference.
+
+Two side effects worth recording, both verified on `origin/main`: the hourly sequence-engine pinger
+that had never existed was added (`61d36bb`), which is why `engine.lastRunAt` now reads same-day
+after 29 days frozen; and the region is now `sin1`, closing the `hkg1` → Anthropic 403 trap the
+2026-08-30 handoff flagged as still-live.
+
+**Handoff brief for the ShikksTracker session:** `docs/handoffs/2026-08-30-p2-messenger-webhook.md` — paste-ready, plus the Meta setup steps only Riku can do. Disposable; now that P2 has shipped, delete it and this line in the post-v0 cleanup.
 
 ## P3 — RikuOS skeleton: auth, queue, push — repo: RikuOS (here)
 
@@ -170,6 +186,25 @@ to be sent; and **no `summary.messenger` field is judged at all** until ShikksTr
 carried through `fetchSummary` so that check becomes a pure addition later. On the first morning
 after deploy the watchdog reports `outreach-health has never run` once, because it runs before the
 new job writes its first record — the same one-off `site-health` had.
+
+**5.1's deferred half — CLOSED 2026-09-04, partially.** P5a-1 parked two checks until ShikksTracker's
+P2 shipped: Messenger webhook freshness and the Meta Graph API token ping. P2 is now live, so:
+
+- **Webhook freshness ships.** It lives in `outreachHealth.ts`, **not** the watchdog — reading it
+  costs an outbound call to ShikksTracker, and the watchdog's whole value is that its verdict on
+  RikuOS's own agents survives a ShikksTracker outage. The threshold is 10 days of total silence
+  (Riku's call, chosen over 7 and 14): `messenger.lastEventAt` advances on outbound echoes as well
+  as inbound messages, so ten days is silence in both directions. Findings reach the morning push
+  through the existing `buildProblems` path with no route change.
+- **The Graph ping does not ship, and is not merely deferred — it moved repos.** RikuOS cannot hold
+  a second copy of the Meta page token: regenerating it in Meta's console invalidates the previous
+  one, so a duplicate here would die on every routine rotation and alarm on a healthy system.
+  Recorded as decision **S9** in `ARCHITECTURE.md` §7; the ask is written up for the ShikksTracker
+  session in `docs/handoffs/2026-09-04-meta-token-health.md` (disposable — delete it and this
+  sentence once that contract lands).
+
+Known gap, stated rather than glossed: webhook silence trails the failure by up to 10 days and
+cannot tell an expired token from a quiet page. Only the direct token check fixes that.
 
 ## P6 — Inbound Messenger triage — repo: RikuOS
 
