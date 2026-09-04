@@ -11,6 +11,14 @@ import ApprovalItem, { type IApprovalItemBase } from "../ApprovalItem.ts";
 // HOLDING_TEXT_MAX is defined once in settings.ts (Task 1); importing it here
 // rather than redeclaring it is what keeps the two 500s from ever disagreeing.
 import { HOLDING_TEXT_MAX } from "../../lib/settings.ts";
+// Same requirement again. INBOUND_TEXT_MAX is defined once in triage.ts
+// (Task 3), which owns it because it also drives a real truncation there
+// (`text.slice(0, INBOUND_TEXT_MAX)`) before a payload ever reaches
+// `.create()`. Importing it here rather than redeclaring it is what keeps a
+// raised truncation constant from ever exceeding this maxlength and turning a
+// webhook call into a 500. triage.ts has zero imports of its own, which is
+// what keeps this safe under strip-types.
+import { INBOUND_TEXT_MAX } from "../../lib/triage.ts";
 
 /**
  * Payload for an inbound Messenger triage draft.
@@ -42,17 +50,6 @@ export interface ITriageResponseApproval extends IApprovalItemBase {
   payload: ITriageResponsePayload;
   editedPayload?: ITriageResponsePayload;
 }
-
-/**
- * The schema owns the hard limit on inbound text. Task 3's parser truncates
- * to this same constant (`text.slice(0, INBOUND_TEXT_MAX)`) before a payload
- * ever reaches `.create()` — importing it from here, rather than redeclaring
- * it, is what keeps a raised truncation constant from ever exceeding this
- * maxlength and turning a webhook call into a 500. Exported the same way
- * FollowupDraftApproval.ts exports DRAFT_CHANNELS: the model owns the closed
- * set / hard limit, callers import it rather than duplicating it.
- */
-export const INBOUND_TEXT_MAX = 4000;
 
 const TriageResponsePayloadSchema = new Schema<ITriageResponsePayload>(
   {
