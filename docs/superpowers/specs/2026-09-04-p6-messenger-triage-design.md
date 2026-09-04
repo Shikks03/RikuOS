@@ -46,6 +46,7 @@ Established 2026-09-04. Do not re-derive; do not assume the opposite.
 | D8 | **A new item pushes immediately; it does not wait for the morning digest.** | With no auto-send, the push is the only thing that can reach Riku inside a 24-hour window. This makes it load-bearing rather than a convenience. |
 | D9 | **ShikksTracker executes the send; RikuOS asks.** | S9 — the token lives there. Also keeps the outbound message inside the system that already records echoes, so a sent reply logs itself. |
 | D10 | **Forwarding is push, not polling.** | Triage is time-sensitive inside the window; a poll interval is latency added to a deadline for no benefit. |
+| D11 | **Every setting Riku has not filled in yet has a defined safe degradation, and the feature ships without them.** | Riku's call, 2026-09-04: build now, fill the content in later. A placeholder that merely blanks a variable produces an LLM improvising into the hole, which is the exact failure D6 exists to prevent. Each one therefore has a *specified* behaviour, tested, not an empty string. |
 
 ---
 
@@ -91,6 +92,28 @@ One bounded string in `OsSettings`. A first draft exists (3,798 characters), syn
 - `demoSiteUrls` — per-package example links. **Empty at time of writing.** A draft must never invent one; when the entry is absent it falls back to naming projects or offering examples in conversation.
 
 **Length is a running cost.** The block enters every draft's prompt, so it is charged on every inbound message. 4,000 characters is the cap.
+
+---
+
+## Pending Riku's input — and what happens until it arrives
+
+Three settings are empty at build time by decision (D11). None blocks the phase; each has a
+specified degradation, and each is pinned by a test, because "safe when unconfigured" is a claim
+that rots silently the moment someone refactors it.
+
+| Setting | Empty state | Behaviour until filled |
+|---|---|---|
+| `knowledgeReviewedAt` | `null` — the block exists but Riku has not approved it | **`answerText` is not generated at all.** The item carries the holding reply only, and the queue card says why. This is the important one: the block states his real prices, and a draft quoting a number he has never read is worse than no draft. Triage still works, still pushes, still gives him a one-tap reply — it just does not speak about money yet. |
+| `nameableProjects` | `[]` | The draft names no client or project. Asked for examples, it offers to walk through relevant work in conversation. It may never name a project that is not on this list, whatever the vault or the model happens to know. |
+| `demoSiteUrls` | `{}` | No URL appears in the draft. **The draft may not emit a URL that was not supplied to it** — pinned by its own test, because an invented link is the most plausible way this feature embarrasses him in front of a prospect. |
+
+The queue card shows which of these are unset, so the reason a draft is thin is visible where he is
+already looking rather than buried in settings.
+
+**A consequence worth stating:** with all three empty, P6 delivers "an inbound message reaches your
+phone within a minute with a one-tap holding reply." That is already most of the value — it is the
+part that beats opening Messenger — and it is honest about being the floor rather than the finished
+feature.
 
 ---
 
