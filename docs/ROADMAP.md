@@ -22,7 +22,9 @@ P1, P5 ──► P8 (Freelance page) ──► P9 (design foundation)
 P1, P2, P3 have no dependencies on each other.
 ```
 
-**Status, 2026-09-04:** P1–P5 shipped. **P6 is next.** P7 waits on accumulated send data. P8–P12
+**Status, 2026-09-05:** P1–P5 shipped. **P6 is built but not accepted** — it is complete and green
+in this repo and receiving nothing until ShikksTracker builds the two contracts handed to it in
+`docs/handoffs/2026-09-04-p6-messenger-forwarding.md`. P7 waits on accumulated send data. P8–P12
 are the pages; their contents are discussed per phase (S11), not planned here.
 
 ---
@@ -242,6 +244,54 @@ cannot tell an expired token from a quiet page. Only the direct token check fixe
   regenerating that token invalidates the old one, so a copy here would fail silently mid-window
   (S9). ShikksTracker sends; RikuOS asks it to. Both that and 6.1's forwarding hook are OS-API
   contract changes, so they travel in **one handoff**, not two.
+
+**P6 BUILT 2026-09-05, not yet accepted** — all ten planned tasks shipped on `master`. 457 tests
+(from 313), `tsc` and `build` green. **It is receiving nothing, and that is expected, not a
+failure:** both halves of the contract live in ShikksTracker and neither exists yet, so 6.1 and 6.3
+are handed across in `docs/handoffs/2026-09-04-p6-messenger-forwarding.md`. Acceptance — a real
+message reaching the phone within a minute and one tap sending the reply — cannot be observed until
+that session runs. Nothing here has been seen doing its job against real data.
+
+**It ships deliberately under-configured (design D11), and that is the design, not unfinished work.**
+The knowledge block is unapproved, `nameableProjects` is empty and `demoSiteUrls` is empty. Each has
+a specified degradation with its own test, and with all three empty the feature still delivers a
+push within a minute and a one-tap holding reply — the part that beats opening Messenger. The
+holding reply is a **template, never model-generated**, which is what makes it survive both an
+unapproved block and an Anthropic outage.
+
+**What the reviews changed, and why they were worth the passes.** Twelve defects in the plan's own
+text were found and fixed during execution. The ones that mattered:
+
+- `new Date("Sep 4 2026")` parses in the **server's** local timezone, so a loosely-formatted forward
+  would have meant different instants on a laptop and on Vercel — against a hard 24-hour deadline.
+  `sentAt` is now strict ISO-8601 with an explicit offset.
+- The Anthropic SDK defaults to `maxRetries: 2`. With a 45s timeout inside a 60s route that is three
+  attempts, so Vercel would kill the function and write **no item, no run, no push** — losing the
+  window the drafting call exists to serve. Retries are now off and the budget is stated truthfully.
+- The dedup was a bare `findOne` spanning a ~40s model call, and the plan justified skipping an index
+  by saying this repo disallows one on a payload field. **It does not** — `payload.replyToLogId` has
+  carried a partial unique index on the base schema since P4. A redelivery during a slow draft was
+  therefore the *expected* path to two cards, two pushes, and two replies to one prospect. Now
+  indexed, with the E11000 race caught as a duplicate. **Needs `npm run migrate:indexes:apply`
+  before the protection is live** — `autoIndex` is off in production.
+- Editing the knowledge block left `knowledgeReviewedAt` set, silently re-opening the approval gate
+  over prices Riku had never read. Editing now clears the stamp.
+- The inbound message was appended to the prompt undelimited, so a stranger could forge the builder's
+  own section headers and hand the model a link. It is fenced now, with the rules restated after it.
+- **Found only by the end-to-end pass, and the most important:** approving a triage card sent text
+  Riku had never seen. The queue page rendered `payload.draftBody` — a followup-draft field,
+  undefined for triage — so the card showed the *inbound* message and nothing of the reply, while
+  Approve worked and sent. An uninformed approval is an auto-send by another name. The card now
+  shows the drafted answer, the holding reply, the withheld reason and the window deadline, and says
+  which text Approve will send. That was minimal plain rendering to make an existing live control
+  safe, and it is what this phase's own acceptance criteria already assumed. **No chooser was
+  built** — picking between the two texts is queue-page design and waits on S11.
+
+**Open, deliberately.** The watchdog does not yet notice a forward that never arrived (design open
+item 2): until ShikksTracker forwards anything, "messenger events exist but no triage run" is the
+normal state, so the check would alarm every morning and train Riku to ignore the watchdog. Revisit
+once one real forward is observed. Flood control is also unbuilt — 40 messages currently means 40
+model calls and 40 pushes — because the limit, and what the card says when it trips, are Riku's call.
 
 ## P7 — Retro agent — repo: skills + RikuOS
 
