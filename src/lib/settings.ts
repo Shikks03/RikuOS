@@ -8,6 +8,14 @@
  * switch.
  */
 
+// This file now sits on sync-indexes.mts's import graph too — OsSettings.ts
+// imports the constants below it under `node --experimental-strip-types`,
+// which does not resolve "@/" tsconfig aliases. The `type` modifier here is
+// load-bearing: strip-types erases type-only imports without resolving them,
+// which is the only reason this "@/" import survives that script. Drop the
+// `type`, or add any value import from "@/"-aliased code to this file, and
+// `npm run migrate:indexes` breaks at runtime on an unresolvable specifier —
+// and a real models/lib require cycle appears with it.
 import type { OsSettingsPatch } from "@/lib/osSettings";
 
 export type SettingsPatchResult =
@@ -149,11 +157,14 @@ export function parseSettingsPatch(body: unknown): SettingsPatchResult {
     if (typeof b.holdingText !== "string" || b.holdingText.trim().length === 0) {
       return { ok: false, error: "holdingText must be a non-empty string." };
     }
+    // Deliberately bounds-checked against the raw, untrimmed input — a
+    // 501-char value that would trim down to 499 is still rejected here.
+    // Conservative and safe, not a bug: the cap is meant to hold on what
+    // Riku typed, not on what happens to survive trimming.
     if (b.holdingText.length > HOLDING_TEXT_MAX) {
       return { ok: false, error: `holdingText must be at most ${HOLDING_TEXT_MAX} characters.` };
     }
-    // Stored trimmed — the raw body is checked pre-trim only to still reject
-    // whitespace-only input above.
+    // Stored trimmed so padding never reaches a client.
     value.holdingText = b.holdingText.trim();
   }
 

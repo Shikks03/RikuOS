@@ -3,7 +3,9 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 // under `node --experimental-strip-types`, which does not resolve the "@/"
 // tsconfig path alias (see the note in approvals/FollowupDraftApproval.ts).
 import {
+  KNOWLEDGE_BLOCK_MAX,
   NAMEABLE_PROJECT_MAX_LENGTH,
+  HOLDING_TEXT_MAX,
   DEMO_URL_PACKAGE_KEY_MAX_LENGTH,
   DEMO_URL_MAX_LENGTH,
 } from "../lib/settings.ts";
@@ -46,7 +48,7 @@ const OsSettingsSchema = new Schema<IOsSettings>(
     chaserNDays: { type: Number, required: true, default: 4, min: 1, max: 30 },
     monitoringEnabled: { type: Boolean, required: true, default: false },
     triageEnabled: { type: Boolean, required: true, default: false },
-    knowledgeBlock: { type: String, maxlength: 4000, default: "" },
+    knowledgeBlock: { type: String, maxlength: KNOWLEDGE_BLOCK_MAX, default: "" },
     // null means "Riku has not approved this yet" and is load-bearing:
     // draftPolicy withholds the substantive answer entirely until it is set
     // (design D11). Do NOT give this a default.
@@ -57,7 +59,7 @@ const OsSettingsSchema = new Schema<IOsSettings>(
     },
     holdingText: {
       type: String,
-      maxlength: 500,
+      maxlength: HOLDING_TEXT_MAX,
       default: "Hi! Thanks for messaging — I've seen this and I'll get back to you shortly.",
     },
     demoSiteUrls: { type: [DemoSiteSchema], default: [] },

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parseSettingsPatch } from "@/lib/settings";
+import {
+  parseSettingsPatch,
+  DEMO_URL_PACKAGE_KEY_MAX_LENGTH,
+  DEMO_URL_MAX_LENGTH,
+} from "@/lib/settings";
 
 describe("parseSettingsPatch", () => {
   it("accepts a boolean toggle", () => {
@@ -212,14 +216,33 @@ describe("parseSettingsPatch — demoSiteUrls bounds and transform", () => {
     expect(parseSettingsPatch({ demoSiteUrls: at21 }).ok).toBe(false);
   });
 
-  it("rejects a package key over 20 characters", () => {
-    const key = "x".repeat(21);
-    expect(parseSettingsPatch({ demoSiteUrls: { [key]: "https://example.com" } }).ok).toBe(false);
+  it("rejects a package key over the cap with a message naming the key's own limit", () => {
+    const key = "x".repeat(DEMO_URL_PACKAGE_KEY_MAX_LENGTH + 1);
+    const result = parseSettingsPatch({ demoSiteUrls: { [key]: "https://example.com" } });
+    expect(result).toEqual({
+      ok: false,
+      error: `demoSiteUrls key "${key}" must be at most ${DEMO_URL_PACKAGE_KEY_MAX_LENGTH} characters.`,
+    });
   });
 
-  it("rejects a URL over 500 characters", () => {
-    const longUrl = "https://example.com/" + "x".repeat(500);
-    expect(parseSettingsPatch({ demoSiteUrls: { A1: longUrl } }).ok).toBe(false);
+  it("rejects a URL over the cap with a distinct message naming the url's own limit", () => {
+    const longUrl = "https://example.com/" + "x".repeat(DEMO_URL_MAX_LENGTH);
+    const result = parseSettingsPatch({ demoSiteUrls: { A1: longUrl } });
+    expect(result).toEqual({
+      ok: false,
+      error: `demoSiteUrls.A1 must be at most ${DEMO_URL_MAX_LENGTH} characters.`,
+    });
+  });
+
+  it("when a url is both over-length and non-http, the length error wins", () => {
+    // Pins the check order in the source: length is checked before the
+    // http(s) regex, so a value failing both never surfaces the scheme error.
+    const longBadUrl = "javascript:" + "x".repeat(DEMO_URL_MAX_LENGTH);
+    const result = parseSettingsPatch({ demoSiteUrls: { A1: longBadUrl } });
+    expect(result).toEqual({
+      ok: false,
+      error: `demoSiteUrls.A1 must be at most ${DEMO_URL_MAX_LENGTH} characters.`,
+    });
   });
 });
 
