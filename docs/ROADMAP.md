@@ -245,6 +245,29 @@ cannot tell an expired token from a quiet page. Only the direct token check fixe
 
 **Done when:** all three pages live on real feeds (D11 satisfied), calendar layers toggle, and the app looks intentional.
 
+**P8 IS BEING SPLIT — decided 2026-09-04, spec pass first.** Riku's call, on the observation that
+P8 is three phases wearing one number. The tells: its "Done when" carries three unrelated acceptance
+bars where every other phase has one; tasks 8.2 and 8.3 each stack three-to-four distinct features
+(8.3 alone is Canvas integration + a modules/reviewers model + Classes sub-calendar population + an
+AI planner) where a task elsewhere is roughly a day; it introduces **two** new external integrations
+with separate auth (Google OAuth, Canvas token) where P2 and P4 each got a whole phase for one; and
+8.3 depends on 8.2 from inside the same phase.
+
+Underneath that is a thinner problem: **the content was never specced.** `RIKUOS_CONCEPT.md` §7 says
+that document specs "*content*, not visual design" — but for Personal and Academics it barely specs
+content either, one bullet each in §2.2. ShikksTracker's work had a deep spec; P5 got its own design
+doc that then cut three specced features on evidence. Personal and Academics have never had that
+pass, which is the same imbalance as their having no agents, showing up somewhere else.
+
+So: a content design spec comes first and **the spec decides the phase boundaries** — do not draw
+them ahead of it. Tasks 8.1–8.5 above stand as the raw material, not as the plan.
+
+**The sectioned to-do store comes back in, folded into the Personal phase** (Riku, 2026-09-04),
+reversing its "deferred past v0" parking in the Deferred section below. Reasons: it is already
+specced (title, section, optional due date, done), it unblocks the morning digest's missing Today
+section (dropped as P5a-7 for exactly this lack), it is likely the source of truth the quest tracker
+needs, and it would be the Personal side's first piece of actual agency.
+
 ---
 
 ## Deferred (v1+, unchanged from concept)
