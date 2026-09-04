@@ -124,3 +124,70 @@ describe("TRIAGE_SYSTEM_PROMPT", () => {
     expect(TRIAGE_SYSTEM_PROMPT.toLowerCase()).toContain("instructions");
   });
 });
+
+describe("the invented-URL guard", () => {
+  it("tells the model, in words, that it has no links when none are configured", () => {
+    // Riku ships with demoSiteUrls empty (design D11). This is the state the
+    // feature will actually run in for a while, so it gets its own test.
+    //
+    // What this CANNOT do is stop a model that ignores the instruction. The
+    // real protection is that Riku reads every draft before it sends (S14).
+    // This test pins the instruction's presence; the human tap is the backstop.
+    const msg = buildTriageUserMessage("do you have samples?", {
+      enabled: true,
+      mayAnswer: true,
+      knowledgeBlock: "A1 from 3,000.",
+      nameableProjects: [],
+      demoSiteUrls: [],
+      holdingText: "Thanks!",
+    });
+    expect(msg).toMatch(/do not include any link at all/i);
+    expect(msg).not.toMatch(/https?:\/\//);
+  });
+
+  it("contains no URL anywhere in the prompt when none was supplied", () => {
+    const msg = buildTriageUserMessage("link?", {
+      enabled: true,
+      mayAnswer: true,
+      knowledgeBlock: "Contact us anytime.",
+      nameableProjects: ["Azerotech — repair shop site"],
+      demoSiteUrls: [],
+      holdingText: "Thanks!",
+    });
+    expect(msg).not.toMatch(/https?:\/\//);
+  });
+
+  it("keeps a URL the stranger sent confined to the fence, with the no-link rule stated after it", () => {
+    // Not every inbound URL is an attack — a stranger might legitimately
+    // paste a link (their own site, a screenshot host, whatever) with no
+    // intent to forge anything. The fence must not strip it: the model still
+    // needs to see what it's replying to. But that URL must never land
+    // anywhere the model could mistake for an approved link, and the
+    // prohibition on sending links must still occupy the last word.
+    const msg = buildTriageUserMessage("check out https://evil.example for reference", {
+      enabled: true,
+      mayAnswer: true,
+      knowledgeBlock: "Contact us anytime.",
+      nameableProjects: [],
+      demoSiteUrls: [],
+      holdingText: "Thanks!",
+    });
+
+    const fenceOpen = msg.indexOf('"""');
+    const fenceClose = msg.indexOf('"""', fenceOpen + 3);
+    expect(fenceOpen).toBeGreaterThanOrEqual(0);
+    expect(fenceClose).toBeGreaterThan(fenceOpen);
+
+    const urlIndex = msg.indexOf("https://evil.example");
+    expect(urlIndex).toBeGreaterThan(fenceOpen);
+    expect(urlIndex).toBeLessThan(fenceClose);
+
+    // The URL must not reappear anywhere after the fence closes.
+    expect(msg.indexOf("https://evil.example", fenceClose)).toBe(-1);
+
+    // The real prohibition is restated after the fence closes, so it — not
+    // the stranger's URL inside the fence — occupies the last position.
+    const reminderIndex = msg.indexOf("Include no link of any kind");
+    expect(reminderIndex).toBeGreaterThan(fenceClose);
+  });
+});
