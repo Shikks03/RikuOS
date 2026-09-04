@@ -51,10 +51,24 @@ describe("evaluateOutreach — quiet when it should be", () => {
   });
 
   it("does not call approved messages stranded while the engine is healthy", () => {
-    // They are about to be sent. Reporting this daily is how an alarm becomes
-    // background noise.
+    // Two reasons, and the second is the load-bearing one.
+    //
+    // Anti-noise: beside a healthy engine they are simply about to be sent, and
+    // reporting that daily is how an alarm becomes background noise.
+    //
+    // DECISION S10: sending is off until Riku says so, each time, and off is
+    // the resting state — so approved messages waiting beside a running engine
+    // is the NORMAL condition of this system, not a transient one. This
+    // assertion is therefore not a nicety about tone; it is what stops the
+    // morning push from nagging him every day to send to businesses he has not
+    // agreed to contact. Do not "improve" this into a warning, and do not add a
+    // finding for approved-count or a stopped send switch. See ARCHITECTURE §7.
     const findings = evaluateOutreach(NOW, summary({ queue: { drafts: 24, approved: 5 } }));
     expect(findings).toEqual([]);
+
+    // Holds no matter how many accumulate, because under S10 they can pile up
+    // indefinitely without anything being wrong.
+    expect(evaluateOutreach(NOW, summary({ queue: { drafts: 500, approved: 500 } }))).toEqual([]);
   });
 
   it("never judges the Messenger backlog counts, however large they grow", () => {

@@ -181,10 +181,10 @@ proposal.
   confirms it runs: `engine.lastRunAt` read `2026-09-04T03:12:37Z` today, after 29 days frozen.
   A *scheduled* token check therefore has a real scheduler to hang on, which strengthens the
   recommendation above rather than weakening it.
-- **But the engine runs without sending.** `61d36bb`'s own message records that both kill switches
-  (`draftGenerationEnabled`, `sendingEnabled`) are `false` in the live Settings document, so the
-  pinger restarted reply detection and nothing else. This is a genuine blind spot on the RikuOS
-  side and is *not* covered by anything shipped today: a fresh `lastRunAt` reads as healthy, so the
-  morning digest would say all clear while zero outreach leaves the building. RikuOS cannot see it
-  either — `GET /api/os/summary` exposes no toggle state. Flagged, not solved; if those switches are
-  meant to be off, this is correct silence, and if they are not, nothing will tell Riku.
+- **The engine runs without sending, and that is deliberate — do not "fix" it.** `61d36bb`'s message
+  records both engine switches (`draftGenerationEnabled`, `sendingEnabled`) as `false` in the live
+  Settings document. That is the resting state under RikuOS decision **S10**: nothing goes to a
+  business until Riku says so, each time. A healthy engine that sends nothing is correct, approved
+  messages waiting beside it are correct, and neither is a stall to be reported or a switch to be
+  proposed. Noted here only so a ShikksTracker session reading `lastRunAt` fresh and `sent` zero
+  does not diagnose a bug that is not there.

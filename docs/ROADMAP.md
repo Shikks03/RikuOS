@@ -176,8 +176,10 @@ disabled, outside the send window, or at its daily cap still stamps `lastRunAt`,
 timestamp always means "did not run", never "ran with nothing to do". **If that write ever moves
 behind a condition, this check silently becomes a lie.** The threshold is 36 h: the pinger is
 scheduled only for UTC hours 0–9 (Manila's send window), so the longest legitimate gap is the ~14 h
-overnight one. Expect this to report every morning until Riku wires the pinger — a real fault stays
-reported until it is fixed.
+overnight one. **Resolved 2026-09-04:** the pinger now exists (ShikksTracker `61d36bb`, a GitHub Actions
+workflow) and the engine reports same-day again. Its two send switches remain off, which is the
+resting state under decision **S10** — a healthy engine that sends nothing is correct and is never
+reported as a fault.
 
 Three deliberate silences, each pinned by a test: a **draft backlog is not a fault** (that queue is
 Riku's own to work); **approved messages beside a healthy engine are not stranded**, they are about

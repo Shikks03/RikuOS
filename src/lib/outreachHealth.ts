@@ -13,12 +13,18 @@
  * exists to catch (concept §1), so the check is now part of the morning run.
  *
  * The root cause was then found in ShikksTracker's own source: its engine is
- * triggered by an EXTERNAL hourly pinger that was never set up, so nothing has
- * ever called /api/cron/sequence on a schedule. Two consequences worth knowing
- * before reading a digest: this check will report the stall EVERY morning
- * until Riku wires that pinger, which is correct — a real fault stays reported
- * until it is fixed — and its two settings toggles both default to false, so a
- * pinger alone will not make the engine send.
+ * triggered by an EXTERNAL hourly pinger that had never been set up, so nothing
+ * had ever called /api/cron/sequence on a schedule.
+ *
+ * RESOLVED 2026-09-04: that pinger now exists (a GitHub Actions workflow,
+ * ShikksTracker commit 61d36bb) and engine.lastRunAt reads same-day again.
+ *
+ * What has NOT changed, and must not be read as a leftover fault: both engine
+ * switches are off, so it runs and sends nothing. That is the resting state by
+ * Riku's standing instruction (decision S10) — nothing goes to a business
+ * until he says so, each time. A healthy engine that sends nothing is correct,
+ * and approved messages waiting beside it are correct. Do not report either,
+ * and do not propose enabling a switch.
  *
  * MESSENGER — what is judged here, and what is deliberately not.
  * ShikksTracker's P2 Messenger webhook is LIVE: verified against production on
