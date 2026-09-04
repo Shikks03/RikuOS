@@ -430,3 +430,64 @@ export async function createDraft(request: DraftRequest): Promise<DraftOutcome> 
       };
   }
 }
+
+/**
+ * POST /api/os/messenger-reply — the one outward action in P6.
+ *
+ * TOTAL BY CONTRACT, exactly as createDraft is: never throws, always returns a
+ * classified outcome, because the caller must record a result it can act on
+ * rather than catch an exception it cannot classify.
+ *
+ * The classification is the whole point and it is asymmetric on purpose:
+ *   2xx        -> done. Confirmed.
+ *   4xx        -> failed. The far side ANSWERED and refused, so nothing was
+ *                 sent and a retry is safe. "Window closed" lands here.
+ *   5xx / net  -> needs_verification. We do not know. A retry could send a
+ *                 prospect the same message twice, which is worse than a late
+ *                 reply. A human checks the thread.
+ */
+export async function sendMessengerReply(
+  conversationId: string,
+  text: string
+): Promise<{ status: "done" | "failed" | "needs_verification"; note: string }> {
+  let baseUrl: string;
+  let secret: string;
+  try {
+    ({ baseUrl, secret } = readStConfig());
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { status: "failed", note: `ShikksTracker is not configured: ${message}` };
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/api/os/messenger-reply`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-os-secret": secret },
+      body: JSON.stringify({ conversationId, text }),
+      signal: AbortSignal.timeout(ST_TIMEOUT_MS),
+    });
+
+    if (res.ok) {
+      return { status: "done", note: "Sent by ShikksTracker." };
+    }
+
+    if (res.status >= 400 && res.status < 500) {
+      const body = await res.text().catch(() => "");
+      return {
+        status: "failed",
+        note: `ShikksTracker refused the send (${res.status}): ${body.slice(0, 300)}`,
+      };
+    }
+
+    return {
+      status: "needs_verification",
+      note: `ShikksTracker returned ${res.status}. Check the Messenger thread before retrying.`,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      status: "needs_verification",
+      note: `The send call did not complete (${message}). Check the Messenger thread before retrying.`,
+    };
+  }
+}

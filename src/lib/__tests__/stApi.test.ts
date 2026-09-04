@@ -12,6 +12,7 @@ import {
   createDraft,
   fetchAttention,
   fetchSummary,
+  sendMessengerReply,
   ST_TIMEOUT_MS,
 } from "@/lib/stApi";
 import { evaluateOutreach } from "@/lib/outreachHealth";
@@ -427,5 +428,87 @@ describe("timeouts", () => {
   it("bounds every external call (CLAUDE.md)", () => {
     expect(ST_TIMEOUT_MS).toBeGreaterThan(0);
     expect(ST_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
+  });
+});
+
+describe("sendMessengerReply", () => {
+  // Unlike the rest of this file, these tests stub fetch with vi.stubGlobal
+  // rather than assigning globalThis.fetch directly, per the plan's spec.
+  // vi.stubGlobal has no automatic cleanup, so — unlike the manual
+  // save/restore the other describe blocks use — this block must call
+  // vi.unstubAllGlobals() itself or a stubbed fetch leaks into whatever runs
+  // next in this file. Also unstub envs, matching every other block here.
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  function stubEnv() {
+    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
+    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
+  }
+
+  it("reports done on a 200", async () => {
+    stubEnv();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await sendMessengerReply("c1", "hello");
+    expect(out.status).toBe("done");
+  });
+
+  it("reports FAILED (retry safe) on a 4xx refusal", async () => {
+    // The far side answered and declined. Provably nothing was sent.
+    stubEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: "window closed" }), { status: 409 })
+      )
+    );
+    const out = await sendMessengerReply("c1", "hello");
+    expect(out.status).toBe("failed");
+    expect(out.note).toMatch(/window closed/);
+  });
+
+  it("reports NEEDS_VERIFICATION on a timeout, never failed", async () => {
+    // We do not know whether Meta sent it. Retrying could double-message a
+    // prospect, which is worse than replying late (CLAUDE.md asymmetric rule).
+    stubEnv();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("aborted")));
+    const out = await sendMessengerReply("c1", "hello");
+    expect(out.status).toBe("needs_verification");
+  });
+
+  it("reports needs_verification on a 5xx, because the send may have happened", async () => {
+    stubEnv();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 502 })));
+    const out = await sendMessengerReply("c1", "hello");
+    expect(out.status).toBe("needs_verification");
+  });
+
+  it("returns failed without touching the network when config is missing", async () => {
+    // The config-error path: readStConfig() throws before fetch is ever
+    // called, so this must classify as failed (nothing was sent, safe to
+    // retry once configured) rather than needs_verification.
+    vi.stubEnv("ST_API_BASE_URL", "");
+    vi.stubEnv("ST_API_SECRET", "");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await sendMessengerReply("c1", "hello");
+    expect(out.status).toBe("failed");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("never throws, whatever fetch does", async () => {
+    stubEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() => {
+        throw "a string, not an Error";
+      })
+    );
+    await expect(sendMessengerReply("c1", "hello")).resolves.toBeDefined();
   });
 });
