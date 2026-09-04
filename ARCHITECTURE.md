@@ -67,7 +67,7 @@ New Next.js App Router app, TypeScript strict, Mongoose, deployed on Vercel. Mob
 |---|-------|---------|---------|--------------|
 | 1 | Follow-up chaser | Daily cron | Vercel cron (RikuOS) | Finds leads who **replied but got no answer** in N days (via OS API attention list), drafts the response (Anthropic API), queues it for approval. *ShikksTracker's own engine already automates pre-reply cold-sequence follow-ups; the chaser owns the post-reply gap.* |
 | 2 | ~~Lead sweep~~ | — | — | **Dropped 2026-08-30 — see S8.** Lead acquisition is not a RikuOS job. |
-| 3 | Inbound Messenger triage | Page webhook event | Vercel function (RikuOS) | Inside the legal 24h window: acknowledge, answer FAQs, propose call times. Substantive replies go through the queue |
+| 3 | Inbound Messenger triage | Page webhook event (forwarded) | Vercel function (RikuOS) | Inside the legal 24h window: **drafts** an acknowledgment, an FAQ answer or a call-time proposal. **Everything goes through the queue — nothing auto-sends (S14).** Sending is executed by ShikksTracker, which holds the page token (S9) |
 | 4 | Site health monitor | Daily cron | Vercel cron (RikuOS) | **Uptime only** on AzeroTech, Meowchi and ShikksTracker → named in the morning digest. Scope cut on evidence during P5a: SSL and domain expiry dropped because all three hosts are `*.vercel.app` subdomains whose certificate and registration are Vercel's, not Riku's (P5a-9, P5a-10); drafting a client email dropped because a flaky check would produce an embarrassing draft (P5a-5). A down client site is a *finding*, not a failed run |
 | 5 | Morning dispatcher | Daily cron | Vercel cron (RikuOS) | Compiles "what needs you today" → one push notification. **Currently freelance and system sources only** — the Today section was dropped for want of a to-do store (P5a-7) and returns in P10, which is how the Personal side reaches Riku at all (S13) |
 | 6 | Retro agent | Weekly | Claude scheduled task | Reads per-variant reply rates + queue decisions → proposes message-variant edits (via queue) |
@@ -153,7 +153,7 @@ repo (S4).
 - Single user. Every RikuOS page and API behind password session auth (ported pattern: `__Host-` HMAC cookie, timing-safe compares, Origin checks on mutations, fail-closed middleware with explicit public allowlist).
 - Cron endpoints gated by `x-cron-secret`; OS API by `x-os-secret`; Meta webhook by signature verification. All compares timing-safe.
 - Secrets live in environment variables only, never in the database (concept rule). `.env.example` documents names, never values.
-- The Approval Queue is the authorization boundary for agent actions: agents draft; only a human tap executes (single exception: triage's bounded in-window auto-acknowledgments, ratified in the concept).
+- The Approval Queue is the authorization boundary for agent actions: agents draft; only a human tap executes. **There is no exception.** Triage's in-window auto-acknowledgment was the one ratified carve-out and was revoked on 2026-09-04 (S14), making this boundary absolute.
 
 ---
 
@@ -204,6 +204,12 @@ Added 2026-09-04:
   - **It is a supplement under D11, not a violation.** D11 requires every page to be fed by data arriving without Riku typing it, allowing manual entry "only as a *supplement* with a specific job". The Personal page is fed by Google Calendar; to-dos ride alongside with a specific job, exactly as modules/reviewers do for Academics. Recorded so a later session does not read the unparking as breaking D11 and undo it.
   - **Today needs both to-dos and the calendar** to be worth reading (Riku, asked directly), so Google sign-in and the live calendar read are inside the Personal phase, not after it. Canvas due dates are not required for Today and stay in the Academics phase.
   - **The calendar reads and writes from the first version.** Riku creating an event from the UI is *Riku* acting, so the approval queue does not apply — that boundary governs agents acting on his behalf. The Academics sentence-to-schedule planner is the one calendar writer that does go through the queue.
+
+
+- **S14 — The approval queue has no exceptions. Messenger triage's auto-acknowledgment is revoked.** Riku's call, 2026-09-04, opening P6. The concept ratified one carve-out — triage acknowledging an inbound message itself, inside the legal 24-hour window — and `CLAUDE.md` carried it as "the sole exception". It is withdrawn. Every outward action now requires an approved `ApprovalItem`, without qualification.
+  - **Why it was reopened rather than inherited.** The carve-out was ratified in August, before S10. D2 does distinguish inbound replies from cold outreach, and legally the in-window reply is fine — but it is still a message leaving Riku's business page, to a business owner, in wording he has not seen. That is the thing S10 exists to prevent, so the old ratification was put back to him rather than assumed to carry.
+  - **What it costs, stated plainly:** someone messaging the page overnight hears nothing until Riku taps. The 24-hour window is a hard deadline set by Meta, so an unactioned draft can expire unsent — `staleAt` is therefore the window's close, not an arbitrary age. This makes the new-item push notification load-bearing rather than a convenience: it is the only thing that can get Riku's attention inside the window.
+  - **What it buys:** one boundary with no special cases. The rule "an agent never acts without a tap" is now checkable by reading the code for a single pattern, and no future feature can cite an existing exception as precedent.
 
 ---
 

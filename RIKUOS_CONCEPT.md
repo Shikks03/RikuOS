@@ -58,7 +58,7 @@ Agency = the system acts first, on triggers, within delegated authority, then re
 |---|-------|---------|--------------|---------|
 | 1 | Follow-up chaser | Time + data state | "Replied to nobody in 4 days" → drafts follow-up → queue | Vercel cron + API |
 | 2 | ~~Lead sweep~~ | — | **Dropped 2026-08-30 — see `ARCHITECTURE.md` S8.** Lead acquisition is not a RikuOS job; prospecting stays manual. | — |
-| 3 | Inbound Messenger triage | Page webhook event | Inside legal 24h window: acknowledge, answer FAQs, propose call times | Vercel function + API |
+| 3 | Inbound Messenger triage | Page webhook event | Inside legal 24h window: ~~acknowledge~~, answer FAQs, propose call times — **all drafted, none auto-sent.** The acknowledgment carve-out was revoked 2026-09-04, see S14 | Vercel function + API |
 | 4 | Site health monitor | Threshold | ~~Uptime/SSL/domain checks → drafts client email~~ **Narrowed 2026-08-30 to uptime only, notify only** — SSL and domain expiry are Vercel's to renew, not Riku's, and a flaky check would draft an embarrassing client email. See `ARCHITECTURE.md` §2.3 and P5a-5/9/10 | Vercel cron + API |
 | 5 | Morning dispatcher | Schedule | Compiles "what needs you today" across all pages → push notification | Vercel cron + API |
 | 6 | Retro agent | Weekly schedule | Reads reply rates per message variant/niche → proposes edits to outreach skills | Claude scheduled task |

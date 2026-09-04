@@ -56,7 +56,7 @@ Proven in ShikksTracker; follow them here.
 
 1. Never edit ShikksTracker code or connect to its DB from here (see prime directive).
 2. Never automate cold Messenger sends, by API or browser automation — Meta policy; risks banning business assets (D2). Drafts only; the human sends.
-3. Never let an agent execute an outward action without an approved `ApprovalItem` — the sole exception is Messenger triage's bounded auto-acknowledgment inside the 24-hour window.
+3. Never let an agent execute an outward action without an approved `ApprovalItem`. **No exceptions.** Messenger triage's bounded auto-acknowledgment was the one carve-out; it was revoked 2026-09-04 (S14). If a future design seems to need an exception, it needs a new decision in `ARCHITECTURE.md` §7 first.
 4. Never store calendar events locally — Google Calendar is the single source of truth; read live, write through (D5).
 5. Never build a dashboard page without a live data feed (D11); the Work page stays parked until hired (D9); UI comes after data + agents (D10).
 6. Never introduce n8n or another workflow platform (D1), Postgres or a second database technology (D4), or a two-copy calendar sync engine (D5).

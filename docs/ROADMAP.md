@@ -226,10 +226,22 @@ cannot tell an expired token from a quiet page. Only the direct token check fixe
 | # | Task | Depends on |
 |---|------|-----------|
 | 6.1 | ShikksTracker forwards inbound events to a secret-gated RikuOS endpoint (push, not polling — triage is time-sensitive inside the 24h window; requires a small forwarding hook added to ShikksTracker's webhook handler, spec'd as an addendum when P6 starts) | P2 |
-| 6.2 | Triage logic inside the 24h window: FAQ answers + call-time proposals drafted; auto-acknowledgment allowed (the one ratified exception); substantive replies → queue with `staleAt` = window close | 6.1 |
-| 6.3 | Send path: approved triage replies sent via page token within the window (this is *inbound response*, legal — not cold outreach) | 6.2 |
+| 6.2 | Triage logic inside the 24h window: acknowledgment, FAQ answer and call-time proposal all **drafted**; every one queued with `staleAt` = window close. **Nothing auto-sends (S14).** Immediate push on a new item — inside a 24h deadline the morning digest is too slow | 6.1 |
+| 6.3 | Send path: on approval, **ShikksTracker sends** — it holds the page token, and RikuOS may not keep a second copy (S9). This is a contract addition to the OS API, folded into the same handoff as 6.1's forwarding hook. Legal as *inbound response* within the window (D2), not cold outreach | 6.2 |
 
-**Done when:** an inbound FAQ gets an acknowledged, approved answer inside the window without Riku opening Messenger.
+**Done when:** an inbound FAQ gets an approved answer inside the window without Riku opening Messenger.
+
+**Two things settled on 2026-09-04, before any design work:**
+
+- **S14 — nothing auto-sends.** The concept's one ratified exception (triage acknowledging inbound
+  messages itself) is revoked. Every triage output is drafted and queued. The cost is accepted
+  deliberately: someone messaging overnight hears nothing until Riku taps, and the 24-hour window is
+  Meta's hard deadline, so an unactioned draft can expire unsent. That makes the **immediate push**
+  load-bearing, not a nicety — it is the only thing that can reach Riku inside the window.
+- **The send path moved repos.** 6.3 originally had RikuOS sending via the page token. It cannot:
+  regenerating that token invalidates the old one, so a copy here would fail silently mid-window
+  (S9). ShikksTracker sends; RikuOS asks it to. Both that and 6.1's forwarding hook are OS-API
+  contract changes, so they travel in **one handoff**, not two.
 
 ## P7 — Retro agent — repo: skills + RikuOS
 
