@@ -8,6 +8,7 @@ import { verifySessionToken, COOKIE_NAME } from "@/lib/session";
  *   /login                — the login page itself
  *   /api/auth/login       — the login POST handler
  *   /api/cron/*           — guarded separately by the cron secret (requireCronSecret)
+ *   /api/messenger/*      — guarded separately by the forward secret (requireForwardSecret)
  *   /manifest.webmanifest — iOS fetches the PWA manifest without credentials
  *   /sw.js                — the service worker must stay fetchable when logged out,
  *                           or an expired session would break push delivery updates
@@ -28,6 +29,7 @@ export function isPublicPath(pathname: string): boolean {
 
   if (
     pathname.startsWith("/api/cron/") ||
+    pathname.startsWith("/api/messenger/") ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/icon") ||
     pathname.startsWith("/apple-icon")

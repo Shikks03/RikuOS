@@ -6,6 +6,7 @@ describe("isPublicPath", () => {
     "/login",
     "/api/auth/login",
     "/api/cron/expire",
+    "/api/messenger/inbound",
     "/manifest.webmanifest",
     "/sw.js",
     "/favicon.ico",
