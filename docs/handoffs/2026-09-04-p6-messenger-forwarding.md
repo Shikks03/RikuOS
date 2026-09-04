@@ -104,6 +104,17 @@ response as a failure:
   not treat a skip as a failure, and must not retry one.** It was considered and correctly declined.
 - **`400`** only for a body RikuOS could not parse at all.
 - **`401` / `500`** from the secret guard (bad secret / secret unset or too short — see below).
+- **`500`** from a second, distinct source: a genuine infrastructure failure — the database
+  unreachable, say — occurring *after* the secret and the body both checked out, but before
+  anything was durably queued (`src/app/api/messenger/inbound/route.ts`, the outer `catch` block,
+  lines 167–191). This is the honest case: nothing was understood or recorded, so a `500` doesn't
+  misrepresent anything. It's distinct from a `500` that happens *after* an item was already queued
+  — that path is deliberately **not** a `500`; it returns `200` with a `note` field, because the
+  item exists regardless of what failed afterward (same route, lines 169–185). None of this changes
+  what the forwarder should *do* — the forward is fire-and-forget and doesn't branch on the
+  response either way — but it matters for anyone debugging a `500` by hand: it can mean either
+  "the secret is misconfigured" or "RikuOS's own infrastructure is down," and the two call for
+  different fixes.
 
 **The forward secret.** Header `x-forward-secret`, value `MESSENGER_FORWARD_SECRET`. This is a
 **new, separate** secret — not `CRON_SECRET`, not the existing `ST_API_SECRET` (ShikksTracker's own
@@ -181,7 +192,7 @@ glance at than guess wrong in either direction on an outward action to a real pe
       npm run migrate:indexes:apply
       ```
       A new partial unique index on `payload.messageId` (`src/models/ApprovalItem.ts`, lines
-      150–160) is what backs the duplicate-`mid` protection described above. `autoIndex` is off in
+      150–158) is what backs the duplicate-`mid` protection described above. `autoIndex` is off in
       production (CLAUDE.md), so Mongoose will **not** create this index on its own — it has to be
       applied explicitly, and per CLAUDE.md's index-change rule the script is dry-run by default.
 
@@ -231,7 +242,12 @@ the real one, silently, mid-window.
    RikuOS answers 200 for everything it understood, INCLUDING a skip
    (triage switched off, window already closed) and a duplicate mid —
    none of those are failures, don't retry them. 400 means it couldn't
-   parse the body at all; 401/500 come from the secret guard. mid over
+   parse the body at all. 401/500 come from the secret guard (unset or
+   under 32 chars); a SEPARATE 500 means a genuine infra failure after
+   the secret and body both checked out but before anything was queued
+   (DB down, etc.) — doesn't change how you should treat the forward
+   (still fire-and-forget, don't branch on it), just useful to know if
+   you're ever debugging one by hand. mid over
    128 chars or conversationId over 64 chars gets the whole event
    rejected outright (not truncated) rather than silently corrupting a
    dedup key or send target — so validate those lengths before sending
@@ -311,7 +327,7 @@ read, changed, or connected to in producing this document, per the prime directi
   already implement and document the exact classification rules stated above — this document
   restates code that exists, it does not invent new rules.
 - `src/models/ApprovalItem.ts` carries a partial unique index on `payload.messageId` (lines
-  150–160); `package.json` defines `migrate:indexes` and `migrate:indexes:apply` exactly as
+  150–158); `package.json` defines `migrate:indexes` and `migrate:indexes:apply` exactly as
   described.
 - `src/app/api/queue/[id]/retry/route.ts` filters strictly on `actionStatus: "failed"` — confirmed
   by reading the route, not assumed from its name.
