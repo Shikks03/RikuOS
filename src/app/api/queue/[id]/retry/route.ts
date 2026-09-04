@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth";
 import { buildActionRetry, runApprovalAction } from "@/lib/queue";
 import ApprovalItem from "@/models/ApprovalItem";
 import "@/models/approvals/FollowupDraftApproval"; // register the discriminator
+import "@/models/approvals/TriageResponseApproval"; // register the discriminator
 
 /**
  * POST /api/queue/:id/retry

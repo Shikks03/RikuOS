@@ -11,6 +11,7 @@ import {
 import ApprovalItem from "@/models/ApprovalItem";
 import type { IFollowupDraftApproval } from "@/models/approvals/FollowupDraftApproval";
 import "@/models/approvals/FollowupDraftApproval"; // register the discriminator
+import "@/models/approvals/TriageResponseApproval"; // register the discriminator
 
 /**
  * POST /api/queue/:id/decide

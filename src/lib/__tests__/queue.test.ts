@@ -10,6 +10,7 @@ import {
   buildDecisionUpdate,
   buildExpirySweep,
   executeFollowupDraft,
+  executeTriageResponse,
   parseDecision,
   STALE_ACTION_MS,
 } from "@/lib/queue";
@@ -172,6 +173,22 @@ describe("approvalModelForType", () => {
     const model = approvalModelForType("followup-draft");
     expect(model.modelName).toBe("followup-draft");
     expect(model.modelName).not.toBe(ApprovalItem.modelName);
+    expect(model.schema.path("editedPayload")).toBeDefined();
+  });
+
+  // This file never imports TriageResponseApproval directly (grep it — the
+  // import list at the top has none), and vitest isolates each test file's
+  // module registry by default, so this test can only pass if queue.ts's own
+  // `import "@/models/approvals/TriageResponseApproval"` (a VALUE import, not
+  // the `import type` a naive reading of Task 6 would have left in its place)
+  // actually ran the discriminator's registration side effect. A type-only
+  // import here would leave `approvalModelForType` silently falling back to
+  // the base model — exactly the trap the block above pins for followup-draft.
+  it("resolves triage-response to the discriminator model via queue.ts's own registration import", () => {
+    const model = approvalModelForType("triage-response");
+    expect(model.modelName).toBe("triage-response");
+    expect(model.modelName).not.toBe(ApprovalItem.modelName);
+    expect(model.schema.path("payload")).toBeDefined();
     expect(model.schema.path("editedPayload")).toBeDefined();
   });
 
@@ -410,6 +427,76 @@ describe("P4 — the followup-draft executor maps outcomes to action states", ()
     const out = await executeFollowupDraft({ type: "followup-draft" } as IApprovalItemBase, async () => {
       called = true;
       return { kind: "created", logId: null };
+    });
+    expect(out.status).toBe("failed");
+    expect(called).toBe(false);
+  });
+});
+
+describe("executeTriageResponse", () => {
+  it("sends the edited text when Riku edited the draft", async () => {
+    const calls: string[] = [];
+    const item = {
+      type: "triage-response",
+      payload: { conversationId: "c1", holdingText: "h", answerText: "original" },
+      editedPayload: { conversationId: "c1", holdingText: "h", answerText: "edited" },
+    };
+    const out = await executeTriageResponse(item as never, async (_c, text) => {
+      calls.push(text);
+      return { status: "done", note: "ok" };
+    });
+    expect(calls).toEqual(["edited"]);
+    expect(out.status).toBe("done");
+  });
+
+  // Original task text returned the promise from the `it` callback instead of
+  // awaiting inside it. That shape does work with vitest (a returned
+  // thenable is awaited by the runner), but it is fragile: nothing here
+  // actually asserts on the settled outcome, so if `executeTriageResponse`'s
+  // returned promise resolved without ever invoking `send` at all, this test
+  // would pass having proven nothing. Made explicitly async and awaited, with
+  // an assertion on the outcome, so a broken precedence chain cannot pass
+  // silently.
+  it("sends the holding reply when that is the chosen text", async () => {
+    // chosenText is how one item carries two options without a second enum.
+    const item = {
+      type: "triage-response",
+      payload: { conversationId: "c1", holdingText: "hold", answerText: "answer", chosenText: "hold" },
+    };
+    let sentText: string | null = null;
+    const out = await executeTriageResponse(item as never, async (_c, text) => {
+      sentText = text;
+      return { status: "done", note: "ok" };
+    });
+    expect(sentText).toBe("hold");
+    expect(out.status).toBe("done");
+  });
+
+  it("fails without sending when there is no text to send", async () => {
+    const out = await executeTriageResponse(
+      { type: "triage-response", payload: { conversationId: "c1", holdingText: "" } } as never,
+      async () => {
+        throw new Error("must not be called");
+      }
+    );
+    expect(out.status).toBe("failed");
+  });
+
+  it("fails without sending when there is no conversation id", async () => {
+    const out = await executeTriageResponse(
+      { type: "triage-response", payload: { conversationId: "", holdingText: "hold" } } as never,
+      async () => {
+        throw new Error("must not be called");
+      }
+    );
+    expect(out.status).toBe("failed");
+  });
+
+  it("fails closed with no network call when the payload is entirely missing", async () => {
+    let called = false;
+    const out = await executeTriageResponse({ type: "triage-response" } as never, async () => {
+      called = true;
+      return { status: "done", note: "ok" };
     });
     expect(out.status).toBe("failed");
     expect(called).toBe(false);

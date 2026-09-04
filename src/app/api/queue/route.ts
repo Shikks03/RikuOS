@@ -5,6 +5,7 @@ import { parseLimit } from "@/lib/env";
 import { buildExpirySweep } from "@/lib/queue";
 import ApprovalItem, { APPROVAL_STATUSES, ApprovalStatus } from "@/models/ApprovalItem";
 import "@/models/approvals/FollowupDraftApproval"; // register the discriminator
+import "@/models/approvals/TriageResponseApproval"; // register the discriminator
 
 /**
  * GET /api/queue?status=pending|approved|edited_approved|rejected|expired|all&limit=N

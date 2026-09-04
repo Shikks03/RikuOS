@@ -24,9 +24,15 @@ import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftAppr
 // happen to import the discriminator itself (e.g. a cron route). Every future
 // discriminator needs a line here too.
 import "@/models/approvals/FollowupDraftApproval";
-import { createDraft } from "@/lib/stApi";
-import type { DraftOutcome, DraftRequest } from "@/lib/stApi";
+import { createDraft, sendMessengerReply } from "@/lib/stApi";
+import type { DraftOutcome, DraftRequest, MessengerSendOutcome } from "@/lib/stApi";
 import type { IFollowupDraftApproval } from "@/models/approvals/FollowupDraftApproval";
+import type { ITriageResponseApproval } from "@/models/approvals/TriageResponseApproval";
+// Side-effect import: registers the triage-response discriminator so
+// approvalModelForType() below can resolve it. Same reason as the
+// FollowupDraftApproval import above — the type-only import is erased at
+// compile time and does NOT register anything with Mongoose on its own.
+import "@/models/approvals/TriageResponseApproval";
 
 export type Decision =
   | { kind: "approve" }
@@ -214,6 +220,24 @@ export interface ActionOutcome {
   note?: string;
 }
 
+/**
+ * Compile-time binding between MessengerSendOutcome's status union (stApi.ts,
+ * Task 5) and this file's ActionResultStatus. Both Record checks together
+ * prove the two literal unions have exactly the same members: the first
+ * catches a status MessengerSendOutcome can produce that ActionResultStatus
+ * cannot express; the second catches the reverse. Either direction drifting —
+ * e.g. a future rename in ApprovalItem's ACTION_STATUSES that isn't mirrored
+ * here — fails this line to compile instead of degrading the executor's
+ * classification silently.
+ */
+const _messengerStatusBoundToActionStatus = {
+  done: "done",
+  failed: "failed",
+  needs_verification: "needs_verification",
+} satisfies Record<ActionResultStatus, MessengerSendOutcome["status"]> &
+  Record<MessengerSendOutcome["status"], ActionResultStatus>;
+void _messengerStatusBoundToActionStatus;
+
 type ActionExecutor = (item: IApprovalItemBase) => Promise<ActionOutcome>;
 
 /** A claimed action older than this is presumed interrupted and is swept. */
@@ -366,10 +390,58 @@ export async function executeFollowupDraft(
 }
 
 /**
- * One executor per discriminator type. Task 7 fills in followup-draft.
+ * Sends an approved triage reply.
+ *
+ * The sender is injected so the classification can be tested without a
+ * network — the same shape executeFollowupDraft uses; production passes
+ * stApi.sendMessengerReply, which is TOTAL (never throws) and returns a
+ * classified MessengerSendOutcome.
+ *
+ * Text precedence: an edited payload wins over the original (Riku changed it
+ * for a reason); within whichever payload is in play, the explicitly chosen
+ * text wins, then the answer, then the holding reply. The last fallback is
+ * load-bearing, not defensive padding: while the knowledge block is
+ * unapproved there IS no answerText, so the holding reply is the entire item
+ * and the only thing one tap can send. This feature ships deliberately
+ * under-configured, so that is the normal path right now.
+ *
+ * Refuses to send — returns `failed` with no call to `send` — for a missing
+ * payload, missing text, or missing conversation id. A missing payload is
+ * the same "nothing to work with" case executeFollowupDraft fails closed on
+ * for a missing draftBody/contactId; it is not thrown, because a throw would
+ * misclassify a provable no-op as `needs_verification` instead of `failed`.
+ */
+export async function executeTriageResponse(
+  item: IApprovalItemBase,
+  send: (
+    conversationId: string,
+    text: string
+  ) => Promise<{ status: ActionResultStatus; note: string }> = sendMessengerReply
+): Promise<ActionOutcome> {
+  const typed = item as unknown as ITriageResponseApproval;
+  const source = typed.editedPayload ?? typed.payload;
+
+  if (!source) {
+    return { status: "failed", note: "The item has no usable payload; nothing was sent." };
+  }
+
+  const text = source.chosenText ?? source.answerText ?? source.holdingText ?? "";
+  if (text.trim().length === 0) {
+    return { status: "failed", note: "No text to send — nothing was attempted." };
+  }
+  if (!source.conversationId) {
+    return { status: "failed", note: "No conversation id — nothing was attempted." };
+  }
+
+  return send(source.conversationId, text);
+}
+
+/**
+ * One executor per discriminator type.
  */
 const executors: Record<string, ActionExecutor> = {
   "followup-draft": (item) => executeFollowupDraft(item),
+  "triage-response": (item) => executeTriageResponse(item),
 };
 
 /**
