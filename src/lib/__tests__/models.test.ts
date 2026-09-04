@@ -218,6 +218,56 @@ describe("P4 — the idempotency index", () => {
   });
 });
 
+describe("P6 — the triage dedup index", () => {
+  // Declared on the BASE schema for the same sync-indexes.mts reason as the
+  // replyToLogId index above.
+  function indexOn(path: string) {
+    return ApprovalItem.schema
+      .indexes()
+      .find(([keys]) => Object.prototype.hasOwnProperty.call(keys, path));
+  }
+
+  it("declares a unique partial index on payload.messageId, NOT scoped to pending", () => {
+    const found = indexOn("payload.messageId");
+    expect(found).toBeDefined();
+    const [, options] = found!;
+    expect(options.unique).toBe(true);
+    // Unlike replyToLogId, a rejected message must stay rejected against a
+    // redelivered mid — so the partial filter carries no status clause.
+    expect(options.partialFilterExpression).toEqual({
+      "payload.messageId": { $exists: true },
+    });
+  });
+
+  it("is NOT declared on the discriminator schema", () => {
+    const onDiscriminator = TriageResponseApproval.schema
+      .indexes()
+      .find(([keys]) => Object.prototype.hasOwnProperty.call(keys, "payload.messageId"));
+    expect(onDiscriminator).toBeUndefined();
+  });
+});
+
+describe("P6 — the triage dedup query casts through the discriminator, not the base", () => {
+  // This is the one piece of behaviour that lives only in the route
+  // (src/app/api/messenger/inbound/route.ts): with strictQuery: true
+  // (src/lib/db.ts), a filter path only reliably casts when queried through a
+  // model whose OWN schema declares it — payload.messageId lives on
+  // TriageResponseApproval's schema, not ApprovalItem's. Querying through the
+  // base model can still happen to work, but only because some other
+  // TriageResponseApproval import elsewhere in the same module graph already
+  // registered the discriminator (this very file does, two lines up) —
+  // brittle, import-order-dependent behaviour the route must not lean on.
+  // Pinning the shape here means a regression that swaps the model back to
+  // the base one won't fail silently: findOne would otherwise match the
+  // first ApprovalItem in the collection and report every inbound message as
+  // a duplicate, with no route-level test able to notice.
+  it("keeps payload.messageId in the cast filter when queried through TriageResponseApproval", () => {
+    const query = TriageResponseApproval.findOne({ "payload.messageId": "m1" });
+    const casted = query.cast(TriageResponseApproval) as Record<string, unknown>;
+    expect(casted).toHaveProperty("payload.messageId", "m1");
+  });
+});
+
 describe("P4 — AgentRun counts", () => {
   it("defaults every count to zero", () => {
     const run = new AgentRun({ agent: "chaser", startedAt: new Date(), durationMs: 1, ok: true });

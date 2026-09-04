@@ -14,10 +14,13 @@ import {
   buildTriageTitle,
   isWithinWindow,
   windowClosesAt,
+  WINDOW_HOURS,
   type DraftPolicy,
   type InboundEvent,
 } from "@/lib/triage";
 import type { ITriageResponsePayload } from "@/models/approvals/TriageResponseApproval";
+
+const HOUR_MS = 60 * 60 * 1000;
 
 export type IngestDecision =
   | { action: "skip"; reason: string }
@@ -67,11 +70,21 @@ export async function decideIngest(
     }
   }
 
+  // Clamped against `now + WINDOW_HOURS`, not just computed from `sentAt`.
+  // parseInboundEvent only sanity-bounds the parsed year (2000-2100), so a
+  // clock-skewed forward with a future-dated `sentAt` would otherwise pass
+  // isWithinWindow and mint a card promising more time than Meta's own
+  // 24-hour clock — which started counting from the real send time — will
+  // actually honour.
+  const staleAt = new Date(
+    Math.min(windowClosesAt(event.sentAt).getTime(), now.getTime() + WINDOW_HOURS * HOUR_MS)
+  );
+
   return {
     action: "create",
     title: buildTriageTitle(event.senderName),
     summary: buildTriageSummary(event.text),
-    staleAt: windowClosesAt(event.sentAt),
+    staleAt,
     payload: {
       conversationId: event.conversationId,
       messageId: event.mid,

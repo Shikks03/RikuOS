@@ -120,6 +120,43 @@ ApprovalItemSchema.index(
   }
 );
 
+/**
+ * Triage inbound dedup (P6). At most ONE item may ever exist per Meta message
+ * id. Meta redelivers at-least-once, and ShikksTracker's own forward can retry
+ * independently on top of that — and the route's `findOne` fast path has an
+ * unavoidable gap behind it: `decideIngest`'s drafter is a ~20s Anthropic call
+ * with `maxRetries: 1`, so a slow draft leaves tens of seconds during which a
+ * redelivery can race the first request straight past the fast path and into
+ * a second `create`. This index is the atomic backstop under that `findOne`,
+ * exactly as the `replyToLogId` index above is the backstop under the chaser's
+ * query-layer check.
+ *
+ * NOT scoped to `status: "pending"`, unlike `replyToLogId` above — deliberately.
+ * A reply anchor legitimately re-earns a proposal after Riku rejects it: he
+ * rejected that wording, not the lead, and the lead can still need a follow-up
+ * tomorrow. A `mid` is different in kind: it is Meta's immutable identity for
+ * one specific message that will never gain new information. A rejected triage
+ * card means "I am not replying to this message" — full stop — so a redelivery
+ * must not be allowed to resurrect it. Scoping this to `pending` would make
+ * rejecting an inbound message futile against an at-least-once webhook: the
+ * very next redelivery would recreate the same card.
+ *
+ * DECLARED ON THE BASE SCHEMA even though `payload` lives on the discriminator,
+ * for the same reason as `replyToLogId` above: scripts/sync-indexes.mts
+ * iterates base models, and syncIndexes() DROPS any index it does not see
+ * declared there. Never declare an index on a discriminator schema in this
+ * repo.
+ */
+ApprovalItemSchema.index(
+  { "payload.messageId": 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      "payload.messageId": { $exists: true },
+    },
+  }
+);
+
 // Stale-action sweep: claimed actions that never resolved (see buildActionSweep).
 ApprovalItemSchema.index({ actionStatus: 1, actionStartedAt: 1 });
 

@@ -49,6 +49,29 @@ describe("decideIngest", () => {
     expect(out.staleAt.toISOString()).toBe("2026-09-05T11:00:00.000Z");
   });
 
+  it("keeps messageId and conversationId on the fields they belong to, not swapped", async () => {
+    // The dedup key (messageId) and the send target (conversationId) — a
+    // transposition between them would break dedup AND route a reply into the
+    // wrong conversation, silently.
+    const out = await decideIngest(NOW, event, policy(), async () => "A1 starts at 3,000.");
+    if (out.action !== "create") throw new Error("expected create");
+    expect(out.payload).toMatchObject({
+      messageId: event.mid,
+      conversationId: event.conversationId,
+    });
+  });
+
+  it("clamps staleAt to now + 24h when sentAt is clock-skewed into the future", async () => {
+    // parseInboundEvent only sanity-bounds the parsed year (2000-2100), so a
+    // future-dated sentAt is not itself rejected. Meta's own 24-hour clock
+    // started at the real send time, so a card must never promise more than
+    // WINDOW_HOURS from now.
+    const skewed = { ...event, sentAt: new Date("2026-09-07T12:00:00.000Z") };
+    const out = await decideIngest(NOW, skewed, policy(), async () => "A1 starts at 3,000.");
+    if (out.action !== "create") throw new Error("expected create");
+    expect(out.staleAt.toISOString()).toBe("2026-09-05T12:00:00.000Z");
+  });
+
   it("creates a holding-only item when the block is unapproved, and never calls the model", async () => {
     const draft = vi.fn();
     const out = await decideIngest(
