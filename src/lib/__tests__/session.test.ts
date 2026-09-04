@@ -1,10 +1,12 @@
 /**
- * Unit tests for src/lib/session.ts (ported from ShikksTracker).
+ * Unit tests for src/lib/session.ts (ported from ShikksTracker), plus the
+ * secret guards in src/lib/auth.ts that build on it.
  *
  * Covers: v2 token round-trip, rejection of the old 2-part format (the
  * regression guard for the "HMAC keyed by the raw password" vulnerability),
  * tamper detection (MAC + expiry), expiry, cross-secret rejection,
- * malformed-input shapes, and assertSessionSecret's fail-closed behavior.
+ * malformed-input shapes, assertSessionSecret's fail-closed behavior, and
+ * requireForwardSecret's fail-closed / timing-safe behavior.
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
@@ -132,6 +134,18 @@ describe("requireForwardSecret", () => {
     expect(res?.status).toBe(500);
   });
 
+  it("fails closed with 500 when the secret is shorter than 32 chars", () => {
+    process.env.MESSENGER_FORWARD_SECRET = "short";
+    const res = requireForwardSecret(req({ "x-forward-secret": "short" }));
+    expect(res?.status).toBe(500);
+  });
+
+  it("treats an empty-string secret as unset and fails closed with 500", () => {
+    process.env.MESSENGER_FORWARD_SECRET = "";
+    const res = requireForwardSecret(req({ "x-forward-secret": "" }));
+    expect(res?.status).toBe(500);
+  });
+
   it("rejects a wrong secret with 401", () => {
     process.env.MESSENGER_FORWARD_SECRET = "a".repeat(32);
     expect(requireForwardSecret(req({ "x-forward-secret": "b".repeat(32) }))?.status).toBe(401);
@@ -142,8 +156,27 @@ describe("requireForwardSecret", () => {
     expect(requireForwardSecret(req({ "x-forward-secret": "a".repeat(32) }))).toBeNull();
   });
 
+  it("accepts a secret padded with a trailing newline in the env value", () => {
+    process.env.MESSENGER_FORWARD_SECRET = `${"a".repeat(32)}\n`;
+    expect(requireForwardSecret(req({ "x-forward-secret": "a".repeat(32) }))).toBeNull();
+  });
+
   it("rejects a missing header without throwing", () => {
     process.env.MESSENGER_FORWARD_SECRET = "a".repeat(32);
     expect(requireForwardSecret(req({}))?.status).toBe(401);
+  });
+
+  it("authorizes when the header name has different casing", () => {
+    process.env.MESSENGER_FORWARD_SECRET = "a".repeat(32);
+    expect(requireForwardSecret(req({ "X-Forward-Secret": "a".repeat(32) }))).toBeNull();
+  });
+
+  it("returns byte-identical 401 bodies for a missing header and a wrong secret", async () => {
+    process.env.MESSENGER_FORWARD_SECRET = "a".repeat(32);
+    const missing = requireForwardSecret(req({}));
+    const wrong = requireForwardSecret(req({ "x-forward-secret": "b".repeat(32) }));
+    expect(missing?.status).toBe(401);
+    expect(wrong?.status).toBe(401);
+    expect(await missing?.text()).toBe(await wrong?.text());
   });
 });
