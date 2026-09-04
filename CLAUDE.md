@@ -9,7 +9,8 @@ Read `ARCHITECTURE.md` before structural work and `RIKUOS_CONCEPT.md` §3 before
 - Next.js (App Router) + TypeScript `strict`. Path alias `@/*` → `src/*`.
 - MongoDB Atlas via **Mongoose only** — no native driver calls.
 - Deployed on Vercel. Cron agents are Vercel crons hitting secret-gated API routes.
-- Mobile-first PWA. Visual design gets its own later pass; until then keep UI plain and dense — no decorative work in logic phases (D10).
+- Mobile-first PWA. Keep UI plain and dense until its page's design work is due — no decorative work in logic phases (D10).
+- **Page phases are content-first.** No page is planned or built until its contents have been discussed with Riku and followed up on — per page, at the start of that phase, never once up front for all of them (S11). Page *structure* (what is shown, what leads, what groups) is settled in that discussion; *visual* design follows S12's timing, not the old "all of it at the end" reading of D10.
 - The product name may change: never hardcode "RikuOS" in user-visible strings; use the `APP_NAME` constant.
 
 ## Repo boundary — the prime directive
@@ -62,4 +63,5 @@ Proven in ShikksTracker; follow them here.
 7. Never put a secret in the DB, in client-visible code, or in a log line.
 8. Never use `Schema.Types.Mixed` or unbounded strings.
 9. Never mark work complete without the verification trio passing.
-10. Never relitigate D1–D11 / S1–S7 without an explicit new decision recorded in `ARCHITECTURE.md`.
+10. Never relitigate D1–D11 or any ratified S-decision without an explicit new decision recorded in `ARCHITECTURE.md` §7.
+11. Never plan or build a page phase before discussing its contents with Riku (S11), and never treat one page's discussion as covering the others.

@@ -11,14 +11,25 @@ P2 (ST: webhook + tabs) ──► P6 (triage)       │
         │                                     ▼
         └────────► P5 (watchdog + health + digest)
 P1 + weeks of send data ──► P7 (retro)
-P1 ──► P8 (dashboard pages)          P1, P2, P3 have no dependencies on each other
+
+The pages (P8 split 2026-09-04, decision S11):
+P1, P5 ──► P8 (Freelance page) ──► P9 (design foundation)
+                                     └──► P10 (Personal: calendar + to-dos + Today)
+                                              └──► P11 (Academics) ──┐
+                                                                     ▼
+                                                    P12 (re-review, then polish)
+
+P1, P2, P3 have no dependencies on each other.
 ```
+
+**Status, 2026-09-04:** P1–P5 shipped. **P6 is next.** P7 waits on accumulated send data. P8–P12
+are the pages; their contents are discussed per phase (S11), not planned here.
 
 ---
 
 ## P1 — OS API + variant tagging — repo: ShikksTracker
 
-*Deep spec: features C & D. Unblocks P4, P7, P8.*
+*Deep spec: features C & D. Unblocks P4, P7, and the Freelance page (P8).*
 
 | # | Task | Depends on |
 |---|------|-----------|
@@ -128,7 +139,7 @@ subject>` itself; the proposed fix is one field in one `.select()`.
 
 ## P5 — Watchdog + site health + morning digest — repo: RikuOS
 
-*Needs P3. Webhook freshness checks need P2. Built before P6–P8 on purpose.*
+*Needs P3. Webhook freshness checks need P2. Built before P6–P12 on purpose.*
 
 | # | Task | Depends on |
 |---|------|-----------|
@@ -231,42 +242,44 @@ cannot tell an expired token from a quiet page. Only the direct token check fixe
 
 **Done when:** the first weekly retro produces a scoreboard and at least one accepted variant improvement.
 
-## P8 — Dashboard pages + calendar + polish — repo: RikuOS
+## P8–P12 — the pages (was P8) — repo: RikuOS
 
-*Needs P1 (Freelance feed); Canvas token (Academics); Google OAuth (Personal). Last by design (D10). Visual design pass happens here (design-loop process per concept §7).*
+**P8 was split on 2026-09-04 (decision S11).** It carried three unrelated acceptance bars, two new
+external integrations with separate auth, and an internal dependency between its own tasks. The old
+tasks 8.1–8.5 remain below as *raw material*; they are not the plan.
 
-| # | Task | Depends on |
-|---|------|-----------|
-| 8.1 | Freelance page: OS API summary/attention/variant-stats + site health view | P1, P5 |
-| 8.2 | Personal page: GCal live read with sub-calendar layers, write-through event creation (D5); morning brief view | P3 |
-| 8.3 | Academics page: Canvas courses/assignments/due dates; manual modules/reviewers with per-course counters; Classes sub-calendar auto-population; sentence-to-schedule planner | 8.2 |
-| 8.4 | PWA polish + the proper visual design pass across all pages | 8.1–8.3 |
-| 8.5 | **Feature re-review before the design pass:** walk every shipped feature (P3–P7) with Riku for improvements and quality-of-life fixes, and fold the accepted ones into 8.4 rather than shipping a coat of paint over v0 ergonomics | 8.1–8.3 |
+**Contents are deliberately not written here.** Under S11 each page's content is discussed with Riku
+at the start of its own phase and followed up before anything is finalised — never once up front,
+never inferred from another page's discussion. Drawing the task lists now would defeat that rule.
+What is settled is the boundaries, the order, and why.
 
-**Done when:** all three pages live on real feeds (D11 satisfied), calendar layers toggle, and the app looks intentional.
+**Ordering rationale.** Freelance goes first because it is the only page needing no new sign-in — all
+its feeds already exist — and because it is the densest and most table-heavy, which is the hardest
+test a design system can face (S12). Personal precedes Academics because Academics' Classes layer
+needs Personal's calendar to exist.
 
-**P8 IS BEING SPLIT — decided 2026-09-04, spec pass first.** Riku's call, on the observation that
-P8 is three phases wearing one number. The tells: its "Done when" carries three unrelated acceptance
-bars where every other phase has one; tasks 8.2 and 8.3 each stack three-to-four distinct features
-(8.3 alone is Canvas integration + a modules/reviewers model + Classes sub-calendar population + an
-AI planner) where a task elsewhere is roughly a day; it introduces **two** new external integrations
-with separate auth (Google OAuth, Canvas token) where P2 and P4 each got a whole phase for one; and
-8.3 depends on 8.2 from inside the same phase.
+| # | Phase | Depends on | Done when |
+|---|-------|-----------|-----------|
+| P8 | **Freelance page.** The pipeline view on real feeds, built plain. | P1, P5 | The page is live on real OS-API data with no manual entry — D11 satisfied for one page. |
+| P9 | **Design foundation.** One focused pass settling type, colour, spacing and a small component vocabulary, proven by rebuilding P8's page to it. | P8 | The system exists as tokens and components, and the Freelance page is built from them rather than from ad-hoc styles. |
+| P10 | **Personal: calendar, to-dos, Today.** Google sign-in, live calendar read with toggleable layers, create-through-to-Google, the sectioned to-do store, and the Today section added to the morning digest (S13). | P3, P9 | One morning push names what is actually due and scheduled that day — the section P5a-7 dropped for want of a to-do store. |
+| P11 | **Academics.** Canvas courses and due dates, the manual modules/reviewers supplement, Classes layer population, and the sentence-to-schedule planner. | P10, Canvas token | Decided at its own content discussion (S11). |
+| P12 | **Feature re-review, then final polish.** Walk P3–P11 with Riku for fixes first, then the polish pass. | P8–P11 | The accepted fixes are shipped and the app looks intentional. Re-review precedes polish — Riku's call, 2026-08-29: not a coat of paint over v0 ergonomics. |
 
-Underneath that is a thinner problem: **the content was never specced.** `RIKUOS_CONCEPT.md` §7 says
-that document specs "*content*, not visual design" — but for Personal and Academics it barely specs
-content either, one bullet each in §2.2. ShikksTracker's work had a deep spec; P5 got its own design
-doc that then cut three specced features on evidence. Personal and Academics have never had that
-pass, which is the same imbalance as their having no agents, showing up somewhere else.
+**Two constraints carried into these phases, both already ratified:**
 
-So: a content design spec comes first and **the spec decides the phase boundaries** — do not draw
-them ahead of it. Tasks 8.1–8.5 above stand as the raw material, not as the plan.
+- **The planner is the one calendar writer that needs approval** (S13). Riku creating an event from
+  the UI is Riku acting, and the approval queue governs *agents* acting on his behalf, not him.
+- **The to-do store is a supplement under D11, not a violation** (S13). The Personal page is fed by
+  Google Calendar; to-dos ride alongside with a specific job, exactly as modules/reviewers do for
+  Academics. Recorded so the unparking is not later mistaken for breaking D11.
 
-**The sectioned to-do store comes back in, folded into the Personal phase** (Riku, 2026-09-04),
-reversing its "deferred past v0" parking in the Deferred section below. Reasons: it is already
-specced (title, section, optional due date, done), it unblocks the morning digest's missing Today
-section (dropped as P5a-7 for exactly this lack), it is likely the source of truth the quest tracker
-needs, and it would be the Personal side's first piece of actual agency.
+**Raw material from the old P8, retained for the content discussions to draw on — not a task list:**
+Freelance page reading OS-API summary/attention/variant-stats plus the site-health view · Personal
+page with GCal sub-calendar layers, write-through creation (D5) and a morning brief view · Academics
+page with Canvas courses/assignments/due dates, manual modules/reviewers with per-course counters,
+Classes sub-calendar auto-population and a sentence-to-schedule planner · PWA polish · the P3–P11
+feature re-review.
 
 ---
 
@@ -274,6 +287,6 @@ needs, and it would be the Personal side's first piece of actual agency.
 
 Voice commands (D8) · GCash/Maya statement import / receipt OCR (D7) · per-lead click links (D3) · Work page (D9) · passkey login (S3) · case-study/brand pipeline.
 
-**Sectioned to-do store** (added 2026-08-29) — a to-do list per OS section (Personal, Freelance, Academics; Work stays parked per D9), consolidated into the morning digest: everything due within 3 days, plus anything overdue. Agreed shape: title, section, optional due date, done — undated items live on the page but never enter the digest. Deliberately deferred past v0 (Riku, 2026-08-29) so P5a stays cheap protective work. Likely the missing source of truth the quest tracker needs.
+~~**Sectioned to-do store**~~ — **UNPARKED 2026-09-04 into P10** (decision S13). It is the input the morning digest's Today section was missing, which is why P5a-7 dropped that section. Agreed shape stands: title, section (Personal, Freelance, Academics; Work parked per D9), optional due date, done — undated items live on the page but never enter the digest, which reports everything due within 3 days plus anything overdue.
 
-**Quest-style project tracker** (added 2026-08-29) — a page that renders currently-open projects as visible, persistent quests, because a project that stops being worked on currently stops being remembered. Needs a source of truth for "what projects exist and which are open" first; that source does not exist yet in either repo. Revisit alongside P8.
+**Quest-style project tracker** (added 2026-08-29) — a page that renders currently-open projects as visible, persistent quests, because a project that stops being worked on currently stops being remembered. Needs a source of truth for "what projects exist and which are open" first; that source does not exist yet in either repo. The unparked to-do store (P10) is the likeliest candidate — raise it in P10's content discussion, and again in P12's re-review.
