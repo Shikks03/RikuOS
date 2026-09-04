@@ -234,10 +234,17 @@ export type DraftOutcome =
   | { kind: "unknown"; message: string };
 
 /**
- * The status/note pair `sendMessengerReply` returns. Named, and exported,
- * so Task 6's executor can bind it to `ActionOutcome` (src/lib/queue.ts,
- * derived from `ACTION_STATUSES`) and let the compiler catch any future
- * divergence between the two unions instead of the copies silently drifting.
+ * The status/note pair `sendMessengerReply` returns. Named, and exported, so
+ * src/lib/queue.ts's executeTriageResponse can pass this function as `send`'s
+ * default value and let the compiler check the assignment: that file's
+ * ActionResultStatus is `Extract<ActionStatus, "done" | "failed" |
+ * "needs_verification">`, itself derived from ApprovalItem's ACTION_STATUSES —
+ * so this status union has to stay assignable to it, or that default-value
+ * assignment fails to compile, catching a future divergence between the two
+ * instead of letting the copies silently drift. (queue.ts also carries a
+ * standalone type-only assertion of the same fact, next to
+ * ActionResultStatus's own definition, for a reader who is looking there
+ * instead of here.)
  */
 export type MessengerSendOutcome = {
   status: "done" | "failed" | "needs_verification";

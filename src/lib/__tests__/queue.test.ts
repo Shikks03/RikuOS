@@ -449,14 +449,6 @@ describe("executeTriageResponse", () => {
     expect(out.status).toBe("done");
   });
 
-  // Original task text returned the promise from the `it` callback instead of
-  // awaiting inside it. That shape does work with vitest (a returned
-  // thenable is awaited by the runner), but it is fragile: nothing here
-  // actually asserts on the settled outcome, so if `executeTriageResponse`'s
-  // returned promise resolved without ever invoking `send` at all, this test
-  // would pass having proven nothing. Made explicitly async and awaited, with
-  // an assertion on the outcome, so a broken precedence chain cannot pass
-  // silently.
   it("sends the holding reply when that is the chosen text", async () => {
     // chosenText is how one item carries two options without a second enum.
     const item = {
@@ -472,24 +464,95 @@ describe("executeTriageResponse", () => {
     expect(out.status).toBe("done");
   });
 
+  it("sends the holding reply on the bare payload — the normal path while the knowledge block is unapproved", async () => {
+    // No chosenText, no answerText at all: draftPolicy (triage.ts) withholds
+    // answerText entirely until the knowledge block is approved, so this
+    // shape, not a fully populated payload, is what most items look like.
+    const item = {
+      type: "triage-response",
+      payload: { conversationId: "c1", holdingText: "hold" },
+    };
+    let sentText: string | null = null;
+    const out = await executeTriageResponse(item as never, async (_c, text) => {
+      sentText = text;
+      return { status: "done", note: "ok" };
+    });
+    expect(sentText).toBe("hold");
+    expect(out.status).toBe("done");
+  });
+
+  it("falls through a present-but-blank answerText to the holding reply", async () => {
+    // A stored "" is a real shape (draftPolicy's own "nothing here" sentinel
+    // for knowledgeBlock), not hypothetical. `??` would stop on it and report
+    // no text to send; the fix must skip past it to holdingText instead.
+    const item = {
+      type: "triage-response",
+      payload: { conversationId: "c1", holdingText: "hold", answerText: "" },
+    };
+    let sentText: string | null = null;
+    const out = await executeTriageResponse(item as never, async (_c, text) => {
+      sentText = text;
+      return { status: "done", note: "ok" };
+    });
+    expect(sentText).toBe("hold");
+    expect(out.status).toBe("done");
+  });
+
+  it("trims the winning candidate before sending", async () => {
+    const item = {
+      type: "triage-response",
+      payload: { conversationId: "c1", holdingText: "hold", chosenText: "  hi  " },
+    };
+    let sentText: string | null = null;
+    const out = await executeTriageResponse(item as never, async (_c, text) => {
+      sentText = text;
+      return { status: "done", note: "ok" };
+    });
+    expect(sentText).toBe("hi");
+    expect(out.status).toBe("done");
+  });
+
+  it("reads the conversation id from the original payload, never the edited one", async () => {
+    let sentConversationId: string | null = null;
+    const item = {
+      type: "triage-response",
+      payload: { conversationId: "original", holdingText: "hold" },
+      // Identity is not something a real edit builder would ever touch, but
+      // this pins the guard even if a future one mistakenly did.
+      editedPayload: { conversationId: "edited", holdingText: "hold", answerText: "new text" },
+    };
+    const out = await executeTriageResponse(item as never, async (conversationId) => {
+      sentConversationId = conversationId;
+      return { status: "done", note: "ok" };
+    });
+    expect(sentConversationId).toBe("original");
+    expect(out.status).toBe("done");
+  });
+
   it("fails without sending when there is no text to send", async () => {
+    let called = false;
     const out = await executeTriageResponse(
       { type: "triage-response", payload: { conversationId: "c1", holdingText: "" } } as never,
       async () => {
-        throw new Error("must not be called");
+        called = true;
+        return { status: "done", note: "should not run" };
       }
     );
     expect(out.status).toBe("failed");
+    expect(called).toBe(false);
   });
 
   it("fails without sending when there is no conversation id", async () => {
+    let called = false;
     const out = await executeTriageResponse(
       { type: "triage-response", payload: { conversationId: "", holdingText: "hold" } } as never,
       async () => {
-        throw new Error("must not be called");
+        called = true;
+        return { status: "done", note: "should not run" };
       }
     );
     expect(out.status).toBe("failed");
+    expect(called).toBe(false);
   });
 
   it("fails closed with no network call when the payload is entirely missing", async () => {
@@ -500,5 +563,35 @@ describe("executeTriageResponse", () => {
     });
     expect(out.status).toBe("failed");
     expect(called).toBe(false);
+  });
+
+  it("passes a needs_verification outcome from send through unchanged", async () => {
+    const item = {
+      type: "triage-response",
+      payload: { conversationId: "c1", holdingText: "hold" },
+    };
+    const out = await executeTriageResponse(item as never, async () => ({
+      status: "needs_verification" as const,
+      note: "ShikksTracker returned 200 without a parseable body.",
+    }));
+    expect(out).toEqual({
+      status: "needs_verification",
+      note: "ShikksTracker returned 200 without a parseable body.",
+    });
+  });
+
+  it("passes a failed outcome from send through unchanged (distinct from the executor's own pre-send failures)", async () => {
+    const item = {
+      type: "triage-response",
+      payload: { conversationId: "c1", holdingText: "hold" },
+    };
+    const out = await executeTriageResponse(item as never, async () => ({
+      status: "failed" as const,
+      note: "ShikksTracker did not send the reply (422): window closed.",
+    }));
+    expect(out).toEqual({
+      status: "failed",
+      note: "ShikksTracker did not send the reply (422): window closed.",
+    });
   });
 });

@@ -15,7 +15,7 @@
  */
 
 import type { Model } from "mongoose";
-import ApprovalItem, { IApprovalItemBase } from "@/models/ApprovalItem";
+import ApprovalItem, { ActionStatus, IApprovalItemBase } from "@/models/ApprovalItem";
 import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftApproval";
 // Side-effect import: registers the followup-draft discriminator so
 // approvalModelForType() below can resolve it. This must be a VALUE import —
@@ -212,31 +212,54 @@ export function approvalModelForType(type: string): Model<IApprovalItemBase> {
  *   failed             the target refused; PROVABLY no side effect. Retryable.
  *   needs_verification unknown. A human checks the far side before anything else
  *                      happens (CLAUDE.md asymmetric-failure rule).
+ *
+ * DERIVED from ApprovalItem's ActionStatus (itself `(typeof ACTION_STATUSES)[
+ * number]`), not hand-typed, so a rename or removal of one of these three
+ * values in the model is a compile error here rather than two lists that
+ * quietly stop matching. "pending" and "running" are excluded on purpose —
+ * they are actionStatus values that exist on the model but that an
+ * executor's return never reports: pending is the pre-claim state, and
+ * running is the claim itself, set by buildActionClaim before any executor
+ * runs.
  */
-export type ActionResultStatus = "done" | "failed" | "needs_verification";
+export type ActionResultStatus = Extract<ActionStatus, "done" | "failed" | "needs_verification">;
 
 export interface ActionOutcome {
   status: ActionResultStatus;
   note?: string;
 }
 
+/** Forces T to be exactly `true`; otherwise TS reports the mismatch at the use site below. */
+type Assert<T extends true> = T;
+
 /**
- * Compile-time binding between MessengerSendOutcome's status union (stApi.ts,
- * Task 5) and this file's ActionResultStatus. Both Record checks together
- * prove the two literal unions have exactly the same members: the first
- * catches a status MessengerSendOutcome can produce that ActionResultStatus
- * cannot express; the second catches the reverse. Either direction drifting —
- * e.g. a future rename in ApprovalItem's ACTION_STATUSES that isn't mirrored
- * here — fails this line to compile instead of degrading the executor's
- * classification silently.
+ * Type-only assertion, no runtime code: MessengerSendOutcome's status union
+ * (stApi.ts — what sendMessengerReply actually returns) must stay assignable
+ * to ActionResultStatus above, or this fails to compile.
+ *
+ * WHAT THIS CATCHES: MessengerSendOutcome producing a status value
+ * ActionResultStatus cannot express. That matters because
+ * buildActionOutcomeUpdate's write runs with no schema validators — an
+ * off-enum actionStatus would land in Mongo unchecked, and buildActionRetry's
+ * `{ actionStatus: "failed" }` filter would then silently stop matching that
+ * row.
+ *
+ * WHAT THIS DOES NOT CATCH: the reverse direction — an ActionResultStatus
+ * value MessengerSendOutcome itself never produces. That is fine on purpose:
+ * ActionResultStatus is shared with executeFollowupDraft's DraftOutcome
+ * mapping too, so it is allowed to be wider than any one sender's output.
+ *
+ * ALSO CAUGHT, INDEPENDENTLY, WITHOUT THIS: `send`'s default value in
+ * executeTriageResponse below (`= sendMessengerReply`) is checked by ordinary
+ * structural typing against the parameter's declared return type the moment
+ * this file compiles, so the same divergence already fails to compile there.
+ * This alias exists to put the relationship where the next reader is more
+ * likely to be looking — next to ActionResultStatus's own definition — not
+ * because that check is insufficient by itself.
  */
-const _messengerStatusBoundToActionStatus = {
-  done: "done",
-  failed: "failed",
-  needs_verification: "needs_verification",
-} satisfies Record<ActionResultStatus, MessengerSendOutcome["status"]> &
-  Record<MessengerSendOutcome["status"], ActionResultStatus>;
-void _messengerStatusBoundToActionStatus;
+export type _AssertMessengerStatusAssignableToActionStatus = Assert<
+  MessengerSendOutcome["status"] extends ActionResultStatus ? true : false
+>;
 
 type ActionExecutor = (item: IApprovalItemBase) => Promise<ActionOutcome>;
 
@@ -397,13 +420,35 @@ export async function executeFollowupDraft(
  * stApi.sendMessengerReply, which is TOTAL (never throws) and returns a
  * classified MessengerSendOutcome.
  *
- * Text precedence: an edited payload wins over the original (Riku changed it
- * for a reason); within whichever payload is in play, the explicitly chosen
- * text wins, then the answer, then the holding reply. The last fallback is
+ * THE SEND TARGET (conversationId) IS ALWAYS READ FROM THE ORIGINAL PAYLOAD,
+ * NEVER FROM editedPayload — identity, not something a human edits. This
+ * makes "an edit replaces the message text only" structural rather than a
+ * convention to remember, matching parseDecision's treatment of contactId for
+ * followup-draft.
+ *
+ * TEXT precedence: within whichever payload is in play — editedPayload wins
+ * over the original when Riku edited it — the first NON-BLANK candidate wins,
+ * in this order: the explicitly chosen text, then the answer, then the
+ * holding reply. First-non-blank, not `??`: a stored `answerText: ""` (a real
+ * shape — draftPolicy in triage.ts already uses "" as its "nothing here"
+ * sentinel) must fall through to holdingText rather than stopping on an empty
+ * string and reporting "no text to send". The holding-reply fallback is
  * load-bearing, not defensive padding: while the knowledge block is
  * unapproved there IS no answerText, so the holding reply is the entire item
  * and the only thing one tap can send. This feature ships deliberately
- * under-configured, so that is the normal path right now.
+ * under-configured, so that is the normal path right now. The winning
+ * candidate is trimmed before it is sent.
+ *
+ * INVARIANT FOR WHATEVER BUILDS editedPayload NEXT (editing is not wired up
+ * for this type yet): NEVER copy `chosenText` forward from the original
+ * payload into editedPayload. The model documents chosenText as an OUTPUT —
+ * it records which text Riku actually sent (TriageResponseApproval.ts) — but
+ * this executor treats it as the HIGHEST-PRIORITY INPUT. parseDecision's edit
+ * path for followup-draft copies every identity field from the original
+ * payload by hand, and its own comment warns every new field needs a line
+ * there; if a future triage edit path follows that convention and copies
+ * chosenText too, this executor will send the stale chosenText instead of
+ * the human's edit and record `done` — discarding the edit with no trace.
  *
  * Refuses to send — returns `failed` with no call to `send` — for a missing
  * payload, missing text, or missing conversation id. A missing payload is
@@ -419,21 +464,24 @@ export async function executeTriageResponse(
   ) => Promise<{ status: ActionResultStatus; note: string }> = sendMessengerReply
 ): Promise<ActionOutcome> {
   const typed = item as unknown as ITriageResponseApproval;
-  const source = typed.editedPayload ?? typed.payload;
+  const payload = typed.payload;
+  const source = typed.editedPayload ?? payload;
 
-  if (!source) {
+  if (!payload || !source) {
     return { status: "failed", note: "The item has no usable payload; nothing was sent." };
   }
 
-  const text = source.chosenText ?? source.answerText ?? source.holdingText ?? "";
-  if (text.trim().length === 0) {
+  const text = [source.chosenText, source.answerText, source.holdingText]
+    .find((candidate) => candidate?.trim())
+    ?.trim();
+  if (!text) {
     return { status: "failed", note: "No text to send — nothing was attempted." };
   }
-  if (!source.conversationId) {
+  if (!payload.conversationId) {
     return { status: "failed", note: "No conversation id — nothing was attempted." };
   }
 
-  return send(source.conversationId, text);
+  return send(payload.conversationId, text);
 }
 
 /**
