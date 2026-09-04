@@ -14,9 +14,16 @@
  * send engine, stranded approved messages — is NOT judged here; it lives in
  * outreachHealth.ts and runs as its own job, so that a ShikksTracker outage
  * fails that job rather than making the watchdog claim RikuOS's agents are
- * broken. Messenger webhook freshness and the Meta token ping still wait for
- * ShikksTracker's P2 (design P5a-1) — until that ships,
- * `messenger.lastEventAt` means "no webhook yet", not "the webhook is dead".
+ * broken. Messenger webhook freshness now lives there too, for exactly that
+ * reason: reading it costs a network call to ShikksTracker, and the watchdog
+ * must never make one.
+ *
+ * The Meta Graph API token ping is still missing, deliberately — S9 in
+ * ARCHITECTURE.md §7 is the decision of record, originally raised as P5a-1.
+ * RikuOS cannot hold a second copy of the page access token — regenerating it
+ * in Meta's console invalidates the old one, so a stale copy here would report
+ * an expired token that is in fact fine. The ping belongs to whoever holds the
+ * live token, which is ShikksTracker; it goes to it as a contract change.
  */
 
 import AgentRun from "@/models/AgentRun";

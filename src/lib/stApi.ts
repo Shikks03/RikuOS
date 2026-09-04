@@ -97,8 +97,9 @@ export interface SummaryQueue {
 }
 
 /**
- * Not evaluated until ShikksTracker's P2 ships — see outreachHealth.ts.
- * Carried through now so that check is a pure addition later.
+ * `lastEventAt` is the webhook's liveness signal and IS judged, in
+ * outreachHealth.ts. The two counts are carried but deliberately unjudged
+ * there — they are Riku's backlog, not a fault. See that file's messenger note.
  */
 export interface SummaryMessenger {
   lastEventAt: string | null;
@@ -278,9 +279,48 @@ function readCount(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** Same rule for dates: only a non-empty string is a reported timestamp. */
+/**
+ * The same rule for dates, but null carries more weight here than it does for
+ * a count, so the asymmetry is worth spelling out.
+ *
+ * A timestamp reaches `outreachHealth` as one of two findings: null is "the
+ * reporter says this has never happened", anything unparseable is "the field
+ * is broken". They send Riku to two different places — Meta's dashboard to
+ * regenerate a page token, or ShikksTracker's API contract. So this collapses
+ * to null ONLY for the states that genuinely mean "ShikksTracker reported
+ * nothing": an explicit null, an absent field, an absent block. Anything else
+ * present is a contract break and must surface as unreadable instead, by one
+ * of two different routes — worth stating separately, because they are not the
+ * same mechanism. A NON-STRING is replaced by a tag that cannot parse. A
+ * string is passed through UNCHANGED and fails on its own merits downstream:
+ * `""` and other junk are already `Invalid Date`, so no tag is needed or
+ * applied. Returning null for either would have Riku regenerating a token that
+ * was never broken while the real regression, a renamed or rolled-back field,
+ * went unnamed.
+ *
+ * The tag is the `typeof`, deliberately, and NOT the value via `String`. That
+ * was the first attempt and it left a hole: `String` makes a small number
+ * parseable — `2026` reads as the year 2026, `0` as the year 2000 — so a
+ * numeric field slipped past the unreadable branch and came out as "Messenger
+ * webhook silent for 246d", a line pointing squarely at Meta for what is a
+ * contract break. This is a DIAGNOSIS MARKER, not data: nothing downstream
+ * reads its content, and its one job is to be impossible to parse as a date.
+ * `"[number]"`, `"[object]"`, `"[boolean]"` all are. Do not "improve" it into
+ * something that carries the value, which is how the hole reopens.
+ *
+ * Scope that claim honestly: the tag closes the hole for NON-STRING values
+ * only. A *string* that parses to a nonsense date — a quoted `"2026"` — still
+ * reads as a real timestamp and would surface as stale, pointing at Meta. That
+ * residual is accepted rather than closed, on the same footing as the
+ * future-dated stamp in outreachHealth.ts: ShikksTracker emits
+ * `new Date(...).toISOString()`, so a quoted number is not a shape it can
+ * produce, and an ISO-shape regex here would trade this unlikely miss for a
+ * likelier one — a valid timestamp in an unanticipated format alarming as a
+ * contract break.
+ */
 function readStamp(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
+  if (value === null || value === undefined) return null;
+  return typeof value === "string" ? value : `[${typeof value}]`;
 }
 
 /**

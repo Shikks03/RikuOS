@@ -14,6 +14,7 @@ import {
   fetchSummary,
   ST_TIMEOUT_MS,
 } from "@/lib/stApi";
+import { evaluateOutreach } from "@/lib/outreachHealth";
 
 const GOOD_SECRET = "s".repeat(32);
 
@@ -354,7 +355,12 @@ describe("fetchSummary", () => {
     expect(out.messenger.unansweredCount).toBeNull();
   });
 
-  it("rejects a non-numeric count and an empty timestamp", async () => {
+  it("rejects a non-numeric count, and keeps a junk timestamp out of the null bucket", async () => {
+    // The empty stamp used to become null. It must not any more: null is now a
+    // FINDING in outreachHealth ("reports no event, ever") that sends Riku to
+    // Meta's dashboard, and an empty string is a contract problem on
+    // ShikksTracker's side, not a Meta one. It stays non-null so it lands in
+    // the unreadable branch, which points at the API instead.
     respond({
       queue: { drafts: "24", approved: null },
       engine: { lastRunAt: "", lastRunErrors: Number.NaN },
@@ -362,8 +368,58 @@ describe("fetchSummary", () => {
     });
     const out = await fetchSummary();
     expect(out.queue.drafts).toBeNull();
-    expect(out.engine.lastRunAt).toBeNull();
     expect(out.engine.lastRunErrors).toBeNull();
+    expect(out.engine.lastRunAt).not.toBeNull();
+    expect(Number.isNaN(new Date(out.engine.lastRunAt as string).getTime())).toBe(true);
+  });
+
+  it("keeps a present-but-non-string stamp out of the null bucket too", async () => {
+    // Four states used to collapse to null: field null, field absent, whole
+    // block absent, and field present but the wrong type. Only the first three
+    // are "ShikksTracker reported nothing". The fourth is a contract break, and
+    // reporting it as "no event, ever" would send Riku to regenerate a page
+    // token that was never broken. Coerced instead, so it fails to parse and
+    // surfaces as unreadable.
+    respond({
+      queue: {},
+      engine: { lastRunAt: { $date: 1 }, lastRunErrors: null },
+      messenger: { lastEventAt: 1757000000, unlinkedCount: null, unansweredCount: null },
+    });
+    const out = await fetchSummary();
+    for (const stamp of [out.engine.lastRunAt, out.messenger.lastEventAt]) {
+      expect(stamp).not.toBeNull();
+      expect(Number.isNaN(new Date(stamp as string).getTime())).toBe(true);
+    }
+  });
+
+  it("makes a SMALL number unreadable too, not a date from the year 2026", async () => {
+    // The case that motivated the typeof tag over String(value). `String(2026)`
+    // parses cleanly as 2026-01-01, so a numeric field slipped past the
+    // unreadable branch and came out as "Messenger webhook silent for 246d" —
+    // a line pointing squarely at Meta for what is a contract break. Coercing
+    // to a tag leaves no arithmetic for a wrong value to succeed at. This
+    // assertion fails if anyone reverts to String(value).
+    respond({
+      queue: {},
+      engine: {},
+      messenger: { lastEventAt: 2026, unlinkedCount: null, unansweredCount: null },
+    });
+    const out = await fetchSummary();
+    const findings = evaluateOutreach(new Date("2026-09-04T00:00:00.000Z"), out);
+    expect(findings.map((f) => f.kind)).toContain("webhook-unreadable");
+    expect(findings.map((f) => f.kind)).not.toContain("webhook-stale");
+  });
+
+  it("still reads an absent stamp, and an absent block, as null", async () => {
+    // The other side of the same rule. These three ARE "ShikksTracker reported
+    // nothing", and null is what outreachHealth reads as such.
+    respond({ queue: {}, engine: { lastRunAt: null }, messenger: {} });
+    const explicitNull = await fetchSummary();
+    expect(explicitNull.engine.lastRunAt).toBeNull();
+    expect(explicitNull.messenger.lastEventAt).toBeNull();
+
+    respond({});
+    expect((await fetchSummary()).messenger.lastEventAt).toBeNull();
   });
 });
 
