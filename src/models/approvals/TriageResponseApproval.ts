@@ -12,21 +12,23 @@ import ApprovalItem, { type IApprovalItemBase } from "../ApprovalItem.ts";
 // rather than redeclaring it is what keeps the two 500s from ever disagreeing.
 import { HOLDING_TEXT_MAX } from "../../lib/settings.ts";
 // Same requirement again. INBOUND_TEXT_MAX, CONVERSATION_ID_MAX,
-// MESSAGE_ID_MAX and SENDER_NAME_MAX are defined once in triage.ts (Task 3),
-// which owns them because they also drive real parsing decisions there —
-// INBOUND_TEXT_MAX truncates, CONVERSATION_ID_MAX/MESSAGE_ID_MAX reject an
-// over-long id outright (truncating either would corrupt the dedup key or
-// the send target), and SENDER_NAME_MAX clamps a cosmetic display name —
-// before a payload ever reaches `.create()`. Importing them here rather than
-// redeclaring them is what keeps a raised limit in the parser from ever
-// exceeding these maxlengths and turning a webhook call into a 500.
-// triage.ts has zero imports of its own, which is what keeps this safe under
-// strip-types.
+// MESSAGE_ID_MAX, SENDER_NAME_MAX and ANSWER_TEXT_MAX are defined once in
+// triage.ts (Task 3), which owns them because they also drive real parsing
+// decisions there — INBOUND_TEXT_MAX truncates, CONVERSATION_ID_MAX/
+// MESSAGE_ID_MAX reject an over-long id outright (truncating either would
+// corrupt the dedup key or the send target), SENDER_NAME_MAX clamps a
+// cosmetic display name, and ANSWER_TEXT_MAX bounds what draftTriage.ts is
+// allowed to hand back — before a payload ever reaches `.create()`. Importing
+// them here rather than redeclaring them is what keeps a raised limit
+// upstream from ever exceeding these maxlengths and turning a webhook call
+// into a 500. triage.ts has zero imports of its own, which is what keeps
+// this safe under strip-types.
 import {
   INBOUND_TEXT_MAX,
   CONVERSATION_ID_MAX,
   MESSAGE_ID_MAX,
   SENDER_NAME_MAX,
+  ANSWER_TEXT_MAX,
 } from "../../lib/triage.ts";
 
 /**
@@ -67,9 +69,9 @@ const TriageResponsePayloadSchema = new Schema<ITriageResponsePayload>(
     senderName: { type: String, maxlength: SENDER_NAME_MAX },
     inboundText: { type: String, required: true, maxlength: INBOUND_TEXT_MAX },
     holdingText: { type: String, required: true, maxlength: HOLDING_TEXT_MAX },
-    answerText: { type: String, maxlength: 4000 },
+    answerText: { type: String, maxlength: ANSWER_TEXT_MAX },
     answerWithheldReason: { type: String, maxlength: 300 },
-    chosenText: { type: String, maxlength: 4000 },
+    chosenText: { type: String, maxlength: ANSWER_TEXT_MAX },
   },
   { _id: false, strict: true }
 );

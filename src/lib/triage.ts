@@ -22,12 +22,13 @@
  * work or a portfolio link that does not exist.
  *
  * EVERY BOUNDED FIELD IS BOUNDED HERE, NOT JUST TRUNCATED IN ONE PLACE.
- * `INBOUND_TEXT_MAX`, `CONVERSATION_ID_MAX`, `MESSAGE_ID_MAX` and
- * `SENDER_NAME_MAX` mirror the schema's `maxlength`s exactly, and
- * `TriageResponseApproval.ts` imports every one of them rather than
- * redeclaring its own copies — two copies that can drift is a live failure
- * path (raise the parser's limit without the schema's, or vice versa, and
- * `.create()` throws a ValidationError inside a webhook handler).
+ * `INBOUND_TEXT_MAX`, `CONVERSATION_ID_MAX`, `MESSAGE_ID_MAX`,
+ * `SENDER_NAME_MAX` and `ANSWER_TEXT_MAX` mirror the schema's `maxlength`s
+ * exactly. `TriageResponseApproval.ts` imports every one of them (the last
+ * for both `answerText` and `chosenText`) rather than redeclaring its own
+ * copies — two copies that can drift is a live failure path (raise the
+ * parser's limit without the schema's, or vice versa, and `.create()` throws
+ * a ValidationError inside a webhook handler).
  *
  * ZERO IMPORTS, DELIBERATELY. `scripts/sync-indexes.mts` loads model files
  * under `node --experimental-strip-types`, which cannot resolve the "@/"
@@ -36,7 +37,11 @@
  * nothing itself and so pulls in no unresolvable specifier. Keeping this
  * module import-free also keeps it a pure logic layer: every consumer and
  * every unit test can use it without dragging in Mongoose or registering a
- * discriminator as a side effect.
+ * discriminator as a side effect. `draftTriage.ts` is not subject to the
+ * strip-types constraint (it value-imports the Anthropic SDK and is never
+ * loaded by the sync script), so it imports `ANSWER_TEXT_MAX` and
+ * `INBOUND_TEXT_MAX` from here the ordinary way, through the "@/lib/triage"
+ * alias — still one source of truth, just reached by two different paths.
  */
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -70,6 +75,19 @@ export const MESSAGE_ID_MAX = 128;
  * should never fire against a genuine event.
  */
 export const SENDER_NAME_MAX = 200;
+
+/**
+ * Mirrors the schema's `answerText` AND `chosenText` maxlength — one bound
+ * for both, since Riku's edited version of a draft should never be allowed
+ * to exceed what a generated one could have been. Also imported by
+ * draftTriage.ts, which clamps the model's raw output to this before it is
+ * ever handed to `.create()`. Declared here rather than in draftTriage.ts
+ * because that file value-imports the Anthropic SDK — an unresolvable
+ * specifier under the strip-types loader `sync-indexes.mts` uses on model
+ * files (see ZERO IMPORTS above) — so this module has to stay import-free
+ * for both the model and draftTriage.ts to depend on it safely.
+ */
+export const ANSWER_TEXT_MAX = 4000;
 
 /**
  * Sanity bound on the parsed year, independent of the ISO regex below. The
