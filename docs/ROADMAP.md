@@ -12,8 +12,9 @@ P2 (ST: webhook + tabs) ──► P6 (triage)       │
         └────────► P5 (watchdog + health + digest)
 P1 + weeks of send data ──► P7 (retro)
 
-The pages (P8 split 2026-09-04, decision S11):
+The pages (P8 split 2026-09-04, decision S11; P9b added 2026-09-05, decision S16):
 P1, P5 ──► P8 (Freelance page) ──► P9 (design foundation)
+                                     ├──► P9b (quest board)
                                      └──► P10 (Personal: calendar + to-dos + Today)
                                               └──► P11 (Academics) ──┐
                                                                      ▼
@@ -26,6 +27,11 @@ P1, P2, P3 have no dependencies on each other.
 built and deployed, then cut because Meta will never deliver prospect DMs to an unpublished app.
 The deletion landed the same day, in both repos. P7 waits on accumulated send data. P8–P12 are the
 pages; their contents are discussed per phase (S11), not planned here.
+
+**P8's content discussion happened 2026-09-05** — the first one under S11. Its outcome is
+`docs/superpowers/specs/2026-09-05-p8-freelance-page-design.md`, ratified and awaiting an
+implementation plan. That session also specified the quest board, which became **P9b** (S16):
+`docs/superpowers/specs/2026-09-05-p9b-quest-board-design.md`.
 
 ---
 
@@ -374,6 +380,7 @@ needs Personal's calendar to exist.
 |---|-------|-----------|-----------|
 | P8 | **Freelance page.** The pipeline view on real feeds, built plain. | P1, P5 | The page is live on real OS-API data with no manual entry — D11 satisfied for one page. |
 | P9 | **Design foundation.** One focused pass settling type, colour, spacing and a small component vocabulary, proven by rebuilding P8's page to it. | P8 | The system exists as tokens and components, and the Freelance page is built from them rather than from ad-hoc styles. |
+| P9b | **Quest board.** Ongoing freelance projects from `Freelance Projects`, each with an agent-maintained checklist, synced by a script and shown as quests with a real percentage. Designed 2026-09-05 (S16). | P9 | One real, ongoing freelance project appears with a percentage matching its checklist, put there by a sync of the real folder. Truly finishing it needs a live client project to exist. |
 | P10 | **Personal: calendar, to-dos, Today.** Google sign-in, live calendar read with toggleable layers, create-through-to-Google, the sectioned to-do store, and the Today section added to the morning digest (S13). | P3, P9 | One morning push names what is actually due and scheduled that day — the section P5a-7 dropped for want of a to-do store. |
 | P11 | **Academics.** Canvas courses and due dates, the manual modules/reviewers supplement, Classes layer population, and the sentence-to-schedule planner. | P10, Canvas token | Decided at its own content discussion (S11). |
 | P12 | **Feature re-review, then final polish.** Walk P3–P11 with Riku for fixes first, then the polish pass. | P8–P11 | The accepted fixes are shipped and the app looks intentional. Re-review precedes polish — Riku's call, 2026-08-29: not a coat of paint over v0 ergonomics. |
@@ -401,4 +408,4 @@ Voice commands (D8) · GCash/Maya statement import / receipt OCR (D7) · per-lea
 
 ~~**Sectioned to-do store**~~ — **UNPARKED 2026-09-04 into P10** (decision S13). It is the input the morning digest's Today section was missing, which is why P5a-7 dropped that section. Agreed shape stands: title, section (Personal, Freelance, Academics; Work parked per D9), optional due date, done — undated items live on the page but never enter the digest, which reports everything due within 3 days plus anything overdue.
 
-**Quest-style project tracker** (added 2026-08-29) — a page that renders currently-open projects as visible, persistent quests, because a project that stops being worked on currently stops being remembered. Needs a source of truth for "what projects exist and which are open" first; that source does not exist yet in either repo. The unparked to-do store (P10) is the likeliest candidate — raise it in P10's content discussion, and again in P12's re-review.
+~~**Quest-style project tracker**~~ (added 2026-08-29) — **UNPARKED 2026-09-05 as P9b** (decision S16). It was blocked on a source of truth for "what projects exist and which are open". Riku settled that: `C:\Users\Shikks\Projects\Freelance Projects`, one folder per ongoing freelance project, each carrying a checklist that the AI agent working in that project keeps current. Neither candidate this line used to name — the P10 to-do store, or the Obsidian vault — turned out to be the answer. Design: `docs/superpowers/specs/2026-09-05-p9b-quest-board-design.md`.
