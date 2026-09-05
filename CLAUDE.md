@@ -56,12 +56,13 @@ Proven in ShikksTracker; follow them here.
 
 1. Never edit ShikksTracker code or connect to its DB from here (see prime directive).
 2. Never automate cold Messenger sends, by API or browser automation — Meta policy; risks banning business assets (D2). Drafts only; the human sends.
-3. Never let an agent execute an outward action without an approved `ApprovalItem`. **No exceptions.** Messenger triage's bounded auto-acknowledgment was the one carve-out; it was revoked 2026-09-04 (S14). If a future design seems to need an exception, it needs a new decision in `ARCHITECTURE.md` §7 first.
-4. Never store calendar events locally — Google Calendar is the single source of truth; read live, write through (D5).
-5. Never build a dashboard page without a live data feed (D11); the Work page stays parked until hired (D9); UI comes after data + agents (D10).
-6. Never introduce n8n or another workflow platform (D1), Postgres or a second database technology (D4), or a two-copy calendar sync engine (D5).
-7. Never put a secret in the DB, in client-visible code, or in a log line.
-8. Never use `Schema.Types.Mixed` or unbounded strings.
-9. Never mark work complete without the verification trio passing.
-10. Never relitigate D1–D11 or any ratified S-decision without an explicit new decision recorded in `ARCHITECTURE.md` §7.
-11. Never plan or build a page phase before discussing its contents with Riku (S11), and never treat one page's discussion as covering the others.
+3. **The Facebook Messenger lane is dropped entirely (S15, 2026-09-05) — do not rebuild it.** Meta App Review needs business verification, Riku has no registered entity and will not register, so prospect DMs never reach the webhook. P6 triage is deleted, not parked, and its handoff is withdrawn. Do not propose registration as a workaround. Deleting the webhook does NOT make the health check safe — a missing `messenger` block reads as `null` and alarms daily, so `evaluateOutreach`'s messenger branch goes with it.
+4. Never let an agent execute an outward action without an approved `ApprovalItem`. **No exceptions.** Messenger triage's bounded auto-acknowledgment was the one carve-out; it was revoked 2026-09-04 (S14). If a future design seems to need an exception, it needs a new decision in `ARCHITECTURE.md` §7 first.
+5. Never store calendar events locally — Google Calendar is the single source of truth; read live, write through (D5).
+6. Never build a dashboard page without a live data feed (D11); the Work page stays parked until hired (D9); UI comes after data + agents (D10).
+7. Never introduce n8n or another workflow platform (D1), Postgres or a second database technology (D4), or a two-copy calendar sync engine (D5).
+8. Never put a secret in the DB, in client-visible code, or in a log line.
+9. Never use `Schema.Types.Mixed` or unbounded strings.
+10. Never mark work complete without the verification trio passing.
+11. Never relitigate D1–D11 or any ratified S-decision without an explicit new decision recorded in `ARCHITECTURE.md` §7.
+12. Never plan or build a page phase before discussing its contents with Riku (S11), and never treat one page's discussion as covering the others.

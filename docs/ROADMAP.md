@@ -22,7 +22,9 @@ P1, P5 ──► P8 (Freelance page) ──► P9 (design foundation)
 P1, P2, P3 have no dependencies on each other.
 ```
 
-**Status, 2026-09-05:** P1–P5 shipped. **P6 is built but not accepted** — it is complete and green
+**Status, 2026-09-05:** P1–P5 shipped. **P6 is DROPPED (S15)** — it was built and deployed, then
+cut because Meta will never deliver prospect DMs to an unpublished app; it is deleted in the next
+session. Previously recorded as: **P6 is built but not accepted** — it is complete and green
 in this repo and receiving nothing until ShikksTracker builds the two contracts handed to it in
 `docs/handoffs/2026-09-04-p6-messenger-forwarding.md`. P7 waits on accumulated send data. P8–P12
 are the pages; their contents are discussed per phase (S11), not planned here.
@@ -222,6 +224,24 @@ Known gap, stated rather than glossed: webhook silence trails the failure by up 
 cannot tell an expired token from a quiet page. Only the direct token check fixes that.
 
 ## P6 — Inbound Messenger triage — repo: RikuOS
+
+> **P6 IS DROPPED — decision S15, 2026-09-05.** Everything below this line is kept as the record of
+> what was built and why it is going. **Do not build from it, and do not revive it.**
+>
+> Meta's App Review requires business verification, "Riku" has no registered legal entity and will
+> not register, so the app stays in Development mode permanently and prospect DMs never reach the
+> webhook at all — verified directly, not assumed. Triage's only input therefore does not exist.
+> The code shipped complete and green on 2026-09-05 and is being **deleted** in the next session
+> rather than parked, because working code with no possible input invites a future session to
+> "finish" it. The handoff `docs/handoffs/2026-09-04-p6-messenger-forwarding.md` is **withdrawn**;
+> the two ShikksTracker contracts it asks for are not to be built.
+>
+> **Carries a trap:** deleting ShikksTracker's webhook does NOT make RikuOS's health check safe. A
+> missing `messenger` block in `/api/os/summary` reads as `null`, which is the `webhook-never-fired`
+> branch — so the daily digest would swap a staleness false alarm for a never-fired one. The
+> messenger branch of `evaluateOutreach`, `WEBHOOK_SILENT_DAYS`, and `SummaryMessenger` must be
+> removed in the same pass. See S15 in `ARCHITECTURE.md` §7 for the full reasoning.
+
 
 *Needs P2 + P3.*
 
