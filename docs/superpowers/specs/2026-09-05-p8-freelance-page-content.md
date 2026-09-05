@@ -1,15 +1,63 @@
 # P8 — The Freelance page: complete content
 
-**Date:** 2026-09-05 · **Purpose:** the full content inventory of `/freelance`, written to be handed to a design tool. Every string, every state, with real data.
-**Companion to:** `2026-09-05-p8-freelance-page-design.md`, which holds the reasoning. This file holds the words.
+**Date:** 2026-09-05 · **Purpose:** the full content inventory of `/freelance`, written to be handed to a design tool. The concept behind the page, then every string and every state, with real data.
+**Companion to:** `2026-09-05-p8-freelance-page-design.md`, which holds the reasoning behind each decision. This file holds the context and the words.
+
+**Read §1 first.** The design consequences of this page — no onboarding, no actions, the honesty about missing data — all follow from what the system is, and they look arbitrary without it.
 
 ---
 
-## 1. What this page is
+## 1. The concept — what this page really is
 
-A personal operations page for one user, Riku. It answers one question: **what is true about my freelance outreach right now.**
+### The system it belongs to
 
-It is read-only. Nothing on it sends, drafts, approves or edits — every action links out to ShikksTracker, a separate app where the client records live.
+**RikuOS is a personal agentic operating system for exactly one person.** A small fleet of scheduled and event-driven AI agents run Riku's freelance outreach, academics and personal admin, and this app is the surface they report through. It is **not a product**: no multi-tenancy, no public signup, no second user, ever. Secondarily it is a portfolio piece, which is why quality matters more than feature count.
+
+That single fact removes most of what a page like this would normally carry. **There is no onboarding, no marketing, no sign-up, no help text, no account switching, no first-run tour.** The only person who will ever see this screen built the system and knows what every word means. Design for a competent owner reading their own instrument panel — not for a visitor being introduced to a product.
+
+### The problem it exists to solve
+
+Before this system, three things were true and all of them hurt:
+
+- **The funnel had no memory.** Outreach went out; nothing reliably recorded who replied. Follow-ups depended on Riku remembering to scroll an inbox.
+- **Follow-through was manual everywhere.** Client sites had no monitoring. Nothing noticed when the send engine silently stopped — it once sat dead for 29 days with approved messages stranded behind it, and nothing said a word.
+- **Nothing improved, because nothing measured.** Outreach messages never got better because no one knew which ones got replies.
+
+**This page is where those facts finally have somewhere to live.** Every number on it exists because its absence previously cost Riku something real.
+
+### What kind of surface it is
+
+**It is a window on machinery that is already running — not a tool Riku operates.**
+
+The agents work on schedules and triggers whether or not anyone opens the app. Follow-ups get drafted at night. Site checks run in the morning. A push notification arrives on Riku's lock screen when something needs him. **The page is where he goes after that push**, or when he simply wants to know where things stand.
+
+So the dominant journey is: *phone buzzes → glance → is this fine, or does it need me?* That question must be answerable in about three seconds, standing up, one-handed. Everything else on the page is for the rarer, slower read.
+
+### The rule that shapes every screen in this app
+
+**Agents draft. The human fires.** No agent takes an outward action — no message, no email, nothing that touches another human being — without Riku tapping approve. There are no exceptions; the one that used to exist was deliberately revoked.
+
+That boundary lives on a *different* page, the Approval Queue, and it is the core UI of the whole system. **Which is exactly why this page has no actions on it at all.** Decisions happen in one place so that place is trustworthy. Everything here reads, and every action leaves for somewhere else. A design that grows a tempting Approve button on this page breaks the system's central guarantee.
+
+### Where the data comes from, and why the page keeps saying so
+
+There are two applications. **ShikksTracker** is the outreach engine — it holds the contacts, the campaigns, the messages, the replies. **RikuOS** is the hub, and it reads ShikksTracker through an API. It never owns freelance data and never touches that database directly.
+
+That is why so many strings on this page name ShikksTracker out loud — *"24 drafts waiting on you in ShikksTracker"*, *"ShikksTracker didn't report…"*. It is not clutter. **The page is being honest about which system holds the truth and where Riku has to go to act on it**, and that honesty is load-bearing: it is what makes "couldn't load this" understandable rather than alarming.
+
+### This page among the others
+
+Five surfaces are planned: the **Approval Queue** (the core), **Freelance** (this one), **Personal**, **Academics**, and a **Work** page that stays unbuilt until Riku is hired. Today only the Queue and Settings exist.
+
+**Freelance is being designed first, deliberately.** It is the only page needing no new sign-in, and it is by far the densest and most table-heavy — the hardest test a design system can face. Whatever visual language survives this page will be applied to the rest. So this is not only a page design; it is the proving ground for the system.
+
+### In one line
+
+**A read-only instrument panel, on a phone, telling one person what is true about his freelance pipeline right now — including when the honest answer is "you have not started yet".**
+
+### Practical framing
+
+It is read-only. Nothing on it sends, drafts, approves or edits — every action links out to ShikksTracker, where the client records live.
 
 **Mobile-first.** Riku reads this on a phone. Assume a narrow screen first and let it widen; do not design a desktop dashboard and shrink it.
 
