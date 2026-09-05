@@ -287,6 +287,26 @@ text were found and fixed during execution. The ones that mattered:
   safe, and it is what this phase's own acceptance criteria already assumed. **No chooser was
   built** — picking between the two texts is queue-page design and waits on S11.
 
+**Meta app review is still pending (2026-09-05), and that gates acceptance.** The Facebook app is
+not yet approved, so the Messenger webhook only receives events from accounts holding a
+**tester role**. Messages from the public do not arrive at all. Two consequences worth stating so
+nobody misreads them later:
+
+- **Triage receiving nothing is the expected state, not a fault.** A quiet `messenger.lastEventAt`
+  and an empty triage history mean "not approved yet", not "the webhook broke". This is the same
+  reason the watchdog check for *a forward that never arrived* was deliberately left unbuilt — it
+  would alarm every morning and train Riku to ignore the watchdog.
+- **Acceptance is scoped to a tester, by Riku's call (2026-09-05).** Messenger-side testing is on
+  hold while blocked. A tester has already messaged the page; P6 counts as done when that message
+  appears properly as a queue item and a reply can be sent back to it. Note the 24-hour window is
+  Meta's and absolute: if that message is already older than 24 hours it cannot be answered at all,
+  and the tester must message again once ShikksTracker's forwarding hook exists.
+
+**Two things to settle before the app goes live**, since approval day is when a trickle of testers
+becomes whatever the public sends: the knowledge block should be approved first (otherwise the
+first real prospects get holding replies only — safe, but thin), and there is still **no volume
+cap** — 40 messages currently means 40 Anthropic calls and 40 pushes.
+
 **Open, deliberately.** The watchdog does not yet notice a forward that never arrived (design open
 item 2): until ShikksTracker forwards anything, "messenger events exist but no triage run" is the
 normal state, so the check would alarm every morning and train Riku to ignore the watchdog. Revisit
