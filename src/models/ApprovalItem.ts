@@ -6,16 +6,19 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 // Keep model-to-model imports relative so both the bundler and plain Node can
 // resolve them.
 import { AGENTS } from "./AgentRun.ts";
-// Same relative + .ts-extension requirement as above. TITLE_MAX is defined
-// once in lib/triage.ts, which owns it because buildTriageTitle() there
-// structurally clamps an assembled "New message from <sender>" string to it
-// before a triage payload ever reaches `.create()` — see the comment on
-// TITLE_MAX. Importing it here rather than redeclaring `maxlength: 200`
-// keeps a raised bound in one place from ever exceeding the other and
-// throwing a ValidationError inside the messenger/inbound webhook handler.
-// triage.ts has zero imports of its own, which is what keeps this safe under
-// strip-types (see triage.ts's own header comment).
-import { TITLE_MAX } from "../lib/triage.ts";
+
+/**
+ * Bound for the base `title` field below.
+ *
+ * Declared HERE, in the model that uses it. It previously lived in
+ * lib/triage.ts and was imported, because the triage drafter assembled a
+ * "New message from <sender>" title from an attacker-influenced sender name
+ * and had to clamp to this bound structurally before `.create()`. That lane
+ * was deleted with the rest of the Messenger triage feature (S15,
+ * 2026-09-05), so the constant came home rather than leaving this schema
+ * importing its own bound from a file with no other reason to exist.
+ */
+export const TITLE_MAX = 200;
 
 /** Who proposed the item — the agents, plus "manual" for seeded/test items. */
 export const APPROVAL_SOURCES = [...AGENTS, "manual"] as const;
@@ -126,43 +129,6 @@ ApprovalItemSchema.index(
     partialFilterExpression: {
       status: "pending",
       "payload.replyToLogId": { $exists: true },
-    },
-  }
-);
-
-/**
- * Triage inbound dedup (P6). At most ONE item may ever exist per Meta message
- * id. Meta redelivers at-least-once, and ShikksTracker's own forward can retry
- * independently on top of that — and the route's `findOne` fast path has an
- * unavoidable gap behind it: `decideIngest`'s drafter is a ~20s Anthropic call
- * with `maxRetries: 1`, so a slow draft leaves tens of seconds during which a
- * redelivery can race the first request straight past the fast path and into
- * a second `create`. This index is the atomic backstop under that `findOne`,
- * exactly as the `replyToLogId` index above is the backstop under the chaser's
- * query-layer check.
- *
- * NOT scoped to `status: "pending"`, unlike `replyToLogId` above — deliberately.
- * A reply anchor legitimately re-earns a proposal after Riku rejects it: he
- * rejected that wording, not the lead, and the lead can still need a follow-up
- * tomorrow. A `mid` is different in kind: it is Meta's immutable identity for
- * one specific message that will never gain new information. A rejected triage
- * card means "I am not replying to this message" — full stop — so a redelivery
- * must not be allowed to resurrect it. Scoping this to `pending` would make
- * rejecting an inbound message futile against an at-least-once webhook: the
- * very next redelivery would recreate the same card.
- *
- * DECLARED ON THE BASE SCHEMA even though `payload` lives on the discriminator,
- * for the same reason as `replyToLogId` above: scripts/sync-indexes.mts
- * iterates base models, and syncIndexes() DROPS any index it does not see
- * declared there. Never declare an index on a discriminator schema in this
- * repo.
- */
-ApprovalItemSchema.index(
-  { "payload.messageId": 1 },
-  {
-    unique: true,
-    partialFilterExpression: {
-      "payload.messageId": { $exists: true },
     },
   }
 );

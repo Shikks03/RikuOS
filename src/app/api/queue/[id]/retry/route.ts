@@ -5,7 +5,6 @@ import { requireSession } from "@/lib/auth";
 import { buildActionRetry, runApprovalAction } from "@/lib/queue";
 import ApprovalItem from "@/models/ApprovalItem";
 import "@/models/approvals/FollowupDraftApproval"; // register the discriminator
-import "@/models/approvals/TriageResponseApproval"; // redundant with @/lib/queue's registration; kept so this route doesn't depend on that transitive import
 
 /**
  * POST /api/queue/:id/retry

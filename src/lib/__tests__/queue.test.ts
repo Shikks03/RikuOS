@@ -10,7 +10,6 @@ import {
   buildDecisionUpdate,
   buildExpirySweep,
   executeFollowupDraft,
-  executeTriageResponse,
   parseDecision,
   STALE_ACTION_MS,
 } from "@/lib/queue";
@@ -173,22 +172,6 @@ describe("approvalModelForType", () => {
     const model = approvalModelForType("followup-draft");
     expect(model.modelName).toBe("followup-draft");
     expect(model.modelName).not.toBe(ApprovalItem.modelName);
-    expect(model.schema.path("editedPayload")).toBeDefined();
-  });
-
-  // This file never imports TriageResponseApproval directly (grep it — the
-  // import list at the top has none), and vitest isolates each test file's
-  // module registry by default, so this test can only pass if queue.ts's own
-  // `import "@/models/approvals/TriageResponseApproval"` (a VALUE import, not
-  // the `import type` a naive reading of Task 6 would have left in its place)
-  // actually ran the discriminator's registration side effect. A type-only
-  // import here would leave `approvalModelForType` silently falling back to
-  // the base model — exactly the trap the block above pins for followup-draft.
-  it("resolves triage-response to the discriminator model via queue.ts's own registration import", () => {
-    const model = approvalModelForType("triage-response");
-    expect(model.modelName).toBe("triage-response");
-    expect(model.modelName).not.toBe(ApprovalItem.modelName);
-    expect(model.schema.path("payload")).toBeDefined();
     expect(model.schema.path("editedPayload")).toBeDefined();
   });
 
@@ -430,168 +413,5 @@ describe("P4 — the followup-draft executor maps outcomes to action states", ()
     });
     expect(out.status).toBe("failed");
     expect(called).toBe(false);
-  });
-});
-
-describe("executeTriageResponse", () => {
-  it("sends the edited text when Riku edited the draft", async () => {
-    const calls: string[] = [];
-    const item = {
-      type: "triage-response",
-      payload: { conversationId: "c1", holdingText: "h", answerText: "original" },
-      editedPayload: { conversationId: "c1", holdingText: "h", answerText: "edited" },
-    };
-    const out = await executeTriageResponse(item as never, async (_c, text) => {
-      calls.push(text);
-      return { status: "done", note: "ok" };
-    });
-    expect(calls).toEqual(["edited"]);
-    expect(out.status).toBe("done");
-  });
-
-  it("sends the holding reply when that is the chosen text", async () => {
-    // chosenText is how one item carries two options without a second enum.
-    const item = {
-      type: "triage-response",
-      payload: { conversationId: "c1", holdingText: "hold", answerText: "answer", chosenText: "hold" },
-    };
-    let sentText: string | null = null;
-    const out = await executeTriageResponse(item as never, async (_c, text) => {
-      sentText = text;
-      return { status: "done", note: "ok" };
-    });
-    expect(sentText).toBe("hold");
-    expect(out.status).toBe("done");
-  });
-
-  it("sends the holding reply on the bare payload — the normal path while the knowledge block is unapproved", async () => {
-    // No chosenText, no answerText at all: draftPolicy (triage.ts) withholds
-    // answerText entirely until the knowledge block is approved, so this
-    // shape, not a fully populated payload, is what most items look like.
-    const item = {
-      type: "triage-response",
-      payload: { conversationId: "c1", holdingText: "hold" },
-    };
-    let sentText: string | null = null;
-    const out = await executeTriageResponse(item as never, async (_c, text) => {
-      sentText = text;
-      return { status: "done", note: "ok" };
-    });
-    expect(sentText).toBe("hold");
-    expect(out.status).toBe("done");
-  });
-
-  it("falls through a present-but-blank answerText to the holding reply", async () => {
-    // A stored "" is a real shape (draftPolicy's own "nothing here" sentinel
-    // for knowledgeBlock), not hypothetical. `??` would stop on it and report
-    // no text to send; the fix must skip past it to holdingText instead.
-    const item = {
-      type: "triage-response",
-      payload: { conversationId: "c1", holdingText: "hold", answerText: "" },
-    };
-    let sentText: string | null = null;
-    const out = await executeTriageResponse(item as never, async (_c, text) => {
-      sentText = text;
-      return { status: "done", note: "ok" };
-    });
-    expect(sentText).toBe("hold");
-    expect(out.status).toBe("done");
-  });
-
-  it("trims the winning candidate before sending", async () => {
-    const item = {
-      type: "triage-response",
-      payload: { conversationId: "c1", holdingText: "hold", chosenText: "  hi  " },
-    };
-    let sentText: string | null = null;
-    const out = await executeTriageResponse(item as never, async (_c, text) => {
-      sentText = text;
-      return { status: "done", note: "ok" };
-    });
-    expect(sentText).toBe("hi");
-    expect(out.status).toBe("done");
-  });
-
-  it("reads the conversation id from the original payload, never the edited one", async () => {
-    let sentConversationId: string | null = null;
-    const item = {
-      type: "triage-response",
-      payload: { conversationId: "original", holdingText: "hold" },
-      // Identity is not something a real edit builder would ever touch, but
-      // this pins the guard even if a future one mistakenly did.
-      editedPayload: { conversationId: "edited", holdingText: "hold", answerText: "new text" },
-    };
-    const out = await executeTriageResponse(item as never, async (conversationId) => {
-      sentConversationId = conversationId;
-      return { status: "done", note: "ok" };
-    });
-    expect(sentConversationId).toBe("original");
-    expect(out.status).toBe("done");
-  });
-
-  it("fails without sending when there is no text to send", async () => {
-    let called = false;
-    const out = await executeTriageResponse(
-      { type: "triage-response", payload: { conversationId: "c1", holdingText: "" } } as never,
-      async () => {
-        called = true;
-        return { status: "done", note: "should not run" };
-      }
-    );
-    expect(out.status).toBe("failed");
-    expect(called).toBe(false);
-  });
-
-  it("fails without sending when there is no conversation id", async () => {
-    let called = false;
-    const out = await executeTriageResponse(
-      { type: "triage-response", payload: { conversationId: "", holdingText: "hold" } } as never,
-      async () => {
-        called = true;
-        return { status: "done", note: "should not run" };
-      }
-    );
-    expect(out.status).toBe("failed");
-    expect(called).toBe(false);
-  });
-
-  it("fails closed with no network call when the payload is entirely missing", async () => {
-    let called = false;
-    const out = await executeTriageResponse({ type: "triage-response" } as never, async () => {
-      called = true;
-      return { status: "done", note: "ok" };
-    });
-    expect(out.status).toBe("failed");
-    expect(called).toBe(false);
-  });
-
-  it("passes a needs_verification outcome from send through unchanged", async () => {
-    const item = {
-      type: "triage-response",
-      payload: { conversationId: "c1", holdingText: "hold" },
-    };
-    const out = await executeTriageResponse(item as never, async () => ({
-      status: "needs_verification" as const,
-      note: "ShikksTracker returned 200 without a parseable body.",
-    }));
-    expect(out).toEqual({
-      status: "needs_verification",
-      note: "ShikksTracker returned 200 without a parseable body.",
-    });
-  });
-
-  it("passes a failed outcome from send through unchanged (distinct from the executor's own pre-send failures)", async () => {
-    const item = {
-      type: "triage-response",
-      payload: { conversationId: "c1", holdingText: "hold" },
-    };
-    const out = await executeTriageResponse(item as never, async () => ({
-      status: "failed" as const,
-      note: "ShikksTracker did not send the reply (422): window closed.",
-    }));
-    expect(out).toEqual({
-      status: "failed",
-      note: "ShikksTracker did not send the reply (422): window closed.",
-    });
   });
 });

@@ -5,7 +5,6 @@ import { parseLimit } from "@/lib/env";
 import { buildExpirySweep } from "@/lib/queue";
 import ApprovalItem, { APPROVAL_STATUSES, ApprovalStatus } from "@/models/ApprovalItem";
 import "@/models/approvals/FollowupDraftApproval"; // register the discriminator
-import "@/models/approvals/TriageResponseApproval"; // redundant with @/lib/queue's registration; kept so this route doesn't depend on that transitive import
 
 /**
  * GET /api/queue?status=pending|approved|edited_approved|rejected|expired|all&limit=N

@@ -11,7 +11,6 @@ import {
 import ApprovalItem from "@/models/ApprovalItem";
 import type { IFollowupDraftApproval } from "@/models/approvals/FollowupDraftApproval";
 import "@/models/approvals/FollowupDraftApproval"; // register the discriminator
-import "@/models/approvals/TriageResponseApproval"; // redundant with @/lib/queue's registration; kept so this route doesn't depend on that transitive import
 
 /**
  * POST /api/queue/:id/decide

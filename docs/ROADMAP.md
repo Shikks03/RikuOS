@@ -22,12 +22,10 @@ P1, P5 ──► P8 (Freelance page) ──► P9 (design foundation)
 P1, P2, P3 have no dependencies on each other.
 ```
 
-**Status, 2026-09-05:** P1–P5 shipped. **P6 is DROPPED (S15)** — it was built and deployed, then
-cut because Meta will never deliver prospect DMs to an unpublished app; it is deleted in the next
-session. Previously recorded as: **P6 is built but not accepted** — it is complete and green
-in this repo and receiving nothing until ShikksTracker builds the two contracts handed to it in
-`docs/handoffs/2026-09-04-p6-messenger-forwarding.md`. P7 waits on accumulated send data. P8–P12
-are the pages; their contents are discussed per phase (S11), not planned here.
+**Status, 2026-09-05:** P1–P5 shipped. **P6 is DROPPED (S15) and its code is now DELETED** — it was
+built and deployed, then cut because Meta will never deliver prospect DMs to an unpublished app.
+The deletion landed the same day, in both repos. P7 waits on accumulated send data. P8–P12 are the
+pages; their contents are discussed per phase (S11), not planned here.
 
 ---
 
@@ -225,22 +223,35 @@ cannot tell an expired token from a quiet page. Only the direct token check fixe
 
 ## P6 — Inbound Messenger triage — repo: RikuOS
 
-> **P6 IS DROPPED — decision S15, 2026-09-05.** Everything below this line is kept as the record of
-> what was built and why it is going. **Do not build from it, and do not revive it.**
+> **P6 IS DROPPED AND DELETED — decision S15, 2026-09-05.** Everything below this line is kept as
+> the record of what was built and why it went. **Do not build from it, and do not revive it.**
 >
 > Meta's App Review requires business verification, "Riku" has no registered legal entity and will
 > not register, so the app stays in Development mode permanently and prospect DMs never reach the
 > webhook at all — verified directly, not assumed. Triage's only input therefore does not exist.
-> The code shipped complete and green on 2026-09-05 and is being **deleted** in the next session
-> rather than parked, because working code with no possible input invites a future session to
-> "finish" it. The handoff `docs/handoffs/2026-09-04-p6-messenger-forwarding.md` is **withdrawn**;
-> the two ShikksTracker contracts it asks for are not to be built.
+> The code shipped complete and green on 2026-09-05 and was **deleted the same day** rather than
+> parked, because working code with no possible input invites a future session to "finish" it. The
+> handoff `docs/handoffs/2026-09-04-p6-messenger-forwarding.md` is **withdrawn and deleted**; the
+> two ShikksTracker contracts it asked for are not to be built.
 >
-> **Carries a trap:** deleting ShikksTracker's webhook does NOT make RikuOS's health check safe. A
-> missing `messenger` block in `/api/os/summary` reads as `null`, which is the `webhook-never-fired`
-> branch — so the daily digest would swap a staleness false alarm for a never-fired one. The
-> messenger branch of `evaluateOutreach`, `WEBHOOK_SILENT_DAYS`, and `SummaryMessenger` must be
-> removed in the same pass. See S15 in `ARCHITECTURE.md` §7 for the full reasoning.
+> **DELETION DONE, 2026-09-05.** Removed from this repo: `lib/triage.ts`, `lib/draftTriage.ts`,
+> `lib/ingestTriage.ts`, `app/api/messenger/`, the `TriageResponseApproval` discriminator and its
+> `payload.messageId` index, `requireForwardSecret` and `MESSENGER_FORWARD_SECRET`, the six triage
+> settings, the triage parts of `queue.ts` / `stApi.ts` / `proxy.ts` / the queue page, and the three
+> triage test files. **457 tests → 300**, `tsc` and `build` green, no `/api/messenger/inbound` in
+> the build output.
+>
+> **The trap was real and was closed in the same pass.** Deleting ShikksTracker's webhook does NOT
+> make RikuOS's health check safe: a missing `messenger` block in `/api/os/summary` reads as `null`,
+> which was the `webhook-never-fired` branch — so the daily digest would have swapped a staleness
+> false alarm for a never-fired one, fired every morning. The messenger branch of
+> `evaluateOutreach`, `WEBHOOK_SILENT_DAYS` and `SummaryMessenger` are gone. See S15 in
+> `ARCHITECTURE.md` §7 for the full reasoning.
+>
+> **Two things deliberately kept.** `"triage"` stays in `AgentRun`'s `AGENTS` enum — old smoke-test
+> rows still carry it and TTL out on their own in 90 days. And `payload.messageId_1` still exists in
+> Atlas: `npm run migrate:indexes` reports it as the single pending DROP, and applying it is Riku's
+> call, not an agent's.
 
 
 *Needs P2 + P3.*
@@ -265,8 +276,8 @@ cannot tell an expired token from a quiet page. Only the direct token check fixe
   (S9). ShikksTracker sends; RikuOS asks it to. Both that and 6.1's forwarding hook are OS-API
   contract changes, so they travel in **one handoff**, not two.
 
-**P6 BUILT 2026-09-05, not yet accepted** — all ten planned tasks shipped on `master`. 457 tests
-(from 313), `tsc` and `build` green. **It is receiving nothing, and that is expected, not a
+**P6 BUILT 2026-09-05, never accepted, deleted the same day** — all ten planned tasks shipped on
+`master` at 457 tests (from 313), then came back out. What follows is the record of what was built. **It is receiving nothing, and that is expected, not a
 failure:** both halves of the contract live in ShikksTracker and neither exists yet, so 6.1 and 6.3
 are handed across in `docs/handoffs/2026-09-04-p6-messenger-forwarding.md`. Acceptance — a real
 message reaching the phone within a minute and one tap sending the reply — cannot be observed until

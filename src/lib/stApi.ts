@@ -14,11 +14,8 @@
  * downgrades a failure to `rejected`; everything else is `unknown` and parks
  * for human verification (CLAUDE.md asymmetric-failure rule).
  *
- * Three ShikksTracker behaviours this file's classifiers depend on. #1 and #2
- * were verified at plan time against ../ShikksTracker/src/lib/os/drafts.ts;
- * #3 is a REQUIREMENT this file is imposing on an endpoint that does not
- * exist yet (Task 10), not an observed fact, and is being carried into that
- * task's handoff so both repos agree on it before either side ships:
+ * Two ShikksTracker behaviours this file's classifiers depend on, both
+ * verified at plan time against ../ShikksTracker/src/lib/os/drafts.ts:
  *
  *  1. createOsDraft hard-codes `origin: "rikuos"` on every log, which is what
  *     permits delivery to a contact whose status is `replied`
@@ -28,15 +25,6 @@
  *     is why 400/404/422 are provably side-effect-free, and it is the single
  *     assumption the `rejected` rows in the table rest on. If that file ever
  *     grows a failure path after the write, this classifier must change with it.
- *  3. POST /api/os/messenger-reply must emit every 4xx BEFORE calling the Meta
- *     Graph API — a validation failure, never a delivery failure — so a 4xx
- *     stays provably side-effect-free, the same way #2 does for drafts.
- *     Anything that fails AFTER the Graph call, including a Graph error
- *     relayed back to RikuOS, must be a 5xx. `failed` is the ONLY status the
- *     retry route accepts; it re-enters `pending` and calls
- *     sendMessengerReply again. If that ordering is ever violated, a
- *     4xx-after-send means Retry sends the prospect the same message twice —
- *     the exact failure this file exists to prevent.
  */
 
 /** Explicit timeout on every external call (CLAUDE.md). */
@@ -108,21 +96,9 @@ export interface SummaryQueue {
   approved: number | null;
 }
 
-/**
- * `lastEventAt` is the webhook's liveness signal and IS judged, in
- * outreachHealth.ts. The two counts are carried but deliberately unjudged
- * there — they are Riku's backlog, not a fault. See that file's messenger note.
- */
-export interface SummaryMessenger {
-  lastEventAt: string | null;
-  unlinkedCount: number | null;
-  unansweredCount: number | null;
-}
-
 export interface SummaryResponse {
   queue: SummaryQueue;
   engine: SummaryEngine;
-  messenger: SummaryMessenger;
 }
 
 /** Request body for POST /api/os/drafts. */
@@ -233,24 +209,6 @@ export type DraftOutcome =
   | { kind: "rejected"; status: number; message: string }
   | { kind: "unknown"; message: string };
 
-/**
- * The status/note pair `sendMessengerReply` returns. Named, and exported, so
- * src/lib/queue.ts's executeTriageResponse can pass this function as `send`'s
- * default value and let the compiler check the assignment: that file's
- * ActionResultStatus is `Extract<ActionStatus, "done" | "failed" |
- * "needs_verification">`, itself derived from ApprovalItem's ACTION_STATUSES —
- * so this status union has to stay assignable to it, or that default-value
- * assignment fails to compile, catching a future divergence between the two
- * instead of letting the copies silently drift. (queue.ts also carries a
- * standalone type-only assertion of the same fact, next to
- * ActionResultStatus's own definition, for a reader who is looking there
- * instead of here.)
- */
-export type MessengerSendOutcome = {
-  status: "done" | "failed" | "needs_verification";
-  note: string;
-};
-
 function describeError(err: unknown): string {
   if (err instanceof Error) return `${err.name}: ${err.message}`;
   return String(err);
@@ -315,38 +273,38 @@ function readCount(value: unknown): number | null {
  *
  * A timestamp reaches `outreachHealth` as one of two findings: null is "the
  * reporter says this has never happened", anything unparseable is "the field
- * is broken". They send Riku to two different places — Meta's dashboard to
- * regenerate a page token, or ShikksTracker's API contract. So this collapses
- * to null ONLY for the states that genuinely mean "ShikksTracker reported
+ * is broken". They send Riku to two different places — so this collapses to
+ * null ONLY for the states that genuinely mean "ShikksTracker reported
  * nothing": an explicit null, an absent field, an absent block. Anything else
  * present is a contract break and must surface as unreadable instead, by one
  * of two different routes — worth stating separately, because they are not the
  * same mechanism. A NON-STRING is replaced by a tag that cannot parse. A
  * string is passed through UNCHANGED and fails on its own merits downstream:
  * `""` and other junk are already `Invalid Date`, so no tag is needed or
- * applied. Returning null for either would have Riku regenerating a token that
- * was never broken while the real regression, a renamed or rolled-back field,
- * went unnamed.
+ * applied.
  *
  * The tag is the `typeof`, deliberately, and NOT the value via `String`. That
  * was the first attempt and it left a hole: `String` makes a small number
  * parseable — `2026` reads as the year 2026, `0` as the year 2000 — so a
- * numeric field slipped past the unreadable branch and came out as "Messenger
- * webhook silent for 246d", a line pointing squarely at Meta for what is a
- * contract break. This is a DIAGNOSIS MARKER, not data: nothing downstream
+ * numeric field slipped past the unreadable branch and surfaced as a
+ * plausible-looking staleness figure, blaming the upstream system for what is
+ * a contract break. This is a DIAGNOSIS MARKER, not data: nothing downstream
  * reads its content, and its one job is to be impossible to parse as a date.
  * `"[number]"`, `"[object]"`, `"[boolean]"` all are. Do not "improve" it into
  * something that carries the value, which is how the hole reopens.
  *
  * Scope that claim honestly: the tag closes the hole for NON-STRING values
  * only. A *string* that parses to a nonsense date — a quoted `"2026"` — still
- * reads as a real timestamp and would surface as stale, pointing at Meta. That
- * residual is accepted rather than closed, on the same footing as the
- * future-dated stamp in outreachHealth.ts: ShikksTracker emits
+ * reads as a real timestamp and would surface as stale. That residual is
+ * accepted rather than closed: ShikksTracker emits
  * `new Date(...).toISOString()`, so a quoted number is not a shape it can
  * produce, and an ISO-shape regex here would trade this unlikely miss for a
  * likelier one — a valid timestamp in an unanticipated format alarming as a
  * contract break.
+ *
+ * Only `engine.lastRunAt` flows through here now. It also served the Messenger
+ * webhook stamp until that lane was deleted (S15, 2026-09-05); the rule is
+ * unchanged, because it was never specific to that field.
  */
 function readStamp(value: unknown): string | null {
   if (value === null || value === undefined) return null;
@@ -378,7 +336,6 @@ export async function fetchSummary(): Promise<SummaryResponse> {
   const parsed = (await res.json()) as {
     queue?: Record<string, unknown>;
     engine?: Record<string, unknown>;
-    messenger?: Record<string, unknown>;
   };
 
   return {
@@ -389,11 +346,6 @@ export async function fetchSummary(): Promise<SummaryResponse> {
     engine: {
       lastRunAt: readStamp(parsed.engine?.lastRunAt),
       lastRunErrors: readCount(parsed.engine?.lastRunErrors),
-    },
-    messenger: {
-      lastEventAt: readStamp(parsed.messenger?.lastEventAt),
-      unlinkedCount: readCount(parsed.messenger?.unlinkedCount),
-      unansweredCount: readCount(parsed.messenger?.unansweredCount),
     },
   };
 }
@@ -458,112 +410,5 @@ export async function createDraft(request: DraftRequest): Promise<DraftOutcome> 
           `HTTP ${res.status} from POST /api/os/drafts — the draft may or may not have been ` +
           "created. Check the contact's lane in ShikksTracker before re-sending.",
       };
-  }
-}
-
-/**
- * POST /api/os/messenger-reply — the one outward action in P6.
- *
- * TOTAL BY CONTRACT, exactly as createDraft is: never throws, always returns a
- * classified outcome, because the caller must record a result it can act on
- * rather than catch an exception it cannot classify.
- *
- * The classification is the whole point and it is asymmetric on purpose:
- *   200 + { ok: true } -> done. This exact combination is the ONLY thing
- *                         read as confirmed — see "Accepted success shape".
- *   4xx                -> failed. The far side ANSWERED and refused, so
- *                         nothing was sent and a retry is safe. "Window
- *                         closed" lands here. This assumes every 4xx is
- *                         emitted BEFORE the Meta Graph call (file header,
- *                         point 3) — if that ordering ever breaks, this
- *                         classifier must change with it.
- *   anything else      -> needs_verification. Any other 2xx (a 202 for a
- *                         queued send, a bare 204, ...), a 200 whose body
- *                         will not parse or does not say `{ ok: true }`, a
- *                         5xx, or a network/timeout error: none of these is
- *                         positive proof either way, so none may be read as
- *                         `done` OR as `failed`. A retry could send a
- *                         prospect the same message twice, which is worse
- *                         than a late reply. A human checks the thread.
- *
- * Accepted success shape: exactly HTTP 200 with a JSON body `{ "ok": true }`.
- * Deliberately narrower than "any 2xx" — the P6 design only promises the
- * endpoint "returns a classified result", not a specific status code, so this
- * pins the contract rather than inheriting whatever Task 10 picks. A bare 202
- * for a queued send, or a 200 carrying `{ ok: false, reason: "window closed" }`,
- * are both spec-compatible readings that must NOT be read as `done`. The body
- * is parsed defensively: anything that fails to parse, or parses without
- * `ok === true`, falls through to `needs_verification` rather than throwing or
- * being treated as a refusal.
- *
- * Network/timeout errors deliberately do NOT use `classifyFetchError` (which
- * distinguishes ECONNREFUSED-style "never connected" from everything else).
- * That distinction is safe for createDraft, where getting it wrong wastes a
- * retry; here, getting it wrong sends a prospect the same message twice, so
- * every network failure parks as `needs_verification` regardless of cause —
- * the error's name/message/cause code are carried in the note for a human to
- * read, never used to decide the status.
- */
-export async function sendMessengerReply(
-  conversationId: string,
-  text: string
-): Promise<MessengerSendOutcome> {
-  let baseUrl: string;
-  let secret: string;
-  try {
-    ({ baseUrl, secret } = readStConfig());
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { status: "failed", note: `ShikksTracker is not configured: ${message}` };
-  }
-
-  try {
-    const res = await fetch(`${baseUrl}/api/os/messenger-reply`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-os-secret": secret },
-      body: JSON.stringify({ conversationId, text }),
-      signal: AbortSignal.timeout(ST_TIMEOUT_MS),
-      cache: "no-store",
-    });
-
-    if (res.status === 200) {
-      let body: unknown;
-      try {
-        body = await res.json();
-      } catch {
-        body = undefined; // unparseable body — not proof of anything
-      }
-      const confirmed =
-        typeof body === "object" && body !== null && (body as { ok?: unknown }).ok === true;
-      if (confirmed) {
-        return { status: "done", note: "ShikksTracker confirmed the send." };
-      }
-      return {
-        status: "needs_verification",
-        note:
-          "ShikksTracker returned 200 without a parseable { ok: true } body. " +
-          "Check the Messenger thread before retrying.",
-      };
-    }
-
-    if (res.status >= 400 && res.status < 500) {
-      return {
-        status: "failed",
-        note: `ShikksTracker did not send the reply (${res.status}): ${await readErrorMessage(res)}`,
-      };
-    }
-
-    return {
-      status: "needs_verification",
-      note: `ShikksTracker returned ${res.status}. Check the Messenger thread before retrying.`,
-    };
-  } catch (err) {
-    const cause = (err as { cause?: { code?: unknown } } | null)?.cause;
-    const code = typeof cause?.code === "string" ? ` (${cause.code})` : "";
-    const message = `${describeError(err)}${code}`;
-    return {
-      status: "needs_verification",
-      note: `The send call did not complete (${message}). Check the Messenger thread before retrying.`,
-    };
   }
 }

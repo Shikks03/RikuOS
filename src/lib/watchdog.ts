@@ -4,7 +4,7 @@
  * The expectations table lives here rather than in OsSettings on purpose
  * (design P5a-2): it mirrors vercel.json, so it should change in the same
  * commit vercel.json does. Only agents that have actually shipped are listed;
- * lead-sweep, triage and retro join the table when they exist.
+ * lead-sweep and retro join the table when they exist.
  *
  * The watchdog is deliberately absent from its own table. It is running, which
  * is the proof. A watchdog that dies mid-run is instead reported by the
@@ -14,16 +14,13 @@
  * send engine, stranded approved messages — is NOT judged here; it lives in
  * outreachHealth.ts and runs as its own job, so that a ShikksTracker outage
  * fails that job rather than making the watchdog claim RikuOS's agents are
- * broken. Messenger webhook freshness now lives there too, for exactly that
- * reason: reading it costs a network call to ShikksTracker, and the watchdog
- * must never make one.
+ * broken.
  *
- * The Meta Graph API token ping is still missing, deliberately — S9 in
- * ARCHITECTURE.md §7 is the decision of record, originally raised as P5a-1.
- * RikuOS cannot hold a second copy of the page access token — regenerating it
- * in Meta's console invalidates the old one, so a stale copy here would report
- * an expired token that is in fact fine. The ping belongs to whoever holds the
- * live token, which is ShikksTracker; it goes to it as a contract change.
+ * Nothing Meta-related is watched from here any more. Messenger webhook
+ * freshness briefly lived in outreachHealth.ts; the whole Messenger lane was
+ * deleted in S15 (2026-09-05), which also retires the Graph API token ping
+ * that S9 had left open — there is no longer a subscription whose token
+ * expiry would matter.
  */
 
 import AgentRun from "@/models/AgentRun";

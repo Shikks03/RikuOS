@@ -12,7 +12,6 @@ import {
   createDraft,
   fetchAttention,
   fetchSummary,
-  sendMessengerReply,
   ST_TIMEOUT_MS,
 } from "@/lib/stApi";
 import { evaluateOutreach } from "@/lib/outreachHealth";
@@ -330,20 +329,18 @@ describe("fetchSummary", () => {
     respond({
       queue: { drafts: 24, approved: 2 },
       engine: { lastRunAt: "2026-08-01T07:06:27.319Z", lastRunErrors: 3 },
-      messenger: { lastEventAt: "2026-08-29T00:00:00.000Z", unlinkedCount: 1, unansweredCount: 2 },
       contacts: { total: 30 },
     });
     expect(await fetchSummary()).toEqual({
       queue: { drafts: 24, approved: 2 },
       engine: { lastRunAt: "2026-08-01T07:06:27.319Z", lastRunErrors: 3 },
-      messenger: { lastEventAt: "2026-08-29T00:00:00.000Z", unlinkedCount: 1, unansweredCount: 2 },
     });
   });
 
   it("reads a missing count as null, never as a real zero", async () => {
     // "The engine reported no errors" and "the engine reported nothing" are
     // different findings, and only one of them is reassuring.
-    respond({ queue: {}, engine: {}, messenger: {} });
+    respond({ queue: {}, engine: {} });
     const out = await fetchSummary();
     expect(out.engine).toEqual({ lastRunAt: null, lastRunErrors: null });
     expect(out.queue).toEqual({ drafts: null, approved: null });
@@ -353,19 +350,18 @@ describe("fetchSummary", () => {
     respond({});
     const out = await fetchSummary();
     expect(out.engine.lastRunAt).toBeNull();
-    expect(out.messenger.unansweredCount).toBeNull();
+    expect(out.queue.drafts).toBeNull();
   });
 
   it("rejects a non-numeric count, and keeps a junk timestamp out of the null bucket", async () => {
-    // The empty stamp used to become null. It must not any more: null is now a
-    // FINDING in outreachHealth ("reports no event, ever") that sends Riku to
-    // Meta's dashboard, and an empty string is a contract problem on
-    // ShikksTracker's side, not a Meta one. It stays non-null so it lands in
-    // the unreadable branch, which points at the API instead.
+    // The empty stamp used to become null. It must not any more: null is a
+    // FINDING in outreachHealth ("has never reported a run"), and an empty
+    // string is a contract problem on ShikksTracker's side rather than a
+    // genuine "never ran". It stays non-null so it lands in the unreadable
+    // branch, which points at the API instead.
     respond({
       queue: { drafts: "24", approved: null },
       engine: { lastRunAt: "", lastRunErrors: Number.NaN },
-      messenger: {},
     });
     const out = await fetchSummary();
     expect(out.queue.drafts).toBeNull();
@@ -378,49 +374,49 @@ describe("fetchSummary", () => {
     // Four states used to collapse to null: field null, field absent, whole
     // block absent, and field present but the wrong type. Only the first three
     // are "ShikksTracker reported nothing". The fourth is a contract break, and
-    // reporting it as "no event, ever" would send Riku to regenerate a page
-    // token that was never broken. Coerced instead, so it fails to parse and
-    // surfaces as unreadable.
+    // reporting it as "never ran" would point at the wrong repo. Coerced
+    // instead, so it fails to parse and surfaces as unreadable.
     respond({
       queue: {},
       engine: { lastRunAt: { $date: 1 }, lastRunErrors: null },
-      messenger: { lastEventAt: 1757000000, unlinkedCount: null, unansweredCount: null },
     });
     const out = await fetchSummary();
-    for (const stamp of [out.engine.lastRunAt, out.messenger.lastEventAt]) {
-      expect(stamp).not.toBeNull();
-      expect(Number.isNaN(new Date(stamp as string).getTime())).toBe(true);
-    }
+    expect(out.engine.lastRunAt).not.toBeNull();
+    expect(Number.isNaN(new Date(out.engine.lastRunAt as string).getTime())).toBe(true);
   });
 
   it("makes a SMALL number unreadable too, not a date from the year 2026", async () => {
     // The case that motivated the typeof tag over String(value). `String(2026)`
     // parses cleanly as 2026-01-01, so a numeric field slipped past the
-    // unreadable branch and came out as "Messenger webhook silent for 246d" —
-    // a line pointing squarely at Meta for what is a contract break. Coercing
-    // to a tag leaves no arithmetic for a wrong value to succeed at. This
-    // assertion fails if anyone reverts to String(value).
+    // unreadable branch and surfaced as a plausible-looking staleness figure —
+    // a line blaming the upstream system for what is a contract break.
+    // Coercing to a tag leaves no arithmetic for a wrong value to succeed at.
+    // This assertion fails if anyone reverts to String(value).
+    //
+    // Originally written against messenger.lastEventAt; retargeted to
+    // engine.lastRunAt when the Messenger lane was deleted (S15, 2026-09-05).
+    // The rule under test is readStamp's, and was never specific to a field.
     respond({
       queue: {},
-      engine: {},
-      messenger: { lastEventAt: 2026, unlinkedCount: null, unansweredCount: null },
+      engine: { lastRunAt: 2026, lastRunErrors: null },
     });
     const out = await fetchSummary();
     const findings = evaluateOutreach(new Date("2026-09-04T00:00:00.000Z"), out);
-    expect(findings.map((f) => f.kind)).toContain("webhook-unreadable");
-    expect(findings.map((f) => f.kind)).not.toContain("webhook-stale");
+    expect(findings.map((f) => f.kind)).toContain("engine-unreadable");
+    expect(findings.map((f) => f.kind)).not.toContain("engine-stale");
   });
 
   it("still reads an absent stamp, and an absent block, as null", async () => {
     // The other side of the same rule. These three ARE "ShikksTracker reported
     // nothing", and null is what outreachHealth reads as such.
-    respond({ queue: {}, engine: { lastRunAt: null }, messenger: {} });
-    const explicitNull = await fetchSummary();
-    expect(explicitNull.engine.lastRunAt).toBeNull();
-    expect(explicitNull.messenger.lastEventAt).toBeNull();
+    respond({ queue: {}, engine: { lastRunAt: null } });
+    expect((await fetchSummary()).engine.lastRunAt).toBeNull();
+
+    respond({ queue: {}, engine: {} });
+    expect((await fetchSummary()).engine.lastRunAt).toBeNull();
 
     respond({});
-    expect((await fetchSummary()).messenger.lastEventAt).toBeNull();
+    expect((await fetchSummary()).engine.lastRunAt).toBeNull();
   });
 });
 
@@ -428,188 +424,5 @@ describe("timeouts", () => {
   it("bounds every external call (CLAUDE.md)", () => {
     expect(ST_TIMEOUT_MS).toBeGreaterThan(0);
     expect(ST_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
-  });
-});
-
-describe("sendMessengerReply", () => {
-  // Unlike the rest of this file, these tests stub fetch with vi.stubGlobal
-  // rather than assigning globalThis.fetch directly, per the plan's spec.
-  // vi.stubGlobal has no automatic cleanup, so — unlike the manual
-  // save/restore the other describe blocks use — this block must call
-  // vi.unstubAllGlobals() itself or a stubbed fetch leaks into whatever runs
-  // next in this file. Also unstub envs, matching every other block here.
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-  });
-
-  function stubEnv() {
-    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
-    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
-  }
-
-  it("reports done on exactly 200 with { ok: true }", async () => {
-    stubEnv();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
-    );
-    const out = await sendMessengerReply("c1", "hello");
-    expect(out.status).toBe("done");
-  });
-
-  it("treats a 200 with ok:false as needs_verification, never done — a queued or refused send answered with 200 must not read as sent", async () => {
-    stubEnv();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ ok: false, reason: "window closed" }), { status: 200 })
-      )
-    );
-    const out = await sendMessengerReply("c1", "hello");
-    expect(out.status).toBe("needs_verification");
-  });
-
-  it("treats a 200 with an unparseable body as needs_verification, and never throws", async () => {
-    stubEnv();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not json", { status: 200 })));
-    const out = await sendMessengerReply("c1", "hello");
-    expect(out.status).toBe("needs_verification");
-  });
-
-  it.each([201, 202])(
-    "treats 2xx status %i as needs_verification, never done — only exactly 200 counts",
-    async (status) => {
-      stubEnv();
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status }))
-      );
-      const out = await sendMessengerReply("c1", "hello");
-      expect(out.status).toBe("needs_verification");
-    }
-  );
-
-  it("treats a bodyless 204 as needs_verification, never done", async () => {
-    // 204 cannot carry a body at all (the Fetch spec forbids it), so this is
-    // the sharpest case of "a status we cannot interpret is not evidence".
-    stubEnv();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
-    const out = await sendMessengerReply("c1", "hello");
-    expect(out.status).toBe("needs_verification");
-  });
-
-  it("reports FAILED (retry safe) on a 4xx refusal, using the structured error field", async () => {
-    // The far side answered and declined. Provably nothing was sent.
-    stubEnv();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ error: "window closed" }), { status: 409 })
-      )
-    );
-    const out = await sendMessengerReply("c1", "hello");
-    expect(out.status).toBe("failed");
-    expect(out.note).toMatch(/window closed/);
-  });
-
-  it.each([400, 401, 409, 429, 499])(
-    "treats %i as failed — every 4xx is provably side-effect-free",
-    async (status) => {
-      stubEnv();
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "x" }), { status }))
-      );
-      const out = await sendMessengerReply("c1", "hello");
-      expect(out.status).toBe("failed");
-    }
-  );
-
-  it.each([500, 502, 504, 599])(
-    "treats %i as needs_verification — the send may have happened after the write",
-    async (status) => {
-      stubEnv();
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status })));
-      const out = await sendMessengerReply("c1", "hello");
-      expect(out.status).toBe("needs_verification");
-    }
-  );
-
-  it("reports needs_verification on a real timeout abort, never failed", async () => {
-    // We do not know whether Meta sent it. Retrying could double-message a
-    // prospect, which is worse than replying late (CLAUDE.md asymmetric rule).
-    // Rejects with the actual shape AbortSignal.timeout produces, not a
-    // generic Error, so this genuinely exercises the timeout path.
-    stubEnv();
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockRejectedValue(new DOMException("The operation was aborted due to timeout", "TimeoutError"))
-    );
-    const out = await sendMessengerReply("c1", "hello");
-    expect(out.status).toBe("needs_verification");
-  });
-
-  it("reports needs_verification even on ECONNREFUSED — classifyFetchError is deliberately not applied to sends", async () => {
-    // Pins the divergence from createDraft: getting this wrong for a send
-    // means a duplicate message to a prospect, not just a wasted retry, so
-    // every network failure parks regardless of cause. The cause code still
-    // reaches the note, for a human to read.
-    stubEnv();
-    const err = new TypeError("fetch failed");
-    (err as TypeError & { cause?: { code: string } }).cause = { code: "ECONNREFUSED" };
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(err));
-    const out = await sendMessengerReply("c1", "hello");
-    expect(out.status).toBe("needs_verification");
-    expect(out.note).toContain("ECONNREFUSED");
-  });
-
-  it("returns failed without touching the network when config is missing", async () => {
-    // The config-error path: readStConfig() throws before fetch is ever
-    // called, so this must classify as failed (nothing was sent, safe to
-    // retry once configured) rather than needs_verification.
-    vi.stubEnv("ST_API_BASE_URL", "");
-    vi.stubEnv("ST_API_SECRET", "");
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    const out = await sendMessengerReply("c1", "hello");
-    expect(out.status).toBe("failed");
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("never throws, whatever fetch does", async () => {
-    stubEnv();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation(() => {
-        throw "a string, not an Error";
-      })
-    );
-    await expect(sendMessengerReply("c1", "hello")).resolves.toBeDefined();
-  });
-
-  it("POSTs JSON to the right path with the secret header and an abort signal", async () => {
-    stubEnv();
-    let seen: { url: string; init: RequestInit } | null = null;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation(async (url: string, init: RequestInit) => {
-        seen = { url, init };
-        return new Response(JSON.stringify({ ok: true }), { status: 200 });
-      })
-    );
-    await sendMessengerReply("c1", "hello there");
-    expect(seen!.url).toBe("https://st.example.com/api/os/messenger-reply");
-    expect(seen!.init.method).toBe("POST");
-    const headers = seen!.init.headers as Record<string, string>;
-    expect(headers["x-os-secret"]).toBe(GOOD_SECRET);
-    expect(headers["content-type"]).toBe("application/json");
-    expect(JSON.parse(seen!.init.body as string)).toEqual({
-      conversationId: "c1",
-      text: "hello there",
-    });
-    expect(seen!.init.signal).toBeInstanceOf(AbortSignal);
   });
 });

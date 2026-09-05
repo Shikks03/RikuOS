@@ -8,36 +8,20 @@ import type { IOsSettings } from "@/models/OsSettings";
 /**
  * Shared response projection for both GET and PATCH.
  *
- * All nine settings are included, not just the original three — the settings
- * PAGE is deliberately deferred (S11: page phases are content-first and
- * discussed with Riku before they are built), but that is a decision about
- * building a page, not about what an API response reports. Omitting the five
- * P6 fields here made the PATCH response go quiet in exactly the direction
- * that fails unsafely: PATCHing `knowledgeBlock` correctly clears
- * `knowledgeReviewedAt` (parseSettingsPatch) — revoking Riku's approval — and
- * a 200 with no trace of either field looks identical to a settings save that
- * changed nothing.
+ * All three settings are included. The settings PAGE is deliberately deferred
+ * (S11: page phases are content-first and discussed with Riku before they are
+ * built), but that is a decision about building a page, not about what an API
+ * response reports — a PATCH that reports nothing back looks identical to a
+ * save that changed nothing.
  *
- * `knowledgeBlock` itself is reported as a length + short preview, not the
- * full text: it can be up to 4KB (KNOWLEDGE_BLOCK_MAX) and every GET would
- * otherwise ship the whole block on every queue-page load's settings check,
- * for a value nothing on the client currently renders in full.
+ * This projected six more fields until S15 (2026-09-05) deleted the Messenger
+ * triage lane that owned them.
  */
-const KNOWLEDGE_BLOCK_PREVIEW_LENGTH = 200;
-
 function projectSettings(settings: IOsSettings) {
-  const knowledgeBlock = settings.knowledgeBlock ?? "";
   return {
     chaserEnabled: settings.chaserEnabled,
     chaserNDays: settings.chaserNDays,
     monitoringEnabled: settings.monitoringEnabled,
-    triageEnabled: settings.triageEnabled,
-    knowledgeBlockLength: knowledgeBlock.length,
-    knowledgeBlockPreview: knowledgeBlock.slice(0, KNOWLEDGE_BLOCK_PREVIEW_LENGTH),
-    knowledgeReviewedAt: settings.knowledgeReviewedAt,
-    nameableProjects: settings.nameableProjects,
-    holdingText: settings.holdingText,
-    demoSiteUrls: settings.demoSiteUrls,
   };
 }
 

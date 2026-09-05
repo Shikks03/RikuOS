@@ -24,15 +24,9 @@ import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftAppr
 // happen to import the discriminator itself (e.g. a cron route). Every future
 // discriminator needs a line here too.
 import "@/models/approvals/FollowupDraftApproval";
-import { createDraft, sendMessengerReply } from "@/lib/stApi";
-import type { DraftOutcome, DraftRequest, MessengerSendOutcome } from "@/lib/stApi";
+import { createDraft } from "@/lib/stApi";
+import type { DraftOutcome, DraftRequest } from "@/lib/stApi";
 import type { IFollowupDraftApproval } from "@/models/approvals/FollowupDraftApproval";
-import type { ITriageResponseApproval } from "@/models/approvals/TriageResponseApproval";
-// Side-effect import: registers the triage-response discriminator so
-// approvalModelForType() below can resolve it. Same reason as the
-// FollowupDraftApproval import above — the type-only import is erased at
-// compile time and does NOT register anything with Mongoose on its own.
-import "@/models/approvals/TriageResponseApproval";
 
 export type Decision =
   | { kind: "approve" }
@@ -229,38 +223,6 @@ export interface ActionOutcome {
   note?: string;
 }
 
-/** Forces T to be exactly `true`; otherwise TS reports the mismatch at the use site below. */
-type Assert<T extends true> = T;
-
-/**
- * Type-only assertion, no runtime code: MessengerSendOutcome's status union
- * (stApi.ts — what sendMessengerReply actually returns) must stay assignable
- * to ActionResultStatus above, or this fails to compile.
- *
- * WHAT THIS CATCHES: MessengerSendOutcome producing a status value
- * ActionResultStatus cannot express. That matters because
- * buildActionOutcomeUpdate's write runs with no schema validators — an
- * off-enum actionStatus would land in Mongo unchecked, and buildActionRetry's
- * `{ actionStatus: "failed" }` filter would then silently stop matching that
- * row.
- *
- * WHAT THIS DOES NOT CATCH: the reverse direction — an ActionResultStatus
- * value MessengerSendOutcome itself never produces. That is fine on purpose:
- * ActionResultStatus is shared with executeFollowupDraft's DraftOutcome
- * mapping too, so it is allowed to be wider than any one sender's output.
- *
- * ALSO CAUGHT, INDEPENDENTLY, WITHOUT THIS: `send`'s default value in
- * executeTriageResponse below (`= sendMessengerReply`) is checked by ordinary
- * structural typing against the parameter's declared return type the moment
- * this file compiles, so the same divergence already fails to compile there.
- * This alias exists to put the relationship where the next reader is more
- * likely to be looking — next to ActionResultStatus's own definition — not
- * because that check is insufficient by itself.
- */
-export type _AssertMessengerStatusAssignableToActionStatus = Assert<
-  MessengerSendOutcome["status"] extends ActionResultStatus ? true : false
->;
-
 type ActionExecutor = (item: IApprovalItemBase) => Promise<ActionOutcome>;
 
 /** A claimed action older than this is presumed interrupted and is swept. */
@@ -413,83 +375,10 @@ export async function executeFollowupDraft(
 }
 
 /**
- * Sends an approved triage reply.
- *
- * The sender is injected so the classification can be tested without a
- * network — the same shape executeFollowupDraft uses; production passes
- * stApi.sendMessengerReply, which is TOTAL (never throws) and returns a
- * classified MessengerSendOutcome.
- *
- * THE SEND TARGET (conversationId) IS ALWAYS READ FROM THE ORIGINAL PAYLOAD,
- * NEVER FROM editedPayload — identity, not something a human edits. This
- * makes "an edit replaces the message text only" structural rather than a
- * convention to remember, matching parseDecision's treatment of contactId for
- * followup-draft.
- *
- * TEXT precedence: within whichever payload is in play — editedPayload wins
- * over the original when Riku edited it — the first NON-BLANK candidate wins,
- * in this order: the explicitly chosen text, then the answer, then the
- * holding reply. First-non-blank, not `??`: a stored `answerText: ""` (a real
- * shape — draftPolicy in triage.ts already uses "" as its "nothing here"
- * sentinel) must fall through to holdingText rather than stopping on an empty
- * string and reporting "no text to send". The holding-reply fallback is
- * load-bearing, not defensive padding: while the knowledge block is
- * unapproved there IS no answerText, so the holding reply is the entire item
- * and the only thing one tap can send. This feature ships deliberately
- * under-configured, so that is the normal path right now. The winning
- * candidate is trimmed before it is sent.
- *
- * INVARIANT FOR WHATEVER BUILDS editedPayload NEXT (editing is not wired up
- * for this type yet): NEVER copy `chosenText` forward from the original
- * payload into editedPayload. The model documents chosenText as an OUTPUT —
- * it records which text Riku actually sent (TriageResponseApproval.ts) — but
- * this executor treats it as the HIGHEST-PRIORITY INPUT. parseDecision's edit
- * path for followup-draft copies every identity field from the original
- * payload by hand, and its own comment warns every new field needs a line
- * there; if a future triage edit path follows that convention and copies
- * chosenText too, this executor will send the stale chosenText instead of
- * the human's edit and record `done` — discarding the edit with no trace.
- *
- * Refuses to send — returns `failed` with no call to `send` — for a missing
- * payload, missing text, or missing conversation id. A missing payload is
- * the same "nothing to work with" case executeFollowupDraft fails closed on
- * for a missing draftBody/contactId; it is not thrown, because a throw would
- * misclassify a provable no-op as `needs_verification` instead of `failed`.
- */
-export async function executeTriageResponse(
-  item: IApprovalItemBase,
-  send: (
-    conversationId: string,
-    text: string
-  ) => Promise<{ status: ActionResultStatus; note: string }> = sendMessengerReply
-): Promise<ActionOutcome> {
-  const typed = item as unknown as ITriageResponseApproval;
-  const payload = typed.payload;
-  const source = typed.editedPayload ?? payload;
-
-  if (!payload || !source) {
-    return { status: "failed", note: "The item has no usable payload; nothing was sent." };
-  }
-
-  const text = [source.chosenText, source.answerText, source.holdingText]
-    .find((candidate) => candidate?.trim())
-    ?.trim();
-  if (!text) {
-    return { status: "failed", note: "No text to send — nothing was attempted." };
-  }
-  if (!payload.conversationId) {
-    return { status: "failed", note: "No conversation id — nothing was attempted." };
-  }
-
-  return send(payload.conversationId, text);
-}
-
-/**
  * One executor per discriminator type.
  */
 const executors: Record<string, ActionExecutor> = {
   "followup-draft": (item) => executeFollowupDraft(item),
-  "triage-response": (item) => executeTriageResponse(item),
 };
 
 /**

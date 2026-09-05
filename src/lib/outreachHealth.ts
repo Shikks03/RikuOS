@@ -26,34 +26,19 @@
  * and approved messages waiting beside it are correct. Do not report either,
  * and do not propose enabling a switch.
  *
- * MESSENGER — what is judged here, and what is deliberately not.
- * ShikksTracker's P2 Messenger webhook is LIVE: verified against production on
- * 2026-09-04, where `messenger.lastEventAt` came back as a real, recent
- * timestamp rather than the P1 null. Its contract
- * (../ShikksTracker/docs/os-api.md) makes that field the webhook's liveness
- * signal — it is the `createdAt` of the newest Messenger message, inbound or
- * outbound, so it advances whenever Meta delivers anything at all. `null`
- * therefore no longer means "no webhook yet"; it now means no Messenger event
- * has EVER been received, which on a live deployment is a subscription that
- * has never worked.
+ * NO MESSENGER CHECK LIVES HERE ANY MORE, and it must not come back.
+ * This file used to judge `messenger.lastEventAt` as the inbound webhook's
+ * liveness signal. The whole Messenger lane was deleted in S15 (2026-09-05)
+ * because Meta only delivers webhook events to role-holding accounts while the
+ * app is unpublished, so prospect DMs never arrived at all.
  *
- * A `lastEventAt` that stops advancing is the EXPECTED failure mode, not a
- * rare one: the dev-mode page access token expires on a roughly 60-day cycle,
- * and Meta disables subscriptions that repeatedly fail to deliver. The
- * threshold is therefore calibrated against message VOLUME, not uptime — this
- * page receives a handful of messages a week, so a quiet day is silence, not
- * death, and the unit is days rather than hours.
- *
- * `unlinkedCount` and `unansweredCount` stay UNJUDGED, on the same rule that
- * keeps `queue.drafts` unjudged: they describe Riku's own queue of work, not a
- * machine that has broken. A monitor that reads a person's backlog back to
- * them every morning is a monitor they stop opening.
- *
- * That rationale is CONDITIONAL, and is written down so it expires out loud
- * rather than quietly becoming false. ShikksTracker's contract says a climbing
- * `unlinkedCount` means triage has stalled — which is Riku's own business only
- * while triage is Riku. When P6 ships a triage agent, these counts become the
- * output of a machine that can break, and judging them here becomes correct.
+ * The trap that made removing this NON-OPTIONAL: ShikksTracker is dropping the
+ * `messenger` block from GET /api/os/summary, and `readStamp` in stApi.ts maps
+ * a MISSING block to `null` — which was exactly the `webhook-never-fired`
+ * branch. Leaving the check in would have turned a staleness false alarm into
+ * a "no Messenger event, ever" false alarm, fired in the morning push every
+ * single day. A daily false alarm in the one push Riku is meant to trust is
+ * precisely how P5's design says a monitor gets ignored.
  *
  * Nothing here throws. A stalled engine is a FINDING, reported in the digest;
  * only a failure of the checking machinery itself (the fetch) makes the run
@@ -68,10 +53,7 @@ export type OutreachFindingKind =
   | "engine-unreadable"
   | "engine-stale"
   | "engine-errors"
-  | "stranded-approved"
-  | "webhook-never-fired"
-  | "webhook-unreadable"
-  | "webhook-stale";
+  | "stranded-approved";
 
 export interface OutreachFinding {
   kind: OutreachFindingKind;
@@ -101,37 +83,6 @@ const HOUR_MS = 60 * 60 * 1000;
  */
 export const ENGINE_STALE_HOURS = 36;
 
-/**
- * How long `messenger.lastEventAt` may sit unchanged before it is a problem.
- *
- * Riku's call on 2026-09-04, chosen over 7 and 14. Ten days is well outside
- * normal traffic on this page: it receives a handful of messages a week, and
- * the field advances on OUTBOUND messages too — Riku's own replies from the
- * page move it — so ten days is silence in both directions at once, not a
- * quiet inbox.
- *
- * Be precise about what this buys, because it is easy to overclaim: the alarm
- * fires AFTER Meta stops delivering, so it trails the failure and gives no
- * advance warning of an expiring token. And the trailing gap is up to ELEVEN
- * days, not ten — the comparison is strict and the digest runs once a day, so
- * silence that crosses the threshold just after one morning's run waits for
- * the next. Eleven days is still under a fifth of the dev-mode token's ~60-day
- * life: short enough that an expiry is caught and regenerated inside the same
- * cycle rather than surfacing when a lead complains they were ignored. Advance
- * warning needs the token checked directly, which this repo cannot do (S9).
- *
- * Ten rather than seven or fourteen, on volume: at roughly five messages a
- * week counted in both directions the ordinary gap between events is a day or
- * two, so ten days is several times the longest quiet stretch seen so far.
- * The residual is real and is named rather than argued away — a fortnight with
- * no inbound message AND no reply sent from the page would raise this line
- * falsely. That is accepted: it is rare, a false alarm costs one glance at
- * Meta's dashboard, and a missed one costs leads nobody ever hears from.
- */
-export const WEBHOOK_SILENT_DAYS = 10;
-
-const DAY_MS = 24 * HOUR_MS;
-
 /** Hours read badly past a couple of days; the real fault was 696h old. */
 export function formatAge(ms: number): string {
   const hours = Math.floor(ms / HOUR_MS);
@@ -140,12 +91,8 @@ export function formatAge(ms: number): string {
 }
 
 /**
- * Pure. Findings are ordered most-COSTLY-first rather than most-fundamental
- * first, which is the one place this file departs from the watchdog: the
- * webhook block is emitted ahead of the engine block because the push body is
- * truncated and last means lost (the reasoning sits inline at that block).
- * Within each subsystem the findings are mutually exclusive, on the watchdog's
- * rule: an engine that never ran cannot also be stale, and a stale engine's
+ * Pure. The engine findings are mutually exclusive, on the watchdog's rule: an
+ * engine that never ran cannot also be stale, and a stale engine's
  * `lastRunErrors` describes a run from before the stall, so reporting it would
  * point at the wrong problem.
  *
@@ -154,76 +101,14 @@ export function formatAge(ms: number): string {
  * machine stopped, this one says real messages to real clients are sitting
  * undelivered because of it. Riku needs both — one is a repair, the other is a
  * promise someone is still waiting on.
- *
- * The webhook findings are exclusive among THEMSELVES on the same rule, but
- * fully independent of the engine ones: the send engine pushes outbound and
- * the webhook receives inbound, they are two separate subsystems, and letting
- * either suppress the other would report half of a total outage as the whole.
  */
 export function evaluateOutreach(
   now: Date,
   summary: SummaryResponse,
-  staleHours: number = ENGINE_STALE_HOURS,
-  silentDays: number = WEBHOOK_SILENT_DAYS
+  staleHours: number = ENGINE_STALE_HOURS
 ): OutreachFinding[] {
   const findings: OutreachFinding[] = [];
-  const { engine, queue, messenger } = summary;
-
-  // The webhook goes FIRST, and the order is not cosmetic. These findings are
-  // appended after the watchdog's and siteHealth's in buildProblems, and the
-  // push body is sliced at 200 chars (push.ts) — a raw slice, no ellipsis and
-  // no line-awareness, so a line straddling the cut is truncated mid-word and
-  // a line starting past it is gone entirely. With no dashboard, that push is
-  // the only channel any of this has, so what falls off is lost rather than
-  // merely shortened. Of the two subsystems, a dead inbound webhook is the
-  // unrecoverable one: leads message the page and are silently dropped, and
-  // nobody ever learns it happened. A stalled outbound engine holds its
-  // messages and sends them when it restarts. The loss that cannot be undone
-  // is the one that must survive truncation.
-  //
-  // Same reason two of the three lines below drop the "ShikksTracker" prefix
-  // the engine lines carry. The asymmetry is deliberate — do not "restore
-  // consistency" here; every character saved is headroom against that slice.
-  // Only the null line keeps the prefix, where it is load-bearing for
-  // diagnosis (see below); the other two already name the subsystem, and the
-  // digest has exactly one upstream.
-  if (messenger.lastEventAt === null) {
-    // Named as ShikksTracker REPORTING nothing rather than as Meta failing,
-    // because the payload cannot tell those apart: a rollback to any pre-P2
-    // deploy sends `messenger: {lastEventAt: null, …}` — block present, field
-    // null — which is byte-identical on the wire to a genuine "no event has
-    // ever arrived". No parser fix reaches that case (readStamp separates the
-    // non-string shapes, not this one), so the wording carries it instead: this
-    // line stays true under both readings and points at the repo to check
-    // first.
-    findings.push({
-      kind: "webhook-never-fired",
-      detail: "ShikksTracker reports no Messenger event, ever",
-    });
-  } else if (Number.isNaN(new Date(messenger.lastEventAt).getTime())) {
-    // Closes the same hole the engine's unreadable branch closes: NaN loses
-    // every comparison, so an unparseable stamp would slip past the silence
-    // check below and read as healthy forever.
-    //
-    // Only the UNPARSEABLE case, though — claim no more than that. A
-    // parseable but future-dated stamp still reads as healthy indefinitely and
-    // nothing here catches it. That is left alone on purpose rather than
-    // overlooked: the field is ShikksTracker's own server `createdAt` at
-    // ingest, not a value Meta or a sender supplies, so the only realistic
-    // error is clock skew of seconds against a ten-day window.
-    findings.push({
-      kind: "webhook-unreadable",
-      detail: "Messenger webhook event time unreadable",
-    });
-  } else {
-    const silentMs = now.getTime() - new Date(messenger.lastEventAt).getTime();
-    if (silentMs > silentDays * DAY_MS) {
-      findings.push({
-        kind: "webhook-stale",
-        detail: `Messenger webhook silent for ${formatAge(silentMs)}`,
-      });
-    }
-  }
+  const { engine, queue } = summary;
 
   let engineStalled = false;
 

@@ -7,7 +7,6 @@
  */
 import { describe, it, expect } from "vitest";
 import FollowupDraftApproval from "@/models/approvals/FollowupDraftApproval";
-import TriageResponseApproval from "@/models/approvals/TriageResponseApproval";
 import ApprovalItem from "@/models/ApprovalItem";
 import AgentRun from "@/models/AgentRun";
 import PushSubscription from "@/models/PushSubscription";
@@ -218,56 +217,6 @@ describe("P4 — the idempotency index", () => {
   });
 });
 
-describe("P6 — the triage dedup index", () => {
-  // Declared on the BASE schema for the same sync-indexes.mts reason as the
-  // replyToLogId index above.
-  function indexOn(path: string) {
-    return ApprovalItem.schema
-      .indexes()
-      .find(([keys]) => Object.prototype.hasOwnProperty.call(keys, path));
-  }
-
-  it("declares a unique partial index on payload.messageId, NOT scoped to pending", () => {
-    const found = indexOn("payload.messageId");
-    expect(found).toBeDefined();
-    const [, options] = found!;
-    expect(options.unique).toBe(true);
-    // Unlike replyToLogId, a rejected message must stay rejected against a
-    // redelivered mid — so the partial filter carries no status clause.
-    expect(options.partialFilterExpression).toEqual({
-      "payload.messageId": { $exists: true },
-    });
-  });
-
-  it("is NOT declared on the discriminator schema", () => {
-    const onDiscriminator = TriageResponseApproval.schema
-      .indexes()
-      .find(([keys]) => Object.prototype.hasOwnProperty.call(keys, "payload.messageId"));
-    expect(onDiscriminator).toBeUndefined();
-  });
-});
-
-describe("P6 — the triage dedup query casts through the discriminator, not the base", () => {
-  // This is the one piece of behaviour that lives only in the route
-  // (src/app/api/messenger/inbound/route.ts): with strictQuery: true
-  // (src/lib/db.ts), a filter path only reliably casts when queried through a
-  // model whose OWN schema declares it — payload.messageId lives on
-  // TriageResponseApproval's schema, not ApprovalItem's. Querying through the
-  // base model can still happen to work, but only because some other
-  // TriageResponseApproval import elsewhere in the same module graph already
-  // registered the discriminator (this very file does, two lines up) —
-  // brittle, import-order-dependent behaviour the route must not lean on.
-  // Pinning the shape here means a regression that swaps the model back to
-  // the base one won't fail silently: findOne would otherwise match the
-  // first ApprovalItem in the collection and report every inbound message as
-  // a duplicate, with no route-level test able to notice.
-  it("keeps payload.messageId in the cast filter when queried through TriageResponseApproval", () => {
-    const query = TriageResponseApproval.findOne({ "payload.messageId": "m1" });
-    const casted = query.cast(TriageResponseApproval) as Record<string, unknown>;
-    expect(casted).toHaveProperty("payload.messageId", "m1");
-  });
-});
-
 describe("P4 — AgentRun counts", () => {
   it("defaults every count to zero", () => {
     const run = new AgentRun({ agent: "chaser", startedAt: new Date(), durationMs: 1, ok: true });
@@ -286,71 +235,5 @@ describe("P4 — AgentRun counts", () => {
       counts: { itemsCreated: 0, itemsProcessed: 0, itemsSkipped: -1, itemsFailed: 0 },
     });
     expect(run.validateSync()?.errors["counts.itemsSkipped"]).toBeDefined();
-  });
-});
-
-describe("TriageResponseApproval", () => {
-  it("registers under the triage-response discriminator key", async () => {
-    expect(TriageResponseApproval.baseModelName).toBe("ApprovalItem");
-    const doc = new TriageResponseApproval({
-      source: "triage",
-      title: "New message from Ana",
-      summary: "Asked how much a website costs",
-      payload: {
-        conversationId: "c1",
-        messageId: "m1",
-        senderName: "Ana",
-        inboundText: "magkano po ang website?",
-        holdingText: "Thanks for messaging!",
-        answerText: "A1 starts at 3,000.",
-      },
-    });
-    expect(doc.type).toBe("triage-response");
-    await expect(doc.validate()).resolves.toBeUndefined();
-  });
-
-  it("drops an unknown payload field rather than storing it", async () => {
-    // strict:true is what stops a drifting payload shape, which is the mistake
-    // ShikksTracker's Mixed run-summary made and this repo's rules exist to
-    // avoid. strict:true DROPS an unrecognized field silently — it does not
-    // reject it; "throw" is what rejects.
-    const doc = new TriageResponseApproval({
-      source: "triage",
-      title: "t",
-      summary: "s",
-      payload: { conversationId: "c", messageId: "m", inboundText: "i", holdingText: "h", nope: 1 },
-    });
-    // Asserting the whole shape at once, rather than just that `nope` is
-    // absent, proves BOTH drop-unknown and keep-known in one line — a schema
-    // that dropped every field (or misspelled a field name) would also leave
-    // `payload.nope` undefined, so that narrower assertion alone would not
-    // have caught it.
-    const saved = doc.toObject<{ payload: Record<string, unknown> }>();
-    expect(saved.payload).toEqual({
-      conversationId: "c",
-      messageId: "m",
-      inboundText: "i",
-      holdingText: "h",
-    });
-  });
-
-  it("requires the fields a send cannot happen without", async () => {
-    const doc = new TriageResponseApproval({
-      source: "triage",
-      title: "t",
-      summary: "s",
-      payload: { inboundText: "i", holdingText: "h" },
-    });
-    // Pin both error paths individually — conversationId and messageId are
-    // what the send call routes on, so a dropped `required: true` on either
-    // one must fail this test even though the other still throws on its own.
-    let error: { errors: Record<string, unknown> } | undefined;
-    try {
-      await doc.validate();
-    } catch (e) {
-      error = e as { errors: Record<string, unknown> };
-    }
-    expect(error?.errors["payload.conversationId"]).toBeDefined();
-    expect(error?.errors["payload.messageId"]).toBeDefined();
   });
 });
