@@ -74,8 +74,6 @@ that had never existed was added (`61d36bb`), which is why `engine.lastRunAt` no
 after 29 days frozen; and the region is now `sin1`, closing the `hkg1` → Anthropic 403 trap the
 2026-08-30 handoff flagged as still-live.
 
-**Handoff brief for the ShikksTracker session:** `docs/handoffs/2026-08-30-p2-messenger-webhook.md` — paste-ready, plus the Meta setup steps only Riku can do. Disposable; now that P2 has shipped, delete it and this line in the post-v0 cleanup.
-
 ## P3 — RikuOS skeleton: auth, queue, push — repo: RikuOS (here)
 
 *No dependencies. Can start immediately, in parallel with P1/P2.*
@@ -214,12 +212,13 @@ P2 shipped: Messenger webhook freshness and the Meta Graph API token ping. P2 is
 - **The Graph ping does not ship, and is not merely deferred — it moved repos.** RikuOS cannot hold
   a second copy of the Meta page token: regenerating it in Meta's console invalidates the previous
   one, so a duplicate here would die on every routine rotation and alarm on a healthy system.
-  Recorded as decision **S9** in `ARCHITECTURE.md` §7; the ask is written up for the ShikksTracker
-  session in `docs/handoffs/2026-09-04-meta-token-health.md` (disposable — delete it and this
-  sentence once that contract lands).
+  Recorded as decision **S9** in `ARCHITECTURE.md` §7.
 
-Known gap, stated rather than glossed: webhook silence trails the failure by up to 10 days and
-cannot tell an expired token from a quiet page. Only the direct token check fixes that.
+**Both halves of S9 are now moot (S15, 2026-09-05)** and this is kept only so the reasoning is not
+re-derived. The webhook-silence check that shipped instead has been deleted, and the direct token
+check that was written up for ShikksTracker is **withdrawn, not pending** — there is no longer a
+Meta subscription whose token expiry could matter. The handoff carrying that ask was deleted with
+it.
 
 ## P6 — Inbound Messenger triage — repo: RikuOS
 
@@ -277,11 +276,11 @@ cannot tell an expired token from a quiet page. Only the direct token check fixe
   contract changes, so they travel in **one handoff**, not two.
 
 **P6 BUILT 2026-09-05, never accepted, deleted the same day** — all ten planned tasks shipped on
-`master` at 457 tests (from 313), then came back out. What follows is the record of what was built. **It is receiving nothing, and that is expected, not a
-failure:** both halves of the contract live in ShikksTracker and neither exists yet, so 6.1 and 6.3
-are handed across in `docs/handoffs/2026-09-04-p6-messenger-forwarding.md`. Acceptance — a real
-message reaching the phone within a minute and one tap sending the reply — cannot be observed until
-that session runs. Nothing here has been seen doing its job against real data.
+`master` at 457 tests (from 313), then came back out. What follows is the record of what was built.
+It never received anything, and never could have: both halves of the contract lived in
+ShikksTracker and neither was ever built, because S15 withdrew the ask before that session ran.
+Acceptance — a real message reaching the phone within a minute and one tap sending the reply — was
+never observed. Nothing here was ever seen doing its job against real data.
 
 **It ships deliberately under-configured (design D11), and that is the design, not unfinished work.**
 The knowledge block is unapproved, `nameableProjects` is empty and `demoSiteUrls` is empty. Each has
