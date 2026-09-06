@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-05 · **Status:** ratified design, awaiting implementation planning
 **Scope:** `ROADMAP.md` P8 — repo: RikuOS. One read-only page on live OS-API data, plus the app's first navigation and one small persistence addition to the morning cron.
-**Not in scope:** visual design (P9) · the quest board (P9b, its own design doc) · any action on a lead · any new agent · Personal or Academics content.
+**Not in scope:** ~~visual design (P9)~~ — **superseded 2026-09-06 by S17: the page is built to the design system directly, so visual design IS in scope** · the quest board (P9b, its own design doc) · any action on a lead · any new agent · Personal or Academics content.
 
 **Goal in one line:** Riku opens `/freelance` and learns, in one screen, what is true about his outreach right now — including when the honest answer is "you have not started yet".
 
@@ -57,7 +57,9 @@ The pipeline being empty is **correct**, not broken: both of ShikksTracker's eng
 
 ## Page structure
 
-`/freelance`, session-guarded, server-rendered fresh on every load (`dynamic = "force-dynamic"`, `cache: "no-store"` throughout). **Built plain — no visual design.** P9 rebuilds it to the design system; that is the point of building it first (S12).
+`/freelance`, session-guarded, server-rendered fresh on every load (`dynamic = "force-dynamic"`, `cache: "no-store"` throughout).
+
+**Built to the design system — corrected 2026-09-06, decision S17.** This paragraph originally read *"Built plain — no visual design. P9 rebuilds it to the design system"*, which was true when written and is now false. Riku had the design system built externally from the content deck before this page was built at all, so the plain build was dropped: it would have meant building the same page twice. **Everything else in this document is unaffected** — the blocks, their order, the strings and the states were all settled on content grounds, not visual ones, and the design system was drawn against them.
 
 ### Block A — State of play
 
@@ -103,7 +105,7 @@ One grey line when all is well: engine last run, site status, and how old the si
 
 ## Navigation
 
-The app currently has no way to reach a second page — `/` redirects to `/queue` and nothing links anywhere. P8 adds a plain top nav (Queue · Freelance · Settings). Unstyled on purpose; P9 designs it. `/` keeps redirecting to `/queue`.
+The app currently has no way to reach a second page — `/` redirects to `/queue` and nothing links anywhere. P8 adds a top nav (Queue · Freelance · Settings), built to the design system along with the rest of the page (S17; this read "unstyled on purpose" before that decision). `/` keeps redirecting to `/queue`.
 
 ---
 

@@ -1,6 +1,7 @@
 # P9b — The quest board (design)
 
-**Date:** 2026-09-05 · **Status:** ratified design, built after P9 · **Phase:** new, inserted after P9
+**Date:** 2026-09-05 · **Status:** ratified design, built after P8 · **Phase:** new, follows the Freelance page
+**Dependency corrected 2026-09-06:** this said "after P9". S17 folded P9 into P8, so the dependency is now P8. The intent is unchanged — the quest board is built once the design system exists and has been proven on a real page.
 **Scope:** repo: RikuOS, plus a convention adopted across `C:\Users\Shikks\Projects\Freelance Projects`.
 **Not in scope:** anything on the P8 Freelance page · writing back into project folders · non-freelance projects.
 
@@ -45,7 +46,7 @@ Not the feed, but it should not be discarded. `Obsidian Projects/` holds 23 `typ
 | D4 | **The feed is a push script Riku runs** — `npm run projects:sync` walks the folder, reads each status file, posts them to RikuOS in one request. | Riku's choice. The folder is on his laptop and RikuOS runs on Vercel, so something must carry it. A script keeps the API secret in one place instead of scattering it across every project folder. |
 | D5 | **Collapsed shows the percentage; open shows everything.** | Riku's choice, confirmed explicitly. The board reads as a compact list of gauges; tapping one reveals the full checklist, when it was last touched, and where it lives. |
 | D6 | **Read-only. RikuOS never writes into a project folder.** | Ticking a box in RikuOS would mean writing to Riku's laptop from Vercel, which is not possible and should not be simulated. Obsidian and the project folders stay the place where things change. |
-| D7 | **Built after P9, as its own phase.** | Riku's choice over folding it into P8 or building it before the design system. A quest board built plain and then restyled is the one page where the visual treatment *is* the feature; building it after P9 means building it quest-styled once. |
+| D7 | **Built after the Freelance page, as its own phase.** (Read "after P9" until S17 folded P9 into P8.) | Riku's choice over folding it into the Freelance phase or building it before the design system. A quest board built plain and then restyled is the one page where the visual treatment *is* the feature; building it after the system exists means building it quest-styled once. |
 | D8 | **The board always shows how stale it is.** | It is a synced snapshot, not a live read. The vault's own dashboard note was last reviewed 2026-07-29 while most `last_commit` dates were July — five weeks adrift. A tracker that hides its own staleness is worse than none. |
 
 ---
