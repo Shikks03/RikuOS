@@ -16,6 +16,7 @@ import {
   deriveAgentStatuses,
 } from "@/lib/watchdog";
 import type { AgentStatus, AgentSwitches, LatestRun } from "@/lib/watchdog";
+import type { Agent } from "@/models/AgentRun";
 
 const NOW = new Date("2026-08-30T00:00:00.000Z");
 const HOUR_MS = 60 * 60 * 1000;
@@ -36,7 +37,7 @@ function healthyRuns(): LatestRun[] {
   }));
 }
 
-function rowFor(rows: AgentStatus[], agent: string): AgentStatus {
+function rowFor(rows: AgentStatus[], agent: Agent): AgentStatus {
   const row = rows.find((r) => r.agent === agent);
   if (!row) throw new Error(`no row for ${agent}`);
   return row;
@@ -67,7 +68,7 @@ describe("RAIL_AGENTS", () => {
   });
 
   it("agrees with the exported staleness threshold", () => {
-    for (const e of RAIL_AGENTS) {
+    for (const e of [...RAIL_AGENTS, ...EXPECTATIONS]) {
       expect(e.everyHours + e.graceHours).toBe(AGENT_STALE_HOURS);
     }
   });
@@ -192,7 +193,7 @@ describe("deriveAgentStatuses", () => {
       { chaserEnabled: true, monitoringEnabled: false },
       RAIL_AGENTS
     );
-    for (const agent of ["watchdog", "site-health", "outreach-health", "dispatcher"]) {
+    for (const agent of ["watchdog", "site-health", "outreach-health", "dispatcher"] as const) {
       expect(rowFor(rows, agent).state).toBe("off");
     }
     expect(rowFor(rows, "chaser").state).toBe("ok");
@@ -206,6 +207,21 @@ describe("deriveAgentStatuses", () => {
       RAIL_AGENTS
     );
     expect(rowFor(rows, "expiry-sweep").state).toBe("ok");
+  });
+
+  it("switches every rail agent but expiry-sweep off when both switches are false", () => {
+    const rows = deriveAgentStatuses(
+      NOW,
+      healthyRuns(),
+      { chaserEnabled: false, monitoringEnabled: false },
+      RAIL_AGENTS
+    );
+    // Derived from RAIL_AGENTS, never a hardcoded list: an agent added to the
+    // rail but forgotten in MONITORING_AGENTS would otherwise ship as a badge
+    // that stays green with the whole system switched off.
+    for (const e of RAIL_AGENTS) {
+      expect(rowFor(rows, e.agent).state).toBe(e.agent === "expiry-sweep" ? "ok" : "off");
+    }
   });
 
   it("puts off ahead of never run, overdue and failed", () => {

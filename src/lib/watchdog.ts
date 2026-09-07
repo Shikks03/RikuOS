@@ -135,6 +135,13 @@ export function evaluateWatchdog(
         break;
       case "ok":
         break;
+      // The throw is dead code once the compiler is satisfied; it exists so a
+      // new AgentVerdict kind fails to compile HERE, as it already does in
+      // deriveAgentStatuses, rather than being silently dropped from the digest.
+      default: {
+        const _exhaustive: never = verdict;
+        throw new Error(`unhandled verdict ${JSON.stringify(_exhaustive)}`);
+      }
     }
   }
 
