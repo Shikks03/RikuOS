@@ -1,0 +1,383 @@
+/* ============================================================
+   components.css — the shared vocabulary, ported from the
+   `components` section of docs/design/p8-mockup.html.
+
+   Two namespaces and no third. Reference names are kept verbatim
+   (.stat, .btn, .tag, .eyebrow, .navitem, .agent, .track,
+   .statuspill) so a recipe can be diffed against components.html by
+   eye; anything only the Freelance page has carries the page prefix
+   `fl-`. No BEM, no utility classes.
+
+   docs/design/components.html's own article furniture — .frame, its
+   .rail, .masthead, .kicker, .standfirst, .well, .caption, .debt,
+   .swatches — is chrome for a document ABOUT components and ships
+   nowhere.
+
+   Five deliberate differences from the mockup, each marked below:
+     1. `.stat .marks` is dropped (Riku chose the plain hero row).
+     2. `.stat .sub` gains a two-line min-height (new CSS).
+     3. `.app-content` gains max-width:none.
+     4. `.navitem` gains border-bottom:0 (it is an <a> in the app).
+     5. `.app-body` gains min-height:100vh (R33).
+   ============================================================ */
+
+/* ---- shell ---------------------------------------------------- */
+.app{background:var(--void);min-width:0}
+/* DIFFERENCE 5 (R33): min-height:100vh, so the rail's ground reaches the
+   bottom of the viewport on every page. The mockup was drawn inside a
+   fixed-height frame; on a short page such as Plan A's /freelance root the
+   rail column would otherwise stop mid-screen. */
+.app-body{
+  display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);
+  align-items:stretch;min-height:100vh;
+}
+
+.app-side{
+  background:#0B0D11;border-right:1px solid var(--line-soft);
+  padding:16px 12px 16px 12px;display:flex;flex-direction:column;gap:16px;
+}
+.app-brand{display:flex;align-items:center;gap:9px;padding:0 4px}
+.app-brand .tile{
+  width:24px;height:24px;border-radius:7px;flex:none;display:grid;place-items:center;
+  background:linear-gradient(150deg,#FF9E5C,#F2622B);
+}
+.app-brand .tile svg{width:14px;height:14px;display:block}
+/* overflow-wrap + min-width:0 so nothing assumes the product name's length */
+.app-brand .wm{
+  font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:-.01em;
+  color:var(--ink);overflow-wrap:anywhere;min-width:0;
+}
+
+.app-nav{display:flex;flex-direction:column;gap:2px}
+/* DIFFERENCE 4: border-bottom:0. The mockup draws nav items as <span>;
+   the app draws them as <Link> -> <a>, and base.css puts a hairline
+   under every anchor. .fl-biz below already does the same thing. */
+.navitem{
+  display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:var(--r-nav);
+  font-size:12.5px;color:var(--ink-3);border-bottom:0;
+}
+.navitem svg{width:13px;height:13px;flex:none;opacity:.85;display:block}
+/* a raised fill plus an INSET hairline — never a left accent bar */
+.navitem.is-active{background:#171B21;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+
+.grouplabel{
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-4);padding:0 9px;margin-top:6px;display:block;
+}
+.agents{display:flex;flex-direction:column;gap:6px;margin-top:7px}
+.agent{
+  display:block;padding:8px 9px;border-radius:var(--r-chip);background:#12151A;
+  border:1px solid var(--line);font-family:var(--mono);font-size:10px;
+  font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-4);
+}
+/* ok: green label, thin green border, deliberately NO tinted fill */
+.agent.is-ok{color:var(--save);border-color:rgba(53,211,153,.18)}
+/* overdue / failed: the reference's tinted-badge recipe in --stale / --missing.
+   Failed carries the heavier fill (.14/.03) because amber is intrinsically
+   brighter than red — at equal alpha the merely-late agent outshouts the broken one. */
+.agent.is-overdue{
+  color:var(--stale);border-color:rgba(251,191,36,.22);
+  background:linear-gradient(180deg,rgba(251,191,36,.09),rgba(251,191,36,.02));
+}
+.agent.is-failed{
+  color:var(--missing);border-color:rgba(248,113,113,.22);
+  background:linear-gradient(180deg,rgba(248,113,113,.14),rgba(248,113,113,.03));
+}
+/* off / never run / unknown — inherits .agent's ground; a dead agent must never
+   sit brighter than a live one */
+.agent.is-grey{color:var(--ink-4);border-color:var(--line)}
+.agent-cap{
+  display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;
+  color:var(--ink-4);padding:0 9px;margin-top:4px;font-variant-numeric:tabular-nums;
+}
+.app-side .rail-foot{margin-top:auto}
+/* the app's only sign-out control — --ink-3, never --ink-4 */
+.app-side .btn.ghost{font-size:11.5px;letter-spacing:.1em;padding:6px 9px;color:var(--ink-3)}
+
+.app-main{min-width:0}
+.topbar{height:44px;border-bottom:1px solid var(--line-soft);padding:0 var(--sp-6);display:flex}
+.topbar-in{width:100%;max-width:var(--content-max);margin:0 auto;display:flex;align-items:center;gap:12px}
+/* the top bar carries the freshness stamp and nothing else: no breadcrumb.
+   `Operator` named nobody in a one-user system and was the bar's brightest
+   element; the crumb's page name restated the title 70px below it. What is
+   left is the only thing in the bar that ever changes. The shell renders it
+   on every page from the request time (Asia/Manila) — on a force-dynamic
+   page that is the moment the data was read. */
+.crumb{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.crumb em{font-style:normal;color:var(--ink-4)}
+/* DIFFERENCE 3: max-width:none, so legacy.css's `main` rule cannot apply a
+   second column to /freelance's own <main className="app-content">. The
+   28px horizontal padding lives HERE and the 920px max-width lives on .fl,
+   because box-sizing:border-box means a 920px element WITH padding gives
+   864px of content, at which point four hero cards wrap. */
+.app-content{padding:var(--sp-6) var(--sp-6) var(--sp-8);max-width:none}
+
+/* ---- section rhythm (the eyebrow / title pair) ----------------- */
+.eyebrow{
+  display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ink-3);
+}
+.fl-h{
+  display:block;font-family:var(--display);font-weight:600;font-size:19px;
+  letter-spacing:-.015em;color:var(--ink);margin-top:5px;
+}
+.fl-title{
+  font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.02em;color:var(--ink);
+}
+.fl{max-width:var(--content-max);margin:0 auto}
+.fl-sect{margin-top:var(--sp-7)}
+.fl-body{margin-top:var(--sp-5)}
+
+/* ---- stat hero cards ------------------------------------------ */
+/* four cards at minmax(215px,1fr) with 14px gaps need 4*215 + 3*14 = 902 <= 920;
+   they land at (920 - 42) / 4 = 219.5px each, so the money-in card fits later
+   with 18px to spare and no deviation from this template */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:var(--sp-4)}
+.stat{
+  position:relative;overflow:hidden;border-radius:var(--r-feature);
+  padding:15px 16px 18px;min-height:132px;
+  border:1px solid var(--line);background:var(--raised);
+  display:flex;flex-direction:column;
+}
+.stat-top{display:flex;align-items:center;gap:7px;position:relative;z-index:2}
+.stat-top .lbl{
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);
+}
+.stat-top .more{
+  margin-left:auto;font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink-4);
+}
+.stat .fig{
+  font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:-.03em;
+  line-height:1.06;margin-top:auto;position:relative;z-index:2;
+  font-variant-numeric:tabular-nums;color:var(--ink);
+}
+/* DIFFERENCE 2: min-height reserves two lines of caption at 10.5px/1.5.
+   .stat .fig is bottom-anchored, so a caption that wraps would otherwise
+   lift its figure above the others — and the "didn't report" captions wrap
+   at 219-297px card widths while `nothing waiting` does not. */
+.stat .sub{
+  font-size:10.5px;color:var(--ink-3);position:relative;z-index:2;margin-top:2px;
+  min-height:32px;
+}
+/* violet — decisions not made */
+.stat.roi{background:var(--tint-roi);border-color:rgba(167,139,250,.2)}
+.stat.roi .lbl,.stat.roi .fig{color:var(--roi)}
+/* this card's `Open ↗` is the page's one exit to ShikksTracker, not ornament */
+.stat.roi .more{color:var(--ink-3)}
+/* amber — a duration is waiting */
+.stat.stale{background:var(--tint-stale);border-color:rgba(251,191,36,.2)}
+.stat.stale .lbl,.stat.stale .fig{color:var(--stale)}
+/* hueless WITH data */
+.stat.plain{background:var(--raised);border-color:var(--line)}
+.stat.plain .fig{color:var(--ink)}
+/* a MEASURED zero (`0`) — the hue drains, the caption still reports.
+   `nothing waiting` is the answer the page exists to give and must not be
+   the dimmest text on the screen. */
+.stat.drained{background:var(--raised);border-color:var(--line)}
+.stat.drained .lbl,.stat.drained .fig{color:var(--ink-4)}
+/* NOTHING WAS MEASURED (`—`) — the whole card drains, caption included,
+   because that caption is a "ShikksTracker didn't report…" sentence. */
+.stat.blank{background:var(--raised);border-color:var(--line)}
+.stat.blank .lbl,.stat.blank .fig,.stat.blank .sub{color:var(--ink-4)}
+/* the one hero graphic: a proportion track, no hue */
+.track{
+  height:4px;border-radius:99px;background:var(--track);overflow:hidden;
+  margin-top:9px;position:relative;z-index:2;
+}
+.track i{display:block;height:100%;border-radius:99px;background:var(--ink-4)}
+/* The track's 13px slot (4px + 9px) is reserved on the cards that have none,
+   so all three figures and all three captions sit on one baseline. Only the
+   contacts card ever fills it. The app targets current Chrome, so :has() is
+   available; the explicit fallback if that ever changes is
+   .stat.roi .sub,.stat.stale .sub,.stat.drained .sub,.stat.blank .sub{margin-top:15px} */
+.stat:not(:has(.track)) .sub{margin-top:15px}
+/* DIFFERENCE 1: the mockup's `.stat .marks` mark-field rule is NOT ported.
+   Riku chose the plain hero row; the only graphic on it is .track above. */
+
+/* ---- statements under the hero row ---------------------------- */
+.fl-say{font-size:13px;color:var(--ink-2);margin-top:var(--sp-4)}
+.fl-say b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* ---- inline stat strip / Block B's summary line ---------------- */
+/* .statstrip ships as declared, unused vocabulary. That list is
+   .statstrip, .btn.go, .statuspill and --session, and it must not grow. */
+.statstrip{display:flex;flex-wrap:wrap;gap:20px;padding:12px 16px;border-top:1px solid var(--line);background:var(--panel)}
+.statstrip div{font-size:11px;color:var(--ink-3)}
+.statstrip b{font-family:var(--display);font-size:13.5px;font-weight:700;margin-right:5px;font-variant-numeric:tabular-nums}
+.fl-sum{
+  border-top:0;background:none;margin:0;padding:6px 0 0;display:block;
+  font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;
+}
+.fl-sum b{font-family:var(--display);font-size:13.5px;font-weight:700;color:var(--ink);margin:0;font-variant-numeric:tabular-nums}
+.fl-sum i{font-style:normal;color:var(--ink-4);margin:0 5px}
+
+/* ---- row grammar: hairlines, a fixed grid, no boxes ------------ */
+.fl-stages{margin-top:var(--sp-4)}
+.fl-stage{
+  display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:var(--sp-4);
+  align-items:baseline;padding:11px 0;border-top:1px solid var(--line-soft);
+}
+.fl-stages>.fl-stage:first-child{border-top:0}
+.fl-stage .nm{font-size:13px;color:var(--ink-2)}
+.fl-stage .ct{
+  font-family:var(--display);font-weight:600;font-size:15px;color:var(--ink);
+  text-align:right;font-variant-numeric:tabular-nums;
+}
+/* Two notes, not rows — deliberately no hairline above either. They are the
+   same shape in two inks because they are two different claims:
+   .fl-note   = a MEASURED emptiness (the source answered, the count was zero)
+   .fl-absent = the field NEVER ARRIVED (--ink-4 is reserved for these) */
+.fl-note{font-size:11px;color:var(--ink-3);margin-top:var(--sp-3)}
+.fl-absent{font-size:11px;color:var(--ink-4);margin-top:var(--sp-3)}
+.fl-empty{font-size:13px;color:var(--ink-3);margin-top:var(--sp-5)}
+
+/* ---- disclosure (Blocks C and D) ------------------------------- */
+.disclose>summary{display:block;list-style:none;cursor:pointer}
+.disclose>summary::-webkit-details-marker{display:none}
+.sumrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:end}
+.sumrow::after{
+  content:"";width:6px;height:6px;align-self:end;margin-bottom:7px;
+  border-right:1.5px solid var(--ink-4);border-bottom:1.5px solid var(--ink-4);
+  transform:rotate(-45deg);transition:transform .14s ease;
+}
+.disclose[open] .sumrow::after{transform:rotate(45deg);margin-bottom:9px}
+.disclose[open] .sumrow .fl-count{color:var(--ink-3)}
+.fl-count{
+  font-family:var(--mono);font-size:10px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;padding-bottom:2px;
+}
+.fl-collapsed{display:block;font-size:11.5px;color:var(--ink-4);margin-top:var(--sp-3)}
+/* when the collapsed line carries a row rather than a sentence, it borrows the
+   summary-line grammar: name at --ink-2, figure at --ink, tabular */
+.fl-collapsed .nm{color:var(--ink-2)}
+.fl-collapsed b{font-weight:600;color:var(--ink);margin-left:var(--sp-4);font-variant-numeric:tabular-nums}
+.disclose[open] .fl-collapsed{display:none}
+/* 28px, not 20px: at 20px the group eyebrow reads as a second eyebrow under
+   the block heading rather than the head of its own group */
+.fl-open{margin-top:var(--sp-6)}
+
+/* ---- table grammar --------------------------------------------
+   The column template is a per-table custom property so one row grammar serves
+   both tables: Block D has four columns, Block C has five. */
+.fl-table{display:block;--fl-cols:minmax(0,1fr) 78px 66px 66px}
+.fl-table.is-campaigns{--fl-cols:minmax(0,1fr) 66px 66px 66px 66px}
+.fl-thead,.fl-trow{
+  display:grid;grid-template-columns:var(--fl-cols);gap:var(--sp-3);
+  align-items:baseline;
+}
+.fl-thead{
+  padding:0 0 9px;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-4);
+}
+.fl-trow{padding:11px 0;border-bottom:1px solid var(--line-soft)}
+.fl-thead>span+span,.fl-trow>span+span{text-align:right;font-variant-numeric:tabular-nums}
+.fl-trow .nm{font-weight:600;font-size:13px;color:var(--ink)}
+.fl-trow>span+span{font-size:12.5px;color:var(--ink-2)}
+.fl-trow .zero{color:var(--ink-4)}
+.fl-trow .dash{color:var(--ink-4)}
+.fl-group{margin-top:var(--sp-6)}
+.fl-group:first-child{margin-top:0}
+.fl-explain{font-size:11.5px;color:var(--ink-3);margin-top:var(--sp-2)}
+.fl-group .fl-table{margin-top:var(--sp-4)}
+/* `Showing 20 of 34 campaigns.` / `Showing 20 of 41.` — a statement to the
+   reader, so sentence case in the body face, not a mono machine label */
+.fl-bound{font-size:11.5px;color:var(--ink-4);margin-top:var(--sp-3)}
+
+/* ---- the honesty note ------------------------------------------ */
+.honesty{
+  display:flex;gap:7px;align-items:flex-start;
+  font-size:11.5px;color:var(--ink-4);margin-top:var(--sp-4);
+}
+.honesty svg{width:13px;height:13px;flex:none;margin-top:2px;display:block}
+
+/* ---- Block E rows ---------------------------------------------- */
+.fl-headrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}
+.fl-rows{margin-top:var(--sp-5)}
+.fl-row{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-4);
+  padding:14px 0;border-top:1px solid var(--line-soft);
+}
+/* both row lists on the page open the same way: no hairline above the first */
+.fl-rows>.fl-row:first-child{border-top:0}
+.fl-row .tag{align-self:start;justify-self:end}
+.fl-biz{
+  font-weight:600;font-size:13px;color:var(--ink);border-bottom:0;
+  display:inline-flex;align-items:baseline;gap:6px;
+}
+.fl-biz:hover{color:var(--ink);border-bottom:0}
+.fl-biz .arr{color:var(--ink-4);font-size:11px}
+.pwhen{
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-4);
+  font-variant-numeric:tabular-nums;margin-top:5px;
+}
+.pwhen.is-stale{color:var(--stale)}
+.fl-snip{font-size:12.5px;color:var(--ink-2);margin-top:6px}
+.fl-why{font-size:11.5px;color:var(--ink-4);margin-top:4px}
+
+/* ---- failed block / failed page -------------------------------- */
+.fl-fail{display:grid;grid-template-columns:5px minmax(0,1fr);gap:9px;margin-top:var(--sp-5)}
+.fl-fail i{
+  width:5px;height:5px;border-radius:50%;background:var(--missing);
+  box-shadow:0 0 6px var(--missing);margin-top:7px;
+}
+.fl-fail .said{font-size:13px;color:var(--ink-2)}
+.fl-fail .because{font-size:12.5px;color:var(--ink-3);margin-top:6px;max-width:62ch}
+
+/* ---- Block F, the health strip --------------------------------- */
+.fl-health{margin-top:var(--sp-8)}
+.fl-health.quiet{
+  border-top:1px solid var(--line);padding-top:var(--sp-4);
+  display:flex;align-items:center;gap:var(--sp-4);
+}
+.fl-health.quiet .line{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.fl-health.quiet .line i{font-style:normal;color:var(--ink-4);margin:0 5px}
+/* the 30-hour rule: past everyHours + graceHours the stamp becomes a statement */
+.fl-health.quiet .line .aged{color:var(--stale)}
+.fl-health .btn{margin-left:auto;flex:none}
+/* cards earn their borders, and a structural alarm is quieter and stronger
+   than more colour */
+.fl-health.alarm{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-card);
+  padding:var(--sp-4) 16px;
+}
+/* the marker is the system's dot, never ⚠ — a coloured emoji glyph has no
+   place in a monochrome instrument panel */
+.fl-warn{display:grid;grid-template-columns:5px minmax(0,1fr);gap:9px;padding:3px 0}
+.fl-warn i{width:5px;height:5px;border-radius:50%;margin-top:7px}
+.fl-warn.is-stale i{background:var(--stale);box-shadow:0 0 6px var(--stale)}
+.fl-warn.is-missing i{background:var(--missing);box-shadow:0 0 6px var(--missing)}
+.fl-warn span{font-size:12.5px;color:var(--ink)}
+.fl-fine{margin-left:14px;font-size:11px;color:var(--ink-3);margin-top:var(--sp-3);font-variant-numeric:tabular-nums}
+.fl-fine i{font-style:normal;color:var(--ink-4);margin:0 5px}
+.fl-stamp{margin-left:14px;margin-top:var(--sp-2);display:flex;align-items:center;gap:var(--sp-4)}
+.fl-stamp .line{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+/* ---- buttons, tags, status pill -------------------------------- */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;cursor:pointer;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  padding:8px 14px;border-radius:var(--r-pill);background:none;
+  border:1px solid var(--line);color:var(--ink-2);
+}
+.btn:hover{border-color:var(--ink-4);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed;color:var(--ink-4)}
+.btn:disabled:hover{border-color:var(--line);color:var(--ink-4)}
+/* the affirmative pill — declared vocabulary; P8 uses none */
+.btn.go{border-color:rgba(53,211,153,.4);color:#8AE9C6}
+.btn.go:hover{background:rgba(53,211,153,.09);border-color:var(--save)}
+.btn.ghost{border-color:transparent;color:var(--ink-3)}
+.tag{
+  display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;
+  text-transform:uppercase;padding:5px 10px;border-radius:var(--r-tag);
+  border:1px solid var(--line);color:var(--ink-3);
+}
+/* status pill — declared vocabulary only. P8's top bar carries no pill of any kind. */
+.statuspill{
+  display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:var(--r-pill);
+  background:rgba(53,211,153,.08);border:1px solid rgba(53,211,153,.2);
+  font-size:10.5px;color:#7FE3BE;
+}
+.statuspill i{width:5px;height:5px;border-radius:50%;background:var(--save);box-shadow:0 0 6px var(--save)}

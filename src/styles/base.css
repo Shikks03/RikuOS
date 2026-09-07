@@ -1,0 +1,35 @@
+/* ============================================================
+   base.css — reset, html/body, prose, links, focus, selection,
+   reduced motion. Ported from the `base` section of
+   docs/design/p8-mockup.html.
+
+   `h1` is NOT here: it is one of the old pages' bare selectors and
+   lives in legacy.css beside the rest of them, which is where both
+   the mockup and the spec's §6.1 selector table put it.
+   ============================================================ */
+*{box-sizing:border-box}
+/* so the browser paints scrollbars, spinners and number steppers dark */
+html,body{color-scheme:dark}
+body{
+  margin:0;
+  background:var(--void);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:13px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+p{margin:var(--sp-3) 0 0;font-size:13px;color:var(--ink-2)}
+strong{font-weight:600;color:var(--ink)}
+/* A deliberate deviation from components.html, which makes links orange.
+   That is right for a teardown article, where orange is the document's
+   accent. In the app orange is --spend: money out, and the brand mark.
+   A `Settings` link is neither. */
+a{color:var(--ink-2);text-decoration:none;border-bottom:1px solid var(--line)}
+a:hover{color:var(--ink);border-bottom-color:var(--ink-4)}
+/* a reference-level convention, not a hue spend */
+:focus-visible{outline:2px solid var(--spend);outline-offset:3px;border-radius:3px}
+/* neutral, not violet: a selection band is not a decision, and no hue is spent
+   where it does not carry its assigned meaning */
+::selection{background:rgba(233,236,240,.16);color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

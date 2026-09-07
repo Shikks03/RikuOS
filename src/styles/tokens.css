@@ -1,0 +1,71 @@
+/* ============================================================
+   tokens.css — :root custom properties only. Nothing else lives here.
+   source: DESIGN-INSPO §2 / §3, hexes verbatim, ported from the
+   `tokens` section of docs/design/p8-mockup.html so drift shows up
+   in a diff.
+
+   The six semantic hues are one closed set plus --track. No token is
+   named after its colour and none ever will be: a token named for how
+   it looks is how a hue eventually gets used for the wrong meaning.
+
+   NAME MAP. docs/design/components.html names the amber and red tokens
+   --amber and --alert. Same hexes, different names. A recipe copied out
+   of that file needs  --alert -> --missing  and  --amber -> --stale.
+   Do NOT define aliases: a second name for the same hue is how the hue
+   eventually gets used for the wrong meaning. A custom property that
+   resolves to nothing is invalid at computed-value time, so a stray
+   var(--alert) would make a red warning silently INHERIT body grey.
+
+   NOT DEFINED HERE: --display, --body and --mono. Those three come from
+   next/font/google in src/app/layout.tsx, which puts them on <html> via
+   the generated .variable class names. Declaring them here would shadow
+   the loaded faces with family names that do not exist.
+
+   Deliberately not ported: --skill (graph-only, and there is no graph)
+   and the -dim tokens (the gradients inline their stops instead).
+   --session is defined and unused on purpose — a fixed set stays
+   complete, and that is settled.
+
+   Dark only. No @media (prefers-color-scheme). No [data-theme].
+   ============================================================ */
+:root{
+  /* ground & structure */
+  --void:#08090B;
+  --panel:#0E1013;
+  --raised:#14171C;
+  --sunk:#050608;
+  --line:#1D222A;
+  --line-soft:#15191F;
+
+  /* ink */
+  --ink:#E9ECF0;
+  --ink-2:#98A1AD;
+  --ink-3:#5B6470;
+  --ink-4:#3A424C;
+
+  /* semantic hues — meaning is fixed */
+  --spend:#FF8A3D;
+  --save:#35D399;
+  --roi:#A78BFA;
+  --session:#5FA5FA;
+  --stale:#FBBF24;
+  --missing:#F87171;
+
+  /* the one non-hue graphic token */
+  --track:#1A1E25;
+
+  /* card tints — 155deg, deep desaturated hue into near-neutral at 62% */
+  --tint-roi:linear-gradient(155deg,#171233,#111117 62%);
+  --tint-stale:linear-gradient(155deg,#241A03,#141209 62%);
+
+  /* spacing 4 / 6 / 10 / 14 / 20 / 28 / 44 / 72 */
+  --sp-1:4px; --sp-2:6px; --sp-3:10px; --sp-4:14px;
+  --sp-5:20px; --sp-6:28px; --sp-7:44px; --sp-8:72px;
+
+  /* radii */
+  --r-tag:6px; --r-nav:7px; --r-chip:8px; --r-card:10px; --r-feature:14px; --r-pill:999px;
+
+  /* layout */
+  --content-max:920px;
+  --rail-w:170px;
+}

@@ -1,0 +1,84 @@
+/* ============================================================
+   legacy.css — the old pages' bare selectors, re-skinned.
+
+   THIS FILE HAS AN EXPIRY DATE. It exists so /queue, /settings and
+   /login can be re-skinned without being rewritten: one treatment per
+   selector, no className churn. It is DELETED in the phase where those
+   pages get their own content discussion under S11 and are rebuilt on
+   the components.css vocabulary. Do not add to it; do not let it
+   outlive its reason.
+
+   Ported from the `legacy` section of docs/design/p8-mockup.html, and
+   it is where every rule from the deleted src/app/globals.css landed
+   except one: the old `main` rule's env(safe-area-inset-*) padding is
+   NOT carried over. That is a deliberate loss consistent with
+   desktop-first, recorded in the spec's §6.2, and it comes back in the
+   phone pass.
+
+   Two named costs, so they are not discovered later as defects:
+     * /queue's status filters lose their solid active state. Bare
+       <button> carries three meanings there at once — affirmative,
+       neutral, and the active segment of the filter row — and one
+       element selector cannot be all three. The six filters now differ
+       only by border and label brightness. That is the price of
+       one-treatment-per-selector.
+     * `main` widens from 640px to 920px. A visible layout change to
+       /queue, forced by the shell.
+   ============================================================ */
+main{
+  max-width:var(--content-max);margin:0 auto;
+  padding:var(--sp-6) var(--sp-6) var(--sp-8);
+}
+h1{
+  font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.02em;
+  color:var(--ink);margin:0;
+}
+/* the neutral-HIGH outline pill: Approve, Save, Enable, and the active filter */
+button{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  padding:8px 14px;border-radius:var(--r-pill);background:none;
+  border:1px solid var(--ink-4);color:var(--ink);cursor:pointer;line-height:1.4;
+}
+button:hover{border-color:var(--ink-3)}
+/* the same pill at resting emphasis: Edit, Cancel, inactive filters, Re-register */
+button.secondary{border-color:var(--line);color:var(--ink-3);background:none}
+button.secondary:hover{border-color:var(--ink-4);color:var(--ink-2)}
+/* the same pill in red — never a solid fill */
+button.danger{border-color:rgba(248,113,113,.4);color:#F5A5A5;background:none}
+button.danger:hover{border-color:rgba(248,113,113,.6)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.card{
+  background:var(--raised);border:1px solid var(--line);border-radius:var(--r-card);
+  padding:var(--sp-4);margin-bottom:var(--sp-4);
+}
+.badge{
+  display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;
+  text-transform:uppercase;border:1px solid var(--line);border-radius:var(--r-tag);
+  padding:4px 8px;color:var(--ink-3);
+}
+.meta{font-size:10.5px;color:var(--ink-3)}
+.row{display:flex;gap:var(--sp-3);align-items:center;flex-wrap:wrap;margin-top:var(--sp-3)}
+.error{color:var(--missing);font-size:12.5px}
+/* pre.body keeps the BODY face deliberately. It holds a draft email to a
+   business owner; rendering Riku's own outgoing message in JetBrains Mono
+   would make him read it as machine output, in the one place he is
+   checking tone. */
+pre.body{
+  white-space:pre-wrap;font-family:var(--body);font-size:12.5px;line-height:1.55;
+  color:var(--ink-2);background:var(--sunk);border:1px solid var(--line-soft);
+  border-radius:var(--r-chip);padding:10px 12px;margin:var(--sp-3) 0 0;
+}
+input,textarea{
+  font-family:var(--body);font-size:13px;width:100%;padding:8px 10px;
+  background:#101318;border:1px solid var(--line);border-radius:var(--r-chip);
+  color:var(--ink);caret-color:var(--spend);
+}
+/* sentence case, not mono caps — a label addresses a person */
+label{display:block;font-size:12px;color:var(--ink-3);margin-bottom:4px}
+/* Chrome paints its own near-white autofill ground on the login field, and
+   nothing else beats it. */
+input:-webkit-autofill{
+  -webkit-text-fill-color:var(--ink);
+  -webkit-box-shadow:0 0 0 1000px #101318 inset;
+  caret-color:var(--ink);
+}
