@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { COOKIE_NAME, verifySessionToken } from "@/lib/session";
+import { COOKIE_NAME, assertSessionSecret, verifySessionToken } from "@/lib/session";
 import Rail from "./_shell/Rail";
 import TopBar from "./_shell/TopBar";
 
@@ -11,16 +11,24 @@ import TopBar from "./_shell/TopBar";
  * /queue.
  *
  * Reading cookies() also opts this whole route subtree into dynamic
- * rendering, which is what makes TopBar's stamp a request time rather than a
- * build time. Do not remove it without moving that guarantee somewhere else.
+ * rendering. Nothing depends on that today — TopBar computes its stamp on the
+ * client, and /freelance will declare force-dynamic itself. The session check
+ * is the reason this read exists.
+ *
+ * The secret comes from assertSessionSecret() rather than a third hand-copied
+ * `length >= 32`; a missing or weak secret throws there and is treated as no
+ * session. redirect() stays OUTSIDE the try: it works by throwing
+ * NEXT_REDIRECT, which a catch would swallow.
  */
 async function requireSessionOrRedirect(): Promise<void> {
-  const secret = process.env.SESSION_SECRET;
+  let secret: string | null = null;
+  try {
+    secret = assertSessionSecret();
+  } catch {
+    secret = null;
+  }
   const token = (await cookies()).get(COOKIE_NAME)?.value ?? "";
-  const valid =
-    secret && secret.length >= 32 && token
-      ? await verifySessionToken(token, secret)
-      : false;
+  const valid = secret && token ? await verifySessionToken(token, secret) : false;
   if (!valid) redirect("/login");
 }
 

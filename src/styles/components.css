@@ -112,9 +112,9 @@
 /* the top bar carries the freshness stamp and nothing else: no breadcrumb.
    `Operator` named nobody in a one-user system and was the bar's brightest
    element; the crumb's page name restated the title 70px below it. What is
-   left is the only thing in the bar that ever changes. The shell renders it
-   on every page from the request time (Asia/Manila) — on a force-dynamic
-   page that is the moment the data was read. */
+   left is the only thing in the bar that ever changes. The shell computes it
+   on the client at each navigation (Asia/Manila), so on every page it is the
+   moment that page's data was read. */
 .crumb{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .crumb em{font-style:normal;color:var(--ink-4)}
 /* DIFFERENCE 3: max-width:none, so legacy.css's `main` rule cannot apply a

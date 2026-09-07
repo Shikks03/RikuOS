@@ -4,6 +4,7 @@ import { readOsSettings } from "@/lib/osSettings";
 import type { OsSettingsValues } from "@/lib/osSettings";
 import { RAIL_AGENTS, deriveAgentStatuses, fetchLatestRuns } from "@/lib/watchdog";
 import type { AgentBadgeState, AgentStatus, LatestRun } from "@/lib/watchdog";
+import type { Agent } from "@/models/AgentRun";
 
 /**
  * Six badges in fixed execution order, read from the last run record per agent
@@ -25,14 +26,40 @@ const BADGE_CLASS: Record<AgentBadgeState, string> = {
   ok: "agent is-ok",
 };
 
+/**
+ * One badge and its optional caption. All three states of this block — read,
+ * loading, failed — render through here, so the rule that a null caption means
+ * NO element (not an empty one) is written once. A blank caption line under
+ * every green badge would change the rail's rhythm in the state it is in
+ * almost all the time.
+ */
+function BadgeRow({
+  agent,
+  className,
+  caption,
+}: {
+  agent: Agent;
+  className: string;
+  caption: string | null;
+}) {
+  return (
+    <span>
+      <span className={className}>{agent}</span>
+      {caption !== null && <span className="agent-cap">{caption}</span>}
+    </span>
+  );
+}
+
 function Badges({ statuses }: { statuses: AgentStatus[] }) {
   return (
     <div className="agents">
       {statuses.map((status) => (
-        <span key={status.agent}>
-          <span className={BADGE_CLASS[status.state]}>{status.agent}</span>
-          {status.caption !== null && <span className="agent-cap">{status.caption}</span>}
-        </span>
+        <BadgeRow
+          key={status.agent}
+          agent={status.agent}
+          className={BADGE_CLASS[status.state]}
+          caption={status.caption}
+        />
       ))}
     </div>
   );
@@ -43,9 +70,12 @@ export function AgentsSkeleton() {
   return (
     <div className="agents">
       {RAIL_AGENTS.map((expectation) => (
-        <span key={expectation.agent}>
-          <span className="agent is-grey">{expectation.agent}</span>
-        </span>
+        <BadgeRow
+          key={expectation.agent}
+          agent={expectation.agent}
+          className="agent is-grey"
+          caption={null}
+        />
       ))}
     </div>
   );
@@ -99,10 +129,12 @@ export default async function AgentsBlock() {
     return (
       <div className="agents">
         {RAIL_AGENTS.map((expectation) => (
-          <span key={expectation.agent}>
-            <span className="agent is-grey">{expectation.agent}</span>
-            <span className="agent-cap">—</span>
-          </span>
+          <BadgeRow
+            key={expectation.agent}
+            agent={expectation.agent}
+            className="agent is-grey"
+            caption="—"
+          />
         ))}
       </div>
     );

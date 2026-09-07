@@ -5,12 +5,13 @@ import { usePathname } from "next/navigation";
 import { IconQueue, IconFreelance, IconSettings } from "@/components/icons";
 
 /**
- * The shell's only client island: usePathname() is client-only, and this is
- * the smallest correct way to mark the active item — no state, no effects, no
- * data. src/proxy.ts could forward the pathname as a header instead and is
- * deliberately NOT touched: it is the app's authorization boundary and must
- * stay boring. Editing a fail-closed security file to save a kilobyte of
- * hydration is a bad trade.
+ * One of the shell's three client islands, each for exactly one reason:
+ * usePathname() here, an onClick in LogoutButton, a per-navigation Date in
+ * TopBar. This is the smallest correct way to mark the active item — no state,
+ * no effects, no data. src/proxy.ts could forward the pathname as a header
+ * instead and is deliberately NOT touched: it is the app's authorization
+ * boundary and must stay boring. Editing a fail-closed security file to save a
+ * kilobyte of hydration is a bad trade.
  *
  * Adding /personal later is one entry in this array.
  *
@@ -30,7 +31,12 @@ export default function NavList() {
       {NAV.map(({ href, label, Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
-          <Link key={href} href={href} className={active ? "navitem is-active" : "navitem"}>
+          <Link
+            key={href}
+            href={href}
+            className={active ? "navitem is-active" : "navitem"}
+            aria-current={active ? "page" : undefined}
+          >
             <Icon />
             {label}
           </Link>
