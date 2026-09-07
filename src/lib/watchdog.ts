@@ -59,9 +59,42 @@ export interface Anomaly {
 const HOUR_MS = 60 * 60 * 1000;
 
 /**
- * Pure. At most one anomaly per agent, most-fundamental first: an agent that
+ * The per-agent judgement, pure and shared by two consumers with different
+ * needs: the watchdog digest (which wants only the anomalies) and the rail's
+ * agents block (which wants a row for every agent, healthy ones included).
+ *
+ * Order is most-fundamental first and must not be rearranged: an agent that
  * never ran cannot also be stale, and a stale run's `ok` flag describes a run
- * from before the outage, so reporting it would point at the wrong problem.
+ * from BEFORE the outage, so reporting `failed` would point at the wrong
+ * problem. The rail must not disagree with the digest about the same agent,
+ * which is why there is one function rather than two.
+ */
+export type AgentVerdict =
+  | { kind: "never" }
+  | { kind: "stale"; ageHours: number }
+  | { kind: "failed" }
+  | { kind: "degraded"; itemsFailed: number }
+  | { kind: "ok"; ageHours: number };
+
+export function classifyAgentRun(
+  now: Date,
+  run: LatestRun | undefined,
+  exp: Expectation
+): AgentVerdict {
+  if (!run) return { kind: "never" };
+
+  const ageMs = now.getTime() - run.startedAt.getTime();
+  const ageHours = Math.floor(ageMs / HOUR_MS);
+  const limitMs = (exp.everyHours + exp.graceHours) * HOUR_MS;
+
+  if (ageMs > limitMs) return { kind: "stale", ageHours };
+  if (!run.ok) return { kind: "failed" };
+  if (run.itemsFailed > 0) return { kind: "degraded", itemsFailed: run.itemsFailed };
+  return { kind: "ok", ageHours };
+}
+
+/**
+ * Pure. At most one anomaly per agent, in classifyAgentRun's order.
  *
  * A switched-off agent is NOT an anomaly and needs no special case here: a
  * disabled agent still writes a run record every day, so it is never stale.
@@ -76,43 +109,32 @@ export function evaluateWatchdog(
   const anomalies: Anomaly[] = [];
 
   for (const expectation of expectations) {
-    const run = byAgent.get(expectation.agent);
+    const agent = expectation.agent;
+    const verdict = classifyAgentRun(now, byAgent.get(agent), expectation);
 
-    if (!run) {
-      anomalies.push({
-        agent: expectation.agent,
-        kind: "never-ran",
-        detail: `${expectation.agent} has never run`,
-      });
-      continue;
-    }
-
-    const ageMs = now.getTime() - run.startedAt.getTime();
-    const limitMs = (expectation.everyHours + expectation.graceHours) * HOUR_MS;
-    if (ageMs > limitMs) {
-      anomalies.push({
-        agent: expectation.agent,
-        kind: "stale",
-        detail: `${expectation.agent} last ran ${Math.floor(ageMs / HOUR_MS)}h ago`,
-      });
-      continue;
-    }
-
-    if (!run.ok) {
-      anomalies.push({
-        agent: expectation.agent,
-        kind: "failed",
-        detail: `${expectation.agent} failed`,
-      });
-      continue;
-    }
-
-    if (run.itemsFailed > 0) {
-      anomalies.push({
-        agent: expectation.agent,
-        kind: "degraded",
-        detail: `${expectation.agent}: ${run.itemsFailed} item${run.itemsFailed === 1 ? "" : "s"} failed`,
-      });
+    switch (verdict.kind) {
+      case "never":
+        anomalies.push({ agent, kind: "never-ran", detail: `${agent} has never run` });
+        break;
+      case "stale":
+        anomalies.push({
+          agent,
+          kind: "stale",
+          detail: `${agent} last ran ${verdict.ageHours}h ago`,
+        });
+        break;
+      case "failed":
+        anomalies.push({ agent, kind: "failed", detail: `${agent} failed` });
+        break;
+      case "degraded":
+        anomalies.push({
+          agent,
+          kind: "degraded",
+          detail: `${agent}: ${verdict.itemsFailed} item${verdict.itemsFailed === 1 ? "" : "s"} failed`,
+        });
+        break;
+      case "ok":
+        break;
     }
   }
 
