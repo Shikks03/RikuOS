@@ -2389,7 +2389,7 @@ Run every check in order. **Do not claim completion until each one has produced 
 - [ ] **Step 1: The standing trio**
 
 Run: `npm test`
-Expected: all suites pass, including `watchdog.test.ts` (9 tests), `agentStatus.test.ts` (19 tests) and `deadline.test.ts` (R38). Zero failures.
+Expected: all suites pass, including `watchdog.test.ts` (9 tests), `agentStatus.test.ts` (20 tests), `deadline.test.ts` (4, R38) and `osSettings.test.ts` (5, R37/R41). Zero failures.
 
 Run: `npx tsc --noEmit`
 Expected: no output, exit code 0.
@@ -2420,8 +2420,8 @@ It also carries a `<link>` to `fonts.googleapis.com`, which from the app's own o
 Run: `git diff --stat 0a9a978..HEAD -- package.json package-lock.json next.config.ts`
 Expected: **no output**. None of the three was touched. (`0a9a978` is the commit this plan started from — `docs(p8): ratify the visual-design spec…`. If the plan file itself was committed on top of it first, that commit touches none of these three, so the range is still correct.)
 
-Run: `git grep -n "dangerouslySetInnerHTML" src/`
-Expected: no output, exit code 1.
+Run: `git grep -n -E "dangerouslySetInnerHTML[[:space:]]*=" src/`
+Expected: no output, exit 1. (The attribute form: `src/components/icons.tsx` names the prop in a comment to say it is never used, and a bare-name grep would hit that.)
 
 Run: `git status --porcelain src/proxy.ts src/app/login/page.tsx`
 Expected: no output — neither file was modified.
