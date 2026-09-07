@@ -13,12 +13,15 @@
    .swatches — is chrome for a document ABOUT components and ships
    nowhere.
 
-   Five deliberate differences from the mockup, each marked below:
+   Six deliberate differences from the mockup, each marked below:
      1. `.stat .marks` is dropped (Riku chose the plain hero row).
      2. `.stat .sub` gains a two-line min-height (new CSS).
      3. `.app-content` gains max-width:none.
      4. `.navitem` gains border-bottom:0 (it is an <a> in the app).
      5. `.app-body` gains min-height:100vh (R33), then 100dvh after it.
+     6. `.segmented`'s tabs are <a>, not <button> (R42) — two added
+        declarations, line-height and hover, plus one verbatim `border:0`
+        doing double duty. Each commented in place.
 
    The quality review added five more, each commented where it sits rather
    than numbered here: `.fl-title` and `.fl-h` carry their own margins,
@@ -140,10 +143,111 @@
 .fl-title{
   font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.02em;color:var(--ink);
   margin:0;
+  /* Declared, not inherited: §3.4's title→switch gap is derived from this
+     36px line box, and `line-height:1.2` is the most natural tidy anyone
+     would apply to a display heading. Same reason .stat .fig carries an
+     explicit 1.06. This is a PIN, not a difference from the mockup — the
+     value is what the rule already inherited from base.css — so it does not
+     join the numbered differences list above. */
+  line-height:1.5;
 }
 .fl{max-width:var(--content-max);margin:0 auto}
 .fl-sect{margin-top:var(--sp-7)}
 .fl-body{margin-top:var(--sp-5)}
+/* The page title moved into the segment layout, so .fl's first child is now
+   the view's first block, sitting directly under the header. Every candidate
+   still carries the top margin it had for the heading that used to be above
+   it — .fl-body 20px, .fl-fail 20px — and that margin would now double the
+   header's gap and make the number in §3.4 false in the whole-page-down
+   state. Zeroed here.
+   .fl>:first-child is (0,2,0) — a class plus a structural pseudo-class —
+   so it outranks .fl-body and .fl-fail, both (0,1,0), from anywhere in the
+   file. It sits here, beside the rules it overrides, the same way
+   .fl-stages>.fl-stage:first-child and .fl-rows>.fl-row:first-child do. */
+.fl>:first-child{margin-top:0}
+
+/* ---- the page header: title + view switch (R42) ---------------- */
+/* The Freelance segment layout renders these above BOTH views, so the header
+   sits outside every <main>: /freelance brings its own
+   <main class="app-content"> and /freelance/queue brings legacy.css's. It
+   reuses .fl rather than declaring a second 920px column, which is what makes
+   it align with the top bar and both views by construction (R34).
+   padding-bottom is 0 on purpose: the <main> below contributes its own 28px
+   top padding on both views, and legacy.css's `main` cannot be changed
+   because it also serves /login. Any bottom padding here would change that
+   gap on both views and would NOT change the 10px difference between them.
+   Spec §3.4 carries the arithmetic.
+   When a title-level control eventually needs to sit RIGHT of the title, the
+   pattern already exists — .fl-headrow's
+   `grid-template-columns:minmax(0,1fr) auto; align-items:end`. Do not invent
+   a second one. */
+.fl-head{padding:var(--sp-6) var(--sp-6) 0}
+/* ADDED (R42): the design system's VIEW SWITCH, ported from
+   docs/design/components.html's `.segmented`, whose note reads "Sits in a
+   sunken track with a hairline border; the active tab is a raised fill.
+   Left-aligned, directly under the heading it modifies."
+   Values are the reference's, verbatim. Its sibling `.range` — the floating
+   time-range switch — is NOT ported: P8 has no time range, and §5.8 forbids
+   declaring vocabulary with no consumer. It has a named future consumer: the
+   queue page's S11 rebuild ports it for the status-filter row (§6.2).
+   #1D222A happens to equal var(--line). The reference writes the literal for
+   the FILL and the token for the BORDER because they are two different jobs;
+   tidying the fill into var(--line) would tie the raised fill to the hairline
+   colour for ever. .navitem.is-active keeps its literal #171B21 for the same
+   reason — and keeps its INSET HAIRLINE, which this does not need, because
+   this fill sits inside a track that already has a border.
+   GROUND: the reference draws this track inside a --sunk well; here it sits
+   on --void, so the track/ground separation is ~25% smaller than in the
+   specimen and the --line hairline does more of the work. If it reads as a
+   floating lighter bar rather than a recess, the alternative is --sunk for
+   the track, which would make the recess literal — that is a ruling, not a
+   tidy. (#101318 is now written three times in this app — see R34's note on
+   legacy.css.)
+   margin-top is 6px (R43), not the 20px of a heading→content gap: the switch
+   belongs to the title above it. Optical, not declared, is the comparison
+   that matters — .fl-title's 36px line box leaves ~9.7px of dead space under
+   the word, so 6px reads as ~15.6px against a true 28px below (ratio 1.79),
+   where the system's bound pair is ~9px optical and its content gap ~29px.
+   The first label sits 16px in from the track's left edge (1px border + 3px
+   track padding + 12px tab padding). The TRACK's edge, not the label, is what
+   aligns with the title; zeroing the first tab's left padding to "fix" that
+   would break the track. */
+.segmented{
+  display:inline-flex;background:#101318;border:1px solid var(--line);
+  border-radius:9px;padding:3px;gap:3px;margin-top:var(--sp-2);
+}
+/* DIFFERENCE: the reference draws the tabs as <button>; these are two real
+   URLs, so they are <a>. Two declarations are added and one verbatim
+   declaration does double duty:
+     * `border:0` is the reference's own, and it also removes base.css's
+       anchor hairline — the same fix .navitem, .fl-biz and .stat-top .more
+       carry. Verbatim, not an addition.
+     * ADDED line-height:1.4. A <button> takes the UA font shorthand's
+       line-height:normal, which is font-metric-derived (~1.3 for JetBrains
+       Mono), so the reference's track is ~32.5px and this one ~33.3px. 1.4
+       is taken NOT to match that number but to stop the track's height
+       depending on the mono's metrics at all, and because it is the
+       line-height .btn and legacy.css's bare `button` already declare — the
+       switch and the queue view's filter pills sit 38px apart and must
+       share it.
+     * ADDED :hover. base.css's `a:hover` is (0,1,1) and so is this selector;
+       at a tie the later stylesheet wins and this one is later, so the hover
+       would be silently dead. --ink because every hover in this file lands
+       on --ink (.btn:hover, .app-side .btn.ghost:hover, .fl-biz:hover, and
+       base.css's a:hover); the app's one --ink-2 hover is legacy.css's
+       button.secondary, in the layer with an expiry date.
+   base.css's :focus-visible also sets border-radius:3px, which would square
+   these corners while focused — except it is (0,1,0) and this rule is
+   (0,1,1), so the 6px survives. A later radius tidy could break that. */
+.segmented a{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  background:none;border:0;color:var(--ink-3);padding:6px 12px;border-radius:6px;
+  cursor:pointer;line-height:1.4;
+}
+.segmented a:hover{color:var(--ink)}
+/* (0,2,1), tying .segmented a:hover and winning on order, so the active tab
+   does not change on hover. */
+.segmented a.on{background:#1D222A;color:var(--ink)}
 
 /* ---- stat hero cards ------------------------------------------ */
 /* four cards at minmax(215px,1fr) with 14px gaps need 4*215 + 3*14 = 902 <= 920;
