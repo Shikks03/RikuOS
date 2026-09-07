@@ -174,3 +174,116 @@ export async function fetchLatestRuns(agents: Agent[]): Promise<LatestRun[]> {
   }
   return runs;
 }
+
+/**
+ * The staleness threshold, exported ONCE and read by both consumers: the
+ * rail's overdue rule and the Freelance page's 30-hour site-snapshot rule.
+ * It is `everyHours + graceHours`, the same 24 + 6 every expectation row
+ * already carries. Two hardcoded 30s in two files is how they drift apart.
+ */
+export const AGENT_STALE_HOURS = 30;
+
+/**
+ * The six agents the rail shows, in execution order.
+ *
+ * A hand-written superset of EXPECTATIONS, and it must stay hand-written for
+ * two separate reasons. The AGENTS enum in models/AgentRun.ts contains
+ * lead-sweep, triage and retro — three agents that do not exist, so a rail
+ * built from it would show three permanent ghosts. And EXPECTATIONS
+ * deliberately omits `watchdog`: it is running, which is the proof — an
+ * absence this file's header documents and watchdog.test.ts pins. So the rail
+ * gets its own list and EXPECTATIONS is not touched.
+ */
+export const RAIL_AGENTS: Expectation[] = [
+  { agent: "chaser", everyHours: 24, graceHours: 6 },
+  { agent: "expiry-sweep", everyHours: 24, graceHours: 6 },
+  { agent: "watchdog", everyHours: 24, graceHours: 6 },
+  { agent: "site-health", everyHours: 24, graceHours: 6 },
+  { agent: "outreach-health", everyHours: 24, graceHours: 6 },
+  { agent: "dispatcher", everyHours: 24, graceHours: 6 },
+];
+
+export type AgentBadgeState = "off" | "never" | "failed" | "overdue" | "ok";
+
+export interface AgentSwitches {
+  chaserEnabled: boolean;
+  monitoringEnabled: boolean;
+}
+
+export interface AgentStatus {
+  agent: Agent;
+  state: AgentBadgeState;
+  /** Mono micro-caption under the badge. null on `ok` — the hue is the message. */
+  caption: string | null;
+}
+
+/** The four agents the monitoring switch governs. expiry-sweep is not one of them. */
+const MONITORING_AGENTS = new Set<Agent>([
+  "watchdog",
+  "site-health",
+  "outreach-health",
+  "dispatcher",
+]);
+
+function isSwitchedOff(agent: Agent, switches: AgentSwitches): boolean {
+  // expiry-sweep is never off: it is the safety net that expires stale
+  // ApprovalItems, and it has no switch.
+  if (agent === "expiry-sweep") return false;
+  if (agent === "chaser") return !switches.chaserEnabled;
+  if (MONITORING_AGENTS.has(agent)) return !switches.monitoringEnabled;
+  return false;
+}
+
+/**
+ * Total by construction: one row per expectation, in the given order, never
+ * more, never fewer. Pure — no database, no clock of its own.
+ *
+ * The switches are an ARGUMENT and are never sniffed from a run record.
+ * runJob writes an ok:true placeholder run for a switched-off agent with the
+ * reason in the run's note string, so a derivation reading only run records
+ * would paint a switched-off chaser green. The note string is prose and must
+ * never be parsed.
+ *
+ * Precedence: off -> never run -> overdue -> failed -> ok. `off` is checked
+ * ahead of everything; the rest is classifyAgentRun's own order, which the
+ * digest already uses, so the rail can never disagree with the digest about
+ * the same agent.
+ *
+ * It never returns "unknown". That state is what the component's catch block
+ * renders when the database read throws — the derivation never sees a
+ * failure, so it can never report one.
+ */
+export function deriveAgentStatuses(
+  now: Date,
+  latest: LatestRun[],
+  switches: AgentSwitches,
+  expectations: Expectation[]
+): AgentStatus[] {
+  const byAgent = new Map(latest.map((run) => [run.agent, run]));
+
+  return expectations.map((expectation) => {
+    const agent = expectation.agent;
+
+    if (isSwitchedOff(agent, switches)) {
+      return { agent, state: "off", caption: "off" };
+    }
+
+    const verdict = classifyAgentRun(now, byAgent.get(agent), expectation);
+    switch (verdict.kind) {
+      case "never":
+        return { agent, state: "never", caption: "never run" };
+      case "stale":
+        return { agent, state: "overdue", caption: `last ran ${verdict.ageHours}h ago` };
+      case "failed":
+        return { agent, state: "failed", caption: "failed" };
+      case "degraded":
+        return {
+          agent,
+          state: "failed",
+          caption: `${verdict.itemsFailed} item${verdict.itemsFailed === 1 ? "" : "s"} failed`,
+        };
+      case "ok":
+        return { agent, state: "ok", caption: null };
+    }
+  });
+}
