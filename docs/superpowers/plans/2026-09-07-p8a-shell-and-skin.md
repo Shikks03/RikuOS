@@ -20,7 +20,7 @@ P8 is three plans. **Plan A (this file)** builds the shell and the skin. **Plan 
 |---|---|---|
 | `src/styles/tokens.css` | A creates | `:root` custom properties only — colours, spacing, radii, layout. **No font families** (those come from `next/font`). |
 | `src/styles/base.css` | A creates | Reset, `html`/`body`, `p`, `strong`, `a`, `:focus-visible`, `::selection`, reduced motion. |
-| `src/styles/components.css` | A creates | The ported recipe book: shell, section rhythm, stat cards, rows, disclosure, tables, Block E/F vocabulary, buttons, tags. Plan C consumes the `.fl-*` half without editing it, **except** one known follow-up: `.stat-top .more` becomes an `<a>` in Plan C and will need `border-bottom:0` added to its rule, the way `.navitem` and `.fl-biz` already have it. |
+| `src/styles/components.css` | A creates | The ported recipe book: shell, section rhythm, stat cards, rows, disclosure, tables, Block E/F vocabulary, buttons, tags. Plan C consumes the `.fl-*` half without editing it at all: `.stat-top .more` becomes an `<a>` in Plan C, and its `border-bottom:0` was added here by the quality review rather than left as a follow-up, the way `.navitem` and `.fl-biz` already have it. |
 | `src/styles/legacy.css` | A creates | The old pages' bare selectors (`main`, `h1`, `button`, `.card`, `.badge`, `.meta`, `.row`, `.error`, `pre.body`, `input`, `textarea`, `label`, autofill). Has an expiry date. |
 | `src/app/globals.css` | A **deletes** | Contents redistributed across the four above. |
 | `src/app/layout.tsx` | A modifies | Loads the three faces via `next/font/google`, imports the four stylesheets in fixed order, sets `viewport.themeColor` / `colorScheme` and the black status bar. |
@@ -2390,7 +2390,11 @@ Why it matters: a custom property that resolves to nothing is invalid at compute
 
 - [ ] **Step 3: `components.html` is never served and never bundled**
 
-Run: `git grep -n "components.html" src/ public/`
+The stylesheets name the file in their comments on purpose — that is the audit
+trail the port was designed to leave — so the grep looks for a real reference
+(an import, a link, a URL) rather than the bare name.
+
+Run: `git grep -n -E "(from|import|href|src|url)[[:space:]]*[:=(]?[[:space:]]*[\"'][^\"']*components\.html" src/ public/`
 Expected: **no output**, exit code 1.
 
 It also carries a `<link>` to `fonts.googleapis.com`, which from the app's own origin would be both a CSP violation and a real third-party request.

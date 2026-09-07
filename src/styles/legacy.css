@@ -22,11 +22,15 @@
        element selector cannot be all three. The six filters now differ
        only by border and label brightness. That is the price of
        one-treatment-per-selector.
-     * `main` widens from 640px to 920px. A visible layout change to
-       /queue, forced by the shell.
+     * `main`'s content column widens from 640px to 920px (976px outer).
+       A visible layout change to /queue, forced by the shell.
    ============================================================ */
+/* R34: the max-width is the CONTENT column plus its own padding, because
+   box-sizing:border-box means a plain 920px would give an 864px column
+   starting 28px in — misaligned with the top bar's inner column and with
+   /freelance's .fl, which are both a true 920px. */
 main{
-  max-width:var(--content-max);margin:0 auto;
+  max-width:calc(var(--content-max) + 2 * var(--sp-6));margin:0 auto;
   padding:var(--sp-6) var(--sp-6) var(--sp-8);
 }
 h1{

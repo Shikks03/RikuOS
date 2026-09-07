@@ -18,7 +18,13 @@
      2. `.stat .sub` gains a two-line min-height (new CSS).
      3. `.app-content` gains max-width:none.
      4. `.navitem` gains border-bottom:0 (it is an <a> in the app).
-     5. `.app-body` gains min-height:100vh (R33).
+     5. `.app-body` gains min-height:100vh (R33), then 100dvh after it.
+
+   The quality review added five more, each commented where it sits rather
+   than numbered here: `.fl-title` and `.fl-h` carry their own margins,
+   `.app-side .btn.ghost` gains a hover state, `.btn` gains line-height:1.4,
+   and `.stat-top .more` gains border-bottom:0 now rather than in Plan C —
+   so Plan C consumes the `.fl-*` half with no edits at all.
    ============================================================ */
 
 /* ---- shell ---------------------------------------------------- */
@@ -26,10 +32,12 @@
 /* DIFFERENCE 5 (R33): min-height:100vh, so the rail's ground reaches the
    bottom of the viewport on every page. The mockup was drawn inside a
    fixed-height frame; on a short page such as Plan A's /freelance root the
-   rail column would otherwise stop mid-screen. */
+   rail column would otherwise stop mid-screen. 100dvh follows as the
+   progressive line: on a phone 100vh is the tallest the viewport ever gets,
+   which leaves the rail overshooting under the browser chrome. */
 .app-body{
   display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);
-  align-items:stretch;min-height:100vh;
+  align-items:stretch;min-height:100vh;min-height:100dvh;
 }
 
 .app-side{
@@ -93,6 +101,10 @@
 .app-side .rail-foot{margin-top:auto}
 /* the app's only sign-out control — --ink-3, never --ink-4 */
 .app-side .btn.ghost{font-size:11.5px;letter-spacing:.1em;padding:6px 9px;color:var(--ink-3)}
+/* .btn.ghost ties .btn:hover on specificity and .app-side .btn.ghost outranks
+   both, so without this rule the app's one sign-out control has no hover
+   feedback at all. */
+.app-side .btn.ghost:hover{color:var(--ink)}
 
 .app-main{min-width:0}
 .topbar{height:44px;border-bottom:1px solid var(--line-soft);padding:0 var(--sp-6);display:flex}
@@ -117,12 +129,17 @@
   display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;
   text-transform:uppercase;color:var(--ink-3);
 }
+/* Both carry their own margins rather than leaning on legacy.css's `h1` reset
+   or on the UA heading margins: legacy.css is deleted the phase these pages
+   are rebuilt, and a heading that silently gains a UA margin then is a
+   regression nobody would connect to the deletion. */
 .fl-h{
   display:block;font-family:var(--display);font-weight:600;font-size:19px;
-  letter-spacing:-.015em;color:var(--ink);margin-top:5px;
+  letter-spacing:-.015em;color:var(--ink);margin:5px 0 0;
 }
 .fl-title{
   font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.02em;color:var(--ink);
+  margin:0;
 }
 .fl{max-width:var(--content-max);margin:0 auto}
 .fl-sect{margin-top:var(--sp-7)}
@@ -144,9 +161,11 @@
   font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
   color:var(--ink-3);
 }
+/* border-bottom:0 because this becomes an <a> in Plan C and base.css puts a
+   hairline under every anchor — same reason .navitem and .fl-biz carry it. */
 .stat-top .more{
   margin-left:auto;font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;
-  text-transform:uppercase;color:var(--ink-4);
+  text-transform:uppercase;color:var(--ink-4);border-bottom:0;
 }
 .stat .fig{
   font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:-.03em;
@@ -361,6 +380,9 @@
   font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
   padding:8px 14px;border-radius:var(--r-pill);background:none;
   border:1px solid var(--line);color:var(--ink-2);
+  /* legacy.css's bare `button` declares this; without it here a .btn on an
+     <a> and a .btn on a <button> are different heights side by side. */
+  line-height:1.4;
 }
 .btn:hover{border-color:var(--ink-4);color:var(--ink)}
 .btn:disabled{opacity:.45;cursor:not-allowed;color:var(--ink-4)}

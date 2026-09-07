@@ -801,7 +801,7 @@ Pitfalls: variable families must **omit** `weight` while static families require
 
 ### 7.8 What must not ship
 
-- **`docs/design/components.html` is never served and never bundled.** It lives under `docs/`, so Next will not serve it; the rule is that it is never copied into `public/` and never imported. It also carries a `<link>` to `fonts.googleapis.com`, which from the app's own origin would be both a CSP violation and a real third-party request. Verification: `git grep -n "components.html" src/ public/` returns nothing.
+- **`docs/design/components.html` is never served and never bundled.** It lives under `docs/`, so Next will not serve it; the rule is that it is never copied into `public/` and never imported. It also carries a `<link>` to `fonts.googleapis.com`, which from the app's own origin would be both a CSP violation and a real third-party request. The stylesheets name the file in their comments on purpose, so the check looks for a real reference rather than the bare name. Verification: `git grep -n -E "(from|import|href|src|url)[[:space:]]*[:=(]?[[:space:]]*["'][^"']*components\.html" src/ public/` returns nothing.
 - **Its `<script>` block ships nowhere** — the night-sky illustration and the animated constellation are decorative by construction and belong to a graph that does not exist.
 - **No `dangerouslySetInnerHTML`, anywhere.** Every SVG is JSX.
 - **No client-side fetching where the server already has the data.** The Freelance page never fetches its own API from the browser. (`/queue` does today; it is left alone.)
@@ -837,7 +837,7 @@ All pure, in `src/lib/__tests__/`, in the existing Vitest style — no database,
 
 1. **The standing trio, all green:** `npm test` · `npx tsc --noEmit` · `npm run build`.
 2. **`git grep "var(--alert)\|var(--amber)" src/` returns nothing.** A custom property that resolves to nothing is invalid at computed-value time, so `color: var(--missing)` would silently **inherit** — a red warning rendering in body grey, in the one place it matters.
-3. **`git grep -n "components.html" src/ public/` returns nothing.**
+3. **`git grep -n -E "(from|import|href|src|url)[[:space:]]*[:=(]?[[:space:]]*["'][^"']*components\.html" src/ public/` returns nothing.**
 4. **Observed once against real data** (`CLAUDE.md`). Concretely: `/freelance` rendered on Vercel with today's real ShikksTracker numbers and nothing typed by hand — D11 satisfied for one page — with the rail's six badges live beside it showing real agent states. `Check now` pressed once and the strip updated; pressed twice inside a minute without an error.
 
 ---
