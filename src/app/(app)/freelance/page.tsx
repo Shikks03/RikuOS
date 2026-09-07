@@ -1,6 +1,7 @@
 /**
- * Placeholder for the Dashboard view. Plan C rewrites this file with
- * force-dynamic, maxDuration, the Promise.allSettled fan-out and Blocks A–F.
+ * Placeholder for the Dashboard view. Plan C (docs/superpowers/plans/)
+ * rewrites this file with force-dynamic, maxDuration, the Promise.allSettled
+ * fan-out and Blocks A–F.
  *
  * The title and the view switch are NOT here: the segment layout renders them
  * above both views (R42). What is left is the frame — Plan C fills the column

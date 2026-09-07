@@ -186,10 +186,11 @@
    docs/design/components.html's `.segmented`, whose note reads "Sits in a
    sunken track with a hairline border; the active tab is a raised fill.
    Left-aligned, directly under the heading it modifies."
-   Values are the reference's, verbatim. Its sibling `.range` — the floating
-   time-range switch — is NOT ported: P8 has no time range, and §5.8 forbids
-   declaring vocabulary with no consumer. It has a named future consumer: the
-   queue page's S11 rebuild ports it for the status-filter row (§6.2).
+   Values are the reference's, verbatim; the placement margin below is ours.
+   Its sibling `.range` — the floating time-range switch — is NOT ported: P8
+   has no time range, and §5.8 forbids declaring vocabulary with no consumer.
+   It has a named future consumer: the queue page's S11 rebuild ports it for
+   the status-filter row (§6.2).
    #1D222A happens to equal var(--line). The reference writes the literal for
    the FILL and the token for the BORDER because they are two different jobs;
    tidying the fill into var(--line) would tie the raised fill to the hairline
@@ -245,8 +246,10 @@
   cursor:pointer;line-height:1.4;
 }
 .segmented a:hover{color:var(--ink)}
-/* (0,2,1), tying .segmented a:hover and winning on order, so the active tab
-   does not change on hover. */
+/* (0,2,1), tying .segmented a:hover and winning on order. Both rules set the
+   same colour and :hover sets no background, so nothing visible rides on the
+   tie today; it is a fragility note — a hover that later changes background
+   must still lose to this rule. */
 .segmented a.on{background:#1D222A;color:var(--ink)}
 
 /* ---- stat hero cards ------------------------------------------ */
