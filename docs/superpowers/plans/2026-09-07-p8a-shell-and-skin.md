@@ -30,9 +30,9 @@ P8 is three plans. **Plan A (this file)** builds the shell and the skin. **Plan 
 | `src/components/icons.tsx` | A creates | Named SVG components: `IconQueue`, `IconFreelance`, `IconSettings`, `IconInfo`, `IconMark`. Plan C consumes `IconInfo`. |
 | `src/app/(app)/layout.tsx` | A creates | The shell: session check, `.app` / `.app-body` / `.app-main`. Renders **no** `<main>`. |
 | `src/app/(app)/_shell/Rail.tsx` | A creates | Server. Brand tile, nav, agents group, foot. |
-| `src/app/(app)/_shell/NavList.tsx` | A creates | `"use client"` — the shell's only client island for active-nav. |
-| `src/app/(app)/_shell/AgentsBlock.tsx` | A creates | Server, async. Reads runs + switches in one `try/catch`; exports `AgentsSkeleton`. |
-| `src/app/(app)/_shell/TopBar.tsx` | A creates | Server. The one freshness stamp, formatted in `Asia/Manila`. |
+| `src/app/(app)/_shell/NavList.tsx` | A creates | `"use client"` — marks the active nav item from `usePathname()`; sets `aria-current`. |
+| `src/app/(app)/_shell/AgentsBlock.tsx` | A creates | Server, async. Reads runs + switches (via `readOsSettings`, R37) in one `try/catch` under a five-second `withDeadline` (R38); one `BadgeRow` for all three renders (R40); exports `AgentsSkeleton`. |
+| `src/app/(app)/_shell/TopBar.tsx` | A creates | `"use client"` since R39. The one freshness stamp, recomputed at every navigation, formatted in `Asia/Manila`. |
 | `src/app/(app)/_shell/LogoutButton.tsx` | A creates | `"use client"`. The app's only sign-out control. |
 | `src/app/(app)/queue/` | A moves | `git mv` from `src/app/queue/`. Contents otherwise untouched except the header deletion below. |
 | `src/app/(app)/queue/page.tsx` | A modifies | Delete the inline `<header className="row">`, the now-unused `logout()`, and the `Link` / `APP_NAME` imports. Nothing else. |
@@ -41,6 +41,10 @@ P8 is three plans. **Plan A (this file)** builds the shell and the skin. **Plan 
 | `src/lib/watchdog.ts` | A modifies, **B reads** | Gains `classifyAgentRun`, `AgentVerdict`, `AGENT_STALE_HOURS`, `RAIL_AGENTS`, `AgentBadgeState`, `AgentSwitches`, `AgentStatus`, `deriveAgentStatuses`. `EXPECTATIONS` and `evaluateWatchdog`'s output are unchanged. Plan B imports `AGENT_STALE_HOURS` for Block F's 30-hour rule. |
 | `src/lib/__tests__/watchdog.test.ts` | A leaves **byte-for-byte unchanged** | It is the refactor's proof. |
 | `src/lib/__tests__/agentStatus.test.ts` | A creates | Pins all badge states, the switch-derived `off`, the `AGENT_STALE_HOURS` boundary, totality and ordering. |
+| `src/lib/deadline.ts` | A creates (R38) | `withDeadline(promise, ms, label)` — `Promise.race` against a timer that is always cleared. Plan C's snapshot read uses it too. |
+| `src/lib/__tests__/deadline.test.ts` | A creates (R38) | Fake-timer tests: the promise wins, the timer wins, the timer is cleared either way. |
+| `src/lib/osSettings.ts` | A modifies (R37) | Gains `readOsSettings()` — `findOne`, never upsert-on-read; schema defaults when no document exists. `getOsSettings()` unchanged for its cron/API callers. |
+| `src/models/OsSettings.ts` | A modifies (R37) | Gains `OS_SETTINGS_DEFAULTS`, the one home for the three defaults, used by the schema and the read fallback. |
 
 ### Plan B — data, logic and the health reading (not this plan)
 
@@ -2285,7 +2289,7 @@ Run: `npx tsc --noEmit`
 Expected: no output, exit code 0. (An unused-import error here means a deletion was missed.)
 
 Run: `npm run lint`
-Expected: no errors.
+Expected: no **new** errors. Lint already exits 1 with four pre-existing `react-hooks/set-state-in-effect` errors (`queue/PushControls.tsx`, `queue/page.tsx`, `settings/page.tsx`, `login/page.tsx`); two are in files this task edits, in `useEffect`s this task does not touch. They are carried forward (round 4 rulings, quality review of tasks 7–10), not fixed here.
 
 Run: `npm run build`
 Expected: `✓ Compiled successfully`.
@@ -2373,7 +2377,7 @@ Run every check in order. **Do not claim completion until each one has produced 
 - [ ] **Step 1: The standing trio**
 
 Run: `npm test`
-Expected: all suites pass, including `watchdog.test.ts` (9 tests) and `agentStatus.test.ts` (19 tests). Zero failures.
+Expected: all suites pass, including `watchdog.test.ts` (9 tests), `agentStatus.test.ts` (19 tests) and `deadline.test.ts` (R38). Zero failures.
 
 Run: `npx tsc --noEmit`
 Expected: no output, exit code 0.
@@ -2422,6 +2426,7 @@ Open `http://localhost:3000/queue`, sign in, and check each of these:
 4. **`/freelance` renders** its title under the shell, and the rail marks Freelance active when you are on it and Queue active when you are not.
 5. **No CSP violation and no error in the DevTools console** on any of the three pages. Specifically, no request to `fonts.googleapis.com` or `fonts.gstatic.com` in the Network tab — `next/font` self-hosts.
 6. **The rail's `#0B0D11` column reaches the bottom of the viewport on `/freelance`**, which is the shortest page in the app (R33, `.app-body{min-height:100vh}`).
+7. **The stamp follows navigation** (R39). Note the `read HH:MM` in the top bar, wait for the minute to roll over, then click a different rail item: the stamp shows the new minute without a reload. (After a hard load the first stamp is the server's; every rail click after that recomputes it.)
 
 Stop the dev server with Ctrl-C.
 

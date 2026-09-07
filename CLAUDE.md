@@ -29,7 +29,7 @@ Proven in ShikksTracker; follow them here.
 - Unique indexes on nullable fields must be `partial` (or `sparse`); a plain unique index on a nullable field breaks at the second null.
 - Mongoose never *alters* an existing index. Any index change ships with a dry-run-by-default sync script (`npm run migrate:indexes` / `:apply` — port ShikksTracker's `sync-indexes.mts`).
 - Connection: single cached promise on `global`, cleared on failure; `bufferCommands: false`; explicit timeouts; `strictQuery: true`; `autoIndex` off in production; require `mongodb+srv://` in production; never echo the URI in errors.
-- Singletons (`OsSettings`) are accessed only through one accessor using `findOneAndUpdate({}, …, {upsert: true})`.
+- Singletons (`OsSettings`) are created and written only through one accessor using `findOneAndUpdate({}, …, {upsert: true})`. A hot read path (the rail, on every page) uses a read-only `findOne` accessor that never upserts and falls back to the schema defaults — an upsert-on-read is a write on every page view (R37).
 - State transitions use guarded atomic updates (`findOneAndUpdate` with the expected current state in the filter), never read-modify-write.
 
 ## Error handling rules
