@@ -16,6 +16,23 @@ const scriptSrc = isDev
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  /**
+   * The queue moved under the Freelance address (R42). This keeps the old one
+   * alive: a bookmark, and — the reason it is permanent — an already-installed
+   * PWA whose cached start_url is still /queue.
+   *
+   * next.config redirects run BEFORE the proxy, so a signed-out hit on /queue
+   * becomes /login?from=/freelance/queue and the login page sends the session
+   * to the right place. src/proxy.ts is not touched: /freelance/queue is not
+   * on its allowlist, which is exactly how /queue was treated.
+   *
+   * permanent: true is a 308 and browsers cache it hard. That is intended —
+   * the address is not coming back — but it means undoing this needs a cache
+   * clear, not just a revert.
+   */
+  async redirects() {
+    return [{ source: "/queue", destination: "/freelance/queue", permanent: true }];
+  },
   async headers() {
     return [
       {
