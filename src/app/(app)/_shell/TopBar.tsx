@@ -21,11 +21,13 @@ import { usePathname } from "next/navigation";
  * preserved across soft navigations, so a server-rendered stamp froze at the
  * moment the shell was first loaded and was wrong after one rail click — on
  * /freelance it would have under-claimed the freshness of numbers the server
- * had just read. Subscribing to usePathname() re-renders this on every
- * navigation, and router.refresh() re-renders it too. At minute precision the
- * navigation time IS the read time on both kinds of page: /freelance is
- * rendered by the server at navigation, and queue and settings fetch their
- * APIs on mount. The first paint is still the server's time.
+ * had just read. The stamp is therefore a child keyed by the pathname: a
+ * navigation changes the key, which remounts the child and recomputes the
+ * time. The key is the same on the server and at hydration, so the first paint
+ * — still the server's time — hydrates in place rather than remounting.
+ * router.refresh() re-renders it too. At minute precision the navigation time
+ * IS the read time on both kinds of page: /freelance is rendered by the server
+ * at navigation, and queue and settings fetch their APIs on mount.
  */
 const STAMP = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Manila",
@@ -35,22 +37,30 @@ const STAMP = new Intl.DateTimeFormat("en-GB", {
 });
 
 export default function TopBar() {
-  // Subscribed to, not read: the subscription is the whole point — it is what
-  // re-renders the stamp on every navigation. Do not "clean up" this call.
-  usePathname();
-
-  const stamp = STAMP.format(new Date());
+  const pathname = usePathname();
 
   return (
     <div className="topbar">
       <div className="topbar-in">
         <span className="crumb">
-          {/* One text node, so a minute rollover between the server render and
-              hydration is a single mismatch this suppresses rather than a
-              logged hydration error. */}
-          <em suppressHydrationWarning>{`read ${stamp}`}</em>
+          <Stamp key={pathname} />
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * Remounted by its key on every navigation, so the time is taken then. The
+ * dependency on the path is the key rather than a bare usePathname() call,
+ * which reached nothing a memoizing compiler could see and would have been
+ * free to hoist — freezing the stamp again with nothing to catch it.
+ */
+function Stamp() {
+  return (
+    /* One text node, so a minute rollover between the server render and
+       hydration is a single mismatch this suppresses rather than a logged
+       hydration error. */
+    <em suppressHydrationWarning>{`read ${STAMP.format(new Date())}`}</em>
   );
 }

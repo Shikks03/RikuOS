@@ -63,6 +63,19 @@ describe("readOsSettings", () => {
     });
   });
 
+  it("reads a field the document does not carry as its default, never as undefined", async () => {
+    // .lean() applies no schema defaults, so a singleton written before a
+    // toggle existed simply has no such key. Reading that as `off` would be
+    // the inference from absence the rail exists to refuse.
+    findOne.mockImplementation(() => query({ chaserEnabled: true }));
+
+    expect(await readOsSettings()).toStrictEqual({
+      chaserEnabled: true,
+      chaserNDays: OS_SETTINGS_DEFAULTS.chaserNDays,
+      monitoringEnabled: OS_SETTINGS_DEFAULTS.monitoringEnabled,
+    });
+  });
+
   it("never upserts — a page view must not stamp updatedAt with the view time", async () => {
     findOne.mockImplementation(() => query(null));
 

@@ -24,9 +24,10 @@ export const OS_SETTINGS_DEFAULTS: Readonly<{
 };
 
 /**
- * Singleton: exactly one document ever exists — access ONLY through
- * src/lib/osSettings.ts, which always queries with the empty filter `{}` and
- * upserts (CLAUDE.md singleton rule).
+ * Singleton: exactly one document ever exists. It is created and written only
+ * through the upsert accessor in src/lib/osSettings.ts (CLAUDE.md singleton
+ * rule); hot read paths use readOsSettings(), which never upserts and falls
+ * back to OS_SETTINGS_DEFAULTS.
  *
  * P3 carries only the chaser fields (ARCHITECTURE.md §3.1 names them
  * explicitly); each later agent adds its own toggle when it ships. Defaults

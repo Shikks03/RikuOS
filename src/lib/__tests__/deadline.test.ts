@@ -25,14 +25,23 @@ describe("withDeadline", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("rejects with the label and the bound once the deadline passes", async () => {
+  it("waits the whole bound, then rejects with the label and the ms", async () => {
     const neverSettles = new Promise<string>(() => {});
-    const caught = withDeadline(neverSettles, 5000, "rail read").catch((error: unknown) => error);
+    let settled = false;
+    const caught = withDeadline(neverSettles, 5000, "rail read").catch((error: unknown) => {
+      settled = true;
+      return error;
+    });
 
-    await vi.advanceTimersByTimeAsync(5000);
+    // At the last millisecond before the bound the caller is still waiting: a
+    // deadline that fires early would cut off reads that were going to answer.
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(settled).toBe(false);
 
+    await vi.advanceTimersByTimeAsync(1);
+    expect(settled).toBe(true);
     expect(await caught).toBeInstanceOf(Error);
-    expect((await caught as Error).message).toBe("rail read timed out after 5000ms");
+    expect(((await caught) as Error).message).toBe("rail read timed out after 5000ms");
   });
 
   it("propagates the promise's own rejection unchanged, and still clears the timer", async () => {

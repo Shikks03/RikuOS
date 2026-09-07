@@ -14,7 +14,8 @@
  *
  * readOsSettings() exists for hot read paths — the rail reads the two switches
  * on every page of the (app) group — and never writes: a findOne that falls
- * back to the schema defaults when the document does not exist yet (R37).
+ * back to the schema defaults for any value the document does not carry,
+ * including the case where there is no document yet (R37, R41).
  *
  * Known, accepted limitation for a single-user tool: the `{}` filter has no
  * unique index behind it, so a two-caller race on the very first-ever call
@@ -74,9 +75,17 @@ export async function getOsSettings(): Promise<IOsSettings> {
  *
  * The three values are copied out by name rather than returned as the lean
  * document, so a projection change can never leak _id, __v or updatedAt to a
- * caller. No document yet means nobody has opened /settings: the schema
- * defaults are the honest answer, and they are the same values the upsert
- * would have written.
+ * caller.
+ *
+ * Each one is defaulted individually, because a document can be missing a
+ * field as easily as the collection can be missing the document: .lean()
+ * returns raw Mongo and applies no schema defaults, so a singleton written
+ * before a toggle existed simply has no such key. Whether nobody has opened
+ * /settings yet or the toggle predates the row, the schema default is the
+ * honest answer — and it is the value the upsert would have written. An
+ * absent toggle must never read as `off`: that is the inference from absence
+ * the rail exists to refuse. `??` and never `||`, so a stored `false`
+ * survives.
  */
 export async function readOsSettings(): Promise<OsSettingsValues> {
   const doc = await OsSettings.findOne(
@@ -86,10 +95,10 @@ export async function readOsSettings(): Promise<OsSettingsValues> {
 
   if (!doc) return { ...OS_SETTINGS_DEFAULTS };
 
-  const row = doc as unknown as OsSettingsValues;
+  const row = doc as unknown as Partial<OsSettingsValues>;
   return {
-    chaserEnabled: row.chaserEnabled,
-    chaserNDays: row.chaserNDays,
-    monitoringEnabled: row.monitoringEnabled,
+    chaserEnabled: row.chaserEnabled ?? OS_SETTINGS_DEFAULTS.chaserEnabled,
+    chaserNDays: row.chaserNDays ?? OS_SETTINGS_DEFAULTS.chaserNDays,
+    monitoringEnabled: row.monitoringEnabled ?? OS_SETTINGS_DEFAULTS.monitoringEnabled,
   };
 }

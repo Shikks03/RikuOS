@@ -1766,6 +1766,8 @@ EOF
 
 - [ ] **Step 1: Create `src/app/(app)/_shell/TopBar.tsx`**
 
+**Superseded by R37–R41 (`round4-lead-rulings.md`): the shipped file is the fix-pass version, not this block.**
+
 ```tsx
 /**
  * 44px, one hairline bottom, and exactly one element: the freshness stamp.
@@ -1808,6 +1810,8 @@ export default function TopBar() {
 ```
 
 - [ ] **Step 2: Create `src/app/(app)/_shell/LogoutButton.tsx`**
+
+**Superseded by R37–R41 (`round4-lead-rulings.md`): the shipped file is the fix-pass version, not this block.**
 
 ```tsx
 "use client";
@@ -1911,6 +1915,8 @@ EOF
 - Create: `src/app/(app)/_shell/AgentsBlock.tsx`
 
 - [ ] **Step 1: Create `src/app/(app)/_shell/AgentsBlock.tsx`**
+
+**Superseded by R37–R41 (`round4-lead-rulings.md`): the shipped file is the fix-pass version, not this block.**
 
 ```tsx
 import { connectDB } from "@/lib/db";
@@ -2090,6 +2096,8 @@ export default function Rail() {
 ```
 
 - [ ] **Step 2: Create `src/app/(app)/layout.tsx`**
+
+**Superseded by R37–R41 (`round4-lead-rulings.md`): the shipped file is the fix-pass version, not this block.**
 
 ```tsx
 import { cookies } from "next/headers";
@@ -2427,6 +2435,7 @@ Open `http://localhost:3000/queue`, sign in, and check each of these:
 5. **No CSP violation and no error in the DevTools console** on any of the three pages. Specifically, no request to `fonts.googleapis.com` or `fonts.gstatic.com` in the Network tab — `next/font` self-hosts.
 6. **The rail's `#0B0D11` column reaches the bottom of the viewport on `/freelance`**, which is the shortest page in the app (R33, `.app-body{min-height:100vh}`).
 7. **The stamp follows navigation** (R39). Note the `read HH:MM` in the top bar, wait for the minute to roll over, then click a different rail item: the stamp shows the new minute without a reload. (After a hard load the first stamp is the server's; every rail click after that recomputes it.)
+8. **Cold-load badge timing** (R38). On the first load after the app has been idle a while, note how long the six badges take to resolve from the grey skeleton. If it is regularly above ~2.5 s, raise `RAIL_READ_TIMEOUT_MS` in `AgentsBlock.tsx` — a deadline that trips on the common path would show `—` for no good reason.
 
 Stop the dev server with Ctrl-C.
 
