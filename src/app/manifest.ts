@@ -7,8 +7,10 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: APP_NAME,
     start_url: "/queue",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#111111",
+    // --void. Left at #ffffff the installed app flashes white on every
+    // launch, which is the most visible possible bug in a dark-only design.
+    background_color: "#08090B",
+    theme_color: "#08090B",
     icons: [{ src: "/icon", sizes: "512x512", type: "image/png" }],
   };
 }
