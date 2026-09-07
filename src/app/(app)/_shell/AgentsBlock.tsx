@@ -1,7 +1,9 @@
 import { connectDB } from "@/lib/db";
-import { getOsSettings } from "@/lib/osSettings";
+import { withDeadline } from "@/lib/deadline";
+import { readOsSettings } from "@/lib/osSettings";
+import type { OsSettingsValues } from "@/lib/osSettings";
 import { RAIL_AGENTS, deriveAgentStatuses, fetchLatestRuns } from "@/lib/watchdog";
-import type { AgentBadgeState, AgentStatus } from "@/lib/watchdog";
+import type { AgentBadgeState, AgentStatus, LatestRun } from "@/lib/watchdog";
 
 /**
  * Six badges in fixed execution order, read from the last run record per agent
@@ -49,6 +51,19 @@ export function AgentsSkeleton() {
   );
 }
 
+/** Clears a cold Atlas connect with room; half connectDB's server-selection bound. */
+const RAIL_READ_TIMEOUT_MS = 5000;
+
+/** Connect and both reads as one awaitable, so one deadline covers all three. */
+async function readRail(): Promise<{ latest: LatestRun[]; settings: OsSettingsValues }> {
+  await connectDB();
+  const [latest, settings] = await Promise.all([
+    fetchLatestRuns(RAIL_AGENTS.map((expectation) => expectation.agent)),
+    readOsSettings(),
+  ]);
+  return { latest, settings };
+}
+
 /**
  * `unknown` — six grey badges captioned with an em-dash — is produced HERE and
  * never by deriveAgentStatuses. The pure function never sees a failure, so it
@@ -56,16 +71,21 @@ export function AgentsSkeleton() {
  *
  * The settings read sits inside the SAME try/catch as the run records, or a
  * settings failure would grey the badges for the wrong reason.
+ *
+ * The whole read is bounded at five seconds because it runs on every signed-in
+ * page and Mongoose has no per-call timeout: a degraded Atlas would otherwise
+ * hold each response open for up to connectDB's 10 s selection plus a 45 s
+ * socket. A timeout is the same `unknown` as any other failure.
  */
 export default async function AgentsBlock() {
   let statuses: AgentStatus[];
 
   try {
-    await connectDB();
-    const [latest, settings] = await Promise.all([
-      fetchLatestRuns(RAIL_AGENTS.map((expectation) => expectation.agent)),
-      getOsSettings(),
-    ]);
+    const { latest, settings } = await withDeadline(
+      readRail(),
+      RAIL_READ_TIMEOUT_MS,
+      "rail read"
+    );
     statuses = deriveAgentStatuses(
       new Date(),
       latest,
