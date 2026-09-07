@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { APP_NAME } from "@/lib/constants";
 import PushControls from "./PushControls";
 
 const STATUS_FILTERS = [
@@ -108,23 +106,8 @@ export default function QueuePage() {
     }
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
-  }
-
   return (
     <main>
-      <header className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <h1>{APP_NAME} — Queue</h1>
-        <span className="row">
-          <Link href="/settings">Settings</Link>
-          <button className="secondary" onClick={() => void logout()}>
-            Log out
-          </button>
-        </span>
-      </header>
-
       <div className="row">
         {STATUS_FILTERS.map((s) => (
           <button

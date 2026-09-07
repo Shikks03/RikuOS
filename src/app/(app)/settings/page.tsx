@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { APP_NAME } from "@/lib/constants";
 
 interface Settings {
   chaserEnabled: boolean;
@@ -65,11 +63,6 @@ export default function SettingsPage() {
 
   return (
     <main>
-      <header className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <h1>{APP_NAME} — Settings</h1>
-        <Link href="/queue">Queue</Link>
-      </header>
-
       {error && <p className="error">{error}</p>}
       {saved && <p className="meta">{saved}</p>}
       {!settings && !error && <p className="meta">Loading…</p>}
