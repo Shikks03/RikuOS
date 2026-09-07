@@ -16,12 +16,16 @@ describe("isPublicPath", () => {
     expect(isPublicPath(p)).toBe(true);
   });
 
-  it.each(["/", "/queue", "/api/queue", "/api/push/test", "/api/auth/logout"])(
-    "protects %s",
-    (p) => {
-      expect(isPublicPath(p)).toBe(false);
-    }
-  );
+  it.each([
+    "/",
+    "/freelance/queue",
+    "/queue",
+    "/api/queue",
+    "/api/push/test",
+    "/api/auth/logout",
+  ])("protects %s", (p) => {
+    expect(isPublicPath(p)).toBe(false);
+  });
 
   it.each([
     "/api/cron/%2e%2e/queue",

@@ -6,7 +6,7 @@ import AgentsBlock, { AgentsSkeleton } from "./AgentsBlock";
 import LogoutButton from "./LogoutButton";
 
 /**
- * 170px. Brand tile, wordmark, three nav items, the AGENTS group, and Log out
+ * 170px. Brand tile, wordmark, two nav items, the AGENTS group, and Log out
  * pushed down with margin-top:auto.
  *
  * The brand tile holds the sunburst glyph and NEVER a letterform: the product

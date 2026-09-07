@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation";
  * page title 70px below it. No pill of any kind: not ShikksTracker
  * reachability (it claims a liveness true only at the instant of render), not
  * push registration (client-only, and it duplicates a control already on the
- * queue page), not a pending-approvals count (two "waiting on you" numbers
+ * queue view), not a pending-approvals count (two "waiting on you" numbers
  * from two systems on one screen). No search, no bell, no theme toggle.
  *
  * Asia/Manila is load-bearing: a server render on Vercel is UTC and would be

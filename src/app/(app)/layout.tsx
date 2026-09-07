@@ -33,10 +33,10 @@ async function requireSessionOrRedirect(): Promise<void> {
 }
 
 /**
- * The shell renders NO <main>. Queue, settings and login each render their
- * own, and two <main> elements in one document is invalid HTML. This renders
- * .app, .app-body, .app-side (via Rail), .app-main and .topbar; the pages
- * bring the rest.
+ * The shell renders NO <main>. The queue view, settings and login each render
+ * their own, and two <main> elements in one document is invalid HTML. This
+ * renders .app, .app-body, .app-side (via Rail), .app-main and .topbar; the
+ * pages bring the rest.
  *
  * /login sits outside this group and gets no shell.
  */
