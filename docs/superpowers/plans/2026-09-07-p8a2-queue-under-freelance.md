@@ -1,10 +1,11 @@
 # P8a-2 — The queue under Freelance: spec delta and implementation plan
 
-**Date:** 2026-09-07 · **Written by:** the Frontend Architect, from **R42** in `docs/superpowers/design/p8-team/round4-lead-rulings.md` ("Riku's decision after Plan A"). **Status:** for the lead's review. Nothing here is committed.
+**Date:** 2026-09-07 · **Written by:** the Frontend Architect, from **R42** in `docs/superpowers/design/p8-team/round4-lead-rulings.md` ("Riku's decision after Plan A").
+**Revision:** revised in one pass against the Design Critic's `round5-design-critic-a2.md` and the lead's rulings on it — **R43** (the title → switch gap is 6px), **R44** (`aria-current` follows the page, `.is-active` the area), M1–M4, S1–S6 and notes N2, N4–N7. `.segmented` keeps the reference's `display:inline-flex`; the provisional call for `display:flex;width:max-content` was reversed and is now the written fallback behind a required measurement. **Status:** for the lead's review. Nothing here is built.
 
 **Goal:** move the queue under the Freelance address, make the Freelance overview the landing page, and give the segment a header — the page title plus the design system's **view switch** — rendered above both views.
 
-**Sequence:** A-2 runs after Plan A and **before Plan B**, because Plan C would otherwise build the page title in the wrong place. Plan A's Task 13 steps 5–6 are still outstanding; they fold into A-2's verification as one by-eye pass (R42).
+**Sequence:** A-2 runs after Plan A and **before Plan B**, because Plan C would otherwise build the page title in the wrong place. Plan A's Task 13 steps 5–6 are still outstanding; they fold into A-2's verification as one by-eye pass (R42). Three build tasks, one verification task, then the Spec Editor's docs commit (Task 5), which also brings `p8-mockup.html` up to date.
 
 **Architecture:** `/queue` becomes `/freelance/queue` by moving the folder. A new `freelance` segment layout renders `<h1 class="fl-title">Freelance</h1>` and, directly under it, a two-link view switch, then the view. The layout renders **no `<main>`** — the Dashboard brings `<main class="app-content">` and the Queue view brings `legacy.css`'s `<main>` — and the header reuses `.fl`, the same 920px column both views use, so the three columns align by construction rather than by arithmetic (R34). The old address is kept alive by a permanent redirect in `next.config.ts`, which runs before the proxy.
 
@@ -22,7 +23,9 @@ Replace the **Nav** bullet's first sentence:
 
 > - **Nav.** Two items — **Freelance, Settings** — each a 13px hand-drawn stroke glyph plus a 12.5px label at `--ink-3`, padding `6px 9px`, radius 7px, gap 9px. **Both carry a glyph or neither does; never a mix.** The active item takes a raised fill `#171B21`, an `--ink` label, and an **inset hairline** (`box-shadow: inset 0 0 0 1px var(--line)`) — never a left accent bar.
 >
-> **The rail marks Freelance active on both Freelance views.** `NavList` matches with `pathname === href || pathname.startsWith(href + "/")`, so `/freelance/queue` lights Freelance. **The view switch (§3.4) matches with equality for the opposite reason** — see there.
+> **The rail marks Freelance active on both Freelance views.** `NavList` matches `.is-active` with `pathname === href || pathname.startsWith(href + "/")`, so `/freelance/queue` lights Freelance.
+>
+> **`aria-current="page"` does not follow that match; it uses equality (R44).** The class follows the **area** — the rail names an area, and Freelance must stay lit on the Queue view. ARIA defines `page` as "the current page within a set of pages", and on `/freelance/queue` the rail's Freelance link points at a *different* URL; without the split, that link and the switch's Queue link would both claim to be the current page on one screen. **The view switch (§3.4) matches by equality for both**, because on the switch the area and the page are the same thing.
 
 The sentence "Adding `/personal` later is one entry in this array" stands and is now the *second* entry rather than the fourth.
 
@@ -47,11 +50,11 @@ The sentence "Adding `/personal` later is one entry in this array" stands and is
 
 **Links, because they are two URLs.** `role="tablist"` describes panels swapped in place: no address change, `aria-controls` pointing at a panel in the same document, and roving-tabindex arrow-key behaviour the author must implement. These are two real routes. They are deep-linkable, back-button-able, right-click-openable, and one of them (`/freelance/queue`) is the target of every push notification the app sends. Announcing them as tabs would describe an interaction model the page does not have, and would be *worse* than plain links unless the arrow-key behaviour were also built — which would be client code written to make a lie consistent.
 
-**`<nav>`, with an accessible name.** R40 left the document's single `<nav>` unnamed on the grounds that it was the only one. A-2 makes it not the only one, so the new landmark is named: `aria-label="Freelance views"`. See **Open question 1** for the rail's.
+**`<nav>`, with an accessible name.** R40 left the document's single `<nav>` unnamed on the grounds that it was the only one. A-2 makes it not the only one, so the new landmark is named `aria-label="Freelance views"` — **and the rail's `<nav>` is named `aria-label="Main"` in the same commit**, because two unnamed navigation landmarks announce as "navigation" and "navigation" (ruled).
 
-**`aria-current="page"`** on the active link, and `class="on"` as the styling hook — the same split `NavList` already uses (`aria-current` for assistive tech, `.is-active` for CSS).
+**`aria-current="page"`** on the active link, and `class="on"` as the styling hook. The switch computes both from the same equality test; the rail does not (R44, §3.1).
 
-**Active is exact equality, never `startsWith`.** `/freelance` is a prefix of `/freelance/queue`, so `startsWith` would light **both** tabs on the Queue view. The rail uses `startsWith` precisely so Freelance stays lit there. **The two rules are deliberately opposite and each file says so.** (A future `/freelance/queue/:id` would light neither tab; there is no such route, and it is one line to change when there is.)
+**Active is exact equality, never `startsWith`.** `/freelance` is a prefix of `/freelance/queue`, so `startsWith` would light **both** tabs on the Queue view. The rail uses `startsWith` for `.is-active` precisely so Freelance stays lit there, and equality for its `aria-current` (R44). **The class rules are deliberately opposite and each file says so.** (A future `/freelance/queue/:id` would light neither tab; there is no such route, and it is one line to change when there is.)
 
 ### The switch's CSS — ported, with the source quoted
 
@@ -87,12 +90,14 @@ and line 887:
 
 **Names are the reference's, verbatim** — `.segmented`, `.on` — under `components.css`'s stated rule ("Reference names are kept verbatim … so a recipe can be diffed against `components.html` by eye"). The `fl-` prefix is for vocabulary the reference has no name for (`.fl-title`, `.fl-say`, `.fl-stage`); it is not a "only this page uses it" prefix — `.stat`, `.track`, `.disclose` and `.honesty` are Freelance-only and keep reference names. The reference is internally inconsistent about the active-state hook (`.navitem.is-active`, `.segmented button.on`); both ports follow their own source.
 
-**The shipped rule**, with the three consequences of the element change:
+**The active treatment is deliberately not unified with `.navitem.is-active`.** The rail's active item takes a raised fill `#171B21` **plus** an inset hairline, because it stands alone on the rail's flat ground and needs its own edge. The switch's active tab takes a raised fill `#1D222A` and **no** hairline, because it sits inside a track that already has a `--line` border. Making them match would either give the switch a redundant second edge inside a bordered track, or take the rail's edge away and leave a fill floating on `#0B0D11`. The two treatments differ because their containers do.
+
+**The shipped rule**, with the two declarations the element change requires, and one note on a verbatim declaration that does double duty:
 
 ```css
 .segmented{
   display:inline-flex;background:#101318;border:1px solid var(--line);
-  border-radius:9px;padding:3px;gap:3px;margin-top:var(--sp-3);
+  border-radius:9px;padding:3px;gap:3px;margin-top:var(--sp-2);
 }
 .segmented a{
   font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
@@ -108,19 +113,25 @@ and line 887:
 | track: `display`, `background`, `border`, `border-radius`, `padding`, `gap` | **verbatim** |
 | tab: `font-family`, `font-size`, `letter-spacing`, `text-transform`, `background`, `border`, `color`, `padding`, `border-radius`, `cursor` | **verbatim** |
 | active: `background:#1D222A`, `color:var(--ink)` | **verbatim** |
-| `margin-top:var(--sp-3)` on the track | **derived** — the reference has no heading above it to space from. See the rhythm below. |
-| `line-height:1.4` on the tab | **derived, and required by the element change.** A `<button>` takes the UA `font` shorthand's `line-height:normal`; an `<a>` inherits `body`'s `1.5`, which would make the track ~2px taller than the reference and make its height depend on JetBrains Mono's metrics. `1.4` is the value `legacy.css`'s bare `button` and `.btn` already declare, for exactly this reason (R34). |
-| `.segmented a:hover{color:var(--ink)}` | **derived.** `base.css`'s `a:hover{color:var(--ink)}` is `(0,1,1)` and so is `.segmented a`; at a specificity tie the later stylesheet wins, and `components.css` loads after `base.css`, so the hover would be silently dead. The rail's `.navitem` is `(0,1,0)` and therefore *does* get that hover for free. Declaring it here gives the switch the same behaviour as the app's other navigation control, as a decision in the file rather than an accident of source order. `--ink-2` was considered and rejected: an inactive tab that hovers to a mid ink and an active tab at `--ink` would read as three states for two. The raised fill is what distinguishes the active tab, hovered or not. |
+| `margin-top:var(--sp-2)` on the track | **derived** — the reference has no heading above it to space from. R43; see the rhythm below. |
+| `line-height:1.4` on the tab | **derived, and required by the element change.** A `<button>` takes the UA `font` shorthand's `line-height:normal`, which is font-metric-derived (≈1.3 for JetBrains Mono), so the reference's track is ≈32.5px and this one is ≈33.3px. **1.4 is taken not to match that number** but to stop the track's height depending on the mono's metrics at all, and because it is the line-height `.btn` (`components.css:385`) and `legacy.css`'s bare `button` (`legacy.css:44`) already declare — the switch and the queue's filter pills sit 38px apart and must share it. |
+| `.segmented a:hover{color:var(--ink)}` | **derived.** `base.css`'s `a:hover{color:var(--ink)}` is `(0,1,1)` and so is `.segmented a`; at a specificity tie the later stylesheet wins, and `components.css` loads after `base.css`, so the hover would be silently dead. The rail's `.navitem` is `(0,1,0)` and therefore *does* get that hover for free. `--ink` rather than `--ink-2` because **every hover in `components.css` lands on `--ink`** — `.btn:hover` (387), `.app-side .btn.ghost:hover` (107), `.fl-biz:hover` (329), and `base.css`'s `a:hover` (29). The app's one `--ink-2` hover is `legacy.css:49`'s `button.secondary`, in the layer with an expiry date. `.segmented a.on` ties `.segmented a:hover` at `(0,2,1)` and wins on order, so the active tab does not change on hover, which is right. |
 
-**Not ported:** the reference's sibling `.range` (the floating time-range switch). P8 has no time range, and §5.8 forbids declaring vocabulary with no consumer.
+**Not ported:** the reference's sibling `.range` (the floating time-range switch). P8 has no time range, and §5.8 forbids declaring vocabulary with no consumer. **It has a named future consumer**: §6.2 records that the queue page's S11 rebuild ports `.range` for the status-filter row.
 
-**Two literals, deliberately not tokens.** `#1D222A` happens to equal `var(--line)`; the reference writes the literal for the *fill* and the token for the *border* because they are two different jobs, exactly as `.navitem.is-active{background:#171B21; box-shadow:inset 0 0 0 1px var(--line)}` does. Tidying the fill into `var(--line)` would tie the raised fill to the hairline colour for ever. `#101318` is now written three times in the app (twice in `legacy.css`'s `input`/autofill rules, once here); R34's note stands — it becomes a token if it ever moves. Note also that `DESIGN-INSPO.md` §2 maps `--sunk` (`#050608`) to "Recessed wells, control tracks", while the reference's own control track is `#101318`. **The drawn file is the truth** (spec §"four companions": "Where prose here is ambiguous, the mockup is the truth"); the tension is recorded, not resolved here.
+**Two literals, deliberately not tokens.** `#1D222A` happens to equal `var(--line)`; the reference writes the literal for the *fill* and the token for the *border* because they are two different jobs, exactly as `.navitem.is-active{background:#171B21; box-shadow:inset 0 0 0 1px var(--line)}` does. Tidying the fill into `var(--line)` would tie the raised fill to the hairline colour for ever. `#101318` is now written three times in the app (twice in `legacy.css`'s `input`/autofill rules, once here); R34's note stands — it becomes a token if it ever moves.
+
+**The recess is defined against a ground the app does not have.** `DESIGN-INSPO.md` §2 maps `--sunk` (`#050608`) to "Recessed wells, control tracks", while the reference's own control track is `#101318` — and the drawn file is the truth (spec §"four companions"). But the half of that tension that matters is the **ground**: in `components.html` the switch specimen sits inside `.well{background:var(--sunk)}`, so track-to-ground contrast is Δ(11,13,16). On `/freelance` the switch sits on `--void` `#08090B`, and Δ drops to (8,10,13) — **about a quarter less separation**. The port is byte-faithful and lands ~25% flatter than drawn, with the `--line` hairline doing more of the work. `#101318` is kept, because eye-diffability against `components.html` is the file's stated rule and this is not worth breaking it for. **If it reads as a floating lighter bar rather than a recess, the alternative is `--sunk` for the track, which would make the recess literal — that is a ruling, not a tidy.** Task 4 step 5 item 1 is the check that can fail.
 
 `border-radius:9px` on the track is outside the radius set (`--r-tag` 6 · `--r-nav` 7 · `--r-chip` 8 · `--r-card` 10 · `--r-feature` 14 · `--r-pill` 999) and ships as a literal, the same way `.app-brand .tile{border-radius:7px}` and `.track{border-radius:99px}` already do.
 
-**Focus.** `base.css`'s `:focus-visible{outline:2px solid var(--spend);outline-offset:3px;border-radius:3px}`, unchanged and unqualified. Arithmetic: a tab's border box sits 4px inside the track's (1px border + 3px padding), and the ring is drawn 3px outside it and 2px thick, so the ring's outer edge lands ~1px beyond the track and overlaps the neighbouring tab by ~2px. Outlines do not affect layout and nothing here sets `overflow:hidden`, so this is a paint overlap and not a reflow. It is the system's ring verbatim (§5.7, "not changed" in round 4) and stays as is.
+**The first label sits 16px in from the track's left edge** (1px border + 3px track padding + 12px tab padding). That is the reference's own construction. **The track's edge, not the label, is what aligns with the title** — worth saying, because zeroing the first tab's left padding to "fix" the alignment would break the track.
+
+**Focus.** `base.css`'s `:focus-visible{outline:2px solid var(--spend);outline-offset:3px;border-radius:3px}`, unchanged and unqualified. Arithmetic: a tab's border box sits 4px inside the track's (1px border + 3px padding), and the ring is drawn 3px outside it and 2px thick, so the ring's outer edge lands ~1px beyond the track and overlaps the neighbouring tab by ~2px. Outlines do not affect layout and nothing here sets `overflow:hidden`, so this is a paint overlap and not a reflow. **The ring rule's `border-radius:3px` would square the tab's corners while focused, except that `:focus-visible` is `(0,1,0)` and `.segmented a` is `(0,1,1)`, so the 6px radius survives** — the kind of thing a later radius tidy would break.
 
 **Hover, active, motion.** Hover as above. No `transition` on the switch — the change of view is a navigation, not an animation, and `prefers-reduced-motion` therefore has nothing to suppress here.
+
+**§5.7 is unchanged.** The switch takes `base.css`'s global focus ring and declares no transition, and `::selection` is untouched. Focus, selection and motion were considered, not skipped.
 
 ### Label text and casing as rendered
 
@@ -133,19 +144,27 @@ Everything below is a declared value plus the arithmetic that turns it into what
 | Gap | Value | Where it comes from |
 |---|---|---|
 | top bar → title | **28px** | `.fl-head{padding-top:var(--sp-6)}` — the same 28px `main` gave the title before A-2. **The title does not move.** |
-| title → switch | **10px** (`--sp-3`) | new, derived; see below |
+| title → switch | **6px** (`--sp-2`) | new, derived (R43); see below |
 | switch → the view's first content, **Dashboard** | **28px** | `main.app-content{padding-top:var(--sp-6)}`, with `.fl`'s first child's own top margin zeroed |
 | switch → the view's first content, **Queue** | **38px** | `legacy.css`'s `main{padding-top:var(--sp-6)}` **+** the page's first child `.row{margin-top:var(--sp-3)}` |
 
-**Why 10px between the title and the switch.** `DESIGN-INSPO.md` §3 gives two numbers for this region — "Eyebrow → heading: 5px. Heading → content: 20px" — and no number for a control bound to a heading, which is what the switch is. It must read as *belonging to* the title and as clearly closer to it than the view content is to the switch. `.fl-title` is 24px display with `line-height:1.5` inherited from `body` (nothing overrides it), so its line box is 36px and roughly 3.9px of half-leading plus ~5.8px of descent sit below the baseline of a word with no descenders. So a declared 10px reads as **≈19.6px of optical space** from the bottom of "Freelance" to the top of the track — tighter than the 28px below the switch, and unmistakably attached. At 14px (`--sp-4`) the optical gap becomes ≈23.6px against 28px below, a 1.19 ratio, and the switch starts to float between the two.
+**Why 6px between the title and the switch (R43).** `DESIGN-INSPO.md` §3 gives two numbers for this region — "Eyebrow → heading: 5px. Heading → content: 20px" — and no number for a control bound to a heading, which is what the switch is. It must read as *belonging to* the title and as clearly closer to it than the view content is to the switch.
+
+**The comparison must be optical against optical.** `.fl-title` is 24px display at `line-height:1.5` (§5.3, and now declared explicitly — see M4 below), so its line box is 36px and roughly 3.9px of half-leading plus ~5.8px of descent sit below the baseline of a word with no descenders: about **9.7px of dead space** under "Freelance" before the declared margin begins. Below the switch there is no leading to add — the line box is exactly `margin-top + 33.3px` (see the next paragraph) — so the 28px below is a **true** 28px of whitespace. The system's own two reference gaps, read the same way: eyebrow → heading is 5px declared ≈ **9px optical** (the bound pair); heading → content is 20px declared ≈ **29px optical**.
+
+At `--sp-3` (10px) the switch sits at ≈19.6px optical against a true 28px — **a ratio of 1.43**, almost exactly the midpoint between the bound pair and the content gap. That is a control floating between its heading and the content, which is not what "**directly** under the heading it modifies" (`DESIGN-INSPO.md:197`, `components.html:885`) describes. At `--sp-2` (6px) it sits at **≈15.6px optical against 28px — a ratio of 1.79**, nearer the eyebrow's 9px than the content's 29px, still on the spacing scale, and clear of the focus ring (the ring's outer edge sits ~1px above the track, leaving ~5px under the title's line box). **6px is the shipped number.** Riku sees it in the mockup's seventh specimen (Task 5) and may overturn it cheaply — it is one token.
 
 **The switch's own height: 33.3px.** Tab text box `9.5 × 1.4 = 13.3px`, plus `6 + 6` padding = 25.3px; plus the track's `3 + 3` padding and `1 + 1` border = **33.3px** (33px in DevTools). Width is shrink-wrapped by `inline-flex` to **≈156px** at these strings.
 
-**The `inline-flex` line box does not leak.** `.segmented` is an atomic inline-level box in an anonymous line box inside `.fl`, whose strut is `body`'s 13px / 1.5 = 19.5px. Per CSS 2.1 §10.8 an atomic inline contributes its **margin box** to the line box, and here that box is taller than the strut both above the baseline (≈30px vs ≈13.4px) and below it (≈13.3px vs ≈6.2px), so the strut adds nothing and the line box is exactly `10 + 33.3 = 43.3px`. The header's total height is therefore `28 + 36 + 10 + 33.3 = 107.3px`. **If a measurement ever shows extra space under the switch, the one-line fix is `display:flex;width:max-content`** — a block-level box with no strut, visually identical, and a marked difference from the reference. It is not taken now because the arithmetic says it is not needed and the port is meant to be verbatim.
+**The `inline-flex` line box does not leak.** `.segmented` is an atomic inline-level box in an anonymous line box inside `.fl`, whose strut is `body`'s 13px / 1.5 = 19.5px. Per CSS 2.1 §10.8 an atomic inline contributes its **margin box** to the line box, and its baseline is its first flex item's: the anchor's baseline sits ~10.1px into its 13.3px line box, plus 6px tab padding, plus 3px track padding, plus 1px border = **~20.1px above the baseline, ~13.2px below it**. Against the strut's ~13.4px above and ~6.2px below, the switch dominates *below* the baseline (13.2 > 6.2) and, with its 6px top margin, above it (26.1 > 13.4). The strut therefore adds nothing and the line box is exactly `6 + 33.3 = **39.3px**`. Vertical margins on an atomic inline do count toward the line box, so `margin-top` works. The header's total height is `28 + 36 + 6 + 33.3 = **103.3px**`.
 
-**Why the header's `padding-bottom` is 0.** The Queue view's `<main>` is `legacy.css`'s, whose `padding: var(--sp-6) var(--sp-6) var(--sp-8)` also serves `/login` and cannot be changed. So the Queue view's content can never begin less than 28px below the header. Any bottom padding on `.fl-head` is therefore added to *both* views on top of 28px, and the smallest achievable gap — and the smallest achievable difference between the two views — is reached with `padding-bottom:0`.
+**This is a required check, not a contingency** (Task 4 step 5 item 13). `display:inline-flex` is kept — the critic re-derived the line box independently and the port's value is eye-diffability against `components.html`. **The written fallback, if the measurement disagrees, is `display:flex;width:max-content`**: a block-level box with no strut and no dependency on either font's metrics, visually identical, and a marked difference from the reference (`width:max-content` is itself a non-reference declaration, needed only to stop a block-level track spanning 920px).
 
-**What the eye will see, and whether the layout compensates.** It does not compensate, deliberately. The Queue view's first control row sits **10px lower** than the Dashboard's first block. That is the same 10px already recorded as carry-forward (5) after Plan A — `/queue`'s first child is a `.row` with `margin-top:var(--sp-3)` and the only ways to remove it are a TSX edit R18 forbids or a rule `legacy.css`'s own header forbids. A-2 does not create the cost; **it does make it more visible**, because the two views are now one click apart instead of one nav item apart, and the switch above them is a fixed reference edge the eye can measure from. At a 28px baseline a 10px difference is about 36% and is perceptible on a fast A/B switch, invisible otherwise. Recorded, not fixed. See **Open question 3** for the one CSS-only escape hatch and why it is not recommended.
+> The critic derived 43.3px for this line box; that figure was taken at the draft's 10px margin. R43's 6px makes it 39.3px. The check — that the line box equals `margin-top + 33.3px` and nothing more — is unchanged.
+
+**Why the header's `padding-bottom` is 0.** The Queue view's `<main>` is `legacy.css`'s, whose `padding: var(--sp-6) var(--sp-6) var(--sp-8)` also serves `/login` and cannot be changed. So the Queue view's content can never begin less than 28px below the header. Any bottom padding on `.fl-head` is added to *both* views on top of 28px, so it changes the **gap** and not the **difference** — the difference is 10px at any value. `padding-bottom:0` is chosen because it gives the smallest gap, which is what puts the Dashboard's first block at the system's own 28px rather than 28 plus an invented number.
+
+**What the eye will see, and whether the layout compensates.** It does not compensate, deliberately. The Queue view's first control row sits **10px lower** than the Dashboard's first block. That is the same 10px already recorded as carry-forward (5) after Plan A — `/queue`'s first child is a `.row` with `margin-top:var(--sp-3)` and the only ways to remove it are a TSX edit R18 forbids or a rule `legacy.css`'s own header forbids. A-2 does not create the cost; **it does make it more visible**, because the two views are now one click apart instead of one nav item apart, and the switch above them is a fixed reference edge the eye can measure from. At a 28px baseline a 10px difference is about 36% and is perceptible on a fast A/B switch, invisible otherwise. Recorded in §6.2, not fixed; the one CSS-only escape hatch — a rule reaching into the queue page's internals — was refused, because that is the third namespace `components.css` exists to refuse.
 
 ### The header's horizontal column — the arithmetic
 
@@ -167,41 +186,65 @@ Exactly two, and both have a consumer in the same commit:
 - `.fl-head` — the header's padding shell. New page vocabulary, `fl-` prefixed, because the reference has no name for it.
 - `.segmented` / `.segmented a` / `.segmented a.on` — the reference's own names, ported.
 
-Plus one normalisation rule, `.fl > :first-child { margin-top: 0 }`, which declares no vocabulary.
+Plus one normalisation rule, `.fl > :first-child { margin-top: 0 }`, which declares no vocabulary, and one declaration added to the existing `.fl-title` rule (`line-height:1.5`, M4) — a pin, not a change: the value is what `.fl-title` already inherits, and it is **not** a difference from the mockup and must not be added to `components.css`'s numbered differences list.
 
 **No declared-but-unused vocabulary is added.** The §5.8 list stays `.statstrip`, `.btn.go`, `.statuspill`, `--session` — `.range` is explicitly not ported, and one entry is *removed* from the app (see §5.8 below).
 
-## §5.3 The scale actually used — one row added
+## §5.3 The scale actually used — one row amended, one added (M4)
+
+§5.3's header says "Read off the mockup's CSS. This is the whole inventory; nothing else has a size." The header's entire arithmetic depends on `.fl-title`'s line-height, which the inventory did not carry — and `line-height:1.2` on a display heading is the single most natural "tidy" anyone would apply to that rule. R42 requires the rhythm to be *stated*, and a number that silently depends on an undeclared inherited value is not stated.
+
+**Amend the existing page-title row:**
 
 | Element | Spec |
 |---|---|
-| View-switch tab `.segmented a` | mono · 9.5px · `0.13em` · uppercase · `--ink-3`, `--ink` when active · `6px 12px` · radius 6px |
+| Page title `.fl-title` | display 600 · 24px · `-0.02em` · **line-height 1.5 (inherited; load-bearing for §3.4's title→switch gap — do not tighten without re-deriving it)** |
+
+**Add:**
+
+| Element | Spec |
+|---|---|
+| View-switch tab `.segmented a` | mono · 9.5px · `0.13em` · uppercase · **line-height 1.4** · `--ink-3`, `--ink` when active or hovered · `6px 12px` · radius 6px |
+
+And declare `line-height:1.5` explicitly on `.fl-title` in `components.css` with a one-line comment naming §3.4, exactly as `.stat .fig` already carries an explicit `line-height:1.06` for the same reason.
 
 ## §5.8 Declared vocabulary that renders nowhere — amended
 
-`IconQueue` loses its only consumer when the rail drops to two items and is **deleted** from `src/components/icons.tsx`. §7.2's icon list becomes `IconFreelance`, `IconSettings`, `IconInfo`, `IconMark` — the same reasoning that already kept `IconLogout` out.
+The `.statstrip` / `.btn.go` / `.statuspill` / `--session` list is unchanged and, per its own rule, **does not grow**: the view switch ships with its consumer, and the reference's `.range` is not ported. (`IconQueue`'s deletion is recorded in §7.2's Icons paragraph, where the icon inventory lives.)
 
-The `.statstrip` / `.btn.go` / `.statuspill` / `--session` list is unchanged and, per R42's own rule, does not grow: the view switch ships with its consumer, and the reference's `.range` is not ported.
-
-## §6.2 Costs, named rather than discovered later — one added
+## §6.2 Costs, named rather than discovered later — three added
 
 > **The Queue view starts 10px lower than the Dashboard view.** `legacy.css`'s `main` gives both views a 28px top padding; the queue page's first child is a `.row`, whose `margin-top: var(--sp-3)` adds 10px on top of it. Removing it needs either a TSX edit (R18 forbids further edits to that file) or a new rule in `legacy.css` (its header forbids additions). This is the same 10px recorded as carry-forward (5) after Plan A; the view switch does not create it but does put the two views one click apart, which makes it easier to see. It goes when the queue page gets its own S11 content discussion and is rebuilt.
+>
+> **Two stacked control rows on the Queue view, with the emphasis inverted.** The view switch and the status-filter row sit 38px apart, on the same left edge, both in 9.5px mono caps, both bearing a selection. The *grammar* is correct and is the reference's own: §5.3 gives the recessed track to the control that "switches what you're looking at" and no track to the one that "switches the window you're looking through", and a status filter genuinely is the second. What is inverted is the **emphasis**. §5.3 gives that second control the loudest active state in the system — "a solid white pill with dark text… correctly so, because it silently reframes every number on the page" — and the named cost above took it away, so the six filters differ only by border and label brightness. A-2 therefore puts a navigation control with a solid raised fill 38px above a reframing control with none: **the navigation shouts and the reframing whispers.** When the queue page gets its S11 discussion, the fix is to port `components.html`'s `.range` (lines 268–273) for the status-filter row — the reference's own answer to "a filter row under a view switch", one rule, and it restores the emphasis order. That is also the future consumer whose absence is today the reason not to port `.range` (§5.8).
+>
+> **`/settings` now has no header at all.** Both Freelance views gain a 103px header band with a 24px title; `/settings` has had no heading of any level since the inline headers were deleted (§6.3) and gains nothing. Two of the three signed-in pages are titled and one is not, and the asymmetry is now structural rather than incidental. That is carry-forward (4); A-2 sharpens it and does not fix it.
 
 ## §7.2 Route group and shell — amended
 
-Replace the tree and the paragraphs that follow it:
+**Replace the tree, and the paragraph beginning "A route group changes no URL". The *Rejected*, *Active nav is a client island*, *A session check in the layout* and *Icons* paragraphs stand, with two corrections: the login default is `/freelance`, and the shell has **four** client islands — `NavList`, `LogoutButton`, `TopBar` (R39) and `ViewSwitch` — each for one reason.** (M3. The delta's blockquotes below cover the routes, the redirect, the landing and the segment layout; they do **not** restate the rejected alternative, the defence-in-depth rationale or the icon inventory, and all three are ratified and still true.)
+
+The tree, with every `_shell/*` row kept and its annotation corrected:
 
 ```
 src/app/(app)/layout.tsx                     server — the shell
-src/app/(app)/freelance/layout.tsx           server — the segment header (new). NO <main>.
-src/app/(app)/freelance/ViewSwitch.tsx       "use client" — the two-view switch (new)
+src/app/(app)/freelance/layout.tsx           server — the segment header (new). Renders NO <main>.
+src/app/(app)/freelance/ViewSwitch.tsx       "use client" — the view switch (new); the fourth island
 src/app/(app)/freelance/page.tsx             the Dashboard view
-src/app/(app)/freelance/queue/               git mv from src/app/(app)/queue/
-src/app/(app)/settings/                      unchanged
-src/app/(app)/_shell/…                       unchanged
+src/app/(app)/freelance/queue/               git mv from src/app/(app)/queue/; contents otherwise untouched
+src/app/(app)/settings/                      contents untouched
+src/app/(app)/_shell/Rail.tsx                server
+src/app/(app)/_shell/NavList.tsx             "use client" — one of four client islands (usePathname)
+src/app/(app)/_shell/AgentsBlock.tsx         server, async
+src/app/(app)/_shell/TopBar.tsx              "use client" since R39 — the stamp, keyed to the path
+src/app/(app)/_shell/LogoutButton.tsx        "use client" — an onClick
 src/app/login/page.tsx                       stays outside the group — no shell
 src/components/icons.tsx                     IconFreelance, IconSettings, IconInfo, IconMark
 ```
+
+And the **Icons** paragraph gains its inventory correction:
+
+> **Icons.** `src/components/icons.tsx`, named exports, no registry: `IconFreelance`, `IconSettings`, `IconInfo`, `IconMark` (the brand sunburst). **`IconQueue` is deleted by A-2** — the rail's two items are Freelance and Settings, so the glyph loses its only consumer, and §5.8 forbids declared-unused vocabulary. That is the same reasoning that already kept `IconLogout` out. All `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `strokeWidth={1.8}`, round caps, `aria-hidden="true"`. Where the design uses a text glyph — `↗`, the chevron — use the literal character, not a component.
 
 > **The routes.** `/freelance` is the Dashboard view; `/freelance/queue` is the Queue view. The move is `git mv src/app/(app)/queue src/app/(app)/freelance/queue`; the folder's contents are unchanged except the one `?from=/queue` literal, which becomes `/freelance/queue` — a route move's mechanical consequence, allowed by R42 despite R18. The relative `./PushControls` import moves with the folder.
 >
@@ -213,7 +256,9 @@ src/components/icons.tsx                     IconFreelance, IconSettings, IconIn
 >
 > **The switch is the shell's fourth client island**, and like the other three it exists for exactly one reason: `usePathname()` for the active state. It lives at `src/app/(app)/freelance/ViewSwitch.tsx`, beside the layout that renders it — the same colocation `src/app/(app)/freelance/queue/PushControls.tsx` already uses beside its page. Not `_shell/`, which is for chrome rendered on every page; not `_blocks/`, which Plan C owns for the page's content blocks.
 
-**Carry-forward (4) is partly closed.** `/freelance/queue` now inherits a real `<h1>` from the segment layout, so the Queue view is no longer a page with no heading of any level. `/settings` still has none, and the browser tab title is still `APP_NAME` on every page; both stay in that carry-forward.
+**Carry-forward (4) is partly closed, and sharpened.** `/freelance/queue` now inherits a real `<h1>` from the segment layout, so the Queue view goes from *no heading of any level* to exactly one — verified: `git grep "<h1" src/` returns two hits, `freelance/page.tsx` (which Task 3 step 4 removes) and `login/page.tsx` (outside the group). What A-2 does not fix: the one `<h1>` says `Freelance` on **both** views, so the view's identity lives entirely in a control and in `aria-current`, and the browser tab title is still `APP_NAME` on every page — which is now the weakest link, because two Freelance views at two URLs are indistinguishable in a tab strip. That argues for pulling carry-forward (4) forward; it does not argue for changing A-2.
+
+**Carry-forward (2) gains a sentence.** The header is not sticky. On the Queue view with a full list the switch scrolls away, and there is no way back to the Dashboard except the rail — which is not sticky either, which is why this belongs in that carry-forward rather than here. It is the first time the app has an *in-page* navigation control that can leave the screen, and carry-forward (2)'s sentence should say so.
 
 ## §9 Verification before "done" — additions
 
@@ -222,7 +267,7 @@ Add to the list:
 > 5. **`git grep -nE '(^|[^a-zA-Z/])[/]queue' -- src/ public/ next.config.ts` returns exactly three lines** — the redirect's `source`, and the two `proxy.test.ts` fixtures that use `/queue` as an example protected path and a traversal string. Any other hit is an address that was missed.
 >    **The pattern must be written with `[/]`, not a leading `/`.** In Git Bash on Windows, MSYS path conversion rewrites a `git grep` argument that begins with `/` into a Windows path, and the grep then matches nothing and *passes for the wrong reason*. (`MSYS_NO_PATHCONV=1` is the other fix.)
 > 6. **The build's route table lists `/freelance`, `/freelance/queue`, `/settings`, `/login` and no `/queue`.** Delete `.next/` before the build: a route move leaves a stale manifest behind.
-> 7. **By eye:** `/queue` redirects; signed out, it redirects to `/login?from=/freelance/queue`; sign-in lands on `/freelance`; the switch renders under the title on both views with exactly one tab active; the rail marks Freelance active on both; the four columns share one left edge; the rhythm is §3.4's.
+> 7. **By eye:** `/queue` redirects; signed out, it redirects to `/login?from=/freelance/queue`; sign-in lands on `/freelance`; the switch renders under the title on both views with **exactly one tab active** and **exactly one element on the page claiming `aria-current="page"`** (R44); the track reads as **recessed against `--void`**, not as a floating lighter bar; the rail marks Freelance active on both views; the four columns share one left edge; the rhythm is §3.4's, and the switch's line box measures `margin-top + 33.3px` with nothing under it; the tab order is rail → switch → content.
 
 ## Series file map — the A-2 delta
 
@@ -243,10 +288,11 @@ Add to the list:
 | `src/app/(app)/layout.tsx` | **A-2 modifies** | Docblock only: the login default is `/freelance`. |
 | `src/app/(app)/_shell/LogoutButton.tsx` | **A-2 modifies** | Docblock only: the provenance sentence loses a stale address. |
 | `src/styles/legacy.css` | **A-2 modifies** | Header comments only: the three prose mentions of `/queue` name the new address. No rule is added. |
-| `src/styles/components.css` | **A-2 modifies** | Adds `.fl-head`, the `.segmented` port, and `.fl > :first-child{margin-top:0}`. |
+| `src/styles/components.css` | **A-2 modifies** | Adds `.fl > :first-child{margin-top:0}` inside the section-rhythm block, then `.fl-head` and the `.segmented` port in a new header block; pins `line-height:1.5` on the existing `.fl-title` rule (M4). |
 | `src/app/(app)/freelance/layout.tsx` | **A-2 creates** | The segment header: `<h1 class="fl-title">` + the view switch. Renders **no** `<main>`. |
 | `src/app/(app)/freelance/ViewSwitch.tsx` | **A-2 creates** | `"use client"`. Two `<Link>`s, `aria-current="page"`, exact-equality active match. |
 | `src/app/(app)/freelance/page.tsx` | A creates, **A-2 modifies**, **C rewrites** | Loses the `<h1>`; the frame stays so Plan C's Task 2 replaces the file it expects. |
+| `docs/design/p8-mockup.html` | **A-2 modifies** (Task 5) | A **seventh specimen**: the header band alone at the real 920px column, drawn twice — `DASHBOARD` active and `QUEUE` active — with the 28 / 6 / 28 rhythm. Plus a one-line marked note on the three existing Freelance specimens that their `title → .fl-body` sequence predates R42. The mockup is one of the spec's four companions and "where prose is ambiguous, the mockup is the truth", so leaving it stale would make a falsehood authoritative for the one region A-2 changes. Republished to its existing artifact URL by the lead. |
 
 ## Plan C amendments
 
@@ -262,19 +308,19 @@ Add to the list:
 
 2. **The "three deviations" preamble, deviation 1** (plan line ~30). Its sentence *"and the page title is `<h1 className="fl-title">`, not the mockup's `<h3>` with an inline margin"* becomes: *"and the page title is an `<h1 className="fl-title">` rendered by the segment layout, not by this page (R42)."* The rest of the deviation — real `<h2 className="fl-h">` block headings — is unchanged.
 
-3. **Nothing else.** In particular: Plan C's ground rule *"`src/styles/*.css` is not edited"* still holds — A-2 ships every rule Plan C renders into. Its self-review class list (line ~1348) is still accurate; `.fl-title` moves out of the page's markup but the class still exists, and Plan C should drop it from that list when it drops the element. `.fl-body` keeps its consumer and its class; only its `margin-top` is neutralised in the position it currently occupies, the same way "DIFFERENCE 3" already neutralises two of `main`'s three declarations. Plan C's checkpoint *"whether `/freelance` exports `metadata.title` is a Plan C ruling"* is untouched by A-2 — see **Open question 2**.
+3. **Nothing else.** In particular: Plan C's ground rule *"`src/styles/*.css` is not edited"* still holds — A-2 ships every rule Plan C renders into. Its self-review class list (line ~1348) is still accurate; `.fl-title` moves out of the page's markup but the class still exists, and Plan C should drop it from that list when it drops the element. `.fl-body` keeps its consumer and its class; only its `margin-top` is neutralised in the position it currently occupies, the same way "DIFFERENCE 3" already neutralises two of `main`'s three declarations. Plan C's checkpoint *"whether `/freelance` exports `metadata.title` is a Plan C ruling"* is untouched by A-2, which adds no `metadata` (ruled), even though it now builds the segment layout that would carry one.
 
-## Open questions for the lead
+## The draft's open questions, and how they were ruled
 
-1. **The rail's `<nav>` has no accessible name, and A-2 makes it one of two.** R40 declined to name it because it was the document's only `<nav>`; the switch is a second navigation landmark, so two unnamed ones would be announced as "navigation" and "navigation". A-2 names the new one (`aria-label="Freelance views"`). **Recommendation: name the rail's in the same commit** — `aria-label="Main"` on `.app-nav`, one attribute in a file A-2 is already editing, and the reason R40 gave for deferring is exactly what A-2 removes. Task 1 Step 5 includes it; strike that one line if the lead prefers to keep it with the a11y pass.
+All five are closed; recorded here so the document asks nothing that has already been decided.
 
-2. **A-2 creates `src/app/(app)/freelance/layout.tsx`, which is the vehicle carry-forward (4) named for page titles** ("a segment `layout.tsx` per page exporting `metadata.title`, plus a `title.template` on the root layout"). Half of it now exists. **Recommendation: do not add `metadata` in A-2.** It is recorded as Plan C's ruling, a layout-level title would give both views the same tab title, and the root-layout `title.template` half is not in A-2's scope. Noted here so the ruling is made knowingly rather than by omission.
+1. **Name the rail's `<nav>` too — yes.** R40 declined only on the grounds that it was the document's only `<nav>`, and A-2 removes that ground; two unnamed navigation landmarks announce as "navigation" and "navigation". `aria-label="Main"` on `.app-nav` and `aria-label="Freelance views"` on the switch, both in Task 1 step 4 and Task 3 step 2.
+2. **No `metadata` in A-2.** It stays Plan C's ruling, with the root layout's `title.template`. A segment-layout title would give both views the same tab title, which is the wrong half of the problem.
+3. **No CSS reaching into the queue page's internals for the 10px.** The recorded carry-forward stands; §6.2 is the correct home for the cost. (The refused hatch was a `.fl-view > main > .row:first-child` rule — the third namespace `components.css` exists to refuse.)
+4. **Keep `.fl > :first-child{margin-top:0}`** — with M1's placement and comment. The alternative costs a second Plan C amendment and puts `.fl-fail` 48px under the switch.
+5. **Take all three one-line edits** — `login/page.tsx`'s comment, `LogoutButton.tsx`'s docblock, `push.test.ts`'s explicit-url example. A comment that quotes a default it no longer has is a lie in the file, and the point of §9's grep expecting *exactly three lines* is that prose does not get to be the exception.
 
-3. **The Queue view's 10px, and the one CSS-only escape hatch.** The segment layout could wrap `{children}` in `<div class="fl-view">`, and `components.css` could then carry `.fl-view > main > .row:first-child{margin-top:0}` — no TSX edit to the queue page, no addition to `legacy.css`, and both views would start at exactly 28px. **Recommendation: do not.** It is a `components.css` rule reaching into a legacy page's internals, which is the third namespace the file's header refuses, and it would break silently if the queue page's first element ever changed. Record the 10px in §6.2 (done above) and let the queue page's own S11 rebuild fix it.
-
-4. **`.fl > :first-child{margin-top:0}` versus dropping `.fl-body`.** The alternative to the normalisation rule is to amend Plan C Task 3 Step 3 to drop the `<div className="fl-body">` wrapper and delete `.fl-body` from `components.css` — one fewer class, but a second Plan C amendment, and the whole-page-down notice would then sit 48px under the switch instead of 28px because `.fl-fail` keeps its own 20px. **Recommendation: keep the rule.** It makes §3.4's number true in every render state, it touches Plan C once instead of twice, and it is the same species as the two `:first-child{border-top:0}` rules already shipped.
-
-5. **Three small edits R42 does not literally authorise, each one line, each easily struck.** (a) `login/page.tsx`'s comment `// malformed value — keep the "/queue" default` — R42 says "one string", but a comment that quotes the old default is wrong the moment the default changes. (b) `LogoutButton.tsx`'s docblock "moved here from `/queue`'s deleted inline header" — history that is still true but leaves a stale address in a grep; proposed as "from the queue page's deleted inline header". (c) `push.test.ts`'s explicit-url example `"/queue?status=pending"` — an example, so it may stay, but it teaches the shape of a push URL and after A-2 that shape is `/freelance/queue…`. **Recommendation: all three.** They are why the §9 grep can expect exactly three lines instead of "three plus some prose".
+Two rulings were made on the draft itself and are applied throughout: **R43** (the title → switch gap is 6px, not 10px) and **R44** (`aria-current` follows the page, `.is-active` follows the area). The one provisional call that the Design Critic contested was reversed: **`.segmented` keeps the reference's `display:inline-flex`**, and the line-box measurement becomes a required check with `display:flex;width:max-content` as the written fallback.
 
 ---
 
@@ -294,7 +340,7 @@ Add to the list:
 
 ### Why the tasks are ordered this way
 
-Renaming one public address cannot be split without a wrong intermediate commit. If the redirect lands first, `/queue` 308s to a route that does not exist yet. If the folder moves first and the pointers do not, `/` redirects to a 404. So **Task 1 is one commit containing the move and every pointer at it** — after it, the app is internally consistent and only an external bookmark on `/queue` is dead. **Task 2 is the redirect alone**, which is a compatibility shim for the old address (including an already-installed PWA's cached `start_url`) and is a genuinely separate concern that is only correct after Task 1. **Task 3 is the header and the switch**, a new feature. **Task 4 verifies.**
+Renaming one public address cannot be split without a wrong intermediate commit. If the redirect lands first, `/queue` 308s to a route that does not exist yet. If the folder moves first and the pointers do not, `/` redirects to a 404. So **Task 1 is one commit containing the move and every pointer at it** — after it, the app is internally consistent and only an external bookmark on `/queue` is dead. **Task 2 is the redirect alone**, which is a compatibility shim for the old address (including an already-installed PWA's cached `start_url`) and is a genuinely separate concern that is only correct after Task 1. **Task 3 is the header and the switch**, a new feature. **Task 4 verifies.** **Task 5 is the Spec Editor's docs commit, and it comes after verification rather than before it — one line: the spec should record what shipped, so a by-eye finding (the track's recess, the rhythm) can change the text before it is pasted into a ratified document.** Task 4 therefore keeps its number and nothing else in this plan is renumbered.
 
 ---
 
@@ -396,12 +442,21 @@ import { IconFreelance, IconSettings } from "@/components/icons";
  *
  * Both items carry a glyph. Never a mix.
  *
- * The prefix match is deliberate and is the OPPOSITE of the view switch's,
- * which compares for equality. /freelance/queue must light Freelance HERE
- * (the rail names the area) and must light only Queue THERE (the switch names
- * the view). A prefix match in the switch would light both of its tabs;
- * an equality match here would leave the rail with nothing lit on the Queue
- * view.
+ * TWO MATCHES, NOT ONE (R44). The prefix match is the OPPOSITE of the view
+ * switch's, which compares for equality: /freelance/queue must light
+ * Freelance HERE, because the rail names an AREA, and must light only Queue
+ * THERE, because the switch names a VIEW. A prefix match in the switch would
+ * light both of its tabs; an equality match here would leave the rail with
+ * nothing lit on the Queue view.
+ *
+ * But only the CLASS follows the area. aria-current="page" follows the PAGE
+ * and so uses equality, because ARIA defines `page` as "the current page
+ * within a set of pages" and on /freelance/queue this link points at a
+ * different URL. Spending one boolean on both would make this link and the
+ * switch's Queue link both claim to be the current page on one screen.
+ *
+ * aria-label because this is now one of two <nav> landmarks; two unnamed ones
+ * announce as "navigation" and "navigation".
  */
 const NAV = [
   { href: "/freelance", label: "Freelance", Icon: IconFreelance },
@@ -419,8 +474,12 @@ export default function NavList() {
           <Link
             key={href}
             href={href}
+            // .is-active follows the AREA (startsWith): Freelance stays lit on
+            // /freelance/queue. aria-current="page" follows the PAGE
+            // (equality): on /freelance/queue the current page is the switch's
+            // Queue tab, not this link. ViewSwitch matches by equality for both.
             className={active ? "navitem is-active" : "navitem"}
-            aria-current={active ? "page" : undefined}
+            aria-current={pathname === href ? "page" : undefined}
           >
             <Icon />
             {label}
@@ -432,7 +491,7 @@ export default function NavList() {
 }
 ```
 
-> `aria-label="Main"` is **Open question 1**. If the lead prefers to keep landmark naming with the a11y pass, delete that one attribute and the paragraph is unaffected.
+> Both the split (R44) and `aria-label="Main"` are ruled, not optional. `aria-current="true"` on the prefix match was the alternative to `undefined`; `undefined` is cleaner, because the rail's raised fill already says the area is current.
 
 - [ ] **Step 5: The two docblocks that name the old address**
 
@@ -531,7 +590,7 @@ export function buildPushPayload(title: string, body: string, url = "/freelance/
   });
 ```
 
-The default-url assertion **must** move in the same commit as the default. The explicit-url example is **Open question 5(c)**.
+The default-url assertion **must** move in the same commit as the default. The explicit-url example is one of the three one-line edits that were ruled in (open question 5c).
 
 `public/sw.js` — line 1 and the two defaults:
 
@@ -619,9 +678,11 @@ notifications - the actual trigger for an approval - open
 /freelance/queue directly. push.test.ts moves in the same commit as the
 default it pins.
 
-The rail keeps its prefix match so /freelance/queue lights Freelance; the
-view switch that follows uses equality for the opposite reason, and both
-files say so.
+The rail keeps its prefix match for .is-active so /freelance/queue lights
+Freelance, and takes equality for aria-current so the rail's Freelance link
+and the switch's Queue link do not both claim to be the current page on one
+screen (R44). The view switch that follows uses equality for both. Both
+navs are named, since two unnamed navigation landmarks announce alike.
 
 Claude-Session: https://claude.ai/code/session_01PiTLrSiqmqRUq6P5JuQ4G5
 EOF
@@ -711,11 +772,22 @@ EOF
 
 - [ ] **Step 1: The CSS**
 
-Two insertions in `src/styles/components.css`.
+**One insertion, one edit to an existing rule, and the file's header comment** — all in `src/styles/components.css`. Nothing is added at the end of the file (M1).
 
-**(a)** Immediately after `.fl-body{margin-top:var(--sp-5)}` (currently line 146) and before the `/* ---- stat hero cards ---- */` banner, add:
+**(a)** One contiguous insertion immediately after `.fl-body{margin-top:var(--sp-5)}` (currently line 146) and before the `/* ---- stat hero cards ---- */` banner. **The first rule closes the section-rhythm block**, beside the rules it overrides (M1); the header banner follows it.
 
 ```css
+/* The page title moved into the segment layout, so .fl's first child is now
+   the view's first block, sitting directly under the header. Every candidate
+   still carries the top margin it had for the heading that used to be above
+   it — .fl-body 20px, .fl-fail 20px — and that margin would now double the
+   header's gap and make the number in §3.4 false in the whole-page-down
+   state. Zeroed here.
+   .fl>:first-child is (0,2,0) — a class plus a structural pseudo-class —
+   so it outranks .fl-body and .fl-fail, both (0,1,0), from anywhere in the
+   file. It sits here, beside the rules it overrides, the same way
+   .fl-stages>.fl-stage:first-child and .fl-rows>.fl-row:first-child do. */
+.fl>:first-child{margin-top:0}
 
 /* ---- the page header: title + view switch (R42) ---------------- */
 /* The Freelance segment layout renders these above BOTH views, so the header
@@ -725,7 +797,13 @@ Two insertions in `src/styles/components.css`.
    it align with the top bar and both views by construction (R34).
    padding-bottom is 0 on purpose: the <main> below contributes its own 28px
    top padding on both views, and legacy.css's `main` cannot be changed
-   because it also serves /login. Spec §3.4 carries the arithmetic. */
+   because it also serves /login. Any bottom padding here would change that
+   gap on both views and would NOT change the 10px difference between them.
+   Spec §3.4 carries the arithmetic.
+   When a title-level control eventually needs to sit RIGHT of the title, the
+   pattern already exists — .fl-headrow's
+   `grid-template-columns:minmax(0,1fr) auto; align-items:end`. Do not invent
+   a second one. */
 .fl-head{padding:var(--sp-6) var(--sp-6) 0}
 /* ADDED (R42): the design system's VIEW SWITCH, ported from
    docs/design/components.html's `.segmented`, whose note reads "Sits in a
@@ -733,62 +811,94 @@ Two insertions in `src/styles/components.css`.
    Left-aligned, directly under the heading it modifies."
    Values are the reference's, verbatim. Its sibling `.range` — the floating
    time-range switch — is NOT ported: P8 has no time range, and §5.8 forbids
-   declaring vocabulary with no consumer.
+   declaring vocabulary with no consumer. It has a named future consumer: the
+   queue page's S11 rebuild ports it for the status-filter row (§6.2).
    #1D222A happens to equal var(--line). The reference writes the literal for
    the FILL and the token for the BORDER because they are two different jobs;
    tidying the fill into var(--line) would tie the raised fill to the hairline
    colour for ever. .navitem.is-active keeps its literal #171B21 for the same
-   reason. #101318 is the reference's control-track ground (it is now written
-   three times in this app — see R34's note on legacy.css).
-   margin-top is 10px, not the 20px of a heading→content gap: the switch
-   belongs to the title above it, and 10px reads as ~19.6px optically once
-   .fl-title's 36px line box is accounted for. */
+   reason — and keeps its INSET HAIRLINE, which this does not need, because
+   this fill sits inside a track that already has a border.
+   GROUND: the reference draws this track inside a --sunk well; here it sits
+   on --void, so the track/ground separation is ~25% smaller than in the
+   specimen and the --line hairline does more of the work. If it reads as a
+   floating lighter bar rather than a recess, the alternative is --sunk for
+   the track, which would make the recess literal — that is a ruling, not a
+   tidy. (#101318 is now written three times in this app — see R34's note on
+   legacy.css.)
+   margin-top is 6px (R43), not the 20px of a heading→content gap: the switch
+   belongs to the title above it. Optical, not declared, is the comparison
+   that matters — .fl-title's 36px line box leaves ~9.7px of dead space under
+   the word, so 6px reads as ~15.6px against a true 28px below (ratio 1.79),
+   where the system's bound pair is ~9px optical and its content gap ~29px.
+   The first label sits 16px in from the track's left edge (1px border + 3px
+   track padding + 12px tab padding). The TRACK's edge, not the label, is what
+   aligns with the title; zeroing the first tab's left padding to "fix" that
+   would break the track. */
 .segmented{
   display:inline-flex;background:#101318;border:1px solid var(--line);
-  border-radius:9px;padding:3px;gap:3px;margin-top:var(--sp-3);
+  border-radius:9px;padding:3px;gap:3px;margin-top:var(--sp-2);
 }
 /* DIFFERENCE: the reference draws the tabs as <button>; these are two real
-   URLs, so they are <a>. Three consequences, each handled here:
-     * base.css underlines every anchor — the reference's own `border:0`
-       removes it, the same fix .navitem, .fl-biz and .stat-top .more carry.
-     * a <button> takes the UA font shorthand's line-height:normal; an <a>
-       inherits body's 1.5, which would make the track ~2px taller than the
-       reference and tie its height to the mono's metrics. Pinned to 1.4 —
-       the value legacy.css's bare `button` and .btn already declare for
-       exactly this reason.
-     * base.css's `a:hover` is (0,1,1) and so is this selector; at a tie the
-       later stylesheet wins and this one is later, so the hover would be
-       silently dead. It is declared below instead of left to source order.
-       (.navitem is (0,1,0) and gets that hover for free — this is the same
-       brightening, made explicit.) */
+   URLs, so they are <a>. Two declarations are added and one verbatim
+   declaration does double duty:
+     * `border:0` is the reference's own, and it also removes base.css's
+       anchor hairline — the same fix .navitem, .fl-biz and .stat-top .more
+       carry. Verbatim, not an addition.
+     * ADDED line-height:1.4. A <button> takes the UA font shorthand's
+       line-height:normal, which is font-metric-derived (~1.3 for JetBrains
+       Mono), so the reference's track is ~32.5px and this one ~33.3px. 1.4
+       is taken NOT to match that number but to stop the track's height
+       depending on the mono's metrics at all, and because it is the
+       line-height .btn and legacy.css's bare `button` already declare — the
+       switch and the queue view's filter pills sit 38px apart and must
+       share it.
+     * ADDED :hover. base.css's `a:hover` is (0,1,1) and so is this selector;
+       at a tie the later stylesheet wins and this one is later, so the hover
+       would be silently dead. --ink because every hover in this file lands
+       on --ink (.btn:hover, .app-side .btn.ghost:hover, .fl-biz:hover, and
+       base.css's a:hover); the app's one --ink-2 hover is legacy.css's
+       button.secondary, in the layer with an expiry date.
+   base.css's :focus-visible also sets border-radius:3px, which would square
+   these corners while focused — except it is (0,1,0) and this rule is
+   (0,1,1), so the 6px survives. A later radius tidy could break that. */
 .segmented a{
   font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
   background:none;border:0;color:var(--ink-3);padding:6px 12px;border-radius:6px;
   cursor:pointer;line-height:1.4;
 }
 .segmented a:hover{color:var(--ink)}
+/* (0,2,1), tying .segmented a:hover and winning on order, so the active tab
+   does not change on hover. */
 .segmented a.on{background:#1D222A;color:var(--ink)}
 ```
 
-**(b)** At the **very end** of the file, after `.statuspill i{…}`, add:
+**(b)** One **edit** to the existing `.fl-title` rule (currently lines 140–143), not a new rule (M4). It is an edit rather than a third insertion because `.fl-title` already exists and a second `.fl-title` block elsewhere in the file would split one selector's declarations across two places — exactly what this file's one-rule-per-selector organisation avoids. Replace:
 
 ```css
-
-/* ---- the .fl column's top edge (R42) --------------------------- */
-/* The page title moved into the segment layout, so .fl's first child is now
-   the view's first block, sitting directly under the header. Every candidate
-   still carries the top margin it had for the heading that used to be above
-   it — .fl-body 20px, .fl-fail 20px — and that margin would now double the
-   header's gap and make the number in §3.4 false in the whole-page-down
-   state. Zeroed here.
-   LAST IN THE FILE ON PURPOSE. This selector is (0,1,0) and so are .fl-body
-   (in the section-rhythm block) and .fl-fail (in the failure block); at equal
-   specificity the later rule wins, so it has to outlive both. Same species as
-   the two `:first-child{border-top:0}` rules above. */
-.fl>:first-child{margin-top:0}
+.fl-title{
+  font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.02em;color:var(--ink);
+  margin:0;
+}
 ```
 
-Then update the file's header comment. Replace lines 16–21 —
+with:
+
+```css
+.fl-title{
+  font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.02em;color:var(--ink);
+  margin:0;
+  /* Declared, not inherited: §3.4's title→switch gap is derived from this
+     36px line box, and `line-height:1.2` is the most natural tidy anyone
+     would apply to a display heading. Same reason .stat .fig carries an
+     explicit 1.06. This is a PIN, not a difference from the mockup — the
+     value is what the rule already inherited from base.css — so it does not
+     join the numbered differences list above. */
+  line-height:1.5;
+}
+```
+
+**(c)** Then update the file's header comment. Replace line 16 —
 
 ```
    Five deliberate differences from the mockup, each marked below:
@@ -803,8 +913,9 @@ Then update the file's header comment. Replace lines 16–21 —
 and append to that numbered list, after item 5:
 
 ```
-     6. `.segmented`'s tabs are <a>, not <button> (R42) — line-height,
-        border and hover, each commented in place.
+     6. `.segmented`'s tabs are <a>, not <button> (R42) — two added
+        declarations, line-height and hover, plus one verbatim `border:0`
+        doing double duty. Each commented in place.
 ```
 
 - [ ] **Step 2: Create `src/app/(app)/freelance/ViewSwitch.tsx`**
@@ -831,12 +942,15 @@ import { usePathname } from "next/navigation";
  * back-buttoned, and /freelance/queue is what every push notification opens.
  * Calling them tabs would describe an interaction this page does not have.
  *
- * EQUALITY, NOT startsWith. /freelance is a prefix of /freelance/queue, so a
- * prefix match would light BOTH tabs on the Queue view. The rail's NavList
- * uses startsWith for the opposite reason — it names the area, so Freelance
- * must stay lit here. The two rules are deliberately opposite. A future
- * /freelance/queue/:id would light neither tab; there is no such route, and it
- * is one line to change when there is.
+ * EQUALITY FOR BOTH THE CLASS AND aria-current. /freelance is a prefix of
+ * /freelance/queue, so a prefix match would light BOTH tabs on the Queue
+ * view. The rail's NavList uses startsWith for its CLASS, for the opposite
+ * reason — it names an area, so Freelance must stay lit there — and equality
+ * for its aria-current, so that link and this one do not both claim to be the
+ * current page on one screen (R44). Here the area and the page are the same
+ * thing, so one test serves both. A future /freelance/queue/:id would light
+ * neither tab; there is no such route, and it is one line to change when
+ * there is.
  *
  * aria-label because this is now the document's second <nav>; an unnamed pair
  * of navigation landmarks is announced as "navigation" twice.
@@ -964,26 +1078,32 @@ above both views. The layout renders no <main>: the Dashboard brings
 <main class="app-content"> and the Queue view brings legacy.css's, and two
 <main> in one document is invalid HTML.
 
-The switch is components.html's `.segmented` ported verbatim, with three
-declarations added because the tabs are <a> and not <button>: line-height
-pinned to 1.4 (a button takes the UA line-height:normal, an anchor
-inherits 1.5), the anchor hairline removed by the reference's own border:0,
-and the hover declared rather than left to a specificity tie with
-base.css's a:hover. The reference's sibling `.range` is not ported - no
-consumer, and dead vocabulary must not grow.
+The switch is components.html's `.segmented` ported verbatim, with two
+declarations added because the tabs are <a> and not <button> - line-height
+pinned to 1.4, for determinism and for parity with .btn and legacy.css's
+bare `button`, which the queue view's filter pills use 38px away; and the
+hover, which a specificity tie with base.css's a:hover would otherwise
+leave dead - and one verbatim declaration, `border:0`, that also removes
+base.css's anchor hairline. The reference's sibling `.range` is not ported;
+its future consumer is the queue page's S11 rebuild.
 
-The switch matches the path by EQUALITY, the opposite of the rail's prefix
-match: /freelance is a prefix of /freelance/queue, so a prefix match would
-light both tabs. Links rather than role="tab" because these are two real
-URLs - bookmarkable, back-buttonable, and the target of every push.
+The switch matches the path by EQUALITY for both its class and its
+aria-current: /freelance is a prefix of /freelance/queue, so a prefix match
+would light both tabs. Links rather than role="tab" because these are two
+real URLs - bookmarkable, back-buttonable, and the target of every push.
 
-Rhythm: 28px above the title (unchanged from Plan A - the title does not
-move), 10px to the switch, 28px from the switch to the view's first
-content. The header reuses .fl, so it shares one left edge with the top
-bar and both views by construction (R34). .fl>:first-child{margin-top:0}
-makes that 28px true in every render state including whole-page-down; it
-sits last in the file because it must outrank .fl-body and .fl-fail, which
-are (0,1,0) like it.
+Rhythm (R43): 28px above the title (unchanged from Plan A - the title does
+not move), 6px to the switch, 28px from the switch to the view's first
+content. 6px because the comparison that matters is optical against
+optical - the title's 36px line box leaves ~9.7px of dead space, so 6px
+reads as ~15.6px against a true 28px, ratio 1.79, near the system's bound
+pair rather than midway to its content gap. The header reuses .fl, so it
+shares one left edge with the top bar and both views by construction (R34).
+.fl>:first-child{margin-top:0} makes that 28px true in every render state
+including whole-page-down; at (0,2,0) it outranks .fl-body and .fl-fail
+from anywhere, so it sits beside them in the section-rhythm block.
+.fl-title's inherited line-height is pinned explicitly, because the whole
+rhythm is derived from it.
 
 The Queue view still starts 10px lower - legacy.css's main padding plus
 the page's first .row - the cost already recorded after Plan A, now one
@@ -1090,9 +1210,9 @@ Open `http://localhost:3000/freelance/queue`, sign in, then check each of these:
 
 Still in the dev server, still signed in:
 
-1. **The switch renders under the title on both views**, left-aligned, one recessed track with two labels reading `DASHBOARD` and `QUEUE` in mono caps.
+1. **The switch renders under the title on both views**, left-aligned, two labels reading `DASHBOARD` and `QUEUE` in mono caps — and **the track reads as recessed against the page ground, not as a floating lighter bar.** It sits on `--void` here rather than in the reference's `--sunk` well, so it has ~25% less separation than the specimen and the `--line` hairline carries the recess. If it reads as a raised bar, say so: the alternative is `--sunk` for the track, which is a ruling for the lead, not a tidy.
 2. **Exactly one tab is active on each view.** On `/freelance`, `DASHBOARD` has the raised fill and `QUEUE` does not. On `/freelance/queue`, the reverse. **If both are filled on the Queue view, the switch is using `startsWith`** — that is the one bug this component can have.
-3. **`aria-current` is on the active tab and only there.** Inspect both anchors in DevTools; the active one carries `aria-current="page"`, the other carries no such attribute.
+3. **Exactly one element on the page claims `aria-current="page"` (R44).** On `/freelance/queue`, inspect both switch anchors *and* the rail's Freelance link: the switch's `QUEUE` anchor carries `aria-current="page"`, and **the rail's Freelance link carries none** even though it is `.navitem is-active`. Two elements claiming it is the defect R44 exists to prevent. On `/freelance` the rail's Freelance link and the switch's `DASHBOARD` anchor are the same URL, so only that one carries it.
 4. **Clicking a tab is a soft navigation** — the rail does not flash, the badges are not re-fetched, and the URL changes.
 5. **Hover.** An inactive tab's label brightens from `--ink-3` to `--ink` on hover; the active tab does not change. Nothing moves.
 6. **Focus.** Tab to each switch link with the keyboard: the orange `:focus-visible` ring appears, slightly overhanging the track and the neighbouring tab, which is expected (the ring is `outline-offset:3px` and the tab sits 4px inside the track). Enter navigates. Nothing reflows when the ring appears.
@@ -1101,8 +1221,9 @@ Still in the dev server, still signed in:
 9. **`/` lands on `/freelance`.** Type `http://localhost:3000/` while signed in.
 10. **The push click target.** Read `public/sw.js`: both the push handler's default and `notificationclick`'s fallback read `/freelance/queue`. **Optional and at Riku's discretion:** press `Send test` in the queue view's `PushControls` and tap the notification — it must open `/freelance/queue`. Nothing is sent to anyone but Riku's own browser; skip it if he would rather not.
 11. **The four columns share one left edge.** With DevTools' rulers, or by dragging a guide: the top bar's `read HH:MM`, the `Freelance` title, the Dashboard's (currently empty) `.fl`, and the Queue view's status-filter row all start at the same x. Then narrow the window below ~1150px and confirm all four collapse together to a flat 28px inset.
-12. **The rhythm is §3.4's.** In DevTools, on `/freelance`: the `.fl-head` box is 28px below the top bar's border; `.segmented` has a 10px top margin and a computed height of ~33px; `main.app-content`'s padding box starts 28px below the switch. On `/freelance/queue`: the same 28px from the switch to the `<main>` padding box, and the first `.row` a further 10px down — **38px total, the recorded cost.** Flip between the two views and confirm the difference reads as a small settle, not a jump.
-13. **No leak under the switch.** The `.segmented` line box in DevTools measures 43.3px tall (10px margin + 33.3px box) with no extra space below it. If it is taller, the inline-flex strut is leaking and the fix is `display:flex;width:max-content` on `.segmented` — record it as a seventh marked difference before changing it.
+12. **The rhythm is §3.4's.** In DevTools, on `/freelance`: the `.fl-head` box is 28px below the top bar's border; `.segmented` has a **6px** top margin (R43) and a computed height of ~33px; `main.app-content`'s padding box starts 28px below the switch. The header band totals **103.3px** (28 + 36 + 6 + 33.3). On `/freelance/queue`: the same 28px from the switch to the `<main>` padding box, and the first `.row` a further 10px down — **38px total, the recorded cost (§6.2).** Flip between the two views and confirm the difference reads as a small settle, not a jump.
+13. **No leak under the switch — a required check, not a contingency.** The `.segmented` line box in DevTools must measure **39.3px** (its 6px margin plus its 33.3px box) with **no extra space below it**. If it is taller, the `inline-flex` strut is leaking; the written fallback is `display:flex;width:max-content` on `.segmented`, recorded as a seventh marked difference from the reference before it is changed. (The critic's independently derived figure of 43.3px was taken at the draft's 10px margin; R43's 6px makes it 39.3px. The check — line box equals `margin-top + 33.3px` and nothing more — is the same.)
+14. **Tab order is rail → switch → content.** From the address bar, press Tab repeatedly on `/freelance/queue`: focus moves through the rail's links and `Log out`, then the switch's two tabs, then the page's status filters. The switch is the first two tab-stops after the rail on every Freelance page, which is the correct order — it is above the content in the document and must be above it in the focus order too.
 
 Stop the dev server with Ctrl-C.
 
@@ -1127,9 +1248,103 @@ Expected: the three A-2 commits, on `master`, unpushed.
 
 - [ ] **Step 8: Hand back to the design lead**
 
-Report: the trio green, the address grep at exactly three lines, the route table, and the result of each by-eye item — in particular items 2, 7, 11 and 12 of step 5, which are the ones that can fail silently.
+Report: the trio green, the address grep at exactly three lines, the route table, and the result of each by-eye item — in particular step 5's items **1** (the recess), **2** (one active tab), **3** (one `aria-current`), **7** (the signed-out redirect), **11** (the columns), **12** (the rhythm) and **13** (the 39.3px line box), which are the ones that can fail silently.
 
 Spec §9's fourth verification item — `/freelance` observed on Vercel against real ShikksTracker data — belongs to **Plan C** and is not claimed here.
+
+**Then Task 5 runs.** The docs commit is deliberately last: the spec should record what shipped, not what was planned, so a by-eye finding in step 5 (the recess, the rhythm) can change the text before it is pasted into a ratified document.
+
+---
+
+## Task 5: The Spec Editor's docs commit
+
+Run by an Opus **Spec Editor** after the build and its verification, not by the implementer. **No source file is touched.** One commit.
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-09-07-p8-freelance-page-visual-design.md`
+- Modify: `docs/superpowers/specs/2026-09-05-p8-freelance-page-content.md`
+- Modify: `docs/superpowers/plans/2026-09-07-p8c-freelance-page.md`
+- Modify: `docs/design/p8-mockup.html`
+
+- [ ] **Step 1: Paste Part 1 into the ratified visual-design spec**
+
+Section by section, from this document's Part 1, into `docs/superpowers/specs/2026-09-07-p8-freelance-page-visual-design.md`:
+
+| Part 1 section | Where it goes | Rule |
+|---|---|---|
+| §3.1 | §3.1's **Nav** bullet | Replace the bullet's first sentence and add the two paragraphs (the area/page split, R44). Nothing else in §3.1 changes. |
+| §3.4 | **New**, after §3.3, before §4 | The whole section, including the ported CSS, the quoted source lines, the rhythm table and the column arithmetic. |
+| §5.3 | §5.3's table | **Amend** the existing `Page title .fl-title` row; **add** the `View-switch tab .segmented a` row. Both as written in Part 1. |
+| §5.8 | §5.8 | Replace with Part 1's one sentence. **Do not add `IconQueue` here** — its deletion belongs to §7.2's Icons paragraph. |
+| §6.2 | §6.2 | Append the three cost paragraphs, in Part 1's order and register. |
+| §7.2 | §7.2 | **M3's rule: replace the tree, and the paragraph beginning "A route group changes no URL" — and nothing else.** The **Rejected**, **Active nav is a client island**, **A session check in the layout** and **Icons** paragraphs stand, with the two corrections Part 1 names (the login default is `/freelance`; four client islands). Paste the corrected Icons paragraph over the old one, since that is where `IconQueue`'s deletion is recorded. Then add Part 1's five blockquotes and its two carry-forward paragraphs. |
+| §9 | §9's numbered list | Append items 5–7. Item 5 carries the `[/]queue` warning verbatim — a verification grep that cannot fail is worse than none. |
+
+**Check before committing:** §7.2 still contains the sentence beginning `**Rejected:** one root layout with `usePathname()`-driven conditional chrome`, and `**A session check in the layout, as defence in depth.**`. If either is gone, the paste over-reached (M3).
+
+- [ ] **Step 2: The content deck**
+
+In `docs/superpowers/specs/2026-09-05-p8-freelance-page-content.md`, beside the existing `**Page title:** \`Freelance\`` line, add:
+
+```
+**The page has two views, named `Dashboard` and `Queue` (R42).** Both strings are Riku's own words, so this deck is their authority like every other string on the page. The title is the same on both views; the view's identity is carried by the switch and by `aria-current`.
+```
+
+- [ ] **Step 3: The two Plan C amendments**
+
+Apply, in `docs/superpowers/plans/2026-09-07-p8c-freelance-page.md`, exactly the two amendments listed under **Plan C amendments** in Part 1: delete the `<h1 className="fl-title">Freelance</h1>` line from Task 2 Step 1's code block, and rewrite the one clause in deviation 1 of the "three deviations" preamble. **Plan C's markup needs no other change**, and `src/styles/*.css` stays off-limits to it.
+
+- [ ] **Step 4: The mockup's seventh specimen**
+
+In `docs/design/p8-mockup.html`, inside the `mockup-only` specimen area:
+
+1. Add a **seventh specimen** — the header band alone, at the real 920px column, drawn **twice**: once with `DASHBOARD` active and once with `QUEUE` active. Rhythm **28 / 6 / 28**: 28px above the title, 6px from the title's line box to the track, and a 28px rule or ghost block below standing in for the view's first content. Use the shipped `.fl-head`, `.fl`, `.fl-title` and `.segmented` recipes — the mockup carries its own copy of the `components` section, so add `.segmented` there too, byte-identical to `components.css`'s.
+2. Add a **one-line marked note** on each of the three existing Freelance specimens: *their `title → .fl-body` sequence predates R42, and the app now renders the title and the switch in the segment layout above the view.*
+
+**Why this and not a note alone.** The mockup is one of the spec's four companions, and its own rule is "where prose here is ambiguous, the mockup is the truth" — so leaving it stale would not merely date it, it would make a falsehood authoritative for the one region A-2 changes. The specimen is also the only way Riku *sees* R43's 6px before it ships, and R43 is explicitly cheap to overturn.
+
+- [ ] **Step 5: Republish the mockup — the lead's step**
+
+The mockup is published as an artifact. **The lead republishes `docs/design/p8-mockup.html` to its existing URL** so the link Riku already has shows the seventh specimen. Do not publish it to a new URL: a second link for the same document is how the wrong one gets reviewed.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add docs/
+git commit -F - <<'EOF'
+docs(p8a2): the spec, the deck, Plan C and the mockup catch up with R42
+
+Part 1 of the A-2 plan pasted into the ratified visual-design spec: §3.1's
+two-item nav with R44's area/page split, a new §3.4 for the Freelance
+header and the view switch, §5.3's two pinned line-heights, §5.8 reduced
+to its does-not-grow sentence, §6.2's three costs and §7.2's routes.
+
+§7.2 is a replacement of the tree and one paragraph, not of the section:
+the Rejected alternative, the client-island rationale, the defence-in-depth
+session check and the Icons inventory are ratified and stand, corrected to
+four islands and a /freelance login default. IconQueue's deletion is
+recorded in the Icons paragraph, where the inventory lives.
+
+The content deck gains R42's line: the page has two views, Dashboard and
+Queue, and those strings are Riku's.
+
+Plan C loses the <h1> from its page and one clause from its deviations
+preamble; nothing else in it changes.
+
+p8-mockup.html gains a seventh specimen - the header band at 920px, drawn
+with each tab active, at the 28 / 6 / 28 rhythm - and a note on the three
+existing Freelance specimens that their title-to-hero sequence predates
+R42. The mockup is one of the spec's four companions and its own rule is
+that it wins where prose is ambiguous, so a stale header there would make
+a falsehood authoritative for exactly the region A-2 changes.
+
+Claude-Session: https://claude.ai/code/session_01PiTLrSiqmqRUq6P5JuQ4G5
+EOF
+```
+
+- [ ] **Step 7: Hand back**
+
+Report to the lead: the seven spec sections written, the deck line, the two Plan C amendments, and that the mockup is ready to republish. The lead republishes and re-reads.
 
 ---
 
@@ -1152,6 +1367,7 @@ Spec §9's fourth verification item — `/freelance` observed on Vercel against 
 | `NAV` is Freelance then Settings, each with its glyph | 1 (step 4) |
 | `IconQueue` deleted | 1 (step 3); checked in 4 (step 3) |
 | `/freelance/queue` already marks Freelance active (`startsWith`) | 1 (step 4); checked in 4 (step 4, item 4) |
+| Spec, deck, Plan C and the mockup brought up to date | 5 |
 | A segment layout renders `<h1 class="fl-title">Freelance</h1>` | 3 (step 3) |
 | The view switch directly under it: recessed track, hairline border, raised active fill, left-aligned | 3 (steps 1–2); spec §3.4 |
 | Two links, `Dashboard` and `Queue`, text only | 3 (step 2) |
@@ -1163,7 +1379,30 @@ Spec §9's fourth verification item — `/freelance` observed on Vercel against 
 | The vertical rhythm is a design number the spec states, not the build | §3.4's table, with the arithmetic |
 | A-2 runs before Plan B; Task 13's steps 5–6 fold in | Sequence note; Task 4 steps 4–6 |
 
-Two things R42 does not mention that A-2 must do, both mechanical consequences: the `LogoutButton` and `legacy.css` prose that name the old address (Task 1 steps 5, 8 — **Open question 5**), and `push.test.ts`'s assertion on the default url, which must move in the same commit as the default (Task 1 step 7).
+Two things R42 does not mention that A-2 must do, both mechanical consequences: the `LogoutButton` and `legacy.css` prose that name the old address (Task 1 steps 5, 8 — ruled in as open question 5), and `push.test.ts`'s assertion on the default url, which must move in the same commit as the default (Task 1 step 7).
+
+**And every round-5 ruling maps to a place in this document:**
+
+| Ruling | Where it landed |
+|---|---|
+| **R43** — 6px, not 10px | §3.4's rhythm table and its rewritten optical-vs-optical paragraph; the header height `28 + 36 + 6 + 33.3 = 103.3`; Task 3 step 1(a)'s `margin-top:var(--sp-2)` and its comment; Task 3 step 6's commit message; Task 4 step 5 items 12–13; Task 5 step 4's specimen rhythm |
+| **R44** — `aria-current` follows the page, `.is-active` the area | §3.1; §3.4's two `aria-current` paragraphs; Task 1 step 4's `NavList` (docblock and the split expression); Task 1 step 11's commit message; `ViewSwitch`'s docblock; Task 4 step 5 item 3 |
+| **M1** — `.fl>:first-child` is (0,2,0), placed beside `.fl-body` | Task 3 step 1(a), first rule; "last in the file" struck from the plan text, the CSS comment and the commit message |
+| **M2** — the duplicate `aria-current` | = R44 above |
+| **M3** — the §7.2 paste must not delete four ratified paragraphs | §7.2's replacement instruction; the tree's six `_shell/*` rows with four-island annotations; the Icons paragraph; §5.8 reduced; Task 5 step 1's table and its pre-commit check |
+| **M4** — pin the two line-heights | §5.3's amended and added rows; Task 3 step 1(b)'s edit to `.fl-title` |
+| **S1** — the comparison must be optical vs optical | = R43 above |
+| **S2** — two declarations, not three | §3.4's "The shipped rule" lead-in; the declaration table; Task 3 step 1(a)'s comment; the commit message; `components.css`'s header item 6 |
+| **S3** — the `line-height:1.4` reason is determinism and parity | §3.4's declaration table; Task 3 step 1(a)'s comment; the commit message |
+| **S4** — the recess is defined against a ground the app lacks | §3.4's "The recess is defined against a ground…" paragraph; Task 3 step 1(a)'s GROUND comment; Task 4 step 5 item 1 |
+| **S5** — §6.2 gains three costs | §6.2's three paragraphs, including the `.range` forward pointer; Part 4 shortened accordingly |
+| **S6** — the mockup joins the file map | The file-map row for `docs/design/p8-mockup.html`; Task 5 steps 4–5 |
+| **N4** focus-ring radius · **N5** the 16px label inset · **N7** `.fl-headrow` for a future title-level control | Comment lines in Task 3 step 1(a); N4 and N5 also as §3.4 paragraphs |
+| **N6** — the header is not sticky | The carry-forward (2) paragraph at the end of §7.2 |
+| **N2** — the hover's stronger reason | §3.4's declaration table and the CSS comment |
+| §5.7 unchanged, said explicitly | The last line of §3.4's CSS section |
+| Tab order rail → switch → content | Task 4 step 5 item 14 |
+| **N10** — the brief's task numbering | Nothing to do: this document has always called the CSS and markup **Task 3** and verification **Task 4**. |
 
 **2. Placeholder scan.** No `TBD`, no `TODO`, no "implement later", no "similar to Task N", no "add appropriate error handling". Every code step carries the complete file or the exact lines to change, with the surrounding lines quoted so the edit is unambiguous. Every command carries its expected output. The `/freelance/page.tsx` frame is a *deliberately minimal shipped file* whose scope R42 fixes, not a placeholder — its comment says which plan replaces it and what replaces it with.
 
@@ -1174,6 +1413,7 @@ Two things R42 does not mention that A-2 must do, both mechanical consequences: 
 - `ViewSwitch` is a default export; `layout.tsx` imports it as `import ViewSwitch from "./ViewSwitch"`, a relative path inside the same segment folder.
 - `FreelanceLayout({ children }: { children: React.ReactNode })` matches the `(app)` layout's own signature; no `params`, so no Next 16 async-props question arises.
 - Both `NavList` and `ViewSwitch` are `"use client"` and both call `usePathname()`; neither takes props, so no prop type crosses a boundary.
+- **The two matching rules are stated identically in three places and nowhere contradicted** (R44): `NavList` computes `active` from `startsWith` for `className` and `pathname === href` for `aria-current`; `ViewSwitch` computes one `active` from `pathname === href` and spends it on both. §3.1, §3.4, both docblocks, both commit messages and Task 4 step 5 item 3 agree.
 - `buildPushPayload(title, body, url = "/freelance/queue")` — the default in `src/lib/push.ts` and the expected value in `src/lib/__tests__/push.test.ts` are the same string, changed in the same step.
 - The redirect's `destination` (`/freelance/queue`), the moved folder's route, `sw.js`'s two defaults, `push.ts`'s default and the queue page's `?from=` value are all the same literal, `/freelance/queue`; Task 4 step 2's grep is what proves no fifth spelling survives.
 - `/freelance` is the same literal in `src/app/page.tsx`, `manifest.ts`, `login/page.tsx` and `VIEWS[0].href`.
@@ -1184,15 +1424,15 @@ Two things R42 does not mention that A-2 must do, both mechanical consequences: 
 |---|---|---|
 | `freelance/layout.tsx` | `.fl-head` | `components.css`, new in Task 3 step 1(a) |
 | | `.fl` | `components.css` line 144, shipped by Plan A |
-| | `.fl-title` | `components.css` line 140, shipped by Plan A |
+| | `.fl-title` | `components.css` line 140, shipped by Plan A; step 1(b) adds `line-height:1.5` to that same rule |
 | `freelance/ViewSwitch.tsx` | `.segmented` | new in Task 3 step 1(a) |
 | | `.on` (as `.segmented a.on`) | new in Task 3 step 1(a) |
 | `freelance/page.tsx` | `.app-content`, `.fl` | `components.css` lines 125, 144 |
 | `_shell/NavList.tsx` | `.app-nav`, `.navitem`, `.is-active` | `components.css` lines 59, 63, 69 |
 
-And in the other direction: every selector Task 3 step 1 adds has a consumer in the same commit — `.fl-head` and `.segmented`/`.segmented a`/`.segmented a.on` in `layout.tsx` and `ViewSwitch.tsx`, and `.fl > :first-child` on `.fl` itself. **The §5.8 declared-unused list does not grow**, and `IconQueue` leaves it in the other direction.
+And in the other direction: every selector Task 3 step 1 adds has a consumer in the same commit — `.fl-head` and `.segmented`/`.segmented a`/`.segmented a.on` in `layout.tsx` and `ViewSwitch.tsx`, and `.fl > :first-child` on `.fl` itself. Step 1(a) is **one contiguous insertion** at line 147: the `.fl>:first-child` rule closes the section-rhythm block beside the two rules it overrides (M1, `(0,2,0)` beats their `(0,1,0)` from anywhere), then the header banner follows. Step 1(b) is an **edit** to an existing rule, not a fourth declaration site for `.fl-title`. **The §5.8 declared-unused list does not grow**, and `IconQueue` leaves the vocabulary in the other direction.
 
-**5. What A-2 deliberately does not do.** No test is added: `ViewSwitch` is a rendering component whose only logic is a string equality, the repo has no component harness and P8 introduces none (spec §8), and the one thing worth pinning — that `startsWith` would light both tabs — is checked by eye in Task 4 step 5 item 2 and stated in the component's own docblock. No `metadata` export (Open question 2). No change to `src/proxy.ts`, `src/lib/__tests__/proxy.test.ts`, the CSP, `package.json`, or any file under `src/app/(app)/freelance/queue/` beyond one literal.
+**5. What A-2 deliberately does not do.** No test is added: `ViewSwitch` is a rendering component whose only logic is a string equality, the repo has no component harness and P8 introduces none (spec §8), and the two things worth pinning — that `startsWith` would light both tabs, and that two elements must not claim `aria-current="page"` — are checked by eye in Task 4 step 5 items 2 and 3 and stated in both components' docblocks. No `metadata` export (ruled). No reach into the queue page for the 10px (ruled). No change to `src/proxy.ts`, `src/lib/__tests__/proxy.test.ts`, the CSP, `package.json`, or any file under `src/app/(app)/freelance/queue/` beyond one literal. **`docs/design/p8-mockup.html` *is* changed** — Task 5, after verification — because it is one of the spec's four companions and a stale header there would outrank the prose it contradicts.
 
 ---
 
@@ -1204,4 +1444,4 @@ Three, kept short. The document above is the deliverable; these are mine and the
 
 **The landing costs one tap, not two, and only sometimes.** Riku chose `/freelance`, so this is a cost note, not an argument. From a cold PWA launch the queue is **one tap** — the `QUEUE` tab, which is on screen at launch, above the fold, at a fixed position. From a push notification it is **zero taps**. The cost is therefore paid only on a cold open that was motivated by an approval and not by a notification, which is the case where Riku opens the app on his own initiative to clear the queue. Against that: every cold open that *was* motivated by "how is the freelance work doing" now pays nothing, and that is the case R42 optimised for. I think it is the right trade and I would not have argued the other way.
 
-**The status-filter row under the switch will read as two stacked tab rows, and within R18 there is nothing to do about it now.** The Queue view's first element is a `.row` of six bare `<button>`s in the same mono 9.5px uppercase register as the switch's labels, 38px below it. Two consequences. First, the shape: a control strip under a control strip, both left-aligned in the same column, reads as two tiers of tabs. Second, and worse: §6.2 already priced out the filters' solid active state as "the price of one-treatment-per-selector", and the switch now demonstrates 38px above them exactly what an active segment looks like in this system. The lost affordance stops being an abstraction. **What could be done:** the queue page happens to give the *active* filter no class at all (`className={s === statusFilter ? "" : "secondary"}`), so `button:not(.secondary)` selects it and a fill could be restored in CSS alone — but that rule would have to live either in `legacy.css`, whose header forbids additions, or in `components.css` reaching into a legacy page's internals, which is the third namespace that file refuses. **So: nothing now.** I would record it as the strongest single argument for bringing the queue page's own S11 content discussion forward, because the switch makes the flatness of the row beneath it a thing you notice rather than a thing you were told about.
+**The two stacked control rows are now a §6.2 cost, not an opinion — and I think they are the strongest argument for bringing the queue page's S11 discussion forward.** The substance moved into §6.2 above, where it belongs: it is a cost A-2 creates, and the critic was right that leaving it here would have kept it out of the spec. What remains mine is the priority call. Two things could be done and only one of them is available: restoring the filters' active fill in CSS alone is *technically* possible — the queue page gives the active filter no class at all (`className={s === statusFilter ? "" : "secondary"}`), so `button:not(.secondary)` selects it — but the rule would have to live either in `legacy.css`, whose header forbids additions, or in `components.css` reaching into a legacy page's internals, which is the third namespace that file exists to refuse. So the real fix is the S11 rebuild, porting `.range` for the filter row. **I would move that phase up.** Until A-2 the filters' flatness was a cost you had been told about; after A-2 there is a worked example of the correct treatment 38px above it, on the same screen, and it is a thing you notice.
