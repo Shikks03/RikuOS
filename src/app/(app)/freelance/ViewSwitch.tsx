@@ -23,9 +23,11 @@ import { usePathname } from "next/navigation";
  * /freelance/queue, so a prefix match would light BOTH tabs on the Queue
  * view. The rail's NavList uses startsWith for its CLASS, for the opposite
  * reason — it names an area, so Freelance must stay lit there — and equality
- * for its aria-current, so that link and this one do not both claim to be the
- * current page on one screen (R44). Here the area and the page are the same
- * thing, so one test serves both. A future /freelance/queue/:id would light
+ * for its aria-current, so that link and this one never both claim it while
+ * pointing at DIFFERENT URLs (R44). On /freelance they point at the same URL
+ * and both are right — one per <nav>, which is what ARIA's one-per-set rule
+ * means (R46). Here the area and the page are the same thing, so one test
+ * serves both. A future /freelance/queue/:id would light
  * neither tab; there is no such route, and it is one line to change when
  * there is.
  *
