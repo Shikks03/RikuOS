@@ -8,7 +8,7 @@ import TopBar from "./_shell/TopBar";
  * Defence in depth. src/proxy.ts already guarantees a session on every path in
  * this group; this exists so that a middleware-matcher typo cannot silently
  * expose the shell. It needs no ?from= — the login page already defaults to
- * /queue.
+ * /freelance, the landing page (R42).
  *
  * Reading cookies() also opts this whole route subtree into dynamic
  * rendering. Nothing depends on that today — TopBar computes its stamp on the

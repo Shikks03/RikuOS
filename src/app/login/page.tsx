@@ -7,7 +7,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [from, setFrom] = useState("/queue");
+  const [from, setFrom] = useState("/freelance");
 
   // Read ?from= redirect param once on mount.
   // Resolve against our own origin and re-check it — string checks alone are
@@ -23,7 +23,7 @@ export default function LoginPage() {
         setFrom(resolved.pathname + resolved.search);
       }
     } catch {
-      // malformed value — keep the "/queue" default
+      // malformed value — keep the "/freelance" default
     }
   }, []);
 

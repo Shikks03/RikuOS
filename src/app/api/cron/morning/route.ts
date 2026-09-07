@@ -155,7 +155,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       if (delivery.sent === 0) {
         throw new Error(
           `the digest reached no device (failed ${delivery.failed}, removed ${delivery.removed}). ` +
-            "Re-subscribe from /queue."
+            "Re-subscribe from /freelance/queue."
         );
       }
       return { counts: { itemsProcessed: problems.length }, data: digest };

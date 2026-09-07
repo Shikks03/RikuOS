@@ -18,7 +18,7 @@ export interface PushPayload {
 }
 
 /** Pure: bounded title/body so a runaway agent can't push a novel. */
-export function buildPushPayload(title: string, body: string, url = "/queue"): PushPayload {
+export function buildPushPayload(title: string, body: string, url = "/freelance/queue"): PushPayload {
   return { title: title.slice(0, 80), body: body.slice(0, 200), url };
 }
 

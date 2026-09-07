@@ -6,7 +6,7 @@ describe("buildPushPayload", () => {
     expect(buildPushPayload("Title", "Body")).toEqual({
       title: "Title",
       body: "Body",
-      url: "/queue",
+      url: "/freelance/queue",
     });
   });
 
@@ -17,8 +17,8 @@ describe("buildPushPayload", () => {
   });
 
   it("accepts an explicit url", () => {
-    expect(buildPushPayload("T", "B", "/queue?status=pending").url).toBe(
-      "/queue?status=pending"
+    expect(buildPushPayload("T", "B", "/freelance/queue?status=pending").url).toBe(
+      "/freelance/queue?status=pending"
     );
   });
 });

@@ -52,7 +52,7 @@ export default function QueuePage() {
     try {
       const res = await fetch(`/api/queue?status=${statusFilter}`);
       if (res.status === 401) {
-        window.location.href = "/login?from=/queue";
+        window.location.href = "/login?from=/freelance/queue";
         return;
       }
       if (!res.ok) throw new Error();

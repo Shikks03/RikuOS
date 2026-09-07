@@ -1,7 +1,7 @@
-/* Service worker: displays pushes and opens the queue on tap. */
+/* Service worker: displays pushes and opens the queue view on tap. */
 
 self.addEventListener("push", (event) => {
-  let data = { title: "Notification", body: "", url: "/queue" };
+  let data = { title: "Notification", body: "", url: "/freelance/queue" };
   try {
     data = { ...data, ...event.data.json() };
   } catch {
@@ -17,7 +17,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/queue";
+  const url = (event.notification.data && event.notification.data.url) || "/freelance/queue";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const client of list) {

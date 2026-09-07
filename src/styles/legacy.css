@@ -1,8 +1,8 @@
 /* ============================================================
    legacy.css — the old pages' bare selectors, re-skinned.
 
-   THIS FILE HAS AN EXPIRY DATE. It exists so /queue, /settings and
-   /login can be re-skinned without being rewritten: one treatment per
+   THIS FILE HAS AN EXPIRY DATE. It exists so /freelance/queue, /settings
+   and /login can be re-skinned without being rewritten: one treatment per
    selector, no className churn. It is DELETED in the phase where those
    pages get their own content discussion under S11 and are rebuilt on
    the components.css vocabulary. Do not add to it; do not let it
@@ -16,14 +16,14 @@
    phone pass.
 
    Two named costs, so they are not discovered later as defects:
-     * /queue's status filters lose their solid active state. Bare
+     * the queue view's status filters lose their solid active state. Bare
        <button> carries three meanings there at once — affirmative,
        neutral, and the active segment of the filter row — and one
        element selector cannot be all three. The six filters now differ
        only by border and label brightness. That is the price of
        one-treatment-per-selector.
      * `main`'s content column widens from 640px to 920px (976px outer).
-       A visible layout change to /queue, forced by the shell.
+       A visible layout change to the queue view, forced by the shell.
    ============================================================ */
 /* R34: the max-width is the CONTENT column plus its own padding, because
    box-sizing:border-box means a plain 920px would give an 864px column

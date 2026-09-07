@@ -19,15 +19,6 @@ const stroke = {
   "aria-hidden": true,
 } as const;
 
-export function IconQueue() {
-  return (
-    <svg {...stroke}>
-      <path d="M5.5 4.5h13l2.5 8.5v5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18v-5z" />
-      <path d="M3 13h5l1.5 3h5l1.5-3h5" />
-    </svg>
-  );
-}
-
 export function IconFreelance() {
   return (
     <svg {...stroke}>
