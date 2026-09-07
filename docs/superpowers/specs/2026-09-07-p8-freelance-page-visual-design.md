@@ -294,7 +294,7 @@ Plus one normalisation rule, `.fl > :first-child { margin-top: 0 }`, which decla
 
 ## 4. The Freelance page, block by block
 
-Page root: `<main className="app-content">` holding `<div className="fl">` (max-width 920px, centred). Title first: `Freelance`, `.fl-title`, display 600 / 24px / `-0.02em`, **no eyebrow above it**.
+Above the page root, the Freelance segment layout renders the title and the view switch (§3.4, R42): `Freelance`, `.fl-title`, display 600 / 24px / `-0.02em`, **no eyebrow above it**, then the switch. Page root: `<main className="app-content">` holding `<div className="fl">` (max-width 920px, centred), whose first child is the hero row — the page itself renders no title.
 
 **Section rhythm, every block below A.** A mono eyebrow — the machine's name for the block, from the deck — above a short heading addressed to the operator:
 
