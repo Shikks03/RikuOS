@@ -152,7 +152,7 @@ Logic layer under `src/lib/__tests__/`, in the existing Vitest style — the gap
 
 ## Non-goals
 
-No visual design. No quest board. No action on any lead — no drafting, sending, or marking. No new agent. No new cron (Vercel Hobby's two are both used; the site-snapshot write rides inside the existing morning route). No change to `/queue`.
+~~No visual design.~~ *(superseded by S17: the page ships designed; see the 2026-09-07 visual-design spec.)* No quest board. No action on any lead — no drafting, sending, or marking. No new agent. No new cron (Vercel Hobby's two are both used; the site-snapshot write rides inside the existing morning route). No behaviour or layout change to `/queue` beyond the shell and the re-skin, and the deletion of its inline header (2026-09-07).
 
 ---
 

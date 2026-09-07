@@ -1,0 +1,1401 @@
+<title>Freelance page mockup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* ============================================================
+   tokens
+   Source: DESIGN-INSPO §2 / §3, verbatim. Ships as src/styles/tokens.css.
+   The six semantic hues are one closed set plus --track. No hue token is
+   named after its colour, and none ever will be (R19) — a token named for
+   how it looks is how a hue eventually gets used for the wrong meaning.
+   ============================================================ */
+:root{
+  /* faces — in the app these come from next/font's .variable classnames */
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --body:'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,monospace;
+
+  /* ground & structure */
+  --void:#08090B;
+  --panel:#0E1013;
+  --raised:#14171C;
+  --sunk:#050608;
+  --line:#1D222A;
+  --line-soft:#15191F;
+
+  /* ink */
+  --ink:#E9ECF0;
+  --ink-2:#98A1AD;
+  --ink-3:#5B6470;
+  --ink-4:#3A424C;
+
+  /* semantic hues — meaning is fixed */
+  --spend:#FF8A3D;
+  --save:#35D399;
+  --roi:#A78BFA;
+  --session:#5FA5FA;
+  --stale:#FBBF24;
+  --missing:#F87171;
+
+  /* the one non-hue graphic token */
+  --track:#1A1E25;
+
+  /* card tints — 155deg, deep desaturated hue into near-neutral at 62% */
+  --tint-roi:linear-gradient(155deg,#171233,#111117 62%);
+  --tint-stale:linear-gradient(155deg,#241A03,#141209 62%);
+
+  /* spacing 4 / 6 / 10 / 14 / 20 / 28 / 44 / 72 */
+  --sp-1:4px; --sp-2:6px; --sp-3:10px; --sp-4:14px;
+  --sp-5:20px; --sp-6:28px; --sp-7:44px; --sp-8:72px;
+
+  /* radii */
+  --r-tag:6px; --r-nav:7px; --r-chip:8px; --r-card:10px; --r-feature:14px; --r-pill:999px;
+
+  /* layout */
+  --content-max:920px;
+  --rail-w:170px;
+}
+
+/* ============================================================
+   base
+   Ships as src/styles/base.css.
+   ============================================================ */
+*{box-sizing:border-box}
+html,body{color-scheme:dark}
+body{
+  margin:0;
+  background:var(--void);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:13px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+p{margin:var(--sp-3) 0 0;font-size:13px;color:var(--ink-2)}
+strong{font-weight:600;color:var(--ink)}
+a{color:var(--ink-2);text-decoration:none;border-bottom:1px solid var(--line)}
+a:hover{color:var(--ink);border-bottom-color:var(--ink-4)}
+:focus-visible{outline:2px solid var(--spend);outline-offset:3px;border-radius:3px}
+/* neutral, not violet: a selection band is not a decision, and no hue is spent
+   where it does not carry its assigned meaning */
+::selection{background:rgba(233,236,240,.16);color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ============================================================
+   components
+   The shared vocabulary. Reference names are kept verbatim so a recipe
+   can be diffed against components.html by eye; anything only this page
+   has carries the page prefix `fl-`. Ships as src/styles/components.css.
+   ============================================================ */
+
+/* ---- shell ---------------------------------------------------- */
+.app{background:var(--void);min-width:0}
+.app-body{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);align-items:stretch}
+
+.app-side{
+  background:#0B0D11;border-right:1px solid var(--line-soft);
+  padding:16px 12px 16px 12px;display:flex;flex-direction:column;gap:16px;
+}
+.app-brand{display:flex;align-items:center;gap:9px;padding:0 4px}
+.app-brand .tile{
+  width:24px;height:24px;border-radius:7px;flex:none;display:grid;place-items:center;
+  background:linear-gradient(150deg,#FF9E5C,#F2622B);
+}
+.app-brand .tile svg{width:14px;height:14px;display:block}
+.app-brand .wm{
+  font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:-.01em;
+  color:var(--ink);overflow-wrap:anywhere;min-width:0;
+}
+
+.app-nav{display:flex;flex-direction:column;gap:2px}
+.navitem{
+  display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:var(--r-nav);
+  font-size:12.5px;color:var(--ink-3);
+}
+.navitem svg{width:13px;height:13px;flex:none;opacity:.85;display:block}
+.navitem.is-active{background:#171B21;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+
+.grouplabel{
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-4);padding:0 9px;margin-top:6px;display:block;
+}
+.agents{display:flex;flex-direction:column;gap:6px;margin-top:7px}
+.agent{
+  display:block;padding:8px 9px;border-radius:var(--r-chip);background:#12151A;
+  border:1px solid var(--line);font-family:var(--mono);font-size:10px;
+  font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-4);
+}
+/* ok: green label, thin green border, deliberately NO tinted fill (R16) */
+.agent.is-ok{color:var(--save);border-color:rgba(53,211,153,.18)}
+/* overdue / failed: the reference's tinted-badge recipe in --stale / --missing.
+   Failed carries the heavier fill (.14/.03) because amber is intrinsically
+   brighter than red — at equal alpha the merely-late agent outshouts the broken one. */
+.agent.is-overdue{
+  color:var(--stale);border-color:rgba(251,191,36,.22);
+  background:linear-gradient(180deg,rgba(251,191,36,.09),rgba(251,191,36,.02));
+}
+.agent.is-failed{
+  color:var(--missing);border-color:rgba(248,113,113,.22);
+  background:linear-gradient(180deg,rgba(248,113,113,.14),rgba(248,113,113,.03));
+}
+/* off / never run / unknown — inherits .agent's ground; a dead agent must never
+   sit brighter than a live one */
+.agent.is-grey{color:var(--ink-4);border-color:var(--line)}
+.agent-cap{
+  display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;
+  color:var(--ink-4);padding:0 9px;margin-top:4px;font-variant-numeric:tabular-nums;
+}
+.app-side .rail-foot{margin-top:auto}
+/* the app's only sign-out control — --ink-3, never --ink-4 */
+.app-side .btn.ghost{font-size:11.5px;letter-spacing:.1em;padding:6px 9px;color:var(--ink-3)}
+
+.app-main{min-width:0}
+.topbar{height:44px;border-bottom:1px solid var(--line-soft);padding:0 var(--sp-6);display:flex}
+.topbar-in{width:100%;max-width:var(--content-max);margin:0 auto;display:flex;align-items:center;gap:12px}
+/* the top bar carries the freshness stamp and nothing else: no breadcrumb.
+   `Operator` named nobody in a one-user system and was the bar's brightest
+   element; the crumb's page name restated the title 70px below it. What is
+   left is the only thing in the bar that ever changes. The shell renders it
+   on every page from the request time (Asia/Manila) — on a force-dynamic
+   page that is the moment the data was read. */
+.crumb{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.crumb em{font-style:normal;color:var(--ink-4)}
+.app-content{padding:var(--sp-6) var(--sp-6) var(--sp-8)}
+
+/* ---- section rhythm (the .rhythm eyebrow/title pair) ----------- */
+.eyebrow{
+  display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ink-3);
+}
+.fl-h{
+  display:block;font-family:var(--display);font-weight:600;font-size:19px;
+  letter-spacing:-.015em;color:var(--ink);margin-top:5px;
+}
+.fl-title{
+  font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.02em;color:var(--ink);
+}
+.fl{max-width:var(--content-max);margin:0 auto}
+.fl-sect{margin-top:var(--sp-7)}
+.fl-body{margin-top:var(--sp-5)}
+
+/* ---- stat hero cards ------------------------------------------ */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:var(--sp-4)}
+.stat{
+  position:relative;overflow:hidden;border-radius:var(--r-feature);
+  padding:15px 16px 18px;min-height:132px;
+  border:1px solid var(--line);background:var(--raised);
+  display:flex;flex-direction:column;
+}
+.stat-top{display:flex;align-items:center;gap:7px;position:relative;z-index:2}
+.stat-top .lbl{
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);
+}
+.stat-top .more{
+  margin-left:auto;font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink-4);
+}
+.stat .fig{
+  font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:-.03em;
+  line-height:1.06;margin-top:auto;position:relative;z-index:2;
+  font-variant-numeric:tabular-nums;color:var(--ink);
+}
+.stat .sub{font-size:10.5px;color:var(--ink-3);position:relative;z-index:2;margin-top:2px}
+/* violet — decisions not made */
+.stat.roi{background:var(--tint-roi);border-color:rgba(167,139,250,.2)}
+.stat.roi .lbl,.stat.roi .fig{color:var(--roi)}
+/* this card's `Open ↗` is the page's one exit to ShikksTracker, not ornament */
+.stat.roi .more{color:var(--ink-3)}
+/* amber — a duration is waiting */
+.stat.stale{background:var(--tint-stale);border-color:rgba(251,191,36,.2)}
+.stat.stale .lbl,.stat.stale .fig{color:var(--stale)}
+/* hueless WITH data — new named component; not .stat.blank */
+.stat.plain{background:var(--raised);border-color:var(--line)}
+.stat.plain .fig{color:var(--ink)}
+/* a MEASURED zero (`0`) — the hue drains, the caption still reports.
+   `nothing waiting` is the answer the page exists to give and must not be
+   the dimmest text on the screen. */
+.stat.drained{background:var(--raised);border-color:var(--line)}
+.stat.drained .lbl,.stat.drained .fig{color:var(--ink-4)}
+/* NOTHING WAS MEASURED (`—`) — the whole card drains, caption included,
+   because that caption is a "ShikksTracker didn't report…" sentence (R4). */
+.stat.blank{background:var(--raised);border-color:var(--line)}
+.stat.blank .lbl,.stat.blank .fig,.stat.blank .sub{color:var(--ink-4)}
+/* the one hero graphic: a proportion track, no hue */
+.track{
+  height:4px;border-radius:99px;background:var(--track);overflow:hidden;
+  margin-top:9px;position:relative;z-index:2;
+}
+.track i{display:block;height:100%;border-radius:99px;background:var(--ink-4)}
+/* The track's 13px slot (4px + 9px) is reserved on the cards that have none,
+   so all three figures and all three captions sit on one baseline. Only the
+   contacts card ever fills it. */
+.stat:not(:has(.track)) .sub{margin-top:15px}
+/* the mark-field variant (question 1 only — not the ruled row) */
+.stat .marks{position:absolute;right:-14px;bottom:-11px;z-index:1;display:block}
+
+/* ---- statements under the hero row ---------------------------- */
+.fl-say{font-size:13px;color:var(--ink-2);margin-top:var(--sp-4)}
+.fl-say b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* ---- inline stat strip (Block B's summary line) ---------------- */
+.statstrip{display:flex;flex-wrap:wrap;gap:20px;padding:12px 16px;border-top:1px solid var(--line);background:var(--panel)}
+.statstrip div{font-size:11px;color:var(--ink-3)}
+.statstrip b{font-family:var(--display);font-size:13.5px;font-weight:700;margin-right:5px;font-variant-numeric:tabular-nums}
+.fl-sum{
+  border-top:0;background:none;margin:0;padding:6px 0 0;display:block;
+  font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;
+}
+.fl-sum b{font-family:var(--display);font-size:13.5px;font-weight:700;color:var(--ink);margin:0;font-variant-numeric:tabular-nums}
+.fl-sum i{font-style:normal;color:var(--ink-4);margin:0 5px}
+
+/* ---- row grammar: hairlines, a fixed grid, no boxes ------------ */
+.fl-stages{margin-top:var(--sp-4)}
+.fl-stage{
+  display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:var(--sp-4);
+  align-items:baseline;padding:11px 0;border-top:1px solid var(--line-soft);
+}
+.fl-stages>.fl-stage:first-child{border-top:0}
+.fl-stage .nm{font-size:13px;color:var(--ink-2)}
+.fl-stage .ct{
+  font-family:var(--display);font-weight:600;font-size:15px;color:var(--ink);
+  text-align:right;font-variant-numeric:tabular-nums;
+}
+/* Two notes, not rows — deliberately no hairline above either. They are the
+   same shape in two inks because they are two different claims:
+   .fl-note   = a MEASURED emptiness (the source answered, the count was zero)
+   .fl-absent = the field NEVER ARRIVED (--ink-4 is reserved for these) */
+.fl-note{font-size:11px;color:var(--ink-3);margin-top:var(--sp-3)}
+.fl-absent{font-size:11px;color:var(--ink-4);margin-top:var(--sp-3)}
+.fl-empty{font-size:13px;color:var(--ink-3);margin-top:var(--sp-5)}
+
+/* ---- disclosure (Blocks C and D) ------------------------------- */
+.disclose>summary{display:block;list-style:none;cursor:pointer}
+.disclose>summary::-webkit-details-marker{display:none}
+.sumrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:end}
+.sumrow::after{
+  content:"";width:6px;height:6px;align-self:end;margin-bottom:7px;
+  border-right:1.5px solid var(--ink-4);border-bottom:1.5px solid var(--ink-4);
+  transform:rotate(-45deg);transition:transform .14s ease;
+}
+.disclose[open] .sumrow::after{transform:rotate(45deg);margin-bottom:9px}
+.disclose[open] .sumrow .fl-count{color:var(--ink-3)}
+.fl-count{
+  font-family:var(--mono);font-size:10px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;padding-bottom:2px;
+}
+.fl-collapsed{display:block;font-size:11.5px;color:var(--ink-4);margin-top:var(--sp-3)}
+/* when the collapsed line carries a row rather than a sentence, it borrows the
+   summary-line grammar: name at --ink-2, figure at --ink, tabular */
+.fl-collapsed .nm{color:var(--ink-2)}
+.fl-collapsed b{font-weight:600;color:var(--ink);margin-left:var(--sp-4);font-variant-numeric:tabular-nums}
+.disclose[open] .fl-collapsed{display:none}
+/* 28px, not 20px: at 20px the group eyebrow reads as a second eyebrow under
+   the block heading rather than the head of its own group */
+.fl-open{margin-top:var(--sp-6)}
+
+/* ---- table grammar (the .debt recipe, page-namespaced) ---------
+   The column template is a per-table custom property so one row grammar serves
+   both tables: Block D has four columns, Block C has five. */
+.fl-table{display:block;--fl-cols:minmax(0,1fr) 78px 66px 66px}
+.fl-table.is-campaigns{--fl-cols:minmax(0,1fr) 66px 66px 66px 66px}
+.fl-thead,.fl-trow{
+  display:grid;grid-template-columns:var(--fl-cols);gap:var(--sp-3);
+  align-items:baseline;
+}
+.fl-thead{
+  padding:0 0 9px;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-4);
+}
+.fl-trow{padding:11px 0;border-bottom:1px solid var(--line-soft)}
+.fl-thead>span+span,.fl-trow>span+span{text-align:right;font-variant-numeric:tabular-nums}
+.fl-trow .nm{font-weight:600;font-size:13px;color:var(--ink)}
+.fl-trow>span+span{font-size:12.5px;color:var(--ink-2)}
+.fl-trow .zero{color:var(--ink-4)}
+.fl-trow .dash{color:var(--ink-4)}
+.fl-group{margin-top:var(--sp-6)}
+.fl-group:first-child{margin-top:0}
+.fl-explain{font-size:11.5px;color:var(--ink-3);margin-top:var(--sp-2)}
+.fl-group .fl-table{margin-top:var(--sp-4)}
+/* `Showing 20 of 34 campaigns.` / `Showing 20 of 41.` — a statement to the
+   reader, so sentence case in the body face, not a mono machine label */
+.fl-bound{font-size:11.5px;color:var(--ink-4);margin-top:var(--sp-3)}
+
+/* ---- the honesty note (§5.6, reused) --------------------------- */
+.honesty{
+  display:flex;gap:7px;align-items:flex-start;
+  font-size:11.5px;color:var(--ink-4);margin-top:var(--sp-4);
+}
+.honesty svg{width:13px;height:13px;flex:none;margin-top:2px;display:block}
+
+/* ---- Block E rows ---------------------------------------------- */
+.fl-headrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}
+.fl-rows{margin-top:var(--sp-5)}
+.fl-row{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-4);
+  padding:14px 0;border-top:1px solid var(--line-soft);
+}
+/* both row lists on the page open the same way: no hairline above the first */
+.fl-rows>.fl-row:first-child{border-top:0}
+.fl-row .tag{align-self:start;justify-self:end}
+.fl-biz{
+  font-weight:600;font-size:13px;color:var(--ink);border-bottom:0;
+  display:inline-flex;align-items:baseline;gap:6px;
+}
+.fl-biz:hover{color:var(--ink);border-bottom:0}
+.fl-biz .arr{color:var(--ink-4);font-size:11px}
+.pwhen{
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-4);
+  font-variant-numeric:tabular-nums;margin-top:5px;
+}
+.pwhen.is-stale{color:var(--stale)}
+.fl-snip{font-size:12.5px;color:var(--ink-2);margin-top:6px}
+.fl-why{font-size:11.5px;color:var(--ink-4);margin-top:4px}
+
+/* ---- failed block / failed page -------------------------------- */
+.fl-fail{display:grid;grid-template-columns:5px minmax(0,1fr);gap:9px;margin-top:var(--sp-5)}
+.fl-fail i{
+  width:5px;height:5px;border-radius:50%;background:var(--missing);
+  box-shadow:0 0 6px var(--missing);margin-top:7px;
+}
+.fl-fail .said{font-size:13px;color:var(--ink-2)}
+.fl-fail .because{font-size:12.5px;color:var(--ink-3);margin-top:6px;max-width:62ch}
+
+/* ---- Block F, the health strip --------------------------------- */
+.fl-health{margin-top:var(--sp-8)}
+.fl-health.quiet{
+  border-top:1px solid var(--line);padding-top:var(--sp-4);
+  display:flex;align-items:center;gap:var(--sp-4);
+}
+.fl-health.quiet .line{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.fl-health.quiet .line i{font-style:normal;color:var(--ink-4);margin:0 5px}
+/* the 30-hour rule: past everyHours + graceHours the stamp becomes a statement */
+.fl-health.quiet .line .aged{color:var(--stale)}
+.fl-health .btn{margin-left:auto;flex:none}
+.fl-health.alarm{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-card);
+  padding:var(--sp-4) 16px;
+}
+.fl-warn{display:grid;grid-template-columns:5px minmax(0,1fr);gap:9px;padding:3px 0}
+.fl-warn i{width:5px;height:5px;border-radius:50%;margin-top:7px}
+.fl-warn.is-stale i{background:var(--stale);box-shadow:0 0 6px var(--stale)}
+.fl-warn.is-missing i{background:var(--missing);box-shadow:0 0 6px var(--missing)}
+.fl-warn span{font-size:12.5px;color:var(--ink)}
+.fl-fine{margin-left:14px;font-size:11px;color:var(--ink-3);margin-top:var(--sp-3);font-variant-numeric:tabular-nums}
+.fl-fine i{font-style:normal;color:var(--ink-4);margin:0 5px}
+.fl-stamp{margin-left:14px;margin-top:var(--sp-2);display:flex;align-items:center;gap:var(--sp-4)}
+.fl-stamp .line{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+/* ---- buttons, tags, status pill -------------------------------- */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;cursor:pointer;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  padding:8px 14px;border-radius:var(--r-pill);background:none;
+  border:1px solid var(--line);color:var(--ink-2);
+}
+.btn:hover{border-color:var(--ink-4);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed;color:var(--ink-4)}
+.btn:disabled:hover{border-color:var(--line);color:var(--ink-4)}
+/* the affirmative pill — available in the vocabulary; P8 uses none */
+.btn.go{border-color:rgba(53,211,153,.4);color:#8AE9C6}
+.btn.go:hover{background:rgba(53,211,153,.09);border-color:var(--save)}
+.btn.ghost{border-color:transparent;color:var(--ink-3)}
+.tag{
+  display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;
+  text-transform:uppercase;padding:5px 10px;border-radius:var(--r-tag);
+  border:1px solid var(--line);color:var(--ink-3);
+}
+/* status pill — vocabulary only. P8's top bar carries no pill of any kind (R17). */
+.statuspill{
+  display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:var(--r-pill);
+  background:rgba(53,211,153,.08);border:1px solid rgba(53,211,153,.2);
+  font-size:10.5px;color:#7FE3BE;
+}
+.statuspill i{width:5px;height:5px;border-radius:50%;background:var(--save);box-shadow:0 0 6px var(--save)}
+
+/* ============================================================
+   legacy (queue re-skin)
+   One treatment per selector, zero TSX edits. Ships as
+   src/styles/legacy.css and has an expiry date: it dies when the
+   queue and settings pages get their own content phase.
+   ============================================================ */
+main{
+  max-width:var(--content-max);margin:0 auto;
+  padding:var(--sp-6) var(--sp-6) var(--sp-8);
+}
+h1{
+  font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.02em;
+  color:var(--ink);margin:0;
+}
+button{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  padding:8px 14px;border-radius:var(--r-pill);background:none;
+  border:1px solid var(--ink-4);color:var(--ink);cursor:pointer;line-height:1.4;
+}
+button:hover{border-color:var(--ink-3)}
+button.secondary{border-color:var(--line);color:var(--ink-3);background:none}
+button.secondary:hover{border-color:var(--ink-4);color:var(--ink-2)}
+button.danger{border-color:rgba(248,113,113,.4);color:#F5A5A5;background:none}
+button.danger:hover{border-color:rgba(248,113,113,.6)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.card{
+  background:var(--raised);border:1px solid var(--line);border-radius:var(--r-card);
+  padding:var(--sp-4);margin-bottom:var(--sp-4);
+}
+.badge{
+  display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;
+  text-transform:uppercase;border:1px solid var(--line);border-radius:var(--r-tag);
+  padding:4px 8px;color:var(--ink-3);
+}
+.meta{font-size:10.5px;color:var(--ink-3)}
+.row{display:flex;gap:var(--sp-3);align-items:center;flex-wrap:wrap;margin-top:var(--sp-3)}
+.error{color:var(--missing);font-size:12.5px}
+pre.body{
+  white-space:pre-wrap;font-family:var(--body);font-size:12.5px;line-height:1.55;
+  color:var(--ink-2);background:var(--sunk);border:1px solid var(--line-soft);
+  border-radius:var(--r-chip);padding:10px 12px;margin:var(--sp-3) 0 0;
+}
+input,textarea{
+  font-family:var(--body);font-size:13px;width:100%;padding:8px 10px;
+  background:#101318;border:1px solid var(--line);border-radius:var(--r-chip);
+  color:var(--ink);caret-color:var(--spend);
+}
+label{display:block;font-size:12px;color:var(--ink-3);margin-bottom:4px}
+/* Chrome paints its own near-white autofill ground; nothing else beats it. */
+input:-webkit-autofill{
+  -webkit-text-fill-color:var(--ink);
+  -webkit-box-shadow:0 0 0 1000px #101318 inset;
+  caret-color:var(--ink);
+}
+
+/* ============================================================
+   mockup-only: document chrome, frames, captions
+   Nothing below this line ships to the app.
+   ============================================================ */
+.doc{max-width:1300px;margin:0 auto;padding:56px 30px 140px}
+.doc-kicker{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 18px;
+}
+.doc-title{
+  font-family:var(--display);font-weight:700;font-size:38px;line-height:1.05;
+  letter-spacing:-.03em;color:var(--ink);margin:0 0 16px;
+}
+.doc-lede{font-size:15px;line-height:1.6;color:var(--ink-2);max-width:74ch;margin:0}
+.doc-rule{height:1px;background:var(--line);border:0;margin:44px 0 0}
+
+.spec{padding-top:72px}
+.spec-eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink-4);display:block;
+}
+.spec-title{
+  font-family:var(--display);font-weight:600;font-size:26px;letter-spacing:-.02em;
+  color:var(--ink);margin:6px 0 0;
+}
+.spec-cap{font-size:13.5px;color:var(--ink-2);max-width:78ch;margin:10px 0 0}
+.spec-q{
+  border-left:2px solid var(--line);padding:2px 0 2px 14px;margin:18px 0 0;max-width:78ch;
+}
+.spec-q .qlbl{
+  display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-4);margin-bottom:5px;
+}
+.spec-q p{margin:0;font-size:13px;color:var(--ink-2)}
+.spec-q ul{margin:8px 0 0;padding-left:18px}
+.spec-q li{font-size:12.5px;color:var(--ink-2);margin-top:4px}
+.doc code{
+  font-family:var(--mono);font-size:11.5px;color:var(--ink);
+  background:var(--raised);border-radius:4px;padding:1px 5px;
+}
+
+.scroll{overflow-x:auto;margin-top:24px;padding-bottom:6px}
+.pair{display:flex;gap:28px;align-items:flex-start;width:max-content}
+/* specimen 03 stacks its two variants instead of scrolling them: on the one
+   specimen whose whole job is an A/B, both drafts cards must be in one view */
+.stack{display:flex;flex-direction:column;gap:28px;margin-top:24px}
+.pane{width:1240px;flex:none}
+.frame{
+  width:1240px;flex:none;border:1px solid var(--line);border-radius:var(--r-card);
+  overflow:hidden;background:var(--void);
+}
+.side{width:430px;flex:none;display:flex;flex-direction:column;gap:22px}
+.mini{
+  border:1px solid var(--line);border-radius:var(--r-card);background:var(--void);
+  padding:22px 24px 26px;
+}
+.tab{
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-4);margin:0 0 9px;
+}
+.hero-pane{width:920px;flex:none}
+/* two hero cards side by side inside a 430px mini — a comparison plate, so the
+   cards sit narrower than the page grid's 215px minimum, deliberately */
+.minipair{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)}
+
+.legendgrid{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:14px;
+  background:#0B0D11;border:1px solid var(--line-soft);border-radius:var(--r-card);
+  padding:18px 16px;margin-top:24px;
+}
+.legendgrid .st{
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-4);margin-bottom:9px;
+}
+</style>
+
+<div class="doc">
+
+  <p class="doc-kicker">P8 &middot; Freelance page &middot; Mockup</p>
+  <h1 class="doc-title">The Freelance page, as ruled</h1>
+  <p class="doc-lede">Six specimens of <code>/freelance</code> and its shell, built to the round-3 rulings at desktop width so you can judge the design in a browser before any of it is built in Next.js. Every number on these screens is either today's real data from ShikksTracker (2026-09-05) or the content deck's invented full render &mdash; nothing here is decoration standing in for a figure.</p>
+  <hr class="doc-rule">
+
+  <!-- ==========================================================
+       SPECIMEN 1 — TODAY
+       ========================================================== -->
+  <section class="spec">
+    <span class="spec-eyebrow">Specimen 01 &middot; State</span>
+    <h2 class="spec-title">Today</h2>
+    <p class="spec-cap">The whole page with the deck's real data &mdash; 24 drafts, 25 of 30 never contacted, nothing waiting, four approaches at zero sends &mdash; which is what you will actually see for months. Block D is drawn open so the two-group shape is visible; both disclosures work, so you can click them.</p>
+
+    <div class="scroll">
+      <div class="frame">
+        <div class="app"><div class="app-body">
+
+          <!-- rail -->
+          <aside class="app-side">
+            <div class="app-brand">
+              <span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span>
+              <span class="wm">RikuOS</span>
+            </div>
+            <nav class="app-nav">
+              <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4.5h13l2.5 8.5v5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18v-5z"/><path d="M3 13h5l1.5 3h5l1.5-3h5"/></svg>Queue</span>
+              <span class="navitem is-active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h18v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M9 8.5V6.5A1.5 1.5 0 0 1 10.5 5h3A1.5 1.5 0 0 1 15 6.5v2"/><path d="M3 13h18"/></svg>Freelance</span>
+              <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5h8.5"/><circle cx="15.5" cy="7.5" r="2.4"/><path d="M18.5 7.5H20"/><path d="M4 16.5h3.5"/><circle cx="10.5" cy="16.5" r="2.4"/><path d="M13.5 16.5H20"/></svg>Settings</span>
+            </nav>
+            <div>
+              <span class="grouplabel">Agents</span>
+              <div class="agents">
+                <span class="agent is-ok">chaser</span>
+                <span class="agent is-ok">expiry-sweep</span>
+                <span class="agent is-ok">watchdog</span>
+                <span class="agent is-ok">site-health</span>
+                <span class="agent is-ok">outreach-health</span>
+                <span class="agent is-ok">dispatcher</span>
+              </div>
+            </div>
+            <div class="rail-foot"><span class="btn ghost">Log out</span></div>
+          </aside>
+
+          <!-- main -->
+          <div class="app-main">
+            <div class="topbar"><div class="topbar-in">
+              <span class="crumb"><em>read 14:32</em></span>
+            </div></div>
+
+            <div class="app-content"><div class="fl">
+
+              <h3 class="fl-title" style="margin:0">Freelance</h3>
+
+              <!-- Block A -->
+              <div class="fl-body">
+                <div class="stats">
+                  <div class="stat roi">
+                    <div class="stat-top">
+                      <span class="lbl">Drafts</span>
+                      <span class="more">Open &#8599;</span>
+                    </div>
+                    <div class="fig">24</div>
+                    <div class="sub">drafts waiting on you in ShikksTracker</div>
+                  </div>
+                  <div class="stat plain">
+                    <div class="stat-top"><span class="lbl">Contacts</span></div>
+                    <div class="fig">25</div>
+                    <div class="track"><i style="width:83%"></i></div>
+                    <div class="sub">of 30 contacts never contacted</div>
+                  </div>
+                  <div class="stat drained">
+                    <div class="stat-top"><span class="lbl">Needs you</span></div>
+                    <div class="fig">0</div>
+                    <div class="sub">nothing waiting</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Block B -->
+              <section class="fl-sect">
+                <span class="eyebrow">Pipeline</span>
+                <span class="fl-h">Your pipeline</span>
+                <p class="fl-sum"><b>30</b> contacts<i>&middot;</i><b>2</b> hot</p>
+                <div class="fl-stages">
+                  <div class="fl-stage"><span class="nm">Not started</span><span class="ct">25</span></div>
+                  <div class="fl-stage"><span class="nm">Contacted</span><span class="ct">3</span></div>
+                  <div class="fl-stage"><span class="nm">Replied</span><span class="ct">2</span></div>
+                </div>
+                <p class="fl-note">Nothing yet at call booked, proposal sent, won or lost</p>
+              </section>
+
+              <!-- Block C -->
+              <details class="disclose fl-sect">
+                <summary>
+                  <span class="sumrow">
+                    <span>
+                      <span class="eyebrow">Campaigns</span>
+                      <span class="fl-h">Your campaigns</span>
+                    </span>
+                    <span class="fl-count">2</span>
+                  </span>
+                </summary>
+                <div class="fl-open">
+                  <div class="fl-table is-campaigns">
+                    <div class="fl-thead"><span>Campaign</span><span>Sent</span><span>Opened</span><span>Clicked</span><span>Replied</span></div>
+                    <div class="fl-trow"><span class="nm">Test One</span><span>5</span><span>2</span><span class="zero">0</span><span>2</span></div>
+                    <div class="fl-trow"><span class="nm">Test number 2</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span><span class="zero">0</span></div>
+                  </div>
+                  <p class="honesty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>
+                    Open counts come from tracking pixels and undercount anyone whose mail client blocks images.
+                  </p>
+                </div>
+              </details>
+
+              <!-- Block D -->
+              <details class="disclose fl-sect" open>
+                <summary>
+                  <span class="sumrow">
+                    <span>
+                      <span class="eyebrow">Approach performance</span>
+                      <span class="fl-h">Your approaches</span>
+                    </span>
+                    <span class="fl-count"></span>
+                  </span>
+                  <span class="fl-collapsed">No sends yet &mdash; nothing to compare.</span>
+                </summary>
+                <div class="fl-open">
+                  <div class="fl-group">
+                    <span class="eyebrow">Measured &mdash; email</span>
+                    <div class="fl-table">
+                      <div class="fl-thead"><span>Approach</span><span>Reply rate</span><span>Sends</span><span>Replies</span></div>
+                      <div class="fl-trow"><span class="nm">Email S1 &mdash; specific compliment first</span><span class="dash">&mdash;</span><span class="zero">0</span><span class="zero">0</span></div>
+                      <div class="fl-trow"><span class="nm">Email S1 &mdash; pain point first</span><span class="dash">&mdash;</span><span class="zero">0</span><span class="zero">0</span></div>
+                    </div>
+                  </div>
+                  <div class="fl-group">
+                    <span class="eyebrow">Not measurable</span>
+                    <p class="fl-explain">Replies are only detected on email, so these can't be scored.</p>
+                    <div class="fl-table">
+                      <div class="fl-thead"><span>Approach</span><span>Reply rate</span><span>Sends</span></div>
+                      <div class="fl-trow"><span class="nm">Facebook DM S1 &mdash; specific compliment first</span><span class="dash">&mdash;</span><span class="zero">0</span></div>
+                      <div class="fl-trow"><span class="nm">Facebook DM S1 &mdash; pain point first</span><span class="dash">&mdash;</span><span class="zero">0</span></div>
+                    </div>
+                  </div>
+                </div>
+              </details>
+
+              <!-- Block E -->
+              <section class="fl-sect">
+                <span class="eyebrow">Needs you</span>
+                <span class="fl-h">Waiting on you</span>
+                <p class="fl-empty">Nothing waiting.</p>
+              </section>
+
+              <!-- Block F -->
+              <div class="fl-health quiet">
+                <span class="line">Engine ran 2h ago<i>&middot;</i>all sites ok<i>&middot;</i>checked 6h ago</span>
+                <button class="btn" type="button">Check now</button>
+              </div>
+
+            </div></div>
+          </div>
+
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================
+       SPECIMEN 2 — FULL
+       ========================================================== -->
+  <section class="spec">
+    <span class="spec-eyebrow">Specimen 02 &middot; State</span>
+    <h2 class="spec-title">Full</h2>
+    <p class="spec-cap">The same page carrying the deck's plausible six-months-of-use render, with both disclosures open, all three kinds of Block&nbsp;E row, and the health strip in its worst case &mdash; the state where the strip stops being a footer and becomes a bordered card you cannot miss.</p>
+
+    <div class="spec-q">
+      <span class="qlbl">Question 2 for Riku</span>
+      <p>The health strip's warning marker: the hued, glowing 5px dot as ruled, or the deck's <code>&#9888;</code>? The dot is the system's own grammar for &ldquo;this thing is in this state&rdquo;; the triangle renders as a colour emoji on some platforms. The words are yours either way.</p>
+    </div>
+
+    <div class="scroll">
+      <div class="frame">
+        <div class="app"><div class="app-body">
+
+          <aside class="app-side">
+            <div class="app-brand">
+              <span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span>
+              <span class="wm">RikuOS</span>
+            </div>
+            <nav class="app-nav">
+              <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4.5h13l2.5 8.5v5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18v-5z"/><path d="M3 13h5l1.5 3h5l1.5-3h5"/></svg>Queue</span>
+              <span class="navitem is-active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h18v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M9 8.5V6.5A1.5 1.5 0 0 1 10.5 5h3A1.5 1.5 0 0 1 15 6.5v2"/><path d="M3 13h18"/></svg>Freelance</span>
+              <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5h8.5"/><circle cx="15.5" cy="7.5" r="2.4"/><path d="M18.5 7.5H20"/><path d="M4 16.5h3.5"/><circle cx="10.5" cy="16.5" r="2.4"/><path d="M13.5 16.5H20"/></svg>Settings</span>
+            </nav>
+            <div>
+              <span class="grouplabel">Agents</span>
+              <div class="agents">
+                <span class="agent is-ok">chaser</span>
+                <span class="agent is-ok">expiry-sweep</span>
+                <span class="agent is-ok">watchdog</span>
+                <span class="agent is-ok">site-health</span>
+                <span>
+                  <span class="agent is-overdue">outreach-health</span>
+                  <span class="agent-cap">last ran 41h ago</span>
+                </span>
+                <span>
+                  <span class="agent is-failed">dispatcher</span>
+                  <span class="agent-cap">failed</span>
+                </span>
+              </div>
+            </div>
+            <div class="rail-foot"><span class="btn ghost">Log out</span></div>
+          </aside>
+
+          <div class="app-main">
+            <div class="topbar"><div class="topbar-in">
+              <span class="crumb"><em>read 08:14</em></span>
+            </div></div>
+
+            <div class="app-content"><div class="fl">
+
+              <h3 class="fl-title" style="margin:0">Freelance</h3>
+
+              <!-- Block A -->
+              <div class="fl-body">
+                <div class="stats">
+                  <div class="stat roi">
+                    <div class="stat-top">
+                      <span class="lbl">Drafts</span>
+                      <span class="more">Open &#8599;</span>
+                    </div>
+                    <div class="fig">6</div>
+                    <div class="sub">drafts waiting on you in ShikksTracker</div>
+                  </div>
+                  <div class="stat plain">
+                    <div class="stat-top"><span class="lbl">Contacts</span></div>
+                    <div class="fig">201</div>
+                    <div class="track"><i style="width:41%"></i></div>
+                    <div class="sub">of 486 contacts never contacted</div>
+                  </div>
+                  <div class="stat stale">
+                    <div class="stat-top"><span class="lbl">Needs you</span></div>
+                    <div class="fig">3</div>
+                    <div class="sub">waiting on you</div>
+                  </div>
+                </div>
+                <p class="fl-say"><b>2</b> approved, not yet sent</p>
+              </div>
+
+              <!-- Block B -->
+              <section class="fl-sect">
+                <span class="eyebrow">Pipeline</span>
+                <span class="fl-h">Your pipeline</span>
+                <p class="fl-sum"><b>486</b> contacts<i>&middot;</i><b>19</b> hot</p>
+                <div class="fl-stages">
+                  <div class="fl-stage"><span class="nm">Not started</span><span class="ct">201</span></div>
+                  <div class="fl-stage"><span class="nm">Contacted</span><span class="ct">178</span></div>
+                  <div class="fl-stage"><span class="nm">Replied</span><span class="ct">54</span></div>
+                  <div class="fl-stage"><span class="nm">Call booked</span><span class="ct">23</span></div>
+                  <div class="fl-stage"><span class="nm">Proposal sent</span><span class="ct">16</span></div>
+                  <div class="fl-stage"><span class="nm">Won</span><span class="ct">9</span></div>
+                  <div class="fl-stage"><span class="nm">Lost</span><span class="ct">5</span></div>
+                </div>
+              </section>
+
+              <!-- Block C -->
+              <details class="disclose fl-sect" open>
+                <summary>
+                  <span class="sumrow">
+                    <span>
+                      <span class="eyebrow">Campaigns</span>
+                      <span class="fl-h">Your campaigns</span>
+                    </span>
+                    <span class="fl-count">3</span>
+                  </span>
+                </summary>
+                <div class="fl-open">
+                  <div class="fl-table is-campaigns">
+                    <div class="fl-thead"><span>Campaign</span><span>Sent</span><span>Opened</span><span>Clicked</span><span>Replied</span></div>
+                    <div class="fl-trow"><span class="nm">September cold &mdash; Cebu caf&eacute;s</span><span>142</span><span>61</span><span>14</span><span>11</span></div>
+                    <div class="fl-trow"><span class="nm">August revival &mdash; old enquiries</span><span>68</span><span>40</span><span>9</span><span>7</span></div>
+                    <div class="fl-trow"><span class="nm">Dental clinics, Metro Manila</span><span>55</span><span>21</span><span>3</span><span>2</span></div>
+                  </div>
+                  <p class="honesty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>
+                    Open counts come from tracking pixels and undercount anyone whose mail client blocks images.
+                  </p>
+                </div>
+              </details>
+
+              <!-- Block D -->
+              <details class="disclose fl-sect" open>
+                <summary>
+                  <span class="sumrow">
+                    <span>
+                      <span class="eyebrow">Approach performance</span>
+                      <span class="fl-h">Your approaches</span>
+                    </span>
+                    <span class="fl-count"></span>
+                  </span>
+                  <span class="fl-collapsed"><span class="nm">Email S1 &mdash; specific compliment first</span><b>11%</b></span>
+                </summary>
+                <div class="fl-open">
+                  <div class="fl-group">
+                    <span class="eyebrow">Measured &mdash; email</span>
+                    <div class="fl-table">
+                      <div class="fl-thead"><span>Approach</span><span>Reply rate</span><span>Sends</span><span>Replies</span></div>
+                      <div class="fl-trow"><span class="nm">Email S1 &mdash; specific compliment first</span><span>11%</span><span>72</span><span>8</span></div>
+                      <div class="fl-trow"><span class="nm">Email S1 &mdash; pain point first</span><span>6%</span><span>54</span><span>3</span></div>
+                    </div>
+                    <p class="honesty">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>
+                      Rates are computed over small numbers of sends.
+                    </p>
+                  </div>
+                  <div class="fl-group">
+                    <span class="eyebrow">Not measurable</span>
+                    <p class="fl-explain">Replies are only detected on email, so these can't be scored.</p>
+                    <div class="fl-table">
+                      <div class="fl-thead"><span>Approach</span><span>Reply rate</span><span>Sends</span></div>
+                      <div class="fl-trow"><span class="nm">Facebook DM S1 &mdash; specific compliment first</span><span class="dash">&mdash;</span><span>31</span></div>
+                      <div class="fl-trow"><span class="nm">Facebook DM S1 &mdash; pain point first</span><span class="dash">&mdash;</span><span>27</span></div>
+                    </div>
+                  </div>
+                </div>
+              </details>
+
+              <!-- Block E -->
+              <section class="fl-sect">
+                <div class="fl-headrow">
+                  <span>
+                    <span class="eyebrow">Needs you</span>
+                    <span class="fl-h">Waiting on you</span>
+                  </span>
+                  <span class="fl-count">3</span>
+                </div>
+                <div class="fl-rows">
+                  <div class="fl-row">
+                    <div>
+                      <a class="fl-biz">Bella's Cafe <span class="arr">&#8599;</span></a>
+                      <div class="pwhen">replied 2 days ago</div>
+                      <div class="fl-snip">"Sounds good, what would the timeline look like?"</div>
+                      <div class="fl-why">Nothing drafts replies for Instagram.</div>
+                    </div>
+                    <span class="tag">Instagram</span>
+                  </div>
+                  <div class="fl-row">
+                    <div>
+                      <a class="fl-biz">Nova Dental <span class="arr">&#8599;</span></a>
+                      <div class="pwhen">replied 4 hours ago</div>
+                      <div class="fl-snip">"Do you do logos as well, or just the site?"</div>
+                      <div class="fl-why">No draft in the queue.</div>
+                    </div>
+                    <span class="tag">Email</span>
+                  </div>
+                  <div class="fl-row">
+                    <div>
+                      <a class="fl-biz">Kiddo Co <span class="arr">&#8599;</span></a>
+                      <div class="pwhen is-stale">follow-up due 3 days ago</div>
+                      <div class="fl-snip">Send the revised proposal</div>
+                    </div>
+                    <span></span>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Block F — worst case -->
+              <div class="fl-health alarm">
+                <div class="fl-warn is-stale"><i></i><span>ShikksTracker send engine last ran 3d ago</span></div>
+                <div class="fl-warn is-missing"><i></i><span>2 approved messages are stranded, unsent</span></div>
+                <div class="fl-warn is-missing"><i></i><span>Meowchi unreachable</span></div>
+                <p class="fl-fine">AzeroTech ok<i>&middot;</i>ShikksTracker ok</p>
+                <div class="fl-stamp">
+                  <span class="line">checked 6h ago</span>
+                  <button class="btn" type="button">Check now</button>
+                </div>
+              </div>
+
+            </div></div>
+          </div>
+
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================
+       SPECIMEN 3 — HERO ROW, TWO VARIANTS
+       ========================================================== -->
+  <section class="spec">
+    <span class="spec-eyebrow">Specimen 03 &middot; Choice</span>
+    <h2 class="spec-title">Hero row: two variants</h2>
+    <p class="spec-cap">Both rows carry today's real numbers at the true content width, stacked so that both drafts cards are in one view. The first is the ruled row: no graphic anywhere except the 4px proportion track on the contacts card, which draws 25-of-30 as a shape the figure does not state. The second adds one mark per draft to the drafts card &mdash; 24 marks, bleeding off the lower and right edges &mdash; and changes nothing else.</p>
+
+    <div class="spec-q">
+      <span class="qlbl">Question 1 for Riku</span>
+      <p>Bare, or the mark field? The argument for bare is that a field of 24 marks says what the 34px <code>24</code> already said, louder. The argument for the marks is that the bare row may read as a template. This is the one ruling whose cost only shows in pixels.</p>
+    </div>
+
+    <div class="stack">
+        <div class="hero-pane">
+          <p class="tab">A &mdash; ruled: no graphics except the track</p>
+          <div class="stats">
+            <div class="stat roi">
+              <div class="stat-top"><span class="lbl">Drafts</span><span class="more">Open &#8599;</span></div>
+              <div class="fig">24</div>
+              <div class="sub">drafts waiting on you in ShikksTracker</div>
+            </div>
+            <div class="stat plain">
+              <div class="stat-top"><span class="lbl">Contacts</span></div>
+              <div class="fig">25</div>
+              <div class="track"><i style="width:83%"></i></div>
+              <div class="sub">of 30 contacts never contacted</div>
+            </div>
+            <div class="stat drained">
+              <div class="stat-top"><span class="lbl">Needs you</span></div>
+              <div class="fig">0</div>
+              <div class="sub">nothing waiting</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-pane">
+          <p class="tab">B &mdash; one mark per draft on the drafts card</p>
+          <div class="stats">
+            <div class="stat roi">
+              <div class="stat-top"><span class="lbl">Drafts</span><span class="more">Open &#8599;</span></div>
+              <div class="fig">24</div>
+              <div class="sub">drafts waiting on you in ShikksTracker</div>
+              <svg class="marks" viewBox="0 0 61 21" width="150" height="52" aria-hidden="true">
+                <g fill="rgba(167,139,250,.22)">
+                  <rect x="0" y="0" width="5" height="5"/><rect x="8" y="0" width="5" height="5"/><rect x="16" y="0" width="5" height="5"/><rect x="24" y="0" width="5" height="5"/><rect x="32" y="0" width="5" height="5"/><rect x="40" y="0" width="5" height="5"/><rect x="48" y="0" width="5" height="5"/><rect x="56" y="0" width="5" height="5"/>
+                  <rect x="0" y="8" width="5" height="5"/><rect x="8" y="8" width="5" height="5"/><rect x="16" y="8" width="5" height="5"/><rect x="24" y="8" width="5" height="5"/><rect x="32" y="8" width="5" height="5"/><rect x="40" y="8" width="5" height="5"/><rect x="48" y="8" width="5" height="5"/><rect x="56" y="8" width="5" height="5"/>
+                  <rect x="0" y="16" width="5" height="5"/><rect x="8" y="16" width="5" height="5"/><rect x="16" y="16" width="5" height="5"/><rect x="24" y="16" width="5" height="5"/><rect x="32" y="16" width="5" height="5"/><rect x="40" y="16" width="5" height="5"/><rect x="48" y="16" width="5" height="5"/><rect x="56" y="16" width="5" height="5"/>
+                </g>
+              </svg>
+            </div>
+            <div class="stat plain">
+              <div class="stat-top"><span class="lbl">Contacts</span></div>
+              <div class="fig">25</div>
+              <div class="track"><i style="width:83%"></i></div>
+              <div class="sub">of 30 contacts never contacted</div>
+            </div>
+            <div class="stat drained">
+              <div class="stat-top"><span class="lbl">Needs you</span></div>
+              <div class="fig">0</div>
+              <div class="sub">nothing waiting</div>
+            </div>
+          </div>
+        </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================
+       SPECIMEN 4 — THINGS MISSING
+       ========================================================== -->
+  <section class="spec">
+    <span class="spec-eyebrow">Specimen 04 &middot; Failure</span>
+    <h2 class="spec-title">Whole page down, and the smaller absences</h2>
+    <p class="spec-cap">When ShikksTracker cannot be reached at all, blocks A to E are not drawn drained &mdash; they are absent, and one statement replaces them. The health strip survives because site results are stored locally. Beside it: what a single failed block looks like, and what &ldquo;the field did not arrive&rdquo; looks like next to a measured zero &mdash; once inside a block, once on the hero row.</p>
+
+    <div class="spec-q">
+      <span class="qlbl">Question 4 for Riku &mdash; wording</span>
+      <p>Four strings and one column header the system needs and the deck does not have. Three of the strings are shown in place in the small specimens on the right; the fourth sits under the measured group in specimen 02. The header is <code>Campaign</code>, over Block C's first column, parallel to Block D's <code>Approach</code>.</p>
+      <ul>
+        <li><code>ShikksTracker didn't report how many are hot.</code></li>
+        <li><code>ShikksTracker didn't report every pipeline stage.</code></li>
+        <li><code>sites not checked since 2d ago</code></li>
+        <li><code>Rates are computed over small numbers of sends.</code></li>
+        <li><code>Campaign</code></li>
+      </ul>
+    </div>
+
+    <div class="scroll">
+      <div class="pair">
+
+        <div class="frame">
+          <div class="app"><div class="app-body">
+
+            <aside class="app-side">
+              <div class="app-brand">
+                <span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span>
+                <span class="wm">RikuOS</span>
+              </div>
+              <nav class="app-nav">
+                <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4.5h13l2.5 8.5v5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18v-5z"/><path d="M3 13h5l1.5 3h5l1.5-3h5"/></svg>Queue</span>
+                <span class="navitem is-active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h18v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M9 8.5V6.5A1.5 1.5 0 0 1 10.5 5h3A1.5 1.5 0 0 1 15 6.5v2"/><path d="M3 13h18"/></svg>Freelance</span>
+                <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5h8.5"/><circle cx="15.5" cy="7.5" r="2.4"/><path d="M18.5 7.5H20"/><path d="M4 16.5h3.5"/><circle cx="10.5" cy="16.5" r="2.4"/><path d="M13.5 16.5H20"/></svg>Settings</span>
+              </nav>
+              <div>
+                <span class="grouplabel">Agents</span>
+                <div class="agents">
+                  <span class="agent is-ok">chaser</span>
+                  <span class="agent is-ok">expiry-sweep</span>
+                  <span class="agent is-ok">watchdog</span>
+                  <span class="agent is-ok">site-health</span>
+                  <span class="agent is-ok">outreach-health</span>
+                  <span class="agent is-ok">dispatcher</span>
+                </div>
+              </div>
+              <div class="rail-foot"><span class="btn ghost">Log out</span></div>
+            </aside>
+
+            <div class="app-main">
+              <div class="topbar"><div class="topbar-in">
+                <span class="crumb"><em>read 14:32</em></span>
+              </div></div>
+
+              <div class="app-content"><div class="fl">
+                <h3 class="fl-title" style="margin:0">Freelance</h3>
+
+                <div class="fl-fail">
+                  <i></i>
+                  <div>
+                    <div class="said">Couldn't reach ShikksTracker.</div>
+                    <div class="because">State of play, pipeline, campaigns, approaches and what's waiting all come from there.</div>
+                  </div>
+                </div>
+
+                <div class="fl-health quiet">
+                  <span class="line">Engine &mdash; unknown<i>&middot;</i>Meowchi ok<i>&middot;</i>checked 6h ago</span>
+                  <button class="btn" type="button">Check now</button>
+                </div>
+              </div></div>
+            </div>
+
+          </div></div>
+        </div>
+
+        <div class="side">
+          <div class="mini">
+            <p class="tab">One source down &mdash; only that block says so</p>
+            <span class="eyebrow">Pipeline</span>
+            <span class="fl-h">Your pipeline</span>
+            <div class="fl-fail">
+              <i></i>
+              <div><div class="said">Couldn't load the pipeline.</div></div>
+            </div>
+          </div>
+
+          <div class="mini">
+            <p class="tab">Not reported &mdash; distinct from a measured zero</p>
+            <span class="eyebrow">Pipeline</span>
+            <span class="fl-h">Your pipeline</span>
+            <p class="fl-sum"><b>30</b> contacts</p>
+            <p class="fl-absent" style="margin-top:6px">ShikksTracker didn't report how many are hot.</p>
+            <div class="fl-stages">
+              <div class="fl-stage"><span class="nm">Not started</span><span class="ct">25</span></div>
+              <div class="fl-stage"><span class="nm">Contacted</span><span class="ct">3</span></div>
+              <div class="fl-stage"><span class="nm">Replied</span><span class="ct">2</span></div>
+            </div>
+            <p class="fl-note">Nothing yet at won or lost</p>
+            <p class="fl-absent">ShikksTracker didn't report every pipeline stage.</p>
+            <div class="fl-health quiet" style="margin-top:44px">
+              <span class="line">Engine ran 2h ago<i>&middot;</i><span class="aged">sites not checked since 2d ago</span></span>
+              <button class="btn" type="button">Check now</button>
+            </div>
+          </div>
+
+          <div class="mini">
+            <p class="tab">Not reported beside a measured zero</p>
+            <div class="minipair">
+              <div class="stat blank">
+                <div class="stat-top"><span class="lbl">Drafts</span></div>
+                <div class="fig">&mdash;</div>
+                <div class="sub">ShikksTracker didn't report how many drafts are waiting</div>
+              </div>
+              <div class="stat drained">
+                <div class="stat-top"><span class="lbl">Needs you</span></div>
+                <div class="fig">0</div>
+                <div class="sub">nothing waiting</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================
+       SPECIMEN 5 — THE QUEUE PAGE, RE-SKINNED
+       ========================================================== -->
+  <section class="spec">
+    <span class="spec-eyebrow">Specimen 05 &middot; Re-skin</span>
+    <h2 class="spec-title">The queue page inside the shell</h2>
+    <p class="spec-cap">The existing <code>/queue</code> markup, unchanged, wearing the new stylesheet: every treatment here comes from one rule per selector &mdash; <code>.card</code>, <code>.badge</code>, <code>.meta</code>, <code>pre.body</code>, bare <code>button</code>, <code>.secondary</code>, <code>.danger</code> &mdash; so no TSX is touched. Scroll right for the same page with its inline header deleted &mdash; and with it the second <code>Settings</code> link, the <code>RikuOS &mdash; Queue</code> heading, and the second <code>Log out</code>. One cost is worth naming rather than discovering later: with their solid active state gone, the six status filters now differ only by border and label brightness, so the row reads as one strip until you look. That is the price of one treatment per selector, not a defect.</p>
+
+    <div class="spec-q">
+      <span class="qlbl">Question 3 for Riku</span>
+      <p>Keep or delete the duplicated header? In the left frame the inline <code>Settings</code> link and the rail's <code>Settings</code> nav item sit in the same eyeful, and <code>RikuOS &mdash; Queue</code> puts the app name and the page name at display weight under a rail that already carries both. The two <code>Log out</code> buttons are the smallest of the three: they are ~300px apart and rarely on screen together. Deleting the ten inline lines on queue and settings is the one place where &ldquo;no TSX change&rdquo; and &ldquo;the shell works&rdquo; genuinely conflict. The recommendation is delete.</p>
+    </div>
+
+    <div class="scroll">
+      <div class="pair">
+
+        <!-- LEFT: as it is today -->
+        <div class="pane">
+          <p class="tab">A &mdash; as the page is today: rail plus its own inline header</p>
+          <div class="frame">
+            <div class="app"><div class="app-body">
+              <aside class="app-side">
+                <div class="app-brand">
+                  <span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span>
+                  <span class="wm">RikuOS</span>
+                </div>
+                <nav class="app-nav">
+                  <span class="navitem is-active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4.5h13l2.5 8.5v5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18v-5z"/><path d="M3 13h5l1.5 3h5l1.5-3h5"/></svg>Queue</span>
+                  <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h18v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M9 8.5V6.5A1.5 1.5 0 0 1 10.5 5h3A1.5 1.5 0 0 1 15 6.5v2"/><path d="M3 13h18"/></svg>Freelance</span>
+                  <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5h8.5"/><circle cx="15.5" cy="7.5" r="2.4"/><path d="M18.5 7.5H20"/><path d="M4 16.5h3.5"/><circle cx="10.5" cy="16.5" r="2.4"/><path d="M13.5 16.5H20"/></svg>Settings</span>
+                </nav>
+                <div>
+                  <span class="grouplabel">Agents</span>
+                  <div class="agents">
+                    <span class="agent is-ok">chaser</span>
+                    <span class="agent is-ok">expiry-sweep</span>
+                    <span class="agent is-ok">watchdog</span>
+                    <span class="agent is-ok">site-health</span>
+                    <span class="agent is-ok">outreach-health</span>
+                    <span class="agent is-ok">dispatcher</span>
+                  </div>
+                </div>
+                <div class="rail-foot"><span class="btn ghost">Log out</span></div>
+              </aside>
+
+              <div class="app-main">
+                <div class="topbar"><div class="topbar-in">
+                  <span class="crumb"><em>read 14:32</em></span>
+                </div></div>
+
+                <main>
+                  <header class="row" style="justify-content:space-between;align-items:center">
+                    <h1>RikuOS &mdash; Queue</h1>
+                    <span class="row">
+                      <a>Settings</a>
+                      <button class="secondary" type="button">Log out</button>
+                    </span>
+                  </header>
+
+                  <div class="row">
+                    <button type="button">pending</button>
+                    <button class="secondary" type="button">approved</button>
+                    <button class="secondary" type="button">edited approved</button>
+                    <button class="secondary" type="button">rejected</button>
+                    <button class="secondary" type="button">expired</button>
+                    <button class="secondary" type="button">all</button>
+                  </div>
+
+                  <div class="card">
+                    <div class="row" style="justify-content:space-between;margin-top:0">
+                      <strong>Follow up: Nova Dental</strong>
+                      <span class="badge">pending</span>
+                    </div>
+                    <p class="meta">chaser &middot; followup-draft &middot; 9/5/2026, 10:12:04 PM</p>
+                    <p>Replied 1 day ago on email and has had no answer since. They said: "Do you do logos as well, or just the site?"</p>
+                    <p class="meta">Their reply: &ldquo;Do you do logos as well, or just the site?&rdquo;</p>
+                    <pre class="body">Hi Nova Dental,
+
+Yes &mdash; logos are part of what I do. They usually come bundled with a site build rather than priced on their own.
+
+I can put together a short outline of what a site plus a logo would look like for the clinic, with the timeline and the cost, and send it over this week.
+
+Riku</pre>
+                    <div class="row">
+                      <button type="button">Approve</button>
+                      <button class="secondary" type="button">Edit</button>
+                      <button class="danger" type="button">Reject</button>
+                    </div>
+                  </div>
+
+                  <div class="card">
+                    <div class="row" style="justify-content:space-between;margin-top:0">
+                      <strong>Follow up: Verde Landscaping</strong>
+                      <span class="badge">pending</span>
+                    </div>
+                    <p class="meta">chaser &middot; followup-draft &middot; 9/5/2026, 10:12:05 PM</p>
+                    <p>Replied 3 days ago on email and has had no answer since. They said: "Can you send over some examples of past work?"</p>
+                    <p class="meta">Their reply: &ldquo;Can you send over some examples of past work?&rdquo;</p>
+                    <pre class="body">Hi Verde Landscaping,
+
+Happy to send examples &mdash; here are three recent builds in the same bracket as the one we talked about, with what each cost and how long it took.
+
+If any of them are close to what you had in mind I can put a proper outline together for you.
+
+Riku</pre>
+                    <div class="row">
+                      <button type="button">Approve</button>
+                      <button class="secondary" type="button">Edit</button>
+                      <button class="danger" type="button">Reject</button>
+                    </div>
+                  </div>
+
+                  <div class="card">
+                    <p class="meta">Notifications</p>
+                    <div class="row">
+                      <button class="secondary" type="button">Send test push</button>
+                      <button class="secondary" type="button">Re-register this device</button>
+                    </div>
+                  </div>
+                </main>
+              </div>
+            </div></div>
+          </div>
+        </div>
+
+        <!-- RIGHT: inline header deleted -->
+        <div class="pane">
+          <p class="tab">B &mdash; the ten inline header lines deleted (recommended)</p>
+          <div class="frame">
+            <div class="app"><div class="app-body">
+              <aside class="app-side">
+                <div class="app-brand">
+                  <span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span>
+                  <span class="wm">RikuOS</span>
+                </div>
+                <nav class="app-nav">
+                  <span class="navitem is-active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4.5h13l2.5 8.5v5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18v-5z"/><path d="M3 13h5l1.5 3h5l1.5-3h5"/></svg>Queue</span>
+                  <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h18v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M9 8.5V6.5A1.5 1.5 0 0 1 10.5 5h3A1.5 1.5 0 0 1 15 6.5v2"/><path d="M3 13h18"/></svg>Freelance</span>
+                  <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5h8.5"/><circle cx="15.5" cy="7.5" r="2.4"/><path d="M18.5 7.5H20"/><path d="M4 16.5h3.5"/><circle cx="10.5" cy="16.5" r="2.4"/><path d="M13.5 16.5H20"/></svg>Settings</span>
+                </nav>
+                <div>
+                  <span class="grouplabel">Agents</span>
+                  <div class="agents">
+                    <span class="agent is-ok">chaser</span>
+                    <span class="agent is-ok">expiry-sweep</span>
+                    <span class="agent is-ok">watchdog</span>
+                    <span class="agent is-ok">site-health</span>
+                    <span class="agent is-ok">outreach-health</span>
+                    <span class="agent is-ok">dispatcher</span>
+                  </div>
+                </div>
+                <div class="rail-foot"><span class="btn ghost">Log out</span></div>
+              </aside>
+
+              <div class="app-main">
+                <div class="topbar"><div class="topbar-in">
+                  <span class="crumb"><em>read 14:32</em></span>
+                </div></div>
+
+                <main>
+                  <div class="row">
+                    <button type="button">pending</button>
+                    <button class="secondary" type="button">approved</button>
+                    <button class="secondary" type="button">edited approved</button>
+                    <button class="secondary" type="button">rejected</button>
+                    <button class="secondary" type="button">expired</button>
+                    <button class="secondary" type="button">all</button>
+                  </div>
+
+                  <div class="card">
+                    <div class="row" style="justify-content:space-between;margin-top:0">
+                      <strong>Follow up: Nova Dental</strong>
+                      <span class="badge">pending</span>
+                    </div>
+                    <p class="meta">chaser &middot; followup-draft &middot; 9/5/2026, 10:12:04 PM</p>
+                    <p>Replied 1 day ago on email and has had no answer since. They said: "Do you do logos as well, or just the site?"</p>
+                    <p class="meta">Their reply: &ldquo;Do you do logos as well, or just the site?&rdquo;</p>
+                    <pre class="body">Hi Nova Dental,
+
+Yes &mdash; logos are part of what I do. They usually come bundled with a site build rather than priced on their own.
+
+I can put together a short outline of what a site plus a logo would look like for the clinic, with the timeline and the cost, and send it over this week.
+
+Riku</pre>
+                    <div class="row">
+                      <button type="button">Approve</button>
+                      <button class="secondary" type="button">Edit</button>
+                      <button class="danger" type="button">Reject</button>
+                    </div>
+                  </div>
+
+                  <div class="card">
+                    <div class="row" style="justify-content:space-between;margin-top:0">
+                      <strong>Follow up: Verde Landscaping</strong>
+                      <span class="badge">pending</span>
+                    </div>
+                    <p class="meta">chaser &middot; followup-draft &middot; 9/5/2026, 10:12:05 PM</p>
+                    <p>Replied 3 days ago on email and has had no answer since. They said: "Can you send over some examples of past work?"</p>
+                    <p class="meta">Their reply: &ldquo;Can you send over some examples of past work?&rdquo;</p>
+                    <pre class="body">Hi Verde Landscaping,
+
+Happy to send examples &mdash; here are three recent builds in the same bracket as the one we talked about, with what each cost and how long it took.
+
+If any of them are close to what you had in mind I can put a proper outline together for you.
+
+Riku</pre>
+                    <div class="row">
+                      <button type="button">Approve</button>
+                      <button class="secondary" type="button">Edit</button>
+                      <button class="danger" type="button">Reject</button>
+                    </div>
+                  </div>
+
+                  <div class="card">
+                    <p class="meta">Notifications</p>
+                    <div class="row">
+                      <button class="secondary" type="button">Send test push</button>
+                      <button class="secondary" type="button">Re-register this device</button>
+                    </div>
+                  </div>
+                </main>
+              </div>
+            </div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================
+       SPECIMEN 6 — AGENT BADGE LEGEND
+       ========================================================== -->
+  <section class="spec">
+    <span class="spec-eyebrow">Specimen 06 &middot; Reference</span>
+    <h2 class="spec-title">Agent badge legend</h2>
+    <p class="spec-cap">All six states once, on the rail's own ground. Off, never run and unknown are the same grey badge with different captions, because they are three ways of having no reading. Failed and overdue take a tinted fill so a broken rail has one thing that glows. A healthy agent is a quiet green word with no caption &mdash; the hue is the whole message.</p>
+
+    <div class="legendgrid">
+      <div>
+        <p class="st">Off</p>
+        <span class="agent is-grey">chaser</span>
+        <span class="agent-cap">off</span>
+      </div>
+      <div>
+        <p class="st">Never run</p>
+        <span class="agent is-grey">expiry-sweep</span>
+        <span class="agent-cap">never run</span>
+      </div>
+      <div>
+        <p class="st">Unknown</p>
+        <span class="agent is-grey">watchdog</span>
+        <span class="agent-cap">&mdash;</span>
+      </div>
+      <div>
+        <p class="st">Failed</p>
+        <span class="agent is-failed">site-health</span>
+        <span class="agent-cap">2 items failed</span>
+      </div>
+      <div>
+        <p class="st">Overdue</p>
+        <span class="agent is-overdue">outreach-health</span>
+        <span class="agent-cap">last ran 41h ago</span>
+      </div>
+      <div>
+        <p class="st">Ok</p>
+        <span class="agent is-ok">dispatcher</span>
+      </div>
+    </div>
+  </section>
+
+</div>

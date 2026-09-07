@@ -60,6 +60,7 @@ Five surfaces are planned: the **Approval Queue** (the core), **Freelance** (thi
 It is read-only. Nothing on it sends, drafts, approves or edits — every action links out to ShikksTracker, where the client records live.
 
 **Mobile-first.** Riku reads this on a phone. Assume a narrow screen first and let it widen; do not design a desktop dashboard and shrink it.
+*Superseded for P8 by decision 1 of 2026-09-06 (desktop first; phone pass later).*
 
 **This is the densest page in the app** and deliberately the first one designed. If a design system survives this page, it survives the rest.
 
@@ -469,7 +470,7 @@ Engine ran 2h ago · all sites ok · checked 6h ago
 
 ## 9. Checklist for whoever designs this
 
-- [ ] Reads well on a phone first
+- [ ] Reads well on a phone first — *superseded for P8 by decision 1 of 2026-09-06 (desktop first; phone pass later)*
 - [ ] Looks finished with §7's near-empty content
 - [ ] Does not break with §8's full content
 - [ ] "Not reported" is visually distinct from "0"

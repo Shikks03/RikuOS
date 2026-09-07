@@ -378,7 +378,7 @@ needs Personal's calendar to exist.
 
 | # | Phase | Depends on | Done when |
 |---|-------|-----------|-----------|
-| P8 | **Freelance page.** The pipeline view on real feeds, built plain. | P1, P5 | The page is live on real OS-API data with no manual entry — D11 satisfied for one page. |
+| P8 | **Freelance page.** The pipeline view on real feeds, shipped designed (S17, P9 folded in). | P1, P5 | The page is live on real OS-API data with no manual entry — D11 satisfied for one page. |
 | ~~P9~~ | ~~**Design foundation.**~~ **FOLDED INTO P8 on 2026-09-06 (decision S17).** Riku had the design system built externally from P8's content deck *before* P8 was built, so a plain build followed by a rebuild would build the same page twice. The system is still proven by the Freelance page — that has not changed, only the order. | — | — |
 | P9b | **Quest board.** Ongoing freelance projects from `Freelance Projects`, each with an agent-maintained checklist, synced by a script and shown as quests with a real percentage. Designed 2026-09-05 (S16). | P8 | One real, ongoing freelance project appears with a percentage matching its checklist, put there by a sync of the real folder. Truly finishing it needs a live client project to exist. |
 | P10 | **Personal: calendar, to-dos, Today.** Google sign-in, live calendar read with toggleable layers, create-through-to-Google, the sectioned to-do store, and the Today section added to the morning digest (S13). | P3, P8 | One morning push names what is actually due and scheduled that day — the section P5a-7 dropped for want of a to-do store. |

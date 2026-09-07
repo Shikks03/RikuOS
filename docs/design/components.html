@@ -1,0 +1,1695 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Design reference for RikuOS: a teardown of the Claude Code OS dashboard UI, plus the RikuOS component layer.">
+<style>
+  html{color-scheme:dark}
+  body{margin:0}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<title>Claude OS UI Teardown</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* ============================================================
+   Claude OS UI Teardown — single visual world, deliberately dark.
+   The subject is a dark instrument panel; specimens must sit on
+   their true ground, so the whole page commits to that ground.
+   ============================================================ */
+:root{
+  /* ground + structure */
+  --void:#08090B;
+  --panel:#0E1013;
+  --raised:#14171C;
+  --sunk:#050608;
+  --line:#1D222A;
+  --line-soft:#15191F;
+
+  /* ink */
+  --ink:#E9ECF0;
+  --ink-2:#98A1AD;
+  --ink-3:#5B6470;
+  --ink-4:#3A424C;
+
+  /* semantic hues lifted from the source system */
+  --spend:#FF8A3D;
+  --spend-dim:#B4551E;
+  --save:#35D399;
+  --save-dim:#177A57;
+  --roi:#A78BFA;
+  --session:#5FA5FA;
+  --alert:#F87171;
+  --amber:#FBBF24;
+  --pink:#F472B6;
+
+  /* type */
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --body:'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,monospace;
+
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px;
+  --maxw:920px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--void);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:15px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--spend);text-decoration:none;border-bottom:1px solid rgba(255,138,61,.3)}
+a:hover{border-bottom-color:var(--spend)}
+:focus-visible{outline:2px solid var(--spend);outline-offset:3px;border-radius:3px}
+
+/* ---------- page frame ---------- */
+.frame{
+  display:grid;
+  grid-template-columns:216px minmax(0,1fr);
+  gap:56px;
+  max-width:1240px;
+  margin:0 auto;
+  padding:0 32px 120px;
+}
+@media (max-width:900px){
+  .frame{grid-template-columns:1fr;gap:0;padding:0 20px 80px}
+  .rail{position:static!important;padding-top:0!important;border-right:0!important;margin-bottom:40px}
+}
+
+/* ---------- left rail (echoes the OS's own sidebar) ---------- */
+.rail{
+  position:sticky;top:0;align-self:start;
+  height:100vh;padding:36px 24px 36px 0;
+  border-right:1px solid var(--line-soft);
+  display:flex;flex-direction:column;gap:26px;
+  overflow-y:auto;
+}
+.mark{display:flex;align-items:center;gap:10px}
+.mark-tile{
+  width:30px;height:30px;border-radius:9px;flex:none;
+  background:linear-gradient(150deg,#FF9E5C,#F2622B);
+  display:grid;place-items:center;
+  box-shadow:0 0 0 1px rgba(255,158,92,.35),0 6px 18px -8px rgba(242,98,43,.9);
+}
+.mark-tile svg{width:17px;height:17px;display:block}
+.mark-name{font-family:var(--display);font-weight:600;font-size:14px;letter-spacing:-.01em}
+.mark-sub{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--ink-3);text-transform:uppercase}
+.rail nav{display:flex;flex-direction:column;gap:1px}
+.rail nav a{
+  font-size:13px;color:var(--ink-2);padding:6px 10px;border-radius:7px;
+  border-bottom:0;display:flex;align-items:center;gap:9px;
+}
+.rail nav a:hover{background:var(--raised);color:var(--ink)}
+.rail nav .dot{width:5px;height:5px;border-radius:50%;background:var(--ink-4);flex:none}
+.rail-label{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-4);padding-left:10px;
+}
+.rail-foot{margin-top:auto;font-size:11.5px;color:var(--ink-4);line-height:1.5}
+
+/* ---------- masthead ---------- */
+.masthead{padding:76px 0 0;max-width:var(--maxw)}
+.kicker{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--spend);display:flex;align-items:center;gap:10px;margin-bottom:22px;
+}
+.kicker::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,rgba(255,138,61,.45),transparent)}
+h1{
+  font-family:var(--display);font-weight:700;font-size:clamp(38px,6vw,62px);
+  line-height:1.02;letter-spacing:-.032em;margin:0 0 22px;text-wrap:balance;
+}
+h1 em{font-style:normal;color:var(--spend)}
+.standfirst{font-size:18px;line-height:1.55;color:var(--ink-2);max-width:62ch;margin:0}
+.meta-strip{
+  display:flex;flex-wrap:wrap;gap:0;margin:38px 0 0;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+}
+.meta-strip div{padding:14px 22px 14px 0;margin-right:22px;border-right:1px solid var(--line-soft)}
+.meta-strip div:last-child{border-right:0}
+.meta-strip dt{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin:0 0 3px}
+.meta-strip dd{margin:0;font-size:13px;color:var(--ink-2)}
+
+/* ---------- sections ---------- */
+section{max-width:var(--maxw);padding-top:74px;scroll-margin-top:24px}
+.eyebrow{
+  font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink-3);display:block;margin-bottom:9px;
+}
+h2{
+  font-family:var(--display);font-weight:600;font-size:27px;letter-spacing:-.02em;
+  margin:0 0 12px;text-wrap:balance;
+}
+h3{font-family:var(--display);font-weight:600;font-size:16px;letter-spacing:-.01em;margin:0 0 6px}
+.lede{color:var(--ink-2);max-width:64ch;margin:0 0 26px;font-size:15px}
+p{max-width:66ch}
+
+/* ---------- specimen well ---------- */
+.well{
+  background:var(--sunk);
+  border:1px solid var(--line);
+  border-radius:var(--r-lg);
+  padding:30px;
+  margin:0 0 18px;
+  overflow-x:auto;
+  background-image:radial-gradient(rgba(255,255,255,.028) 1px,transparent 1px);
+  background-size:22px 22px;
+}
+.well.flush{padding:0;background-image:none}
+.well-row{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start}
+.caption{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--ink-4);margin:0 0 26px;
+}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:0 30px;margin:0 0 8px}
+.notes>div{padding:13px 0;border-top:1px solid var(--line-soft)}
+.notes dt{font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+.notes dd{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.55}
+code{font-family:var(--mono);font-size:.88em;color:var(--ink);background:var(--raised);padding:1px 5px;border-radius:4px}
+
+/* ============================================================
+   SPECIMENS — rebuilt components from the source system
+   ============================================================ */
+
+/* app chrome miniature */
+.app{
+  border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;
+  background:#0A0C0F;min-width:640px;
+}
+.app-body{display:grid;grid-template-columns:158px minmax(0,1fr)}
+.app-side{background:#0B0D11;border-right:1px solid var(--line-soft);padding:14px 10px;display:flex;flex-direction:column;gap:16px}
+.app-brand{display:flex;align-items:center;gap:8px;padding:0 4px}
+.app-brand .tile{width:20px;height:20px;border-radius:6px;background:linear-gradient(150deg,#FF9E5C,#F2622B);flex:none;display:grid;place-items:center}
+.app-brand .tile svg{width:12px;height:12px}
+.app-brand span{font-family:var(--display);font-weight:600;font-size:11.5px}
+.app-nav{display:flex;flex-direction:column;gap:2px}
+.navitem{
+  display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:7px;
+  font-size:11.5px;color:var(--ink-3);
+}
+.navitem svg{width:13px;height:13px;flex:none;opacity:.85}
+.navitem.is-active{background:#171B21;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.grouplabel{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);padding:0 9px;margin-top:6px}
+.agent{
+  display:block;padding:8px 9px;border-radius:8px;background:#12151A;
+  border:1px solid var(--line);font-family:var(--mono);font-size:10px;
+  font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+}
+.agent.hermes{color:var(--amber);border-color:rgba(251,191,36,.22);background:linear-gradient(180deg,rgba(251,191,36,.09),rgba(251,191,36,.02))}
+.agent.claw{color:var(--alert);border-color:rgba(248,113,113,.22);background:linear-gradient(180deg,rgba(248,113,113,.09),rgba(248,113,113,.02))}
+.app-main{min-width:0}
+.topbar{
+  display:flex;align-items:center;gap:12px;padding:11px 16px;
+  border-bottom:1px solid var(--line-soft);
+}
+.crumb{font-size:11.5px;color:var(--ink-2)}
+.crumb b{font-weight:500;color:var(--ink)}
+.crumb span{color:var(--ink-4);margin:0 5px}
+.statuspill{
+  display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+  background:rgba(53,211,153,.08);border:1px solid rgba(53,211,153,.2);
+  font-size:10.5px;color:#7FE3BE;
+}
+.statuspill i{width:5px;height:5px;border-radius:50%;background:var(--save);box-shadow:0 0 6px var(--save)}
+.searchbox{
+  margin-left:auto;display:flex;align-items:center;gap:7px;
+  background:#101318;border:1px solid var(--line);border-radius:8px;
+  padding:5px 8px 5px 10px;min-width:190px;font-size:11px;color:var(--ink-4);
+}
+.searchbox kbd{
+  margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--ink-3);
+  background:#181C22;border:1px solid var(--line);border-radius:4px;padding:1px 4px;
+}
+.iconbtn{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;color:var(--ink-3)}
+.iconbtn svg{width:14px;height:14px}
+.app-content{padding:20px 18px}
+
+/* section rhythm demo */
+.rhythm .rhy-eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3)}
+.rhythm .rhy-title{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.015em;margin-top:5px}
+
+/* stat hero cards */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;min-width:660px}
+.stat{
+  position:relative;overflow:hidden;border-radius:var(--r-lg);
+  padding:15px 16px 18px;min-height:132px;
+  border:1px solid var(--line);background:var(--raised);
+  display:flex;flex-direction:column;
+}
+.stat-top{display:flex;align-items:center;gap:7px;position:relative;z-index:2}
+.stat-top .lbl{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase}
+.stat-top .more{margin-left:auto;font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4)}
+.stat .fig{
+  font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:-.03em;
+  margin-top:auto;position:relative;z-index:2;font-variant-numeric:tabular-nums;
+}
+.stat .sub{font-size:10.5px;color:var(--ink-3);position:relative;z-index:2;margin-top:2px}
+.stat svg.viz{position:absolute;left:0;right:0;bottom:0;width:100%;height:74px;z-index:1}
+.stat.spend{background:linear-gradient(155deg,#2A1408,#141013 62%);border-color:rgba(255,138,61,.2)}
+.stat.spend .lbl,.stat.spend .fig{color:var(--spend)}
+.stat.save{background:linear-gradient(155deg,#052620,#0F1417 62%);border-color:rgba(53,211,153,.2)}
+.stat.save .lbl,.stat.save .fig{color:var(--save)}
+.stat.roi{background:linear-gradient(155deg,#171233,#111117 62%);border-color:rgba(167,139,250,.2)}
+.stat.roi .lbl{color:var(--roi)}
+.stat.roi .fig{color:#EDE9FE}
+
+/* segmented + range controls */
+.segmented{display:inline-flex;background:#101318;border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px}
+.segmented button{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  background:none;border:0;color:var(--ink-3);padding:6px 12px;border-radius:6px;cursor:pointer;
+}
+.segmented button.on{background:#1D222A;color:var(--ink)}
+.range{display:inline-flex;gap:2px;background:none}
+.range button{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  background:none;border:0;color:var(--ink-3);padding:6px 13px;border-radius:999px;cursor:pointer;
+}
+.range button.on{background:var(--ink);color:#0A0C0F;font-weight:700}
+
+/* provider card */
+.providers{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;min-width:620px}
+.provider{
+  display:flex;align-items:center;gap:11px;padding:13px 14px;
+  border:1px solid var(--line);border-radius:var(--r-md);background:var(--raised);
+}
+.provider .logo{
+  width:28px;height:28px;border-radius:8px;flex:none;display:grid;place-items:center;
+  font-family:var(--display);font-weight:700;font-size:12px;
+}
+.provider .nm{font-size:12.5px;font-weight:600}
+.provider .sub{font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4)}
+.provider .amt{margin-left:auto;text-align:right}
+.provider .amt b{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:-.02em}
+.provider .amt span{display:block;font-size:9.5px;color:var(--ink-4)}
+
+/* usage rows */
+.usage{display:flex;flex-direction:column;min-width:640px}
+.urow{display:grid;grid-template-columns:64px 176px minmax(0,1fr);gap:16px;align-items:center;padding:16px 0;border-top:1px solid var(--line-soft)}
+.urow:first-child{border-top:0}
+.ring{position:relative;width:52px;height:52px}
+.ring svg{transform:rotate(-90deg);display:block}
+.ring b{
+  position:absolute;inset:0;display:grid;place-items:center;
+  font-family:var(--display);font-size:11.5px;font-weight:700;letter-spacing:-.02em;
+}
+.uname{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.uname .ic{width:19px;height:19px;border-radius:6px;flex:none;display:grid;place-items:center;font-size:9px;font-weight:700;font-family:var(--display)}
+.uplan{font-size:10.5px;color:var(--ink-3);margin-top:2px}
+.uchip{
+  display:inline-block;font-family:var(--mono);font-size:8px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-4);border:1px solid var(--line);
+  border-radius:4px;padding:1px 5px;margin-top:5px;
+}
+.bars{display:flex;flex-direction:column;gap:11px;min-width:0}
+.bar-head{display:flex;align-items:baseline;gap:8px;font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4)}
+.bar-head b{font-family:var(--body);font-size:12px;letter-spacing:0;text-transform:none;color:var(--ink);font-variant-numeric:tabular-nums}
+.bar-head .rt{margin-left:auto;display:flex;gap:14px;align-items:baseline}
+.bar-head .rt em{font-style:normal;color:var(--ink-3);letter-spacing:.1em}
+.track{height:4px;border-radius:99px;background:#161A20;overflow:hidden;margin-top:5px}
+.track i{display:block;height:100%;border-radius:99px}
+
+/* skill cards */
+.skills{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;min-width:660px}
+.skill{border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;background:var(--raised)}
+.skill-cap{height:74px;position:relative;display:grid;place-items:center}
+.skill-cap .glass{
+  width:34px;height:34px;border-radius:11px;display:grid;place-items:center;
+  background:rgba(10,10,14,.42);backdrop-filter:blur(7px);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
+}
+.skill-cap .glass svg{width:16px;height:16px;color:#fff}
+.skill-cap .live{position:absolute;top:9px;right:9px;width:6px;height:6px;border-radius:50%;background:var(--save);box-shadow:0 0 7px var(--save)}
+.skill-body{padding:13px 14px 14px}
+.skill-body .nm{font-size:13px;font-weight:600}
+.skill-body .ago{font-size:10px;color:var(--ink-4);margin-top:1px}
+.skill-body .saved{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:-.03em;color:var(--save);margin-top:11px;font-variant-numeric:tabular-nums}
+.skill-body .saved span{font-family:var(--body);font-weight:400;font-size:10.5px;color:var(--ink-3);margin-left:6px;letter-spacing:0}
+.skill-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line-soft)}
+.skill-stats dt{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4)}
+.skill-stats dd{margin:2px 0 0;font-size:11.5px;font-weight:600}
+
+/* insight card */
+.insight{
+  display:grid;grid-template-columns:210px minmax(0,1fr);gap:20px;
+  border-radius:var(--r-lg);padding:16px;min-width:620px;
+  background:linear-gradient(120deg,#1B1440,#120F22 70%);
+  border:1px solid rgba(167,139,250,.2);
+}
+.insight-art{border-radius:var(--r-md);overflow:hidden;position:relative;min-height:152px}
+.insight-art canvas{display:block;width:100%;height:100%}
+.insight-art .cap{position:absolute;left:12px;bottom:11px;right:12px}
+.insight-art .cap span{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.62)}
+.insight-art .cap b{display:block;font-family:var(--display);font-size:14px;font-weight:600;color:#fff;letter-spacing:-.01em}
+.insight-why h4{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--roi);margin:2px 0 11px;font-weight:500}
+.insight-why ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.insight-why li{font-size:12.5px;color:var(--ink-2);padding-left:15px;position:relative;line-height:1.5}
+.insight-why li::before{content:"";position:absolute;left:0;top:8px;width:4px;height:4px;border-radius:50%;background:var(--roi)}
+.insight-act{display:flex;gap:9px;margin-top:16px;align-items:center;flex-wrap:wrap}
+.dots{margin-left:auto;display:flex;gap:5px;align-items:center}
+.dots i{width:5px;height:5px;border-radius:50%;background:var(--ink-4)}
+.dots i.on{width:16px;border-radius:99px;background:var(--ink-2)}
+
+/* buttons */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;cursor:pointer;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  padding:8px 14px;border-radius:999px;background:none;
+  border:1px solid var(--line);color:var(--ink-2);
+}
+.btn:hover{border-color:var(--ink-4);color:var(--ink)}
+.btn svg{width:12px;height:12px}
+.btn.go{border-color:rgba(53,211,153,.4);color:#8AE9C6}
+.btn.go:hover{background:rgba(53,211,153,.09);border-color:var(--save)}
+.btn.solid{background:var(--ink);color:#0A0C0F;border-color:var(--ink);font-weight:700}
+.btn.ghost{border-color:transparent;color:var(--ink-3)}
+
+/* tag pills */
+.tags{display:flex;flex-wrap:wrap;gap:7px}
+.tag{
+  font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;
+  padding:5px 10px;border-radius:6px;border:1px solid var(--line);color:var(--ink-3);
+}
+.tag.fill{border-color:transparent;background:var(--spend);color:#1A0C02;font-weight:700}
+.tag.hue{border-color:rgba(95,165,250,.3);color:#9CC7FF;background:rgba(95,165,250,.08)}
+
+/* graph panel */
+.graph{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--line);background:#000;min-width:620px}
+.graph canvas{display:block;width:100%;height:250px}
+.legend{position:absolute;top:14px;left:14px;background:rgba(6,7,9,.6);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:var(--r-md);padding:11px 13px}
+.legend h5{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin:0 0 8px;font-weight:500}
+.legend li{list-style:none;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink-2);padding:2px 0}
+.legend ul{margin:0;padding:0}
+.legend i{width:6px;height:6px;border-radius:50%;flex:none}
+.signals{position:absolute;top:14px;right:14px;width:210px;background:rgba(6,7,9,.66);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:var(--r-md);padding:11px 13px}
+.signals h5{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin:0 0 9px;font-weight:500}
+.signals li{list-style:none;padding:5px 0 5px 14px;position:relative}
+.signals ul{margin:0;padding:0}
+.signals i{position:absolute;left:0;top:11px;width:5px;height:5px;border-radius:50%}
+.signals b{display:block;font-size:11.5px;font-weight:500;color:var(--ink)}
+.signals span{font-size:9.5px;color:var(--ink-4)}
+.statstrip{
+  display:flex;flex-wrap:wrap;gap:20px;padding:12px 16px;
+  border-top:1px solid var(--line);background:var(--panel);
+}
+.statstrip div{font-size:11px;color:var(--ink-3)}
+.statstrip b{font-family:var(--display);font-size:13.5px;font-weight:700;margin-right:5px;font-variant-numeric:tabular-nums}
+
+/* integrations */
+.integrations{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;min-width:600px}
+.integ{display:flex;align-items:center;gap:11px;padding:12px 13px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--raised)}
+.integ .tile{width:28px;height:28px;border-radius:8px;background:#fff;display:grid;place-items:center;flex:none;font-family:var(--display);font-weight:700;font-size:13px;color:#111}
+.integ .nm{font-size:12.5px;font-weight:600}
+.integ .st{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--save);margin-top:1px}
+.integ .st i{width:4px;height:4px;border-radius:50%;background:var(--save)}
+
+/* color tokens */
+.swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px}
+.sw{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:var(--raised)}
+.sw .chip{height:52px}
+.sw .info{padding:9px 11px 11px}
+.sw .nm{font-size:11.5px;font-weight:600}
+.sw .hex{font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:1px}
+.sw .use{font-size:10.5px;color:var(--ink-4);margin-top:5px;line-height:1.4}
+
+/* type scale */
+.scale{display:flex;flex-direction:column}
+.scale-row{display:grid;grid-template-columns:112px minmax(0,1fr);gap:20px;align-items:baseline;padding:15px 0;border-top:1px solid var(--line-soft)}
+.scale-row:first-child{border-top:0}
+.scale-row .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);line-height:1.5}
+.scale-row .k em{display:block;font-style:normal;color:var(--ink-3);letter-spacing:.04em;margin-top:2px;text-transform:none}
+
+/* do / don't */
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.rule{border:1px solid var(--line);border-radius:var(--r-md);padding:16px 18px;background:var(--panel)}
+.rule.yes{border-left:2px solid var(--save)}
+.rule.no{border-left:2px solid var(--alert)}
+.rule h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;margin:0 0 10px;font-weight:500}
+.rule.yes h4{color:var(--save)}
+.rule.no h4{color:var(--alert)}
+.rule ul{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:8px}
+.rule li{font-size:13px;color:var(--ink-2);line-height:1.5}
+
+/* deviations */
+.slot{
+  border:1px dashed var(--line);border-radius:var(--r-md);
+  padding:18px 20px;background:rgba(255,138,61,.025);margin-bottom:12px;
+}
+.slot h4{font-family:var(--display);font-size:14px;font-weight:600;margin:0 0 5px}
+.slot p{font-size:13px;color:var(--ink-3);margin:0;max-width:70ch}
+.slot .todo{
+  display:inline-block;font-family:var(--mono);font-size:8.5px;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--spend);border:1px solid rgba(255,138,61,.3);
+  border-radius:4px;padding:2px 6px;margin-bottom:9px;
+}
+
+.slot.done{border-style:solid;background:rgba(53,211,153,.035)}
+.slot.done .todo{color:var(--save);border-color:rgba(53,211,153,.32)}
+.debt{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}
+.debt th{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4);text-align:left;padding:0 16px 9px 0;border-bottom:1px solid var(--line);font-weight:500}
+.debt td{padding:11px 16px 11px 0;border-bottom:1px solid var(--line-soft);color:var(--ink-2);vertical-align:top;line-height:1.5}
+.debt td:first-child{color:var(--ink);font-weight:600;white-space:nowrap}
+
+/* ---------- part divider ---------- */
+.part{max-width:var(--maxw);margin-top:104px;padding-top:36px;border-top:1px solid var(--line)}
+.part .tagline{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--spend);display:flex;align-items:center;gap:10px}
+.part .tagline::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,rgba(255,138,61,.4),transparent)}
+.part h2{font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:-.028em;margin:16px 0 12px}
+.part p{color:var(--ink-2);font-size:16px;max-width:64ch;margin:0}
+
+/* ---------- calendar ---------- */
+.cal{display:grid;grid-template-columns:200px minmax(0,1fr);gap:26px;min-width:720px}
+.cal-side{display:flex;flex-direction:column}
+.cal-side h5{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin:0 0 8px;font-weight:500}
+.layer{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid var(--line-soft)}
+.layer:nth-of-type(1){border-top:0}
+.layer i{width:7px;height:7px;border-radius:50%;flex:none}
+.layer .nm{font-size:12.5px;color:var(--ink-2)}
+.layer .ct{font-family:var(--mono);font-size:9px;color:var(--ink-4);margin-left:auto;font-variant-numeric:tabular-nums}
+.layer.off .nm,.layer.off i{opacity:.35}
+.swx{width:26px;height:15px;border-radius:99px;background:#141820;border:1px solid var(--line);position:relative;flex:none;cursor:pointer;padding:0}
+.swx b{position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:var(--ink-4)}
+.swx.on{border-color:currentColor;background:rgba(255,255,255,.05)}
+.swx.on b{left:13px;background:currentColor}
+.cal-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:nowrap}
+.cal-head .range{flex:none;white-space:nowrap}
+.cal-head .range button{padding:6px 10px}
+.cal-month{font-family:var(--display);font-weight:600;font-size:17px;letter-spacing:-.015em}
+.cal-head button{width:24px;height:24px;border-radius:7px;background:none;border:1px solid var(--line);color:var(--ink-3);cursor:pointer;display:grid;place-items:center;font-size:10px;padding:0}
+.dow{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:5px}
+.dow span{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4);text-align:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.day{min-height:78px;border-radius:8px;border:1px solid var(--line-soft);background:var(--raised);padding:6px;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.day.dim{opacity:.34}
+.day.today{background:#171B21;box-shadow:inset 0 0 0 1px var(--line)}
+.day .n{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.day.today .n{color:var(--ink)}
+.ev{font-size:9.5px;line-height:1.35;padding:2px 5px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:2px solid}
+.ev.more{border:0;padding-left:5px;color:var(--ink-4);font-family:var(--mono);font-size:8.5px}
+
+/* ---------- outreach pipeline ---------- */
+.pipe{display:flex;flex-direction:column;min-width:720px}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) 118px 148px 92px;gap:18px;align-items:center;padding:13px 0;border-top:1px solid var(--line-soft)}
+.prow:nth-of-type(1){border-top:0}
+.pbiz{display:flex;align-items:center;gap:10px;min-width:0}
+.pbiz .av{width:30px;height:30px;border-radius:9px;flex:none;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:12px;background:#1B2029;color:var(--ink-2)}
+.pbiz>span:last-child{min-width:0}
+.pbiz .nm{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbiz .mt{display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.touch{display:flex;gap:4px;align-items:center}
+.touch i{width:17px;height:4px;border-radius:99px;background:#1A1E25}
+.touch em{font-style:normal;font-family:var(--mono);font-size:8.5px;color:var(--ink-4);margin-left:6px}
+.pstate{font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;padding:4px 9px;border-radius:6px;border:1px solid var(--line);color:var(--ink-3);justify-self:start}
+.pwhen{font-family:var(--mono);font-size:9.5px;color:var(--ink-4);text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---------- academics ---------- */
+.courses{display:grid;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));gap:14px;min-width:700px}
+.course{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--raised);padding:14px 15px 15px}
+.course .code{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4)}
+.course .nm{font-size:13px;font-weight:600;margin-top:3px}
+.course .fig{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:-.03em;margin-top:11px;font-variant-numeric:tabular-nums}
+.course .fig span{font-family:var(--body);font-weight:400;font-size:11px;color:var(--ink-3);margin-left:7px;letter-spacing:0}
+.ticks{display:flex;gap:3px;margin-top:11px}
+.ticks i{height:5px;flex:1;border-radius:2px;background:#1A1E25}
+.course .foot{display:flex;gap:18px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line-soft)}
+.course .foot div{font-size:10.5px;color:var(--ink-3)}
+.course .foot b{color:var(--ink);font-weight:600}
+
+/* ---------- empty states ---------- */
+.stat.blank{background:var(--raised);border-color:var(--line)}
+.stat.blank .lbl,.stat.blank .fig{color:var(--ink-4)}
+.emptycard{
+  border:1px dashed var(--line);border-radius:var(--r-lg);background:transparent;
+  min-height:132px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+  gap:10px;padding:18px;
+}
+.emptycard .t{font-size:13px;font-weight:600;color:var(--ink-2)}
+.emptycard p{font-size:12px;color:var(--ink-4);margin:0;max-width:32ch;line-height:1.5}
+.firstrun{
+  display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:var(--r-md);min-width:600px;
+  border:1px solid rgba(255,138,61,.22);background:linear-gradient(155deg,rgba(255,138,61,.09),rgba(255,138,61,.02));
+}
+.firstrun .t{font-size:13px;font-weight:600}
+.firstrun .s{font-size:11.5px;color:var(--ink-3);margin-top:2px}
+
+footer{max-width:var(--maxw);margin-top:80px;padding-top:22px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-4)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="frame">
+
+<aside class="rail">
+  <div class="mark">
+    <span class="mark-tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span>
+    <span>
+      <span class="mark-name">Teardown</span><br>
+      <span class="mark-sub">Claude OS</span>
+    </span>
+  </div>
+
+  <nav aria-label="Sections">
+    <a href="#read"><i class="dot"></i>The read</a>
+    <a href="#color"><i class="dot"></i>Color</a>
+    <a href="#type"><i class="dot"></i>Type &amp; space</a>
+    <a href="#shell"><i class="dot"></i>Shell</a>
+    <a href="#rhythm"><i class="dot"></i>Section rhythm</a>
+  </nav>
+
+  <div>
+    <div class="rail-label">Components</div>
+    <nav aria-label="Components">
+      <a href="#hero"><i class="dot"></i>Stat heroes</a>
+      <a href="#controls"><i class="dot"></i>Controls</a>
+      <a href="#provider"><i class="dot"></i>Provider cards</a>
+      <a href="#usage"><i class="dot"></i>Usage rows</a>
+      <a href="#skill"><i class="dot"></i>Skill cards</a>
+      <a href="#insight"><i class="dot"></i>Insight card</a>
+      <a href="#graph"><i class="dot"></i>Memory graph</a>
+      <a href="#integ"><i class="dot"></i>Integrations</a>
+      <a href="#buttons"><i class="dot"></i>Buttons &amp; tags</a>
+    </nav>
+  </div>
+
+  <div>
+    <div class="rail-label">Applying it</div>
+    <nav aria-label="Applying it">
+      <a href="#rules"><i class="dot"></i>Rules</a>
+    </nav>
+  </div>
+
+  <div>
+    <div class="rail-label">RikuOS layer</div>
+    <nav aria-label="RikuOS layer">
+      <a href="#calendar"><i class="dot" style="background:var(--spend)"></i>Calendar</a>
+      <a href="#pipeline"><i class="dot" style="background:var(--spend)"></i>Outreach pipeline</a>
+      <a href="#academics"><i class="dot" style="background:var(--spend)"></i>Academics</a>
+      <a href="#empty"><i class="dot" style="background:var(--spend)"></i>Empty states</a>
+      <a href="#decisions"><i class="dot" style="background:var(--spend)"></i>Decisions</a>
+    </nav>
+  </div>
+
+  <div class="rail-foot">Every specimen below is a rebuild, not a screenshot &mdash; inspect it, copy it, change it.</div>
+</aside>
+
+<main>
+
+<header class="masthead">
+  <div class="kicker">Design reference &middot; for RikuOS</div>
+  <h1>The dashboard is an <em>instrument panel</em>, not a website.</h1>
+  <p class="standfirst">A component-by-component teardown of the Claude Code OS interface shown in Jack Roberts&rsquo; video, rebuilt here as live specimens so Claude Design can read the system instead of guessing at a screenshot.</p>
+  <dl class="meta-strip">
+    <div><dt>Source</dt><dd>&ldquo;Claude Code Agentic OS&hellip; It self improves&rdquo;</dd></div>
+    <div><dt>Frames read</dt><dd>0:45 &middot; 0:48 &middot; 0:52 &middot; 0:56</dd></div>
+    <div><dt>Covers</dt><dd>App UI only &mdash; not the pitch page</dd></div>
+    <div><dt>Status</dt><dd>Teardown + RikuOS layer &mdash; desktop-first</dd></div>
+  </dl>
+  <p style="font-size:13.5px;color:var(--ink-3);margin-top:26px;max-width:64ch">
+    <strong style="color:var(--ink-2);font-weight:600">Two halves.</strong> Everything up to
+    <a href="#rules" style="border:0;color:var(--ink-2)">Rules</a> is a faithful read of the source.
+    Everything after it is the RikuOS layer &mdash; components the source doesn&rsquo;t have, built from its
+    parts, plus the decisions that produced them.
+  </p>
+</header>
+
+<!-- ============ THE READ ============ -->
+<section id="read">
+  <span class="eyebrow">Before the tokens</span>
+  <h2>What actually makes it work</h2>
+  <p class="lede">Five ideas carry the whole interface. Copy these and the details follow; copy the details without these and it turns into another dark admin template.</p>
+
+  <div class="notes" style="grid-template-columns:1fr">
+    <div>
+      <dt>Every number has a hue, and the hue never moves</dt>
+      <dd>Orange is always money leaving. Green is always money or time saved. Violet is judgement &mdash; ROI, decisions, insight. Blue is sessions and activity. Red is missing or in conflict. You learn the palette in about four seconds and then read the whole app by color alone. This is the single highest-value thing to steal.</dd>
+    </div>
+    <div>
+      <dt>Sections announce themselves twice</dt>
+      <dd>A tiny letterspaced mono label (<code>LIVE USAGE</code>) sits above a normal-weight sentence-case heading (<code>Plan limits &amp; windows</code>). The label is the machine&rsquo;s name for the section, the heading is the human one. It repeats down every page without exception, and it&rsquo;s what makes a long scroll feel indexed rather than endless.</dd>
+    </div>
+    <div>
+      <dt>The chrome is silent so the data can shout</dt>
+      <dd>Sidebar, top bar, nav, labels &mdash; all near-monochrome, small, low contrast. Then a single figure jumps to 34&ndash;40px display weight in a saturated hue. There is exactly one loud thing per card and roughly three per screen.</dd>
+    </div>
+    <div>
+      <dt>Cards earn their borders</dt>
+      <dd>Only real objects get a border and a radius: a stat, a provider, a skill, an integration. Rows inside a list are separated by a hairline, not boxed. Nothing is nested more than one card deep. The result reads as a panel of instruments rather than a pile of tiles.</dd>
+    </div>
+    <div>
+      <dt>Decoration is data-shaped</dt>
+      <dd>The pretty bits are never abstract: the orange wash behind spend is a topographic reading of that spend, the green swoop is the savings curve, the constellation is the actual memory graph. Nothing is there purely to look expensive &mdash; which is precisely why it looks expensive.</dd>
+    </div>
+  </div>
+</section>
+
+<!-- ============ COLOR ============ -->
+<section id="color">
+  <span class="eyebrow">Tokens</span>
+  <h2>Color</h2>
+  <p class="lede">A cool near-black ground, four steps of ink, and six semantic hues. Hues are used at full strength for figures and glyphs, at ~20% alpha for borders, and at ~8% alpha for fills.</p>
+
+  <div class="well">
+    <p class="caption">Ground &amp; structure</p>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:#08090B"></div><div class="info"><div class="nm">Void</div><div class="hex">#08090B</div><div class="use">Page ground. Cool, not neutral black.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#0E1013"></div><div class="info"><div class="nm">Panel</div><div class="hex">#0E1013</div><div class="use">Section wells, graph frames.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#14171C"></div><div class="info"><div class="nm">Raised</div><div class="hex">#14171C</div><div class="use">Cards. One step up, never two.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#1D222A"></div><div class="info"><div class="nm">Line</div><div class="hex">#1D222A</div><div class="use">1px hairlines. Every card edge.</div></div></div>
+    </div>
+    <p class="caption" style="margin:26px 0 26px">Ink</p>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:#E9ECF0"></div><div class="info"><div class="nm">Ink</div><div class="hex">#E9ECF0</div><div class="use">Headings, figures, card titles.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#98A1AD"></div><div class="info"><div class="nm">Ink 2</div><div class="hex">#98A1AD</div><div class="use">Body copy, list items.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#5B6470"></div><div class="info"><div class="nm">Ink 3</div><div class="hex">#5B6470</div><div class="use">Captions, inactive nav.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#3A424C"></div><div class="info"><div class="nm">Ink 4</div><div class="hex">#3A424C</div><div class="use">Mono micro-labels, meta.</div></div></div>
+    </div>
+    <p class="caption" style="margin:26px 0 26px">Semantic hues &mdash; meaning is fixed</p>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:#FF8A3D"></div><div class="info"><div class="nm">Spend</div><div class="hex">#FF8A3D</div><div class="use">Money out, limits, the brand mark.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#35D399"></div><div class="info"><div class="nm">Saved</div><div class="hex">#35D399</div><div class="use">Value recovered, healthy, connected.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#A78BFA"></div><div class="info"><div class="nm">Judgement</div><div class="hex">#A78BFA</div><div class="use">ROI, decisions, overnight insight.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#5FA5FA"></div><div class="info"><div class="nm">Session</div><div class="hex">#5FA5FA</div><div class="use">Activity, runs, workflow chains.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#FBBF24"></div><div class="info"><div class="nm">Stale</div><div class="hex">#FBBF24</div><div class="use">Ageing data, agents idling.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#F87171"></div><div class="info"><div class="nm">Missing</div><div class="hex">#F87171</div><div class="use">Conflicts, gaps, over-limit.</div></div></div>
+    </div>
+  </div>
+
+  <dl class="notes">
+    <div><dt>Alpha ladder</dt><dd><code>100%</code> figures and glyphs &middot; <code>20%</code> card borders &middot; <code>8&ndash;9%</code> card fills &middot; <code>30%</code> the glow on a status dot.</dd></div>
+    <div><dt>Card tint</dt><dd>Hued cards use a 155&deg; gradient from a deep desaturated version of the hue into the neutral card color at ~62%, not a flat wash.</dd></div>
+    <div><dt>Never</dt><dd>Two hues inside one card. A hue used for decoration where it doesn&rsquo;t carry its assigned meaning.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ TYPE ============ -->
+<section id="type">
+  <span class="eyebrow">Tokens</span>
+  <h2>Type &amp; space</h2>
+  <p class="lede">Three roles: a display face for figures and headings, a neutral UI face for everything read as a sentence, and a mono face that does all the labelling. The mono is doing most of the work in setting the tone &mdash; it is what makes the app read as an instrument.</p>
+
+  <div class="well">
+    <div class="scale">
+      <div class="scale-row"><div class="k">Figure<em>display 700 &middot; 34px &middot; -0.03em</em></div><div style="font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:-.03em;color:var(--spend);font-variant-numeric:tabular-nums">$174.40</div></div>
+      <div class="scale-row"><div class="k">Page title<em>display 600 &middot; 24px &middot; -0.02em</em></div><div style="font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.02em">Today at a glance</div></div>
+      <div class="scale-row"><div class="k">Section head<em>display 600 &middot; 19px</em></div><div style="font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.015em">Plan limits &amp; windows</div></div>
+      <div class="scale-row"><div class="k">Card title<em>body 600 &middot; 13px</em></div><div style="font-weight:600;font-size:13px">Deep Research</div></div>
+      <div class="scale-row"><div class="k">Body<em>body 400 &middot; 13px &middot; ink&nbsp;2</em></div><div style="font-size:13px;color:var(--ink-2)">Drag to rotate. Hover a node to trace its links.</div></div>
+      <div class="scale-row"><div class="k">Eyebrow<em>mono 500 &middot; 9.5px &middot; 0.18em</em></div><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3)">Live usage</div></div>
+      <div class="scale-row"><div class="k">Micro-label<em>mono 400 &middot; 8.5px &middot; 0.15em</em></div><div style="font-family:var(--mono);font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-4)">Anthropic &middot; OAuth</div></div>
+      <div class="scale-row"><div class="k">Meta<em>body 400 &middot; 10.5px &middot; ink&nbsp;3</em></div><div style="font-size:10.5px;color:var(--ink-3)">last 28 days &middot; 40.7M in &middot; 3.5M out</div></div>
+    </div>
+  </div>
+
+  <dl class="notes">
+    <div><dt>Spacing scale</dt><dd><code>4 / 6 / 10 / 14 / 20 / 28 / 44 / 72</code>. Card padding 14&ndash;16px, gap between cards 12&ndash;14px, gap between sections 44&ndash;72px.</dd></div>
+    <div><dt>Radii</dt><dd><code>6</code> tags &middot; <code>7&ndash;8</code> nav items and small chips &middot; <code>10</code> plain cards &middot; <code>14</code> feature cards &middot; <code>999</code> pills and status.</dd></div>
+    <div><dt>Numerals</dt><dd><code>font-variant-numeric: tabular-nums</code> on every figure, every progress readout, every table column. Non-negotiable in a dashboard.</dd></div>
+    <div><dt>Substitutions</dt><dd>This rebuild uses Archivo / IBM&nbsp;Plex&nbsp;Sans / JetBrains&nbsp;Mono. The source looks like a neutral geometric UI face; any well-cut grotesque works &mdash; the mono is the part that must stay.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ SHELL ============ -->
+<section id="shell">
+  <span class="eyebrow">Layout</span>
+  <h2>The shell</h2>
+  <p class="lede">Fixed rail, thin top bar, one scrolling content column. The rail carries identity, destinations, and &mdash; the interesting move &mdash; the running agents, treated as a separate class of thing from pages.</p>
+
+  <div class="well flush">
+    <div class="app">
+      <div class="app-body">
+        <div class="app-side">
+          <div class="app-brand">
+            <span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span>
+            <span>Claude Code OS</span>
+          </div>
+          <div class="app-nav">
+            <span class="navitem is-active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</span>
+            <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 2.4 5.8 5.8 2.4-5.8 2.4L12 21l-2.4-7.4L3.8 11.2l5.8-2.4z"/></svg>Skills</span>
+            <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="7" r="2"/><circle cx="6" cy="18" r="2"/><path d="m14 10 4-3M10 11 7 9m1 6-1 2"/></svg>Memory</span>
+            <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2.5-6 4 13L16 12h5"/></svg>Activity</span>
+          </div>
+          <div>
+            <div class="grouplabel">Agents</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:7px">
+              <span class="agent hermes">Hermes-Agent</span>
+              <span class="agent claw">OpenClaw</span>
+            </div>
+          </div>
+        </div>
+        <div class="app-main">
+          <div class="topbar">
+            <span class="crumb"><b>Operator</b><span>/</span>jackroberts</span>
+            <span class="statuspill"><i></i>Local Claude Code daemon connected</span>
+            <span class="searchbox">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              Search workspaces, skills&hellip;
+              <kbd>&#8984;K</kbd>
+            </span>
+            <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-2 8-2 8h16s-2-1-2-8M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+            <span class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9 7 7m10 10 2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg></span>
+          </div>
+          <div class="app-content">
+            <div class="rhythm">
+              <div class="rhy-eyebrow">Operator &middot; Jack Roberts</div>
+              <div class="rhy-title">Today at a glance</div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:16px">
+              <div style="flex:1;height:62px;border-radius:10px;border:1px solid rgba(255,138,61,.2);background:linear-gradient(155deg,#2A1408,#141013 62%)"></div>
+              <div style="flex:1;height:62px;border-radius:10px;border:1px solid rgba(53,211,153,.2);background:linear-gradient(155deg,#052620,#0F1417 62%)"></div>
+              <div style="flex:1;height:62px;border-radius:10px;border:1px solid rgba(167,139,250,.2);background:linear-gradient(155deg,#171233,#111117 62%)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="notes">
+    <div><dt>Rail</dt><dd>~170px fixed. Logo tile 20&ndash;30px with a 6&ndash;9px radius. Nav items 6px&times;9px padding, 7px radius; the active one gets a raised fill plus an inset hairline, never a left accent bar.</dd></div>
+    <div><dt>Agents block</dt><dd>Separated by a mono group label, then hue-coded badge cards in uppercase mono. This is the move worth stealing: background workers are not pages, so they don&rsquo;t look like nav.</dd></div>
+    <div><dt>Top bar</dt><dd>Breadcrumb (role / identity) &rarr; live daemon status pill &rarr; search with <code>&#8984;K</code> pushed right &rarr; notification and theme icon buttons. One row, ~44px, hairline bottom, no shadow.</dd></div>
+    <div><dt>Content</dt><dd>Single column, generous side padding, sections stacked with 44&ndash;72px gaps. No secondary sidebar anywhere.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ RHYTHM ============ -->
+<section id="rhythm">
+  <span class="eyebrow">Pattern</span>
+  <h2>Section rhythm</h2>
+  <p class="lede">The one pattern that repeats more than any other. Mono label, then heading, then content. It costs nothing and it is most of why the page feels organised.</p>
+  <div class="well">
+    <div class="rhythm" style="display:flex;flex-direction:column;gap:30px">
+      <div><div class="rhy-eyebrow">Live usage</div><div class="rhy-title">Plan limits &amp; windows</div></div>
+      <div><div class="rhy-eyebrow">Skills</div><div class="rhy-title">Your skills</div></div>
+      <div><div class="rhy-eyebrow">Memory</div><div class="rhy-title">Your knowledge system</div></div>
+      <div><div class="rhy-eyebrow">Integrations</div><div class="rhy-title">What&rsquo;s plugged into your operator</div></div>
+    </div>
+  </div>
+  <dl class="notes">
+    <div><dt>Label</dt><dd>The system&rsquo;s noun. One or two words, mono, uppercase, 0.18em tracking, ink&nbsp;3.</dd></div>
+    <div><dt>Heading</dt><dd>Sentence case, possessive, addressed to the operator &mdash; &ldquo;<em>Your</em> skills&rdquo;, &ldquo;plugged into <em>your</em> operator&rdquo;. Never a noun phrase like &ldquo;Skill management&rdquo;.</dd></div>
+    <div><dt>Gap</dt><dd>5px between label and heading. 20px from heading to content.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ STAT HEROES ============ -->
+<section id="hero">
+  <span class="eyebrow">Component</span>
+  <h2>Stat heroes</h2>
+  <p class="lede">Three cards, three hues, three different graphic treatments &mdash; and the graphic is always a reading of that card&rsquo;s own number. Each card is one figure, one caption, one optional link out.</p>
+
+  <div class="well">
+    <div class="stats">
+      <div class="stat spend">
+        <div class="stat-top">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:12px;height:12px;color:var(--spend)"><path d="M12 22c4-1 6-4.5 6-8 0-4-3-6-3-9 0 0-2 1.5-2 4 0 1.5-1 2-1.5 1-.7-1.4-.5-3-.5-3S6 9 6 14c0 3.5 2 7 6 8Z"/></svg>
+          <span class="lbl">Spent on AI</span>
+          <span class="more">Details &#8599;</span>
+        </div>
+        <div class="fig">$174.40</div>
+        <div class="sub">last 28 days &middot; 40.7M in &middot; 3.5M out</div>
+        <svg class="viz" viewBox="0 0 240 74" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 58 C30 44 46 62 74 50 C104 37 118 20 150 24 C182 28 206 46 240 40 L240 74 L0 74Z" fill="rgba(255,138,61,.16)"/>
+          <path d="M0 58 C30 44 46 62 74 50 C104 37 118 20 150 24 C182 28 206 46 240 40" fill="none" stroke="rgba(255,138,61,.55)" stroke-width="1.5"/>
+          <path d="M0 66 C34 54 50 70 78 60 C110 49 124 34 154 38 C186 42 208 56 240 51" fill="none" stroke="rgba(255,138,61,.22)" stroke-width="1"/>
+        </svg>
+      </div>
+
+      <div class="stat save">
+        <div class="stat-top">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:12px;height:12px;color:var(--save)"><path d="M3 17 9 10l4 4 8-9"/><path d="M21 5v6h-6"/></svg>
+          <span class="lbl">Skills saved</span>
+          <span class="more">Details &#8599;</span>
+        </div>
+        <div class="fig">$241,600</div>
+        <div class="sub">16h of work avoided &middot; click to tune</div>
+        <svg class="viz" viewBox="0 0 240 74" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 66 C46 64 72 56 108 44 C146 32 176 22 240 16 L240 74 L0 74Z" fill="rgba(53,211,153,.14)"/>
+          <path d="M0 66 C46 64 72 56 108 44 C146 32 176 22 240 16" fill="none" stroke="rgba(53,211,153,.75)" stroke-width="1.6"/>
+          <circle cx="238" cy="16" r="2.6" fill="#35D399"/>
+        </svg>
+      </div>
+
+      <div class="stat roi">
+        <div class="stat-top">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:12px;height:12px;color:var(--roi)"><path d="M3 17 9 10l4 4 8-9"/><path d="M21 5v6h-6"/></svg>
+          <span class="lbl">Net ROI</span>
+        </div>
+        <div class="fig">+$241,426</div>
+        <div class="sub">1385.5&times; return on AI spend</div>
+        <svg class="viz" viewBox="0 0 240 74" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M-10 74 C40 40 96 16 240 8" fill="none" stroke="rgba(167,139,250,.55)" stroke-width="9" stroke-linecap="round" opacity=".45"/>
+          <path d="M-10 74 C40 40 96 16 240 8" fill="none" stroke="rgba(216,201,255,.9)" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <dl class="notes">
+    <div><dt>Anatomy</dt><dd>Icon + mono label + optional <code>DETAILS &#8599;</code> on one line &rarr; figure pushed to the bottom with <code>margin-top:auto</code> &rarr; meta caption under it. Graphic bleeds to all three lower edges at <code>z-index:1</code>.</dd></div>
+    <div><dt>Figure</dt><dd>Display 700, 34px, <code>-0.03em</code>, tabular. Takes the card&rsquo;s hue &mdash; except ROI, where the hue is spent on the graphic and the figure goes near-white so it still reads as the headline.</dd></div>
+    <div><dt>Graphic</dt><dd>Spend gets stacked topographic contours, savings a filled area with an emphasised endpoint, ROI a single wide-stroke swoosh. Different shapes for different kinds of number &mdash; don&rsquo;t give all three the same sparkline.</dd></div>
+    <div><dt>Height</dt><dd>Fixed min-height so the row stays even; content decides nothing about the card size here, because these are read as a set.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ CONTROLS ============ -->
+<section id="controls">
+  <span class="eyebrow">Component</span>
+  <h2>Controls</h2>
+  <p class="lede">Two segmented patterns doing two different jobs. The recessed one switches what you&rsquo;re looking at; the floating one switches the window you&rsquo;re looking through.</p>
+  <div class="well">
+    <div class="well-row" style="gap:34px;align-items:center">
+      <div>
+        <p class="caption" style="margin-bottom:12px">View switch &mdash; recessed</p>
+        <div class="segmented">
+          <button class="on" type="button">Subscription</button>
+          <button type="button">Tokens &middot; API-equivalent</button>
+        </div>
+      </div>
+      <div>
+        <p class="caption" style="margin-bottom:12px">Time range &mdash; floating</p>
+        <div class="range">
+          <button type="button">Today</button>
+          <button type="button">7 days</button>
+          <button class="on" type="button">28 days</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <dl class="notes">
+    <div><dt>View switch</dt><dd>Sits in a sunken track with a hairline border; the active tab is a raised fill. Left-aligned, directly under the heading it modifies.</dd></div>
+    <div><dt>Time range</dt><dd>No track at all. The active item inverts to a solid white pill with dark text &mdash; the strongest contrast anywhere in the UI, which is right, because it silently reframes every number on the page.</dd></div>
+    <div><dt>Both</dt><dd>Mono, uppercase, ~0.13em tracking, 9.5px. Controls are labelled in the machine&rsquo;s voice; content is labelled in yours.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ PROVIDER ============ -->
+<section id="provider">
+  <span class="eyebrow">Component</span>
+  <h2>Provider cards</h2>
+  <p class="lede">The flattest card in the system. Brand tile, two-line identity, price right-aligned. Used anywhere an external account is listed.</p>
+  <div class="well">
+    <div class="providers">
+      <div class="provider">
+        <span class="logo" style="background:#D97757;color:#2A1002">A</span>
+        <span><span class="nm">Claude Pro Max</span><br><span class="sub">Anthropic &middot; OAuth</span></span>
+        <span class="amt"><b>$200</b><span>/ month</span></span>
+      </div>
+      <div class="provider">
+        <span class="logo" style="background:#10A37F;color:#03251C">&#9679;</span>
+        <span><span class="nm">ChatGPT Plus</span><br><span class="sub">OpenAI &middot; OAuth (Codex)</span></span>
+        <span class="amt"><b>$20</b><span>/ month</span></span>
+      </div>
+      <div class="provider">
+        <span class="logo" style="background:#1A73E8;color:#fff">G</span>
+        <span><span class="nm">Gemini Advanced</span><br><span class="sub">Google &middot; API key</span></span>
+        <span class="amt"><b>$20</b><span>/ month</span></span>
+      </div>
+      <div class="provider">
+        <span class="logo" style="background:#2B3440;color:#8FD3FF">&#8635;</span>
+        <span><span class="nm">OpenRouter</span><br><span class="sub">Pay-as-you-go &middot; API key</span></span>
+        <span class="amt"><b>&mdash;</b><span>credit</span></span>
+      </div>
+    </div>
+  </div>
+  <dl class="notes">
+    <div><dt>Anatomy</dt><dd>28px brand tile at 8px radius &rarr; name at 12.5px/600 with a mono micro-label under it &rarr; price pushed right with <code>margin-left:auto</code>, figure over unit.</dd></div>
+    <div><dt>Restraint</dt><dd>Neutral card fill, no hue. These are inventory, not insight &mdash; only the brand tile carries color.</dd></div>
+    <div><dt>Empty state</dt><dd>An em-dash, not &ldquo;N/A&rdquo; or a zero. Unit label still shown so the column stays readable.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ USAGE ============ -->
+<section id="usage">
+  <span class="eyebrow">Component</span>
+  <h2>Usage rows</h2>
+  <p class="lede">The densest thing in the app and the best-designed. Three encodings of the same fact side by side: a ring for the glance, a name for the what, and bars for the detail &mdash; each window on its own line with its own reset clock.</p>
+
+  <div class="well">
+    <div class="usage">
+      <div class="urow">
+        <div class="ring">
+          <svg viewBox="0 0 44 44" width="52" height="52">
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#1A1E25" stroke-width="4"/>
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#FF8A3D" stroke-width="4" stroke-linecap="round" stroke-dasharray="113.1 113.1" stroke-dashoffset="0"/>
+          </svg>
+          <b style="color:var(--spend)">100%</b>
+        </div>
+        <div>
+          <div class="uname"><span class="ic" style="background:#D97757;color:#2A1002">A</span>Claude</div>
+          <div class="uplan">Claude Max 20x</div>
+          <span class="uchip">OAuth</span>
+        </div>
+        <div class="bars">
+          <div>
+            <div class="bar-head">5h <b>1,103</b> / 900 <span class="rt"><em>&#9201; 4h 22m</em><em style="color:var(--spend)">100%</em></span></div>
+            <div class="track"><i style="width:100%;background:linear-gradient(90deg,#B4551E,#FF8A3D)"></i></div>
+          </div>
+          <div>
+            <div class="bar-head">Weekly <b>2,543</b> / 6,300 <span class="rt"><em>&#9201; 3d 7h</em><em style="color:var(--spend)">40%</em></span></div>
+            <div class="track"><i style="width:40%;background:linear-gradient(90deg,#B4551E,#FF8A3D)"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="urow">
+        <div class="ring">
+          <svg viewBox="0 0 44 44" width="52" height="52">
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#1A1E25" stroke-width="4"/>
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#35D399" stroke-width="4" stroke-linecap="round" stroke-dasharray="0 113.1"/>
+          </svg>
+          <b style="color:var(--ink-3)">0%</b>
+        </div>
+        <div>
+          <div class="uname"><span class="ic" style="background:#10A37F;color:#03251C">&#9679;</span>ChatGPT</div>
+          <div class="uplan">ChatGPT Plus</div>
+          <span class="uchip">OAuth</span>
+        </div>
+        <div class="bars">
+          <div>
+            <div class="bar-head">5h <b>0</b> / 80 <span class="rt"><em>&#9201; 4h 22m</em><em>0%</em></span></div>
+            <div class="track"><i style="width:2%;background:#35D399"></i></div>
+          </div>
+          <div>
+            <div class="bar-head">Weekly <b>0</b> / 560 <span class="rt"><em>&#9201; 3d 7h</em><em>0%</em></span></div>
+            <div class="track"><i style="width:2%;background:#35D399"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="urow">
+        <div class="ring">
+          <svg viewBox="0 0 44 44" width="52" height="52">
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#1A1E25" stroke-width="4"/>
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#5FA5FA" stroke-width="4" stroke-linecap="round" stroke-dasharray="4.5 113.1"/>
+          </svg>
+          <b style="color:var(--session)">4%</b>
+        </div>
+        <div>
+          <div class="uname"><span class="ic" style="background:#2B3440;color:#8FD3FF">&#8635;</span>OpenRouter</div>
+          <div class="uplan">Pay-as-you-go</div>
+          <span class="uchip">API key</span>
+        </div>
+        <div class="bars">
+          <div>
+            <div class="bar-head">Credit <b>$1.23</b> / $30 <span class="rt"><em>$28.77 left</em><em style="color:var(--session)">4%</em></span></div>
+            <div class="track"><i style="width:4%;background:#5FA5FA"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="notes">
+    <div><dt>Grid</dt><dd><code>64px | 176px | 1fr</code>. Ring, identity, bars. Rows separated by a hairline, never boxed.</dd></div>
+    <div><dt>Ring</dt><dd>52px, 4px stroke, rotated <code>-90deg</code>, round caps, percentage centred inside in display weight. Track <code>#1A1E25</code>. At 0% the number goes ink&nbsp;3 rather than the hue &mdash; nothing is happening, so nothing lights up.</dd></div>
+    <div><dt>Bar line</dt><dd>Window name in mono caps &rarr; used / limit with the used half in body weight &rarr; reset countdown and percentage pushed right. The 4px track sits under it. Over-limit fills to 100% and keeps the hue; it does not turn red.</dd></div>
+    <div><dt>Why it works</dt><dd>A limit has three facts &mdash; how full, how long until reset, and against what. Most dashboards show one. This shows all three without the row getting taller than 76px.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ SKILL CARDS ============ -->
+<section id="skill">
+  <span class="eyebrow">Component</span>
+  <h2>Skill cards</h2>
+  <p class="lede">The one place the app allows itself real color. A gradient cap, a glass icon chip, then a strictly ordered body: what it is, when it last ran, what it saved, and how it was measured.</p>
+
+  <div class="well">
+    <div class="skills">
+      <div class="skill">
+        <div class="skill-cap" style="background:linear-gradient(135deg,#7B2CBF,#C9186E 55%,#E5484D)">
+          <span class="live"></span>
+          <span class="glass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+        </div>
+        <div class="skill-body">
+          <div class="nm">Deep Research</div>
+          <div class="ago">last used 5h ago</div>
+          <div class="saved">$15,125<span>saved this week</span></div>
+          <dl class="skill-stats">
+            <div><dt>Used</dt><dd>11&times; this week</dd></div>
+            <div><dt>~Per run</dt><dd>55 min</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="skill">
+        <div class="skill-cap" style="background:linear-gradient(135deg,#B45309,#D97706 45%,#84CC16)">
+          <span class="live"></span>
+          <span class="glass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/></svg></span>
+        </div>
+        <div class="skill-body">
+          <div class="nm">Title Generator</div>
+          <div class="ago">last used 2h ago</div>
+          <div class="saved">$9,000<span>saved this week</span></div>
+          <dl class="skill-stats">
+            <div><dt>Used</dt><dd>24&times; this week</dd></div>
+            <div><dt>~Per run</dt><dd>15 min</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="skill">
+        <div class="skill-cap" style="background:linear-gradient(135deg,#4C1D95,#7C3AED 40%,#DB2777)">
+          <span class="live"></span>
+          <span class="glass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-8 8H4l2.2-2.6A8 8 0 1 1 21 12Z"/></svg></span>
+        </div>
+        <div class="skill-body">
+          <div class="nm">Comment Miner</div>
+          <div class="ago">last used 6h ago</div>
+          <div class="saved">$8,400<span>saved this week</span></div>
+          <dl class="skill-stats">
+            <div><dt>Used</dt><dd>12&times; this week</dd></div>
+            <div><dt>~Per run</dt><dd>28 min</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:11.5px;color:var(--ink-4);margin:16px 0 0;display:flex;gap:7px;align-items:flex-start">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:13px;height:13px;flex:none;margin-top:2px"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>
+      Time-per-run is AI-estimated. Click any card to edit on the Skills tab.
+    </p>
+  </div>
+
+  <dl class="notes">
+    <div><dt>Cap</dt><dd>~74px, a two- or three-stop gradient unique per skill, a 34px glass chip centred (<code>rgba(10,10,14,.42)</code> + <code>blur(7px)</code> + inset white hairline), and a live dot top-right.</dd></div>
+    <div><dt>Body order</dt><dd>Name &rarr; recency &rarr; value in green display weight &rarr; hairline &rarr; two mono-labelled stats. Same order on every card, so the row scans as columns.</dd></div>
+    <div><dt>Honesty note</dt><dd>The footnote admitting the numbers are estimated sits directly under the cards. Worth copying: it buys the whole panel credibility instead of undermining it.</dd></div>
+    <div><dt>Overflow</dt><dd>Rows cap at three or four with a <code>SHOW ALL 10</code> pill right-aligned beneath, plus an <code>All skills &#8599;</code> text link above. Two exits, two different intents.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ INSIGHT ============ -->
+<section id="insight">
+  <span class="eyebrow">Component</span>
+  <h2>Insight card</h2>
+  <p class="lede">The agentic part made visible. The system proposes something, shows its reasoning, and offers two ways out. Illustration left, argument right, actions bottom-right, carousel dots for the queue.</p>
+
+  <div class="well">
+    <div class="insight">
+      <div class="insight-art">
+        <canvas id="art" width="420" height="304" aria-label="Generated illustration for the overnight insight"></canvas>
+        <div class="cap">
+          <span>Overnight insight</span>
+          <b>Sharpen your memory</b>
+        </div>
+      </div>
+      <div class="insight-why">
+        <h4>Why we&rsquo;re suggesting this</h4>
+        <ul>
+          <li>Memory hasn&rsquo;t been touched in 18 days</li>
+          <li>Last 7 sessions all crossed the 14-minute mark</li>
+          <li>None of the last 12 scripts followed the old outline</li>
+        </ul>
+        <div class="insight-act">
+          <button class="btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/></svg>Skip</button>
+          <button class="btn go" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>Apply &amp; mark done</button>
+          <span class="dots"><i class="on"></i><i></i><i></i><i></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="notes">
+    <div><dt>Ground</dt><dd>A violet gradient panel, the only place in the app where a whole section is tinted &mdash; because this is the only place the system is speaking rather than reporting.</dd></div>
+    <div><dt>Argument</dt><dd>Three bullets maximum, each a countable observation with a real number in it. No adjectives. This is what separates a suggestion from a nag.</dd></div>
+    <div><dt>Actions</dt><dd>Dismiss is a neutral outline pill; accept is outlined in green. Neither is a solid button &mdash; the system is proposing, not demanding.</dd></div>
+    <div><dt>Queue</dt><dd>Dot pagination far right; the current dot elongates into a bar. Tells you how many more are waiting without a count.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ GRAPH ============ -->
+<section id="graph">
+  <span class="eyebrow">Component</span>
+  <h2>Memory graph</h2>
+  <p class="lede">A full-bleed constellation on true black, with two glass panels floating over it and a stat strip sealing the bottom. The most decorative element in the app is also the most literal &mdash; it&rsquo;s the actual data.</p>
+
+  <div class="well flush">
+    <div class="graph">
+      <canvas id="constellation" width="1240" height="500" aria-label="Memory graph: nodes coloured by type, connected by shared decisions"></canvas>
+      <div class="legend">
+        <h5>Node legend</h5>
+        <ul>
+          <li><i style="background:#35D399"></i>Memory core</li>
+          <li><i style="background:#E9ECF0"></i>Workspaces</li>
+          <li><i style="background:#A78BFA"></i>Decisions</li>
+          <li><i style="background:#5FA5FA"></i>Sessions</li>
+          <li><i style="background:#F472B6"></i>Skills</li>
+          <li><i style="background:#FBBF24"></i>Stale</li>
+          <li><i style="background:#F87171"></i>Missing</li>
+        </ul>
+      </div>
+      <div class="signals">
+        <h5>Latest signals</h5>
+        <ul>
+          <li><i style="background:#35D399"></i><b>Memory wrap synced</b><span>2h ago &middot; 14 files</span></li>
+          <li><i style="background:#5FA5FA"></i><b>New decision recorded</b><span>yesterday &middot; skills-as-units</span></li>
+          <li><i style="background:#FBBF24"></i><b>Video Scripts marked stale</b><span>18d since refresh</span></li>
+          <li><i style="background:#F87171"></i><b>Conflict in Client Builds</b><span>style-guide mismatch</span></li>
+        </ul>
+      </div>
+      <div class="statstrip">
+        <div><b style="color:var(--ink)">51</b>memories</div>
+        <div><b style="color:var(--ink)">4</b>types</div>
+        <div><b style="color:var(--ink)">13</b>projects</div>
+        <div><b style="color:var(--amber)">3</b>stale</div>
+        <div><b style="color:var(--alert)">1</b>conflict detected</div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="notes">
+    <div><dt>Render</dt><dd>Canvas, true black ground, additive glow: a wide low-alpha halo under a small solid core. Edges are 1px at 6&ndash;12% white. Node radius encodes importance, hue encodes type.</dd></div>
+    <div><dt>Floating panels</dt><dd><code>rgba(6,7,9,.6)</code> + <code>blur(8px)</code> + hairline, 10px radius, inset 14px from the corners. Legend top-left, live signals top-right. Never a solid panel &mdash; you must still see the graph behind them.</dd></div>
+    <div><dt>Signals</dt><dd>Colored dot &rarr; bold one-line title &rarr; muted meta. The dot uses the same node hue, so a stale signal and a stale node are the same amber. That link is the whole point.</dd></div>
+    <div><dt>Stat strip</dt><dd>Inline counts, figure in display weight and label in ink&nbsp;3. Only the problem counts take a hue &mdash; a healthy strip is entirely white on black.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ INTEGRATIONS ============ -->
+<section id="integ">
+  <span class="eyebrow">Component</span>
+  <h2>Integrations</h2>
+  <p class="lede">The simplest card in the system, and deliberately so: a white brand tile against the dark grid, a name, and a live status. Nothing else, because there&rsquo;s nothing else to say.</p>
+  <div class="well">
+    <div class="integrations">
+      <div class="integ"><span class="tile" style="color:#3ECF8E">&#9650;</span><span><span class="nm">Supabase</span><span class="st"><i></i>connected</span></span></div>
+      <div class="integ"><span class="tile" style="color:#EA4335">M</span><span><span class="nm">Gmail</span><span class="st"><i></i>connected</span></span></div>
+      <div class="integ"><span class="tile" style="color:#1A73E8">31</span><span><span class="nm">Google Calendar</span><span class="st"><i></i>connected</span></span></div>
+      <div class="integ"><span class="tile" style="color:#111">N</span><span><span class="nm">Notion</span><span class="st"><i></i>connected</span></span></div>
+    </div>
+  </div>
+  <dl class="notes">
+    <div><dt>Tile</dt><dd>White fill, 8px radius, 28px. Brand logos stay on their own ground rather than being tinted to the palette &mdash; these are foreign objects and should look it.</dd></div>
+    <div><dt>Status</dt><dd>4px green dot + lowercase word. Lowercase matters: it&rsquo;s an ambient state, not a label, so it doesn&rsquo;t get the mono-caps treatment.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ BUTTONS ============ -->
+<section id="buttons">
+  <span class="eyebrow">Component</span>
+  <h2>Buttons &amp; tags</h2>
+  <p class="lede">Almost everything is an outline pill in mono caps. Solid fills are rationed &mdash; one per screen at most, reserved for the control that reframes everything else.</p>
+  <div class="well">
+    <p class="caption" style="margin-bottom:14px">Buttons</p>
+    <div class="well-row" style="gap:10px;align-items:center">
+      <button class="btn" type="button">Show all 10</button>
+      <button class="btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/></svg>Skip</button>
+      <button class="btn go" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>Apply &amp; mark done</button>
+      <button class="btn solid" type="button">28 days</button>
+      <button class="btn ghost" type="button">All skills &#8599;</button>
+    </div>
+    <p class="caption" style="margin:26px 0 14px">Status &amp; tags</p>
+    <div class="well-row" style="gap:10px;align-items:center">
+      <span class="statuspill"><i></i>Local Claude Code daemon connected</span>
+      <span class="tag">Subscription</span>
+      <span class="tag hue">19 live</span>
+      <span class="tag">Depleting</span>
+      <span class="tag fill">Guessed</span>
+    </div>
+  </div>
+  <dl class="notes">
+    <div><dt>Pill</dt><dd>8&times;14px padding, fully rounded, 1px <code>--line</code> border, mono 9.5px at 0.14em. Hover lifts the border to ink&nbsp;4 and the label to ink.</dd></div>
+    <div><dt>Affirmative</dt><dd>Green border at 40% with a pale green label &mdash; never a solid green button. The system never looks like it&rsquo;s pushing you.</dd></div>
+    <div><dt>Tags</dt><dd>6px radius (not pills &mdash; they&rsquo;re labels, not controls). The last tag in a set fills solid in the group&rsquo;s hue with dark text, which is how the eye finds the punchline of the row.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ RULES ============ -->
+<section id="rules">
+  <span class="eyebrow">Applying it</span>
+  <h2>Rules to hold, traps to avoid</h2>
+  <p class="lede">Distilled from the frames. The left column is what makes it look like this; the right is what will make a rebuild look like a template with the same colors.</p>
+  <div class="rules">
+    <div class="rule yes">
+      <h4>Hold</h4>
+      <ul>
+        <li>One loud figure per card, one hue per card.</li>
+        <li>Mono caps for anything the system names; sentence case for anything addressed to the person.</li>
+        <li>Address the operator directly &mdash; &ldquo;your skills&rdquo;, &ldquo;plugged into your operator&rdquo;.</li>
+        <li>Hairlines between rows; borders only around real objects.</li>
+        <li>Tabular numerals everywhere a digit repeats.</li>
+        <li>Say when a number is estimated, right under it.</li>
+        <li>Give background agents their own visual class, apart from navigation.</li>
+      </ul>
+    </div>
+    <div class="rule no">
+      <h4>Avoid</h4>
+      <ul>
+        <li>Boxing every row &mdash; it flattens the hierarchy the hairlines create.</li>
+        <li>The same sparkline on every stat card; vary the graphic by the kind of number.</li>
+        <li>Solid accent-colored buttons. The system proposes; it doesn&rsquo;t demand.</li>
+        <li>Turning a hue loose as decoration once it carries a meaning.</li>
+        <li>Left accent bars on cards &mdash; the active state here is a fill plus an inset hairline.</li>
+        <li>Glow on text. The glow belongs to graph nodes and status dots only.</li>
+        <li>A second sidebar, ever.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PART TWO ============ -->
+<div class="part">
+  <div class="tagline">Part two</div>
+  <h2>The RikuOS layer</h2>
+  <p>Four things RikuOS needs that the source has no answer for. Each one is built from parts that already exist above &mdash; nothing here invents a new visual idea, it recombines the ones the system already earns.</p>
+</div>
+
+<!-- ============ CALENDAR ============ -->
+<section id="calendar">
+  <span class="eyebrow">New component</span>
+  <h2>Calendar with toggleable layers</h2>
+  <p class="lede">The graph legend, made interactive, sitting beside a month grid. The hard part isn&rsquo;t the grid &mdash; it&rsquo;s that layer colors would normally collide with the semantic palette. They don&rsquo;t here, because each layer is assigned the hue that matches what it <em>means</em>.</p>
+
+  <div class="well">
+    <div class="cal">
+      <div class="cal-side">
+        <h5>Layers</h5>
+        <div class="layer"><i style="background:#FF8A3D"></i><span class="nm">Freelance</span><span class="ct">12</span><button class="swx on" style="color:#FF8A3D" type="button" aria-label="Freelance layer on"><b></b></button></div>
+        <div class="layer"><i style="background:#5FA5FA"></i><span class="nm">Classes</span><span class="ct">18</span><button class="swx on" style="color:#5FA5FA" type="button" aria-label="Classes layer on"><b></b></button></div>
+        <div class="layer"><i style="background:#35D399"></i><span class="nm">Workouts</span><span class="ct">9</span><button class="swx on" style="color:#35D399" type="button" aria-label="Workouts layer on"><b></b></button></div>
+        <div class="layer"><i style="background:#F87171"></i><span class="nm">Deadlines</span><span class="ct">4</span><button class="swx on" style="color:#F87171" type="button" aria-label="Deadlines layer on"><b></b></button></div>
+        <div class="layer off"><i style="background:#A78BFA"></i><span class="nm">Personal</span><span class="ct">7</span><button class="swx" type="button" aria-label="Personal layer off"><b></b></button></div>
+      </div>
+
+      <div>
+        <div class="cal-head">
+          <span class="cal-month">September 2026</span>
+          <button type="button" aria-label="Previous month">&#8249;</button>
+          <button type="button" aria-label="Next month">&#8250;</button>
+          <span class="range" style="margin-left:auto"><button type="button">Month</button><button type="button">Week</button><button type="button">Agenda</button></span>
+        </div>
+        <div class="dow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+        <div class="cal-grid">
+          <div class="day dim"><span class="n">31</span></div>
+          <div class="day"><span class="n">1</span><span class="ev" style="border-color:#5FA5FA;background:rgba(95,165,250,.09);color:#9CC7FF">Software Eng II</span></div>
+          <div class="day"><span class="n">2</span><span class="ev" style="border-color:#FF8A3D;background:rgba(255,138,61,.09);color:#FFBE8F">Outreach batch</span></div>
+          <div class="day"><span class="n">3</span><span class="ev" style="border-color:#5FA5FA;background:rgba(95,165,250,.09);color:#9CC7FF">Operating Sys</span><span class="ev" style="border-color:#35D399;background:rgba(53,211,153,.09);color:#8AE9C6">Push day</span></div>
+          <div class="day"><span class="n">4</span><span class="ev" style="border-color:#FF8A3D;background:rgba(255,138,61,.09);color:#FFBE8F">Outreach batch</span></div>
+          <div class="day today"><span class="n">5</span><span class="ev" style="border-color:#35D399;background:rgba(53,211,153,.09);color:#8AE9C6">Pull day</span><span class="ev more">+2 more</span></div>
+          <div class="day"><span class="n">6</span></div>
+
+          <div class="day"><span class="n">7</span><span class="ev" style="border-color:#FF8A3D;background:rgba(255,138,61,.09);color:#FFBE8F">Outreach batch</span></div>
+          <div class="day"><span class="n">8</span><span class="ev" style="border-color:#5FA5FA;background:rgba(95,165,250,.09);color:#9CC7FF">Software Eng II</span></div>
+          <div class="day"><span class="n">9</span><span class="ev" style="border-color:#FF8A3D;background:rgba(255,138,61,.09);color:#FFBE8F">Outreach batch</span><span class="ev" style="border-color:#35D399;background:rgba(53,211,153,.09);color:#8AE9C6">Legs</span></div>
+          <div class="day"><span class="n">10</span><span class="ev" style="border-color:#5FA5FA;background:rgba(95,165,250,.09);color:#9CC7FF">Operating Sys</span></div>
+          <div class="day"><span class="n">11</span><span class="ev" style="border-color:#FF8A3D;background:rgba(255,138,61,.09);color:#FFBE8F">Outreach batch</span></div>
+          <div class="day"><span class="n">12</span></div>
+          <div class="day"><span class="n">13</span><span class="ev" style="border-color:#35D399;background:rgba(53,211,153,.09);color:#8AE9C6">Long run</span></div>
+
+          <div class="day"><span class="n">14</span><span class="ev" style="border-color:#FF8A3D;background:rgba(255,138,61,.09);color:#FFBE8F">Outreach batch</span></div>
+          <div class="day"><span class="n">15</span><span class="ev" style="border-color:#5FA5FA;background:rgba(95,165,250,.09);color:#9CC7FF">Software Eng II</span></div>
+          <div class="day"><span class="n">16</span><span class="ev" style="border-color:#FF8A3D;background:rgba(255,138,61,.09);color:#FFBE8F">Outreach batch</span></div>
+          <div class="day"><span class="n">17</span><span class="ev" style="border-color:#5FA5FA;background:rgba(95,165,250,.09);color:#9CC7FF">Operating Sys</span></div>
+          <div class="day"><span class="n">18</span><span class="ev" style="border-color:#F87171;background:rgba(248,113,113,.1);color:#FCA5A5">Thesis draft due</span></div>
+          <div class="day"><span class="n">19</span></div>
+          <div class="day"><span class="n">20</span></div>
+
+          <div class="day"><span class="n">21</span><span class="ev" style="border-color:#FF8A3D;background:rgba(255,138,61,.09);color:#FFBE8F">Outreach batch</span></div>
+          <div class="day"><span class="n">22</span><span class="ev" style="border-color:#5FA5FA;background:rgba(95,165,250,.09);color:#9CC7FF">Software Eng II</span></div>
+          <div class="day"><span class="n">23</span><span class="ev" style="border-color:#FF8A3D;background:rgba(255,138,61,.09);color:#FFBE8F">Outreach batch</span></div>
+          <div class="day"><span class="n">24</span><span class="ev" style="border-color:#F87171;background:rgba(248,113,113,.1);color:#FCA5A5">Meowchi handoff</span></div>
+          <div class="day"><span class="n">25</span><span class="ev" style="border-color:#FF8A3D;background:rgba(255,138,61,.09);color:#FFBE8F">Outreach batch</span></div>
+          <div class="day"><span class="n">26</span></div>
+          <div class="day"><span class="n">27</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="notes">
+    <div><dt>The colour rule</dt><dd>A layer takes the hue of what it <em>is</em>, not an arbitrary one. Freelance is orange because it&rsquo;s money work. Deadlines are red because a missed one is a conflict. Classes are blue because they&rsquo;re sessions. Workouts are green because they&rsquo;re the healthy state. Personal is violet. The semantic palette survives intact &mdash; nothing new was invented.</dd></div>
+    <div><dt>Toggle</dt><dd>26&times;15px pill, track <code>#141820</code> with a hairline. On: border and knob take the layer&rsquo;s hue via <code>currentColor</code>. Off: the whole row drops to 35% opacity, including its dot, so the list still reads as a legend.</dd></div>
+    <div><dt>Day cell</dt><dd>78px minimum, 8px radius, <code>--line-soft</code> border. Today reuses the <em>exact</em> active-nav treatment &mdash; raised fill plus inset hairline. Not a colored ring, not a filled circle.</dd></div>
+    <div><dt>Event chip</dt><dd>2px left border in the layer hue, 9% fill, text in a lightened version of the hue. Two chips maximum per cell, then a mono <code>+2 more</code>. Chips are labels, so 3px radius, not pills.</dd></div>
+    <div><dt>Adjacent months</dt><dd>Dimmed to 34% rather than hidden. The grid keeps its shape and the week rows stay honest.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ PIPELINE ============ -->
+<section id="pipeline">
+  <span class="eyebrow">New component</span>
+  <h2>Outreach pipeline</h2>
+  <p class="lede">This is the usage row wearing different clothes. A lead is a thing with a cadence, a limit and a state &mdash; structurally identical to a plan window, so it gets the same row grammar rather than a new one.</p>
+
+  <div class="well">
+    <div class="pipe">
+      <div class="prow">
+        <div class="pbiz"><span class="av">K</span><span><span class="nm">Kape Mont Alban</span><span class="mt">Caf&eacute; &middot; Quezon City &middot; A2</span></span></div>
+        <div class="touch"><i style="background:#3A424C"></i><i style="background:#5FA5FA"></i><i style="background:#35D399"></i><em>3/3</em></div>
+        <span class="pstate" style="border-color:rgba(53,211,153,.4);color:#8AE9C6">Replied</span>
+        <span class="pwhen">2h ago</span>
+      </div>
+      <div class="prow">
+        <div class="pbiz"><span class="av">S</span><span><span class="nm">Sagrada Dental</span><span class="mt">Clinic &middot; Pasig &middot; A3</span></span></div>
+        <div class="touch"><i style="background:#3A424C"></i><i style="background:#5FA5FA"></i><i style="background:#35D399"></i><em>3/3</em></div>
+        <span class="pstate" style="border-color:transparent;background:#35D399;color:#03251C;font-weight:700">Booked</span>
+        <span class="pwhen">yesterday</span>
+      </div>
+      <div class="prow">
+        <div class="pbiz"><span class="av">B</span><span><span class="nm">Bella Nails Studio</span><span class="mt">Salon &middot; Makati &middot; A3-Lite</span></span></div>
+        <div class="touch"><i style="background:#3A424C"></i><i style="background:#3A424C"></i><i></i><em>2/3</em></div>
+        <span class="pstate">No reply</span>
+        <span class="pwhen">4d ago</span>
+      </div>
+      <div class="prow">
+        <div class="pbiz"><span class="av">V</span><span><span class="nm">Verde Landscaping</span><span class="mt">Services &middot; Taguig &middot; A2</span></span></div>
+        <div class="touch"><i style="background:#3A424C"></i><i></i><i></i><em>1/3</em></div>
+        <span class="pstate">No reply</span>
+        <span class="pwhen">6d ago</span>
+      </div>
+      <div class="prow">
+        <div class="pbiz"><span class="av">T</span><span><span class="nm">Tindahan ni Aling Rosa</span><span class="mt">Retail &middot; Manila &middot; A1</span></span></div>
+        <div class="touch"><i style="background:#3A424C"></i><i style="background:#3A424C"></i><i style="background:#3A424C"></i><em>3/3</em></div>
+        <span class="pstate" style="border-color:rgba(251,191,36,.4);color:#FCD34D">Cold</span>
+        <span class="pwhen">21d ago</span>
+      </div>
+    </div>
+    <div class="statstrip" style="margin:20px -30px -30px;border-radius:0 0 var(--r-lg) var(--r-lg)">
+      <div><b style="color:var(--ink)">42</b>sent</div>
+      <div><b style="color:var(--save)">9</b>replied</div>
+      <div><b style="color:var(--save)">3</b>booked</div>
+      <div><b style="color:var(--stale,#FBBF24)">6</b>gone cold</div>
+      <div><b style="color:var(--ink)">21%</b>reply rate</div>
+    </div>
+  </div>
+
+  <dl class="notes">
+    <div><dt>Grid</dt><dd><code>1fr | 118px | 148px | 92px</code> &mdash; identity, cadence, state, recency. Hairline between rows, no boxes, exactly like the usage rows.</dd></div>
+    <div><dt>Cadence strip</dt><dd>Three 17&times;4px bars, one per Mon/Wed/Fri touch. Empty track <code>#1A1E25</code> &rarr; sent <code>--ink-4</code> &rarr; opened <code>--session</code> &rarr; replied <code>--save</code>. Progression reads left to right without a legend; the mono <code>3/3</code> is the fallback for anyone who wants the number.</dd></div>
+    <div><dt>State tag</dt><dd>Outline by default. Only <em>Booked</em> fills solid &mdash; it&rsquo;s the terminal success and the one thing you scan the list for. <em>Cold</em> takes amber because it&rsquo;s the same idea as a stale memory node: still there, no longer fresh.</dd></div>
+    <div><dt>Summary strip</dt><dd>The graph stat strip, reused verbatim and flush to the bottom of the panel. Only the counts that mean something take a hue.</dd></div>
+    <div><dt>Why not cards</dt><dd>A lead list is scanned down a column, not compared side by side. Cards would force a width and break the alignment that makes the cadence strip readable at a glance.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ ACADEMICS ============ -->
+<section id="academics">
+  <span class="eyebrow">New component</span>
+  <h2>Academics module counter</h2>
+  <p class="lede">A skill card with the gradient cap removed and a segmented counter in its place. Courses aren&rsquo;t expressive objects &mdash; they&rsquo;re progress against a fixed denominator &mdash; so the colour goes into the ticks, not a header.</p>
+
+  <div class="well">
+    <div class="courses">
+      <div class="course">
+        <div class="code">CS0055 &middot; 1st term</div>
+        <div class="nm">Software Engineering II</div>
+        <div class="fig" style="color:var(--save)">8<span>of 12 modules</span></div>
+        <div class="ticks">
+          <i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="foot">
+          <div><b>4</b> reviewers</div>
+          <div>next due <b>Sep 18</b></div>
+        </div>
+      </div>
+
+      <div class="course">
+        <div class="code">CS0027 &middot; 1st term</div>
+        <div class="nm">Operating Systems</div>
+        <div class="fig" style="color:var(--stale,#FBBF24)">3<span>of 10 modules</span></div>
+        <div class="ticks">
+          <i style="background:#FBBF24"></i><i style="background:#FBBF24"></i><i style="background:#FBBF24"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="foot">
+          <div><b>1</b> reviewer</div>
+          <div>next due <b>Sep 11</b></div>
+        </div>
+      </div>
+
+      <div class="course">
+        <div class="code">CS0043 &middot; 1st term</div>
+        <div class="nm">Information Assurance</div>
+        <div class="fig" style="color:var(--save)">9<span>of 9 modules</span></div>
+        <div class="ticks">
+          <i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i><i style="background:#35D399"></i>
+        </div>
+        <div class="foot">
+          <div><b>6</b> reviewers</div>
+          <div>complete</div>
+        </div>
+      </div>
+
+      <div class="course">
+        <div class="code">GED0009 &middot; 1st term</div>
+        <div class="nm">Ethics</div>
+        <div class="fig" style="color:var(--alert)">1<span>of 8 modules</span></div>
+        <div class="ticks">
+          <i style="background:#F87171"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="foot">
+          <div><b>0</b> reviewers</div>
+          <div>next due <b>Sep 9</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="notes">
+    <div><dt>Ticks, not a bar</dt><dd>One segment per module, 5px tall, 3px gaps. A continuous bar tells you a proportion; ticks tell you a <em>count</em>, which is the thing you actually want when the denominator is 9 or 12. Countable up to about 16 segments; past that, switch to a bar.</dd></div>
+    <div><dt>Hue from state</dt><dd>Green on track, amber behind, red at risk. Derived from progress against the next deadline &mdash; not a per-course colour. Same semantic palette, no new meanings.</dd></div>
+    <div><dt>Figure</dt><dd>Display 700 at 26px &mdash; a step down from the stat hero, because this is a section-level number, not a page-level one. The denominator stays in body weight next to it.</dd></div>
+    <div><dt>Foot</dt><dd>Two facts only: what you have (reviewers) and what&rsquo;s coming (next due). A finished course says <code>complete</code> rather than a date, so the row doesn&rsquo;t look broken.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ EMPTY ============ -->
+<section id="empty">
+  <span class="eyebrow">New component</span>
+  <h2>Empty &amp; first-run states</h2>
+  <p class="lede">The source video only ever shows a full, healthy dashboard. Day-one RikuOS has nothing in it, and an undesigned empty version of this system reads as broken rather than new. Five rules and their specimens.</p>
+
+  <div class="well">
+    <p class="caption" style="margin-bottom:20px">First run &mdash; one banner at the top of the page, not an action in every card</p>
+    <div class="firstrun">
+      <span style="width:34px;height:34px;border-radius:10px;background:linear-gradient(150deg,#FF9E5C,#F2622B);display:grid;place-items:center;flex:none">
+        <svg viewBox="0 0 24 24" fill="#2A1002" style="width:18px;height:18px"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg>
+      </span>
+      <span>
+        <span class="t">Nothing&rsquo;s connected yet</span>
+        <span class="s">Link a calendar and an outreach account and this page fills itself in.</span>
+      </span>
+      <button class="btn" type="button" style="margin-left:auto">Set up</button>
+    </div>
+
+    <p class="caption" style="margin:32px 0 20px">Empty containers &mdash; the frame stays, the hue drains</p>
+    <div class="stats">
+      <div class="stat blank">
+        <div class="stat-top">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:12px;height:12px;color:var(--ink-4)"><path d="M12 22c4-1 6-4.5 6-8 0-4-3-6-3-9 0 0-2 1.5-2 4 0 1.5-1 2-1.5 1-.7-1.4-.5-3-.5-3S6 9 6 14c0 3.5 2 7 6 8Z"/></svg>
+          <span class="lbl">Spent on AI</span>
+        </div>
+        <div class="fig">&mdash;</div>
+        <div class="sub" style="color:var(--ink-4)">no provider connected</div>
+      </div>
+      <div class="emptycard">
+        <span class="t">No skills yet</span>
+        <p>Skills appear here after their first run. Nothing to show is not the same as nothing happening.</p>
+        <button class="btn" type="button">Add a skill</button>
+      </div>
+      <div class="emptycard">
+        <span class="t">No leads in this batch</span>
+        <p>Run a sweep and the pipeline fills from the top.</p>
+        <button class="btn" type="button">Run a sweep</button>
+      </div>
+    </div>
+
+    <p class="caption" style="margin:32px 0 20px">Empty row &mdash; the ring stays, the number goes grey</p>
+    <div class="usage">
+      <div class="urow">
+        <div class="ring">
+          <svg viewBox="0 0 44 44" width="52" height="52">
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#1A1E25" stroke-width="4"/>
+          </svg>
+          <b style="color:var(--ink-4)">&mdash;</b>
+        </div>
+        <div>
+          <div class="uname" style="color:var(--ink-3)"><span class="ic" style="background:#1B2029;color:var(--ink-4)">?</span>No plan connected</div>
+          <div class="uplan">Connect an account to track windows</div>
+        </div>
+        <div class="bars">
+          <div>
+            <div class="bar-head" style="color:var(--ink-4)">5h <b style="color:var(--ink-4)">&mdash;</b> / &mdash;</div>
+            <div class="track"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="notes" style="grid-template-columns:1fr">
+    <div><dt>1. The container never disappears</dt><dd>An empty stat card is still a card, at the same height, in the same grid position. If containers vanish when empty, the layout jumps the moment real data arrives &mdash; and the page teaches the user nothing about what will eventually live there.</dd></div>
+    <div><dt>2. Hue drains, structure stays</dt><dd>Colour in this system means &ldquo;there is a signal here.&rdquo; No data means no signal, so labels and figures fall to <code>--ink-4</code> and hued backgrounds revert to the plain card fill. The border and radius are unchanged.</dd></div>
+    <div><dt>3. Em-dash, never zero</dt><dd>A zero is a measurement: it says you used nothing. An em-dash says nothing was measured. Confusing the two in a dashboard is a correctness bug, not a style choice.</dd></div>
+    <div><dt>4. One action per empty component, maximum</dt><dd>An outline pill, the same one used everywhere else. Never a solid call-to-action, never two competing options, never an illustration &mdash; this is a tool, and the empty state is a temporary condition rather than a landing page.</dd></div>
+    <div><dt>5. First run is a banner, not a state</dt><dd>Before anything is connected, every card would be empty, and six identical &ldquo;connect something&rdquo; prompts is noise. One banner at the top of the page, in the brand hue, with a single action; the cards below simply sit quiet.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ DECISIONS ============ -->
+<section id="decisions">
+  <span class="eyebrow">Your layer</span>
+  <h2>Decisions</h2>
+  <p class="lede">Where the earlier open questions landed, and the one debt that was taken on deliberately. Anything marked settled is safe for Claude Code to build against without asking.</p>
+
+  <div class="slot done">
+    <span class="todo">Settled</span>
+    <h4>Desktop first, mobile as a later pass</h4>
+    <p>RikuOS is built at desktop width against this system as documented, and gets a mobile pass afterwards. The reference stays desktop-shaped &mdash; no mobile specimens, no responsive hedging in the component code.</p>
+    <table class="debt">
+      <thead><tr><th>Component</th><th>What happens at 390px</th></tr></thead>
+      <tbody>
+        <tr><td>Stat heroes</td><td>Reflows on its own &mdash; already <code>auto-fit / minmax</code>. Stacks to one column, no work needed.</td></tr>
+        <tr><td>Skill &amp; provider cards</td><td>Same. Reflows cleanly.</td></tr>
+        <tr><td>Integrations, tags, buttons</td><td>Same. Reflows cleanly.</td></tr>
+        <tr><td>Course cards</td><td>Same. Ticks compress but stay countable down to about 12 modules.</td></tr>
+        <tr><td>Usage rows</td><td><strong>Needs work.</strong> The <code>64px | 176px | 1fr</code> grid has three encodings side by side. Ring and identity have to stack above the bars.</td></tr>
+        <tr><td>Outreach pipeline</td><td><strong>Needs work.</strong> Four columns; the cadence strip and state tag have to move under the business name.</td></tr>
+        <tr><td>App shell</td><td><strong>Needs work.</strong> The 170px fixed rail has no mobile form &mdash; bottom tabs or a sheet, decided later.</td></tr>
+        <tr><td>Insight card</td><td><strong>Needs work.</strong> <code>210px | 1fr</code> with the illustration beside the argument; has to become illustration over argument.</td></tr>
+        <tr><td>Memory graph</td><td><strong>Needs work.</strong> Two floating panels over a 250px canvas will overlap each other.</td></tr>
+        <tr><td>Calendar</td><td><strong>Needs work.</strong> A 7-column month grid does not fit. The week and agenda views exist for this reason &mdash; mobile likely defaults to agenda.</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:14px">Six components, and five of them are the same fix: a fixed multi-column grid becoming a stack. Worth knowing the size of the debt before it comes due.</p>
+  </div>
+
+  <div class="slot done">
+    <span class="todo">Settled</span>
+    <h4>One semantic palette across all four life pages</h4>
+    <p>No per-page accent hues. Orange, green, violet, blue, amber and red keep their fixed meanings everywhere, and pages are told apart by content and heading rather than colour. This is what preserves the four-second readability that makes the source work &mdash; and it is why the calendar layers could be coloured at all without inventing a second colour language.</p>
+  </div>
+
+  <div class="slot done">
+    <span class="todo">Settled</span>
+    <h4>Content and page structure live outside this document</h4>
+    <p>Sections, page inventory and data shapes are already specified elsewhere for Claude Code. This reference governs how things look and behave, not what is rendered &mdash; the two should not be duplicated, and where they disagree, the content spec wins.</p>
+  </div>
+
+  <div class="slot">
+    <span class="todo">Open</span>
+    <h4>What the three hero figures are</h4>
+    <p>The source opens on money spent, money saved, net ROI &mdash; three numbers that only exist because it is an AI-cost tracker. RikuOS needs its own three: the figures worth seeing first thing in the morning, across freelance, academics and personal. Until those are named, the hero row is a shape with nothing in it.</p>
+  </div>
+
+  <div class="slot">
+    <span class="todo">Open</span>
+    <h4>Where the agents block goes</h4>
+    <p>The source rail separates background agents from navigation, which is the single best structural idea in it. RikuOS has real background work &mdash; outreach sweeps, calendar sync, Canvas pulls &mdash; but no decision yet on whether those surface as named agents in the rail, as a status row, or not at all.</p>
+  </div>
+</section>
+
+<footer>
+  Part one is rebuilt from four frames of &ldquo;Claude Code Agentic OS&hellip; It self improves&rdquo; by Jack Roberts; part two is original work built from its parts. Every specimen on this page is HTML and CSS written by hand &mdash; no assets were taken from the video. Sample data throughout is illustrative. Reference only.
+</footer>
+
+</main>
+</div>
+
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- insight card illustration: a quiet night sky ---- */
+  var art = document.getElementById('art');
+  if (art && art.getContext) {
+    var a = art.getContext('2d'), W = art.width, H = art.height;
+    var sky = a.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#241C55'); sky.addColorStop(.55, '#3A2A63'); sky.addColorStop(1, '#6B4A6E');
+    a.fillStyle = sky; a.fillRect(0, 0, W, H);
+    for (var i = 0; i < 220; i++) {
+      var sx = Math.random() * W, sy = Math.random() * H * .72, r = Math.random() * 1.1 + .2;
+      a.globalAlpha = Math.random() * .8 + .15;
+      a.fillStyle = '#fff'; a.beginPath(); a.arc(sx, sy, r, 0, 6.284); a.fill();
+    }
+    a.globalAlpha = 1;
+    /* haze */
+    var haze = a.createRadialGradient(W * .68, H * .3, 6, W * .68, H * .3, W * .5);
+    haze.addColorStop(0, 'rgba(214,190,255,.28)'); haze.addColorStop(1, 'rgba(214,190,255,0)');
+    a.fillStyle = haze; a.fillRect(0, 0, W, H);
+    /* ridgelines */
+    var ridges = [
+      { y: .62, c: '#2B2350' }, { y: .72, c: '#221C43' }, { y: .84, c: '#171334' }
+    ];
+    ridges.forEach(function (rg, k) {
+      a.fillStyle = rg.c; a.beginPath(); a.moveTo(0, H);
+      a.lineTo(0, H * rg.y);
+      for (var x = 0; x <= W; x += 14) {
+        var yy = H * rg.y + Math.sin(x / (52 + k * 22) + k * 1.7) * (13 + k * 5) + Math.sin(x / 17) * 2.5;
+        a.lineTo(x, yy);
+      }
+      a.lineTo(W, H); a.closePath(); a.fill();
+    });
+    /* telescope silhouette */
+    a.strokeStyle = '#0D0B1C'; a.lineWidth = 4; a.lineCap = 'round';
+    a.beginPath(); a.moveTo(W * .3, H * .93); a.lineTo(W * .38, H * .74); a.stroke();
+    a.beginPath(); a.moveTo(W * .42, H * .93); a.lineTo(W * .36, H * .74); a.stroke();
+    a.lineWidth = 8;
+    a.beginPath(); a.moveTo(W * .28, H * .82); a.lineTo(W * .47, H * .70); a.stroke();
+  }
+
+  /* ---- memory graph constellation ---- */
+  var cv = document.getElementById('constellation');
+  if (cv && cv.getContext) {
+    var g = cv.getContext('2d'), CW = cv.width, CH = cv.height;
+    var hues = ['#FFD08A', '#FFB25C', '#FF8A3D', '#FFFFFF', '#F87171', '#F472B6', '#A78BFA', '#FBBF24'];
+    var nodes = [], N = 46;
+    for (var n = 0; n < N; n++) {
+      nodes.push({
+        x: Math.random() * CW,
+        y: Math.random() * CH,
+        r: Math.pow(Math.random(), 2.1) * 26 + 2.5,
+        c: hues[Math.floor(Math.random() * hues.length)],
+        p: Math.random() * 6.28
+      });
+    }
+    function draw(t) {
+      g.fillStyle = '#000'; g.fillRect(0, 0, CW, CH);
+      /* edges */
+      g.lineWidth = 1;
+      for (var i = 0; i < nodes.length; i++) {
+        for (var j = i + 1; j < nodes.length; j++) {
+          var dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+          var d = Math.sqrt(dx * dx + dy * dy);
+          if (d < 260) {
+            g.strokeStyle = 'rgba(255,236,205,' + (0.10 * (1 - d / 260)).toFixed(3) + ')';
+            g.beginPath();
+            g.moveTo(nodes[i].x, nodes[i].y);
+            g.quadraticCurveTo((nodes[i].x + nodes[j].x) / 2, (nodes[i].y + nodes[j].y) / 2 - 34, nodes[j].x, nodes[j].y);
+            g.stroke();
+          }
+        }
+      }
+      /* nodes: wide halo + solid core */
+      nodes.forEach(function (nd) {
+        var pulse = reduce ? 1 : 1 + Math.sin(t / 1400 + nd.p) * 0.07;
+        var R = nd.r * pulse;
+        var grd = g.createRadialGradient(nd.x, nd.y, 0, nd.x, nd.y, R * 3.4);
+        grd.addColorStop(0, nd.c);
+        grd.addColorStop(.16, hexA(nd.c, .55));
+        grd.addColorStop(1, hexA(nd.c, 0));
+        g.fillStyle = grd;
+        g.beginPath(); g.arc(nd.x, nd.y, R * 3.4, 0, 6.284); g.fill();
+        g.fillStyle = nd.c;
+        g.beginPath(); g.arc(nd.x, nd.y, Math.max(1.2, R * .34), 0, 6.284); g.fill();
+      });
+    }
+    function hexA(h, al) {
+      var r = parseInt(h.slice(1, 3), 16), gg = parseInt(h.slice(3, 5), 16), b = parseInt(h.slice(5, 7), 16);
+      return 'rgba(' + r + ',' + gg + ',' + b + ',' + al + ')';
+    }
+    draw(0);
+    if (!reduce) {
+      var start = performance.now();
+      (function loop(now) { draw(now - start); requestAnimationFrame(loop); })(start);
+    }
+  }
+})();
+</script>
+
+</body>
+</html>
