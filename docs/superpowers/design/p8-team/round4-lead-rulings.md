@@ -53,3 +53,9 @@ The design is closed. Next: the visual-design spec, drafted from rounds 3 and 4 
 - **R32 — the 60-second floor is a pure function in `src/lib/healthSnapshot.ts`, tested in `src/lib/__tests__/`.** The route stays thin and calls it. There are no route-level tests in this repo and P8 does not introduce them.
 - **The `heroGraphics` module named in R22 does not exist.** Riku chose the plain row; the contacts track is one percentage computed in `freelanceView`. R22 is read without it.
 - **R19's "five stylesheets" is four** — `globals.css` was the fifth and is deleted.
+
+## Rulings made while Plan A was reviewed — 2026-09-07
+
+- **R33 — `.app-body{min-height:100vh}`.** The mockup was drawn inside a fixed-height frame and never showed a short page; on the real `/freelance` root the rail column would stop mid-screen. The rail's ground reaches the viewport bottom on every page. A fifth marked difference from the mockup in `components.css`.
+- **Spec deltas accepted from the Build Planner:** `IconLogout` is not exported (nothing renders it and §5.8 forbids dead vocabulary; `Log out` is text only). `.navitem` carries `border-bottom:0` because the app draws nav items as anchors and `base.css` underlines anchors. `h1` lives in `legacy.css`, not `base.css`, per the mockup and §6.1. The `(app)` layout's `cookies()` read is what makes the top-bar stamp a request time on the client-rendered queue and settings pages — it is load-bearing, not redundant with the proxy.
+- **Execution runs on `master` directly**, as every commit in this repo does and as the plan's commit steps assume; no worktree. Riku keeps `master` local and unpushed by standing choice.
