@@ -352,6 +352,8 @@ a:hover{color:var(--ink);border-bottom-color:var(--ink-4)}
 
 - [ ] **Step 3: Create `src/styles/components.css`**
 
+**One comment in the shipped file differs from this block:** the `.crumb` comment is R39's (the stamp is computed on the client at each navigation), per `40a8cdc`. The rules are unchanged.
+
 ```css
 /* ============================================================
    components.css — the shared vocabulary, ported from the
@@ -1837,6 +1839,8 @@ export default function LogoutButton() {
 
 - [ ] **Step 3: Create `src/app/(app)/_shell/NavList.tsx`**
 
+**Superseded by R37–R41 (`round4-lead-rulings.md`): the shipped file carries `aria-current` on the active item and the three-islands docblock, not this block.**
+
 ```tsx
 "use client";
 
@@ -2396,7 +2400,7 @@ Expected: `✓ Compiled successfully` and a route table listing `/queue`, `/sett
 - [ ] **Step 2: No stray `components.html` token names**
 
 Run: `git grep "var(--alert)\|var(--amber)" src/`
-Expected: **no output**, exit code 1.
+Expected: exactly one hit, and it is prose — the line in `src/styles/tokens.css`'s header comment that names `var(--alert)` as the thing that must never be written. No hit in any rule, and none in any other file.
 
 Why it matters: a custom property that resolves to nothing is invalid at computed-value time, so `color: var(--alert)` would silently **inherit** — a red warning rendering in body grey, in the one place it matters.
 
