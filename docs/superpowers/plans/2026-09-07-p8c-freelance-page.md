@@ -27,7 +27,7 @@
 
 Three deviations, each forced and each recorded here rather than discovered later:
 
-1. **Block headings are real `<h2 className="fl-h">`, not the mockup's `<span className="fl-h">`,** and the page title is `<h1 className="fl-title">`, not the mockup's `<h3>` with an inline margin. The margin fix in `94eddc9` put `margin:5px 0 0` on `.fl-h` and `margin:0` on `.fl-title`, so a real heading renders identically. The eyebrow stays a `<span className="eyebrow">` above it.
+1. **Block headings are real `<h2 className="fl-h">`, not the mockup's `<span className="fl-h">`,** and the page title is an `<h1 className="fl-title">` rendered by the segment layout, not by this page (R42). The margin fix in `94eddc9` put `margin:5px 0 0` on `.fl-h` and `margin:0` on `.fl-title`, so a real heading renders identically. The eyebrow stays a `<span className="eyebrow">` above it.
 2. **Wrappers that contain an `<h2>` become `<div>`, where the mockup used `<span>`** — `.sumrow` and its first child in Blocks C and D, and `.fl-headrow`'s first child in Block E. A `<span>` is phrasing content and cannot legally contain a heading. Both are grid items, so nothing moves. **The cost, stated plainly: `<summary>`'s content model is phrasing content or a single heading element, so a `<div className="sumrow">` inside it is not strictly conformant HTML.** It renders correctly in every browser and React does not object. The ruling asked for real headings; this is what real headings cost inside a native disclosure. The alternative — keeping `<span className="fl-h">` inside the two `<summary>` elements only — is a one-word change per file if the lead prefers conformance over heading semantics.
 3. **The mockup's inline `style="margin-top:6px"` on the `.fl-absent` hot line does not ship.** It is tuning inside specimen 04's `.mini` frame, which is mockup-only chrome. `.fl-absent`'s own `margin-top: var(--sp-3)` applies.
 
@@ -377,8 +377,6 @@ export default async function FreelancePage() {
   return (
     <main className="app-content">
       <div className="fl">
-        <h1 className="fl-title">Freelance</h1>
-
         {wholePageDown ? (
           <div className="fl-fail">
             <i />

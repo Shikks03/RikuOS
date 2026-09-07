@@ -548,6 +548,8 @@ export default function Home() {
     start_url: "/freelance",
 ```
 
+**R45, after review:** the manifest also declares `id: "/"` above `start_url`, with a comment, so the installed app's identity no longer follows `start_url`.
+
 `src/app/login/page.tsx` — line 10:
 
 ```tsx
@@ -705,12 +707,12 @@ const nextConfig: NextConfig = {
   /**
    * The queue moved under the Freelance address (R42). This keeps the old one
    * alive: a bookmark, and — the reason it is permanent — an already-installed
-   * PWA whose cached start_url is still /queue.
+   * PWA whose cached start_url still points at the old address.
    *
-   * next.config redirects run BEFORE the proxy, so a signed-out hit on /queue
-   * becomes /login?from=/freelance/queue and the login page sends the session
-   * to the right place. src/proxy.ts is not touched: /freelance/queue is not
-   * on its allowlist, which is exactly how /queue was treated.
+   * next.config redirects run BEFORE the proxy, so a signed-out hit on the old
+   * address becomes /login?from=/freelance/queue and the login page sends the
+   * session to the right place. src/proxy.ts is not touched: /freelance/queue
+   * is not on its allowlist, which is exactly how the old address was treated.
    *
    * permanent: true is a 308 and browsers cache it hard. That is intended —
    * the address is not coming back — but it means undoing this needs a cache
@@ -721,6 +723,8 @@ const nextConfig: NextConfig = {
   },
   async headers() {
 ```
+
+The docblock names the old address without quoting it, so §9 item 5's grep stays at three lines (ruled after Task 2).
 
 - [ ] **Step 2: Confirm the CSP was not touched**
 
@@ -946,9 +950,11 @@ import { usePathname } from "next/navigation";
  * /freelance/queue, so a prefix match would light BOTH tabs on the Queue
  * view. The rail's NavList uses startsWith for its CLASS, for the opposite
  * reason — it names an area, so Freelance must stay lit there — and equality
- * for its aria-current, so that link and this one do not both claim to be the
- * current page on one screen (R44). Here the area and the page are the same
- * thing, so one test serves both. A future /freelance/queue/:id would light
+ * for its aria-current, so that link and this one never both claim it while
+ * pointing at DIFFERENT URLs (R44). On /freelance they point at the same URL
+ * and both are right — one per <nav>, which is what ARIA's one-per-set rule
+ * means (R46). Here the area and the page are the same thing, so one test
+ * serves both. A future /freelance/queue/:id would light
  * neither tab; there is no such route, and it is one line to change when
  * there is.
  *
@@ -1124,7 +1130,7 @@ Run every check in order. **Do not claim completion until each one has produced 
 - [ ] **Step 1: The standing trio**
 
 Run: `npm test`
-Expected: all suites pass, zero failures — including `push.test.ts`, `proxy.test.ts`, `watchdog.test.ts`, `agentStatus.test.ts`, `deadline.test.ts`, `osSettings.test.ts`.
+Expected: all suites pass, zero failures — **330 tests in 22 files** (R45 added one `proxy.test.ts` case) — including `push.test.ts`, `proxy.test.ts`, `watchdog.test.ts`, `agentStatus.test.ts`, `deadline.test.ts`, `osSettings.test.ts`.
 
 Run: `npx tsc --noEmit`
 Expected: no output, exit code 0.
@@ -1145,12 +1151,12 @@ git grep -nE '(^|[^a-zA-Z/])[/]queue' -- src/ public/ next.config.ts
 Expected: **exactly three lines** —
 
 ```
-next.config.ts:NN:    return [{ source: "/queue", destination: "/freelance/queue", permanent: true }];
-src/lib/__tests__/proxy.test.ts:19:  it.each(["/", "/queue", "/api/queue", "/api/push/test", "/api/auth/logout"])(
-src/lib/__tests__/proxy.test.ts:28:    "/api/cron/../queue",
+next.config.ts:34:    return [{ source: "/queue", destination: "/freelance/queue", permanent: true }];
+src/lib/__tests__/proxy.test.ts:22:    "/queue",
+src/lib/__tests__/proxy.test.ts:32:    "/api/cron/../queue",
 ```
 
-The first is the redirect's source. The other two use `/queue` as an example of a protected path and as a traversal fixture; `isPublicPath` is a pure function and both remain valid inputs, so `proxy.test.ts` stays byte-unchanged.
+The first is the redirect's source. The other two use `/queue` as an example of a protected path and as a traversal fixture; `isPublicPath` is a pure function and both remain valid inputs. `proxy.test.ts` is **not** byte-unchanged, though: its protected-path list was re-wrapped one element per line and gained `/freelance/queue` (R45), which does not match the pattern.
 
 **Note the `[/]`.** In Git Bash on Windows, MSYS path conversion rewrites a `git grep` pattern that *begins* with `/` into a Windows path, so `git grep -n '"/queue' -- src/` silently matches nothing and **the check passes for the wrong reason.** Verified during planning: `git grep -n '/queue' src/app/manifest.ts` returns nothing on a file that contains `"/queue"`. `[/]` and `MSYS_NO_PATHCONV=1` both fix it; `[/]` needs no environment.
 
@@ -1170,7 +1176,7 @@ Expected: additions only, all inside the new `redirects()` block and its docbloc
 git status --porcelain src/proxy.ts
 git diff --stat 0f83b86..HEAD -- src/proxy.ts src/lib/__tests__/proxy.test.ts
 ```
-Expected: no output from either. The authorization boundary and its tests are untouched.
+Expected: `src/proxy.ts` — **no output from either command**. `src/lib/__tests__/proxy.test.ts` — **one changed block**: the `it.each` protected-path list, re-wrapped one element per line to match the file's other two lists and gaining `"/freelance/queue"` (R45). Nothing else in that file, and nothing at all in the authorization boundary itself.
 
 ```bash
 git diff 0f83b86..HEAD -- "src/app/(app)/freelance/queue/page.tsx"
@@ -1212,7 +1218,7 @@ Still in the dev server, still signed in:
 
 1. **The switch renders under the title on both views**, left-aligned, two labels reading `DASHBOARD` and `QUEUE` in mono caps — and **the track reads as recessed against the page ground, not as a floating lighter bar.** It sits on `--void` here rather than in the reference's `--sunk` well, so it has ~25% less separation than the specimen and the `--line` hairline carries the recess. If it reads as a raised bar, say so: the alternative is `--sunk` for the track, which is a ruling for the lead, not a tidy.
 2. **Exactly one tab is active on each view.** On `/freelance`, `DASHBOARD` has the raised fill and `QUEUE` does not. On `/freelance/queue`, the reverse. **If both are filled on the Queue view, the switch is using `startsWith`** — that is the one bug this component can have.
-3. **Exactly one element on the page claims `aria-current="page"` (R44).** On `/freelance/queue`, inspect both switch anchors *and* the rail's Freelance link: the switch's `QUEUE` anchor carries `aria-current="page"`, and **the rail's Freelance link carries none** even though it is `.navitem is-active`. Two elements claiming it is the defect R44 exists to prevent. On `/freelance` the rail's Freelance link and the switch's `DASHBOARD` anchor are the same URL, so only that one carries it.
+3. **At most one `aria-current="page"` per `<nav>`, and every one of them points at the current URL (R44, R46).** On `/freelance` there are **two**, and both are right: the rail's Freelance link and the switch's `DASHBOARD` anchor both carry it, and both `href="/freelance"` — ARIA's one-per-set rule is per `<nav>`, and the rail and the switch are two sets. On `/freelance/queue` there is **exactly one**: the switch's `QUEUE` anchor. Inspect the rail's Freelance link there — it is `.navitem is-active` and **carries none**, because it points at a different URL. A link claiming to be the current page while pointing somewhere else is the defect R44 exists to prevent.
 4. **Clicking a tab is a soft navigation** — the rail does not flash, the badges are not re-fetched, and the URL changes.
 5. **Hover.** An inactive tab's label brightens from `--ink-3` to `--ink` on hover; the active tab does not change. Nothing moves.
 6. **Focus.** Tab to each switch link with the keyboard: the orange `:focus-visible` ring appears, slightly overhanging the track and the neighbouring tab, which is expected (the ring is `outline-offset:3px` and the tab sits 4px inside the track). Enter navigates. Nothing reflows when the ring appears.
@@ -1346,6 +1352,16 @@ EOF
 
 Report to the lead: the seven spec sections written, the deck line, the two Plan C amendments, and that the mockup is ready to republish. The lead republishes and re-reads.
 
+## Post-build record
+
+What actually landed, in order, so a later reader is not left inferring it from `git log`.
+
+- **Task 1** — `0386327`, then the review fixes `7a5bd87` and `498b9d2`. R45: the manifest declares `id: "/"` above `start_url`; `proxy.test.ts`'s protected list gained `/freelance/queue` and was re-wrapped one element per line; three docblocks the move had made false were swept (`Rail.tsx`'s "three nav items", the `(app)` layout's queue sentence, `TopBar.tsx`'s "a control already on the queue page"). The manifest comment was reworded in `498b9d2` because its own prose quoted the old address, and prose is not an exception to §9 item 5's grep.
+- **Task 2** — `2ddd61b`, then `1192868`, which reworded the redirect's docblock for the same reason. The redirect was exercised live against the running dev server: `/queue` — 308 — `/freelance/queue`, the query string carried, `/api/queue` untouched, and a signed-out hit terminating at `/login?from=/freelance/queue` in two hops.
+- **Task 3** — `92f5f7e`, then `8c26088` (three comment fixes: the `.segmented` placement margin is ours, not the reference's; the `.on` order-tie note no longer claims a visible consequence; the Dashboard placeholder's pointer to Plan C regained its path), then the R46 docblock commit on `ViewSwitch.tsx`.
+- **Task 4** — verified 2026-09-07. The trio green at 330 tests, the guard grep at exactly three lines, and A-2's own items measured rather than eyeballed: the rhythm **28 / 36 / 6 / 32.9 / 28** on both views, the `.fl-head > .fl` line box **74.9** = 36 + 6 + 32.9 with no strut leak, one active tab per view, the 308 and the signed-out `?from=/freelance/queue` both observed, `/` landing on `/freelance`, the four columns on one left edge, and the degrade run rendering header, switch, rail and six grey `—` badges. **R46** was ruled here: `aria-current="page"` is at most one per `<nav>`, not one per document.
+- **Manual steps handed to Riku, due now:** sign out and in once from `/login` with no `?from=` and confirm it lands on `/freelance`; drag the window under ~1150px once and watch the four left edges move together (the extension could not resize a maximised window); if the app is installed to a home screen or desktop, remove it and add it again (R45); and, optionally, `Send test` on the Queue view and tap the notification, which must open `/freelance/queue`.
+
 ---
 
 # Part 3 — Self-review
@@ -1432,7 +1448,7 @@ Two things R42 does not mention that A-2 must do, both mechanical consequences: 
 
 And in the other direction: every selector Task 3 step 1 adds has a consumer in the same commit — `.fl-head` and `.segmented`/`.segmented a`/`.segmented a.on` in `layout.tsx` and `ViewSwitch.tsx`, and `.fl > :first-child` on `.fl` itself. Step 1(a) is **one contiguous insertion** at line 147: the `.fl>:first-child` rule closes the section-rhythm block beside the two rules it overrides (M1, `(0,2,0)` beats their `(0,1,0)` from anywhere), then the header banner follows. Step 1(b) is an **edit** to an existing rule, not a fourth declaration site for `.fl-title`. **The §5.8 declared-unused list does not grow**, and `IconQueue` leaves the vocabulary in the other direction.
 
-**5. What A-2 deliberately does not do.** No test is added: `ViewSwitch` is a rendering component whose only logic is a string equality, the repo has no component harness and P8 introduces none (spec §8), and the two things worth pinning — that `startsWith` would light both tabs, and that two elements must not claim `aria-current="page"` — are checked by eye in Task 4 step 5 items 2 and 3 and stated in both components' docblocks. No `metadata` export (ruled). No reach into the queue page for the 10px (ruled). No change to `src/proxy.ts`, `src/lib/__tests__/proxy.test.ts`, the CSP, `package.json`, or any file under `src/app/(app)/freelance/queue/` beyond one literal. **`docs/design/p8-mockup.html` *is* changed** — Task 5, after verification — because it is one of the spec's four companions and a stale header there would outrank the prose it contradicts.
+**5. What A-2 deliberately does not do.** No test is added: `ViewSwitch` is a rendering component whose only logic is a string equality, the repo has no component harness and P8 introduces none (spec §8), and the two things worth pinning — that `startsWith` would light both tabs, and that two elements must not claim `aria-current="page"` — are checked by eye in Task 4 step 5 items 2 and 3 and stated in both components' docblocks. No `metadata` export (ruled). No reach into the queue page for the 10px (ruled). No change to `src/proxy.ts`, the CSP, `package.json`, or any file under `src/app/(app)/freelance/queue/` beyond one literal (`proxy.test.ts`'s protected list gained `/freelance/queue`, R45). **`docs/design/p8-mockup.html` *is* changed** — Task 5, after verification — because it is one of the spec's four companions and a stale header there would outrank the prose it contradicts.
 
 ---
 

@@ -111,6 +111,8 @@ Queue    Freelance    Settings
 
 **Page title:** `Freelance`
 
+**The page has two views, named `Dashboard` and `Queue` (R42).** Both strings are Riku's own words, so this deck is their authority like every other string on the page. The title is the same on both views; the view's identity is carried by the switch and by `aria-current`.
+
 **Freshness control:** the page loads fresh every time. A refresh affordance is optional; if present, label it `Refresh`.
 
 ---

@@ -176,6 +176,27 @@ a:hover{color:var(--ink);border-bottom-color:var(--ink-4)}
 .fl{max-width:var(--content-max);margin:0 auto}
 .fl-sect{margin-top:var(--sp-7)}
 .fl-body{margin-top:var(--sp-5)}
+.fl>:first-child{margin-top:0}
+
+/* ---- the page header: title + view switch (R42) ---------------- */
+/* The Freelance segment layout renders these above BOTH views, so the header
+   sits outside every <main> and reuses .fl rather than declaring a second
+   920px column. Values are the reference's (components.html `.segmented`),
+   verbatim; the 6px placement margin is ours (R43) and the tabs are <a>
+   because they are two real URLs. src/styles/components.css carries the full
+   reasoning as comments; this copy carries the declarations. */
+.fl-head{padding:var(--sp-6) var(--sp-6) 0}
+.segmented{
+  display:inline-flex;background:#101318;border:1px solid var(--line);
+  border-radius:9px;padding:3px;gap:3px;margin-top:var(--sp-2);
+}
+.segmented a{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  background:none;border:0;color:var(--ink-3);padding:6px 12px;border-radius:6px;
+  cursor:pointer;line-height:1.4;
+}
+.segmented a:hover{color:var(--ink)}
+.segmented a.on{background:#1D222A;color:var(--ink)}
 
 /* ---- stat hero cards ------------------------------------------ */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:var(--sp-4)}
@@ -533,6 +554,13 @@ input:-webkit-autofill{
    cards sit narrower than the page grid's 215px minimum, deliberately */
 .minipair{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)}
 
+/* specimen 07 only: a 28px ghost standing in for the view's first content, so
+   the 28px between the switch and it reads as a gap and not as an edge */
+.s7-ghost{
+  height:28px;border-radius:var(--r-card);
+  border:1px dashed var(--line);background:var(--panel);
+}
+
 .legendgrid{
   display:grid;grid-template-columns:repeat(6,1fr);gap:14px;
   background:#0B0D11;border:1px solid var(--line-soft);border-radius:var(--r-card);
@@ -548,7 +576,7 @@ input:-webkit-autofill{
 
   <p class="doc-kicker">P8 &middot; Freelance page &middot; Mockup</p>
   <h1 class="doc-title">The Freelance page, as ruled</h1>
-  <p class="doc-lede">Six specimens of <code>/freelance</code> and its shell, built to the round-3 rulings at desktop width so you can judge the design in a browser before any of it is built in Next.js. Every number on these screens is either today's real data from ShikksTracker (2026-09-05) or the content deck's invented full render &mdash; nothing here is decoration standing in for a figure.</p>
+  <p class="doc-lede">Seven specimens of <code>/freelance</code> and its shell, built to the round-3 rulings at desktop width so you can judge the design in a browser before any of it is built in Next.js. Every number on these screens is either today's real data from ShikksTracker (2026-09-05) or the content deck's invented full render &mdash; nothing here is decoration standing in for a figure.</p>
   <hr class="doc-rule">
 
   <!-- ==========================================================
@@ -558,6 +586,8 @@ input:-webkit-autofill{
     <span class="spec-eyebrow">Specimen 01 &middot; State</span>
     <h2 class="spec-title">Today</h2>
     <p class="spec-cap">The whole page with the deck's real data &mdash; 24 drafts, 25 of 30 never contacted, nothing waiting, four approaches at zero sends &mdash; which is what you will actually see for months. Block D is drawn open so the two-group shape is visible; both disclosures work, so you can click them.</p>
+
+    <p class="spec-cap"><strong>Predates R42.</strong> This specimen's <code>title &rarr; .fl-body</code> sequence is the page before the queue moved; the app now renders the title and the view switch in the Freelance segment layout above the view &mdash; specimen 07.</p>
 
     <div class="scroll">
       <div class="frame">
@@ -721,6 +751,8 @@ input:-webkit-autofill{
     <span class="spec-eyebrow">Specimen 02 &middot; State</span>
     <h2 class="spec-title">Full</h2>
     <p class="spec-cap">The same page carrying the deck's plausible six-months-of-use render, with both disclosures open, all three kinds of Block&nbsp;E row, and the health strip in its worst case &mdash; the state where the strip stops being a footer and becomes a bordered card you cannot miss.</p>
+
+    <p class="spec-cap"><strong>Predates R42.</strong> This specimen's <code>title &rarr; .fl-body</code> sequence is the page before the queue moved; the app now renders the title and the view switch in the Freelance segment layout above the view &mdash; specimen 07.</p>
 
     <div class="spec-q">
       <span class="qlbl">Question 2 for Riku</span>
@@ -1007,6 +1039,8 @@ input:-webkit-autofill{
     <span class="spec-eyebrow">Specimen 04 &middot; Failure</span>
     <h2 class="spec-title">Whole page down, and the smaller absences</h2>
     <p class="spec-cap">When ShikksTracker cannot be reached at all, blocks A to E are not drawn drained &mdash; they are absent, and one statement replaces them. The health strip survives because site results are stored locally. Beside it: what a single failed block looks like, and what &ldquo;the field did not arrive&rdquo; looks like next to a measured zero &mdash; once inside a block, once on the hero row.</p>
+
+    <p class="spec-cap"><strong>Predates R42.</strong> This specimen's <code>title &rarr; .fl-body</code> sequence is the page before the queue moved; the app now renders the title and the view switch in the Freelance segment layout above the view &mdash; specimen 07.</p>
 
     <div class="spec-q">
       <span class="qlbl">Question 4 for Riku &mdash; wording</span>
@@ -1394,6 +1428,58 @@ Riku</pre>
       <div>
         <p class="st">Ok</p>
         <span class="agent is-ok">dispatcher</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================
+       SPECIMEN 7 &mdash; THE HEADER BAND AND THE VIEW SWITCH (R42)
+       ========================================================== -->
+  <section class="spec">
+    <span class="spec-eyebrow">Specimen 07 &middot; Header</span>
+    <h2 class="spec-title">The header band, both views</h2>
+    <p class="spec-cap">R42 put the approvals queue under the Freelance address, so the page has two views &mdash; <code>Dashboard</code> at <code>/freelance</code> and <code>Queue</code> at <code>/freelance/queue</code> &mdash; and a segment layout draws the title and the design system&rsquo;s view switch above both of them. The band alone here, at the real 920px column, drawn once with each tab active. The rhythm is <strong>28 / 6 / 28</strong>: 28px above the title, 6px from the title&rsquo;s line box to the track (R43), and 28px from the track down to the view&rsquo;s first content, which the dashed ghost block stands in for. The two tabs are real links to the two real routes and do nothing inside this document.</p>
+
+    <div class="spec-q">
+      <span class="qlbl">Question 7 for Riku</span>
+      <p>Two numbers to judge, both cheap to overturn.</p>
+      <ul>
+        <li>The <strong>6px</strong> under the title (R43). It should read as belonging to the title rather than floating between the title and the content. One token.</li>
+        <li>The <strong>track</strong>. On <code>--void</code> it has about a quarter less separation from the ground than the reference&rsquo;s own specimen, which sits inside a <code>--sunk</code> well. If it reads as a floating lighter bar rather than a housed control, the alternative is <code>--sunk</code> for the track &mdash; a ruling, not a tidy.</li>
+      </ul>
+    </div>
+
+    <div class="stack">
+      <div>
+        <p class="tab">Dashboard active &mdash; /freelance</p>
+        <div class="frame" style="width:976px">
+          <div class="fl-head"><div class="fl">
+            <h3 class="fl-title" style="margin:0;line-height:1.5">Freelance</h3>
+            <nav class="segmented" aria-label="Freelance views">
+              <a class="on" aria-current="page" href="/freelance">Dashboard</a>
+              <a href="/freelance/queue">Queue</a>
+            </nav>
+          </div></div>
+          <div class="app-content" style="padding-bottom:var(--sp-6)"><div class="fl">
+            <div class="s7-ghost"></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div>
+        <p class="tab">Queue active &mdash; /freelance/queue</p>
+        <div class="frame" style="width:976px">
+          <div class="fl-head"><div class="fl">
+            <h3 class="fl-title" style="margin:0;line-height:1.5">Freelance</h3>
+            <nav class="segmented" aria-label="Freelance views">
+              <a href="/freelance">Dashboard</a>
+              <a class="on" aria-current="page" href="/freelance/queue">Queue</a>
+            </nav>
+          </div></div>
+          <div class="app-content" style="padding-bottom:var(--sp-6)"><div class="fl">
+            <div class="s7-ghost"></div>
+          </div></div>
+        </div>
       </div>
     </div>
   </section>
