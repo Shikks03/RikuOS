@@ -9,9 +9,10 @@ export interface IOsSettings extends Document {
 
 /**
  * The three defaults, in one place. The schema reads them below, and
- * readOsSettings() returns them when no document exists yet — so the value a
- * read reports before the first write is exactly the value the upsert would
- * have created. Two copies is how those two drift apart (R37).
+ * readOsSettings() returns them for any value the document does not carry,
+ * including when there is no document yet — so the value a read reports is
+ * exactly the value the upsert would have written. Two copies is how those two
+ * drift apart (R37, R41).
  */
 export const OS_SETTINGS_DEFAULTS: Readonly<{
   chaserEnabled: boolean;

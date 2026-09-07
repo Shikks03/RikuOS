@@ -55,6 +55,15 @@ export default function TopBar() {
  * dependency on the path is the key rather than a bare usePathname() call,
  * which reached nothing a memoizing compiler could see and would have been
  * free to hoist — freezing the stamp again with nothing to catch it.
+ *
+ * Both halves are load-bearing and neither is redundant: the hook in TopBar is
+ * what re-renders the component at all (a key on a child cannot re-render its
+ * parent), and the key is what makes the path a visible dependency of the
+ * time. Deleting either one breaks the stamp.
+ *
+ * router.refresh() re-renders this too — but as a re-render, not a remount:
+ * a refresh leaves the key unchanged. That path holds only while nothing
+ * memoizes Stamp.
  */
 function Stamp() {
   return (

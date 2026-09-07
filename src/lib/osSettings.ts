@@ -69,6 +69,16 @@ export async function getOsSettings(): Promise<IOsSettings> {
   return updateOsSettings({});
 }
 
+// Typed against OsSettingsValues so a fourth setting must FAIL TO COMPILE here
+// rather than compile into the return object, stay out of the projection, and
+// read as its default forever.
+const SETTINGS_PROJECTION: Record<keyof OsSettingsValues, 1> & { _id: 0 } = {
+  chaserEnabled: 1,
+  chaserNDays: 1,
+  monitoringEnabled: 1,
+  _id: 0,
+};
+
 /**
  * The read-only accessor. Never upserts, never saves — a page view must not
  * be a primary write.
@@ -88,10 +98,7 @@ export async function getOsSettings(): Promise<IOsSettings> {
  * survives.
  */
 export async function readOsSettings(): Promise<OsSettingsValues> {
-  const doc = await OsSettings.findOne(
-    {},
-    { chaserEnabled: 1, chaserNDays: 1, monitoringEnabled: 1, _id: 0 }
-  ).lean();
+  const doc = await OsSettings.findOne({}, SETTINGS_PROJECTION).lean();
 
   if (!doc) return { ...OS_SETTINGS_DEFAULTS };
 

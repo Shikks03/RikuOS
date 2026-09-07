@@ -2,9 +2,11 @@
  * Covers readOsSettings, the accessor the rail uses on every page of the (app)
  * group. Three things about it are load-bearing and none of them is visible
  * from a caller: it must not write (getOsSettings() next door does, on every
- * call), it must answer with the schema defaults before the singleton exists,
- * and it must return the settings alone — a projection widened by accident
- * would otherwise start handing _id and updatedAt to render code.
+ * call), it must answer with the schema defaults for any value the document
+ * does not carry — including when there is no document yet, and without
+ * swallowing a stored falsy value — and it must return the settings alone, or
+ * a projection widened by accident starts handing _id and updatedAt to render
+ * code.
  *
  * Only the model is mocked; OS_SETTINGS_DEFAULTS is the real constant, so the
  * fallback is pinned to the same values the schema creates.
@@ -73,6 +75,22 @@ describe("readOsSettings", () => {
       chaserEnabled: true,
       chaserNDays: OS_SETTINGS_DEFAULTS.chaserNDays,
       monitoringEnabled: OS_SETTINGS_DEFAULTS.monitoringEnabled,
+    });
+  });
+
+  it("keeps a stored value that is falsy rather than substituting the default", async () => {
+    // `min: 1` means a 0 cannot be written through the schema today — which is
+    // the point: a document written before that bound existed is exactly the
+    // drift R41 guards against, and a stored 0 is the only value under today's
+    // defaults that can tell `??` from `||`.
+    findOne.mockImplementation(() =>
+      query({ chaserEnabled: false, chaserNDays: 0, monitoringEnabled: false })
+    );
+
+    expect(await readOsSettings()).toStrictEqual({
+      chaserEnabled: false,
+      chaserNDays: 0,
+      monitoringEnabled: false,
     });
   });
 
