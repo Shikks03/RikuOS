@@ -47,6 +47,7 @@
  */
 
 import type { SummaryResponse } from "@/lib/stApi";
+import { formatAge } from "@/lib/format";
 
 export type OutreachFindingKind =
   | "engine-never-ran"
@@ -82,13 +83,6 @@ const HOUR_MS = 60 * 60 * 1000;
  * this whole check silently becomes a lie.
  */
 export const ENGINE_STALE_HOURS = 36;
-
-/** Hours read badly past a couple of days; the real fault was 696h old. */
-export function formatAge(ms: number): string {
-  const hours = Math.floor(ms / HOUR_MS);
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}
 
 /**
  * Pure. The engine findings are mutually exclusive, on the watchdog's rule: an

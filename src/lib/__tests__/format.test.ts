@@ -1,0 +1,82 @@
+/**
+ * Two age grammars live side by side and must not be confused.
+ *
+ *   formatAge      Block F's machine stamp: 6h / 36h / 3d / 29d
+ *   formatWaiting  Block E's human duration: just now / 4 hours ago / 2 days ago
+ *
+ * The boundaries are the whole test: an off-by-one here reads as a wrong fact
+ * on the page, not as a crash.
+ */
+import { describe, it, expect } from "vitest";
+import { formatAge, formatWaiting, pluralise, numberCell } from "@/lib/format";
+
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+describe("formatAge", () => {
+  it("reads in hours below two days", () => {
+    expect(formatAge(0)).toBe("0h");
+    expect(formatAge(1 * HOUR)).toBe("1h");
+    expect(formatAge(36 * HOUR)).toBe("36h");
+    expect(formatAge(47 * HOUR)).toBe("47h");
+  });
+
+  it("switches to days at exactly 48 hours", () => {
+    expect(formatAge(48 * HOUR)).toBe("2d");
+    expect(formatAge(72 * HOUR)).toBe("3d");
+    expect(formatAge(696 * HOUR)).toBe("29d");
+  });
+});
+
+describe("formatWaiting", () => {
+  it("says just now below one hour", () => {
+    expect(formatWaiting(0)).toBe("just now");
+    expect(formatWaiting(59 * MINUTE)).toBe("just now");
+  });
+
+  it("switches to hours at exactly 60 minutes, singular at one", () => {
+    expect(formatWaiting(60 * MINUTE)).toBe("1 hour ago");
+    expect(formatWaiting(4 * HOUR)).toBe("4 hours ago");
+    expect(formatWaiting(23 * HOUR)).toBe("23 hours ago");
+  });
+
+  it("switches to days at 24 hours and floors, so 47h is still one day", () => {
+    expect(formatWaiting(24 * HOUR)).toBe("1 day ago");
+    expect(formatWaiting(47 * HOUR)).toBe("1 day ago");
+    expect(formatWaiting(48 * HOUR)).toBe("2 days ago");
+    expect(formatWaiting(6 * DAY)).toBe("6 days ago");
+  });
+
+  it("switches to weeks at exactly seven days", () => {
+    expect(formatWaiting(7 * DAY)).toBe("1 week ago");
+    expect(formatWaiting(21 * DAY)).toBe("3 weeks ago");
+  });
+
+  it("never reads a future timestamp as a negative duration", () => {
+    expect(formatWaiting(-5 * HOUR)).toBe("just now");
+  });
+});
+
+describe("pluralise", () => {
+  it("keeps the singular at exactly one and pluralises everywhere else", () => {
+    expect(pluralise(1, "draft")).toBe("draft");
+    expect(pluralise(0, "draft")).toBe("drafts");
+    expect(pluralise(2, "draft")).toBe("drafts");
+    expect(pluralise(1, "contact")).toBe("contact");
+    expect(pluralise(30, "contact")).toBe("contacts");
+  });
+
+  it("takes an explicit plural for words that do not take an s", () => {
+    expect(pluralise(1, "is", "are")).toBe("is");
+    expect(pluralise(3, "is", "are")).toBe("are");
+  });
+});
+
+describe("numberCell", () => {
+  it("distinguishes a measured zero from an absence — the page's core rule", () => {
+    expect(numberCell(0)).toEqual({ text: "0", tone: "zero" });
+    expect(numberCell(null)).toEqual({ text: "—", tone: "dash" });
+    expect(numberCell(5)).toEqual({ text: "5", tone: "value" });
+  });
+});

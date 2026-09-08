@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { evaluateOutreach, formatAge, ENGINE_STALE_HOURS } from "@/lib/outreachHealth";
+import { evaluateOutreach, ENGINE_STALE_HOURS } from "@/lib/outreachHealth";
 import type { SummaryResponse } from "@/lib/stApi";
 
 const NOW = new Date("2026-08-30T00:00:00.000Z");
@@ -166,18 +166,6 @@ describe("evaluateOutreach — a field that was never sent is not a zero", () =>
       summary({ queue: { drafts: null, approved: null }, engine: { lastRunAt: null, lastRunErrors: null } })
     );
     expect(findings.map((f) => f.kind)).toEqual(["engine-never-ran"]);
-  });
-});
-
-describe("formatAge", () => {
-  it("reads in hours below two days", () => {
-    expect(formatAge(1 * HOUR)).toBe("1h");
-    expect(formatAge(47 * HOUR)).toBe("47h");
-  });
-
-  it("switches to days at two days, where 696h stops being readable", () => {
-    expect(formatAge(48 * HOUR)).toBe("2d");
-    expect(formatAge(696 * HOUR)).toBe("29d");
   });
 });
 
