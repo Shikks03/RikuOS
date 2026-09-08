@@ -11,6 +11,7 @@ import ApprovalItem from "@/models/ApprovalItem";
 import AgentRun from "@/models/AgentRun";
 import PushSubscription from "@/models/PushSubscription";
 import OsSettings from "@/models/OsSettings";
+import HealthSnapshot from "@/models/HealthSnapshot";
 
 const validPayload = {
   contactId: "c1",
@@ -235,5 +236,58 @@ describe("P4 — AgentRun counts", () => {
       counts: { itemsCreated: 0, itemsProcessed: 0, itemsSkipped: -1, itemsFailed: 0 },
     });
     expect(run.validateSync()?.errors["counts.itemsSkipped"]).toBeDefined();
+  });
+});
+
+describe("HealthSnapshot", () => {
+  it("accepts a valid reading", async () => {
+    const doc = new HealthSnapshot({
+      checkedAt: new Date("2026-09-05T04:00:00.000Z"),
+      sites: [{ name: "Meowchi", up: true, detail: "Meowchi ok" }],
+    });
+    await expect(doc.validate()).resolves.toBeUndefined();
+  });
+
+  it("requires checkedAt — a reading with no time is not a reading", async () => {
+    const doc = new HealthSnapshot({ sites: [] });
+    await expect(doc.validate()).rejects.toThrow(/checkedAt/);
+  });
+
+  it("accepts an empty sites array, which is different from no document", async () => {
+    const doc = new HealthSnapshot({ checkedAt: new Date(), sites: [] });
+    await expect(doc.validate()).resolves.toBeUndefined();
+  });
+
+  it("bounds the array, per CLAUDE.md", async () => {
+    const doc = new HealthSnapshot({
+      checkedAt: new Date(),
+      sites: Array.from({ length: 21 }, (_, i) => ({
+        name: `s${i}`,
+        up: true,
+        detail: "ok",
+      })),
+    });
+    await expect(doc.validate()).rejects.toThrow(/sites/);
+  });
+
+  it("bounds every string", async () => {
+    const long = new HealthSnapshot({
+      checkedAt: new Date(),
+      sites: [{ name: "x".repeat(61), up: true, detail: "ok" }],
+    });
+    await expect(long.validate()).rejects.toThrow(/name/);
+
+    const longDetail = new HealthSnapshot({
+      checkedAt: new Date(),
+      sites: [{ name: "ok", up: true, detail: "x".repeat(201) }],
+    });
+    await expect(longDetail.validate()).rejects.toThrow(/detail/);
+  });
+
+  it("carries no TTL — the newest reading must always be present", () => {
+    const ttl = HealthSnapshot.schema
+      .indexes()
+      .filter(([, options]) => (options as { expireAfterSeconds?: number }).expireAfterSeconds !== undefined);
+    expect(ttl).toEqual([]);
   });
 });
