@@ -13,7 +13,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { AttentionItem } from "@/lib/stApi";
-import type { DraftChannel } from "@/models/approvals/FollowupDraftApproval";
+import type { DraftChannel } from "@/lib/draftChannels";
 
 /** Matches IFollowupDraftPayload.draftBody's maxlength. */
 export const FOLLOWUP_MAX_BODY = 8000;

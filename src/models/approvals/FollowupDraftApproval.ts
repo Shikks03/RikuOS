@@ -6,9 +6,7 @@ import { Model, Schema } from "mongoose";
 // analysis, so an interface imported as a value becomes a runtime import of an
 // export that does not exist.
 import ApprovalItem, { type IApprovalItemBase } from "../ApprovalItem.ts";
-
-export const DRAFT_CHANNELS = ["email", "facebook"] as const;
-export type DraftChannel = (typeof DRAFT_CHANNELS)[number];
+import { DRAFT_CHANNELS, type DraftChannel } from "../../lib/draftChannels.ts";
 
 /**
  * Payload for a chaser follow-up draft. contactId/contactName identify the

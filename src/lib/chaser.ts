@@ -10,8 +10,9 @@
  */
 
 import type { AttentionItem } from "@/lib/stApi";
-import { DRAFT_CHANNELS } from "@/models/approvals/FollowupDraftApproval";
-import type { DraftChannel, IFollowupDraftPayload } from "@/models/approvals/FollowupDraftApproval";
+import { DRAFT_CHANNELS } from "@/lib/draftChannels";
+import type { DraftChannel } from "@/lib/draftChannels";
+import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftApproval";
 
 /** Leads drafted per run. Bounds cost, tokens and the function's wall clock. */
 export const CHASER_MAX_PER_RUN = 5;
