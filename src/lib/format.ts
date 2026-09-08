@@ -71,7 +71,7 @@ export interface Cell {
   tone: CellTone;
 }
 
-/** The em-dash for every absence on the page, exported so there is exactly one. */
+/** The em-dash for every absence in the app, exported so there is exactly one. */
 export const DASH = "—";
 
 /**

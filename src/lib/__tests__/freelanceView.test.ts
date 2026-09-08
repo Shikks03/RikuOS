@@ -272,6 +272,21 @@ describe("Block A — the statement lines", () => {
     });
     expect(countAbsent.lines).toEqual([]);
     expect(card(countAbsent, "needs-you").tone).toBe("blank");
+
+    const draftsAbsent = blockA({
+      queue: queue({ drafts: null, approved: 0 }),
+      contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
+      needsYouCount: 0,
+    });
+    expect(draftsAbsent.lines).toEqual([]);
+    expect(card(draftsAbsent, "drafts").tone).toBe("blank");
+
+    const approvedAbsent = blockA({
+      queue: queue({ drafts: 0, approved: null }),
+      contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
+      needsYouCount: 0,
+    });
+    expect(approvedAbsent.lines).toEqual([]);
   });
 
   it("never says it beside a lit needs-you card (R35)", () => {
@@ -307,9 +322,16 @@ describe("Block A — the statement lines", () => {
   });
 
   it("still renders all three cards under the whole-block fallback, drained", () => {
-    const out = blockA({ queue: queue({ drafts: 0, approved: 0 }), contacts: null });
+    const out = blockA({
+      queue: queue({ drafts: 0, approved: 0 }),
+      contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
+      needsYouCount: 0,
+    });
+    expect(out.lines).toEqual([{ figure: null, text: "Nothing waiting on you." }]);
     expect(out.cards).toHaveLength(3);
     expect(card(out, "drafts").tone).toBe("drained");
+    expect(card(out, "contacts").tone).toBe("drained");
+    expect(card(out, "needs-you").tone).toBe("drained");
   });
 });
 
