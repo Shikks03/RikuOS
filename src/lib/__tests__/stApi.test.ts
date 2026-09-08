@@ -444,6 +444,29 @@ describe("fetchSummary", () => {
     expect(rows[0].id).toBe("c1");
   });
 
+  it("drops a campaign row with no string id — it cannot be keyed", async () => {
+    // The rule fetchVariantStats already applies to `key`. Block C's React key
+    // is the id, so a row without one cannot be rendered honestly.
+    respond({
+      queue: {},
+      engine: {},
+      campaigns: [{ name: "Nameless" }, { id: "", name: "Empty" }, { id: "c1", name: "Real" }],
+    });
+    const rows = (await fetchSummary()).campaigns!;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("c1");
+  });
+
+  it("reads a contacts value that is not an object as null, not as a block of nulls", async () => {
+    // "Not reported" and "reported, all unknown" are different findings. A
+    // string is neither, and must not manufacture the second.
+    respond({ queue: {}, engine: {}, contacts: "30" });
+    expect((await fetchSummary()).contacts).toBeNull();
+
+    respond({ queue: {}, engine: {}, contacts: [1, 2] });
+    expect((await fetchSummary()).contacts).toBeNull();
+  });
+
   it("reads a missing count as null, never as a real zero", async () => {
     // "The engine reported no errors" and "the engine reported nothing" are
     // different findings, and only one of them is reassuring.
@@ -591,9 +614,12 @@ describe("fetchVariantStats", () => {
     expect(rows[0].uniqueContacts).toBeNull();
   });
 
-  it("survives a body that is not an array rather than throwing", async () => {
+  it("throws on a body that is not an array — a changed contract must not read as an empty one", async () => {
+    // The exact body a move to an envelope would produce. Returning [] here
+    // would render `No approaches set up.` forever, silently; the throw reaches
+    // the page's per-block catch as `Couldn't load approach performance.`
     respond({ variants: [] });
-    expect(await fetchVariantStats()).toEqual([]);
+    await expect(fetchVariantStats()).rejects.toThrow(/not an array/);
   });
 
   it("drops a row with no string key — it can never be identified or keyed", async () => {
@@ -625,6 +651,7 @@ describe("the page timeout", () => {
   afterEach(() => {
     globalThis.fetch = original;
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it("is well under the cron timeout — a human must not wait a cron's patience", () => {
@@ -635,6 +662,10 @@ describe("the page timeout", () => {
   it("is optional on all three GETs, and defaults to the cron timeout", async () => {
     // AbortSignal.timeout is the only observable difference, so the assertion
     // is on the signal each call was handed rather than on wall-clock time.
+    // The spy is REAL (spyOn, not mockImplementation), so the fetch stub still
+    // receives a genuine signal — and the recorded arguments are what pins the
+    // feature this test names. Asserting `instanceof AbortSignal` alone could
+    // not fail if timeoutMs were ignored entirely.
     vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
     vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
     const seen: (AbortSignal | undefined)[] = [];
@@ -642,6 +673,7 @@ describe("the page timeout", () => {
       seen.push(init.signal ?? undefined);
       return new Response(JSON.stringify([]), { status: 200 });
     }) as unknown as typeof fetch;
+    const spy = vi.spyOn(AbortSignal, "timeout");
 
     await fetchSummary();
     await fetchSummary(ST_PAGE_TIMEOUT_MS);
@@ -652,6 +684,15 @@ describe("the page timeout", () => {
 
     expect(seen).toHaveLength(6);
     for (const signal of seen) expect(signal).toBeInstanceOf(AbortSignal);
+    expect(spy.mock.calls.map((c) => c[0])).toEqual([
+      ST_TIMEOUT_MS,
+      ST_PAGE_TIMEOUT_MS,
+      ST_TIMEOUT_MS,
+      ST_PAGE_TIMEOUT_MS,
+      ST_TIMEOUT_MS,
+      ST_PAGE_TIMEOUT_MS,
+    ]);
+    spy.mockRestore();
   });
 });
 

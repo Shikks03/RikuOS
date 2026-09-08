@@ -27,6 +27,12 @@ describe("formatAge", () => {
     expect(formatAge(72 * HOUR)).toBe("3d");
     expect(formatAge(696 * HOUR)).toBe("29d");
   });
+
+  it("clamps a negative age to zero rather than printing a minus", () => {
+    // Block F feeds this a stored checkedAt written by another Vercel instance,
+    // so a small clock skew must read `0h`, never `-1h`. Matches formatWaiting.
+    expect(formatAge(-5 * HOUR)).toBe("0h");
+  });
 });
 
 describe("formatWaiting", () => {
@@ -78,5 +84,12 @@ describe("numberCell", () => {
     expect(numberCell(0)).toEqual({ text: "0", tone: "zero" });
     expect(numberCell(null)).toEqual({ text: "—", tone: "dash" });
     expect(numberCell(5)).toEqual({ text: "5", tone: "value" });
+  });
+
+  it("reads a non-finite number as the dash, never as a printed NaN", () => {
+    // The function whose one job is keeping a measurement apart from a
+    // non-measurement must not print `NaN` or `Infinity` as a value.
+    expect(numberCell(Number.NaN)).toEqual({ text: "—", tone: "dash" });
+    expect(numberCell(Number.POSITIVE_INFINITY)).toEqual({ text: "—", tone: "dash" });
   });
 });

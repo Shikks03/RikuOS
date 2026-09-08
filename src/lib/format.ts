@@ -9,6 +9,11 @@
  * a machine stamp (`36h`, `3d`) for the health strip, and a human duration
  * (`4 hours ago`, `3 weeks ago`) for what is waiting on a person. Do not merge
  * them, and do not "fix" one to look like the other.
+ *
+ * These primitives take a FINITE number. An unreadable timestamp is the
+ * caller's finding, decided where the string arrives (as `evaluateOutreach`'s
+ * `engine-unreadable` does), never a duration — there is no honest string for
+ * one at this level.
  */
 
 const MINUTE_MS = 60 * 1000;
@@ -25,7 +30,9 @@ const WEEK_MS = 7 * DAY_MS;
  * the page's `checked 6h ago`. They must never disagree.
  */
 export function formatAge(ms: number): string {
-  const hours = Math.floor(ms / HOUR_MS);
+  // Block F feeds this a stored `checkedAt` written by another Vercel instance,
+  // so a small clock skew must read `0h`, never `-1h` — formatWaiting's clamp.
+  const hours = Math.floor(Math.max(0, ms) / HOUR_MS);
   if (hours < 48) return `${hours}h`;
   return `${Math.floor(hours / 24)}d`;
 }
@@ -70,7 +77,9 @@ export interface Cell {
  * style choice. `--ink-4` is reserved for the absences.
  */
 export function numberCell(value: number | null): Cell {
-  if (value === null) return { text: "—", tone: "dash" };
+  // A non-finite number is an absence too: the function whose one job is
+  // keeping a measurement apart from a non-measurement must not print `NaN`.
+  if (value === null || !Number.isFinite(value)) return { text: "—", tone: "dash" };
   if (value === 0) return { text: "0", tone: "zero" };
   return { text: String(value), tone: "value" };
 }

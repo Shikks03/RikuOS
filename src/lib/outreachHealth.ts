@@ -47,7 +47,7 @@
  */
 
 import type { SummaryResponse } from "@/lib/stApi";
-import { formatAge } from "@/lib/format";
+import { formatAge, pluralise } from "@/lib/format";
 
 export type OutreachFindingKind =
   | "engine-never-ran"
@@ -132,9 +132,9 @@ export function evaluateOutreach(
     } else if (engine.lastRunErrors !== null && engine.lastRunErrors > 0) {
       findings.push({
         kind: "engine-errors",
-        detail: `ShikksTracker send engine reported ${engine.lastRunErrors} error${
-          engine.lastRunErrors === 1 ? "" : "s"
-        }`,
+        detail:
+          `ShikksTracker send engine reported ${engine.lastRunErrors} ` +
+          pluralise(engine.lastRunErrors, "error"),
       });
     }
   }

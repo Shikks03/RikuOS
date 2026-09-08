@@ -15,15 +15,20 @@
  */
 
 import type { Model } from "mongoose";
-import ApprovalItem, { ActionStatus, IApprovalItemBase } from "@/models/ApprovalItem";
+import ApprovalItem, {
+  ActionStatus,
+  ApprovalStatus,
+  IApprovalItemBase,
+} from "@/models/ApprovalItem";
 import type { IFollowupDraftPayload } from "@/models/approvals/FollowupDraftApproval";
-// Side-effect import: registers the followup-draft discriminator so
-// approvalModelForType() below can resolve it. This must be a VALUE import —
-// the type-only import above is erased at compile time, which would leave the
-// resolver silently falling back to the base model in any bundle that does not
-// happen to import the discriminator itself (e.g. a cron route). Every future
-// discriminator needs a line here too.
-import "@/models/approvals/FollowupDraftApproval";
+// A VALUE import, and it must stay one: importing the model is what registers
+// the followup-draft discriminator, so approvalModelForType() below can resolve
+// it. The type-only imports of this module are erased at compile time, which
+// would leave the resolver silently falling back to the base model in any bundle
+// that does not happen to import the discriminator itself (e.g. a cron route).
+// A default import registers it just the same, and fetchLiveAnchorIds needs the
+// model itself. Every future discriminator needs a line here too.
+import FollowupDraftApproval from "@/models/approvals/FollowupDraftApproval";
 import { createDraft } from "@/lib/stApi";
 import type { DraftOutcome, DraftRequest } from "@/lib/stApi";
 import type { IFollowupDraftApproval } from "@/models/approvals/FollowupDraftApproval";
@@ -428,15 +433,27 @@ export async function runApprovalAction(item: IApprovalItemBase): Promise<void> 
   await ApprovalItem.updateOne({ _id: claimed._id, ...record.filter }, record.update);
 }
 
-/** The three statuses that mean "this reply is already being handled". */
-export const LIVE_APPROVAL_STATUSES = ["pending", "approved", "edited_approved"] as const;
+/**
+ * The three statuses that mean "this reply is already being handled".
+ * `satisfies` rather than a bare `as const`, so renaming a status in the model
+ * breaks the build here instead of quietly matching nothing at runtime.
+ */
+const LIVE_APPROVAL_STATUSES = [
+  "pending",
+  "approved",
+  "edited_approved",
+] as const satisfies readonly ApprovalStatus[];
 
-/** The shape of ApprovalItem.find this function needs; injected so it is testable. */
-type AnchorFinder = (filter: Record<string, unknown>) => {
-  select: (projection: Record<string, number>) => {
-    limit: (n: number) => { lean: () => Promise<unknown[]> };
-  };
+/** The shape of the find this function needs; injected so it is testable. */
+export type AnchorFinder = (filter: Record<string, unknown>) => {
+  select: (projection: Record<string, number>) => { lean: () => Promise<unknown[]> };
 };
+
+// Mongoose's Query is generic over its document type and its chain methods
+// are overloaded, so it is not structurally an AnchorFinder result; the cast
+// narrows it to the two-method chain fetchLiveAnchorIds actually uses.
+const findFollowupDrafts = ((filter: Record<string, unknown>) =>
+  FollowupDraftApproval.find(filter)) as unknown as AnchorFinder;
 
 /**
  * Which of these reply anchors already carry a live ApprovalItem.
@@ -451,12 +468,28 @@ type AnchorFinder = (filter: Record<string, unknown>) => {
  * If the two ever queried different status lists they would disagree about the
  * same lead. That is why this is one function and not two copies.
  *
+ * WHY THE DISCRIMINATOR MODEL, NOT THE BASE ONE. With `strictQuery: true` a
+ * base-model `find` casts this filter against the discriminator schema only
+ * because the `type` key is present. Drop that key, or query a model in a bundle
+ * where the discriminator was never registered, and Mongoose SILENTLY STRIPS
+ * `payload.replyToLogId` and `type` from the filter — the query then returns
+ * every live item of every type, and every test with an injected finder still
+ * passes. Querying FollowupDraftApproval directly casts against its own schema
+ * and injects `type` itself, so the strip cannot happen. `type` stays in the
+ * filter below as a stated belt, and the test pins it.
+ *
+ * WHY NO `.limit`. A limit equal to the expected row count (`anchors.length`)
+ * turns a violated invariant into a silently truncated answer: the partial
+ * unique index covers `pending` only, so a second live item on one anchor —
+ * `approved` or `edited_approved`, the states this very check guards — would
+ * push an unrelated anchor out of the result and the chaser would draft it a
+ * second time. The `$in` over at most ATTENTION_LIMIT anchors is the bound.
+ *
  * Callers must have connectDB()'d already, matching the rest of the lib layer.
  */
 export async function fetchLiveAnchorIds(
   anchors: string[],
-  find: AnchorFinder = ((filter: Record<string, unknown>) =>
-    ApprovalItem.find(filter)) as unknown as AnchorFinder
+  find: AnchorFinder = findFollowupDrafts
 ): Promise<Set<string>> {
   const live = new Set<string>();
   // An empty $in matches nothing, so the round trip would be pure cost.
@@ -468,7 +501,6 @@ export async function fetchLiveAnchorIds(
     "payload.replyToLogId": { $in: anchors },
   })
     .select({ payload: 1 })
-    .limit(anchors.length)
     .lean();
 
   for (const doc of docs as { payload?: { replyToLogId?: string } }[]) {

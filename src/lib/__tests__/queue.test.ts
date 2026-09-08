@@ -14,7 +14,7 @@ import {
   parseDecision,
   STALE_ACTION_MS,
 } from "@/lib/queue";
-import type { Decision } from "@/lib/queue";
+import type { AnchorFinder, Decision } from "@/lib/queue";
 import ApprovalItem from "@/models/ApprovalItem";
 import type { IApprovalItemBase } from "@/models/ApprovalItem";
 import FollowupDraftApproval from "@/models/approvals/FollowupDraftApproval";
@@ -422,47 +422,45 @@ describe("fetchLiveAnchorIds", () => {
     // The chaser's original guard, kept: an empty $in matches nothing, so the
     // round trip would be pure cost.
     let called = false;
-    const find = () => {
+    const find: AnchorFinder = () => {
       called = true;
-      return { select: () => ({ limit: () => ({ lean: async () => [] }) }) };
+      return { select: () => ({ lean: async () => [] }) };
     };
-    const out = await fetchLiveAnchorIds([], find as never);
+    const out = await fetchLiveAnchorIds([], find);
     expect(out.size).toBe(0);
     expect(called).toBe(false);
   });
 
   it("collects the replyToLogIds that already carry a live ApprovalItem", async () => {
-    const find = () => ({
+    const find: AnchorFinder = () => ({
       select: () => ({
-        limit: () => ({
-          lean: async () => [
-            { payload: { replyToLogId: "log-1" } },
-            { payload: { replyToLogId: "log-2" } },
-          ],
-        }),
+        lean: async () => [
+          { payload: { replyToLogId: "log-1" } },
+          { payload: { replyToLogId: "log-2" } },
+        ],
       }),
     });
-    const out = await fetchLiveAnchorIds(["log-1", "log-2", "log-3"], find as never);
+    const out = await fetchLiveAnchorIds(["log-1", "log-2", "log-3"], find);
     expect([...out].sort()).toEqual(["log-1", "log-2"]);
   });
 
   it("skips a document whose payload lost its anchor rather than adding undefined", async () => {
-    const find = () => ({
+    const find: AnchorFinder = () => ({
       select: () => ({
-        limit: () => ({ lean: async () => [{ payload: {} }, {}, { payload: { replyToLogId: "log-9" } }] }),
+        lean: async () => [{ payload: {} }, {}, { payload: { replyToLogId: "log-9" } }],
       }),
     });
-    const out = await fetchLiveAnchorIds(["log-9"], find as never);
+    const out = await fetchLiveAnchorIds(["log-9"], find);
     expect([...out]).toEqual(["log-9"]);
   });
 
   it("queries exactly the three live statuses — the page and the chaser must agree", async () => {
     let seenFilter: Record<string, unknown> = {};
-    const find = (filter: Record<string, unknown>) => {
+    const find: AnchorFinder = (filter: Record<string, unknown>) => {
       seenFilter = filter;
-      return { select: () => ({ limit: () => ({ lean: async () => [] }) }) };
+      return { select: () => ({ lean: async () => [] }) };
     };
-    await fetchLiveAnchorIds(["log-1"], find as never);
+    await fetchLiveAnchorIds(["log-1"], find);
     expect(seenFilter.type).toBe("followup-draft");
     expect(seenFilter.status).toEqual({ $in: ["pending", "approved", "edited_approved"] });
     expect(seenFilter["payload.replyToLogId"]).toEqual({ $in: ["log-1"] });

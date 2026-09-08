@@ -456,19 +456,32 @@ export async function fetchSummary(timeoutMs: number = ST_TIMEOUT_MS): Promise<S
       lastRunAt: readStamp(parsed.engine?.lastRunAt),
       lastRunErrors: readCount(parsed.engine?.lastRunErrors),
     },
+    // "Not reported" (null) and "reported, all unknown" (a block of nulls) are
+    // different findings. A string or an array is neither, and must not
+    // manufacture the second one.
     contacts:
-      parsed.contacts === null || parsed.contacts === undefined
-        ? null
-        : {
+      typeof parsed.contacts === "object" &&
+      parsed.contacts !== null &&
+      !Array.isArray(parsed.contacts)
+        ? {
             total: readCount(parsed.contacts.total),
             hot: readCount(parsed.contacts.hot),
             byPipelineStage: readPipeline(parsed.contacts.byPipelineStage),
-          },
+          }
+        : null,
     campaigns: Array.isArray(parsed.campaigns)
       ? parsed.campaigns
-          .filter((row): row is Record<string, unknown> => typeof row === "object" && row !== null)
+          // A row with no id cannot be keyed (Block C's React key) — the same
+          // rule fetchVariantStats applies to `key`.
+          .filter(
+            (row): row is Record<string, unknown> & { id: string } =>
+              typeof row === "object" &&
+              row !== null &&
+              typeof row.id === "string" &&
+              row.id.length > 0
+          )
           .map((row) => ({
-            id: readText(row.id),
+            id: row.id,
             name: readText(row.name),
             sent: readCount(row.sent),
             opened: readCount(row.opened),
@@ -503,7 +516,13 @@ export async function fetchVariantStats(
   }
 
   const parsed: unknown = await res.json();
-  if (!Array.isArray(parsed)) return [];
+  if (!Array.isArray(parsed)) {
+    throw new Error(
+      `GET /api/os/variant-stats returned a body that is not an array ` +
+        `(got ${parsed === null ? "null" : typeof parsed}) — the contract has changed. ` +
+        "The endpoint returns a BARE ARRAY; an envelope means ShikksTracker moved it."
+    );
+  }
 
   const rows: VariantStatsItem[] = [];
   for (const raw of parsed) {
