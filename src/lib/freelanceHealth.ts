@@ -24,8 +24,9 @@
  * the strip judges the READING's age. `Check now` writes a snapshot without
  * running the agent, so a green `checked 2m ago` beside an `overdue` rail
  * badge is two true statements about two different subjects rather than the
- * kind of contradiction R30 forbids. Both read AGENT_STALE_HOURS, and both
- * compare with a strict `>`, so the hour itself can never be read two ways.
+ * kind of contradiction R30 forbids. The strip reads AGENT_STALE_HOURS; the
+ * watchdog reads its own everyHours + graceHours, which watchdog.ts documents
+ * as the same 30 and the shared-boundary test pins.
  */
 
 import { formatAge, HOUR_MS, msSince } from "@/lib/format";

@@ -86,6 +86,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       };
     });
 
+    // Lifted out of the job so today's digest can name a failed write (R58).
+    let snapshotStored = true;
     const health = await runJob("site-health", async () => {
       const results = await checkSites();
       // The snapshot is what lets the Freelance page's health strip survive a
@@ -101,6 +103,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         await saveHealthSnapshot(new Date(), results);
       } catch (err) {
         saveFailed = true;
+        snapshotStored = false;
         console.error("[cron/morning] snapshot write failed:", err);
       }
       return {
@@ -140,7 +143,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const problems = buildProblems({
         expiry: { ok: expiry.ok, error: expiry.error, unstuck: expiry.data?.unstuck ?? 0 },
         watchdog: { ok: watch.ok, error: watch.error, anomalies: watch.data ?? [] },
-        siteHealth: { ok: health.ok, error: health.error, sites: health.data ?? [] },
+        siteHealth: {
+          ok: health.ok,
+          error: health.error,
+          sites: health.data ?? [],
+          snapshotStored,
+        },
         outreachHealth: {
           ok: outreach.ok,
           error: outreach.error,

@@ -11,7 +11,11 @@ import type { MorningOutcomes } from "@/lib/digest";
 const healthy: MorningOutcomes = {
   expiry: { ok: true, unstuck: 0 },
   watchdog: { ok: true, anomalies: [] },
-  siteHealth: { ok: true, sites: [{ name: "Meowchi", up: true, detail: "Meowchi ok" }] },
+  siteHealth: {
+    ok: true,
+    sites: [{ name: "Meowchi", up: true, detail: "Meowchi ok" }],
+    snapshotStored: true,
+  },
   outreachHealth: { ok: true, findings: [] },
 };
 
@@ -29,6 +33,7 @@ describe("buildProblems", () => {
           { name: "Meowchi", up: true, detail: "Meowchi ok" },
           { name: "AzeroTech", up: false, detail: "AzeroTech unreachable" },
         ],
+        snapshotStored: true,
       },
     });
     expect(problems).toEqual(["AzeroTech unreachable"]);
@@ -95,7 +100,7 @@ describe("buildProblems", () => {
     const problems = buildProblems({
       ...healthy,
       watchdog: { ok: false, anomalies: [] },
-      siteHealth: { ok: false, error: "boom", sites: [] },
+      siteHealth: { ok: false, error: "boom", sites: [], snapshotStored: true },
     });
     expect(problems).toEqual(["watchdog failed: unknown", "site health failed: boom"]);
   });
@@ -135,9 +140,43 @@ describe("buildProblems", () => {
       siteHealth: {
         ok: true,
         sites: [{ name: "AzeroTech", up: false, detail: "AzeroTech unreachable" }],
+        snapshotStored: true,
       },
       outreachHealth: { ok: false, findings: [] },
     });
     expect(problems).toEqual(["outreach check failed: unknown", "AzeroTech unreachable"]);
+  });
+});
+
+describe("buildProblems — the stored reading (R58)", () => {
+  it("names a reading that could not be stored, on the morning it happened", () => {
+    // The job catches the write and counts it as a failed item, so siteHealth.ok
+    // stays true. Without this line the digest says "All clear" while the rail
+    // shows the heaviest red in the block, and the honest report only arrives
+    // tomorrow, from the watchdog, captioned as if a SITE had failed.
+    const problems = buildProblems({
+      ...healthy,
+      siteHealth: {
+        ok: true,
+        sites: [{ name: "Meowchi", up: true, detail: "Meowchi ok" }],
+        snapshotStored: false,
+      },
+    });
+    expect(problems).toContain("site reading could not be stored");
+  });
+
+  it("says nothing when the reading was stored", () => {
+    expect(buildProblems(healthy)).not.toContain("site reading could not be stored");
+  });
+
+  it("never reports both the failed check and the unstored reading", () => {
+    // A check that failed never reached the write, so naming both would report
+    // one fault twice and inflate the push title's problem count.
+    const problems = buildProblems({
+      ...healthy,
+      siteHealth: { ok: false, error: "boom", sites: [], snapshotStored: false },
+    });
+    expect(problems).toContain("site health failed: boom");
+    expect(problems).not.toContain("site reading could not be stored");
   });
 });

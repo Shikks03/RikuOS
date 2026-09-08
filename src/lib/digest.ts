@@ -98,7 +98,12 @@ export function composeDigest(input: DigestInput): Digest {
 export interface MorningOutcomes {
   expiry: { ok: boolean; error?: string; unstuck: number };
   watchdog: { ok: boolean; error?: string; anomalies: Anomaly[] };
-  siteHealth: { ok: boolean; error?: string; sites: SiteResult[] };
+  /**
+   * `snapshotStored` is false when the job ran but its reading could not be
+   * stored — the write is caught and counted inside the job, never allowed to
+   * fail it.
+   */
+  siteHealth: { ok: boolean; error?: string; sites: SiteResult[]; snapshotStored: boolean };
   outreachHealth: { ok: boolean; error?: string; findings: OutreachFinding[] };
 }
 
@@ -129,6 +134,12 @@ export function buildProblems(outcomes: MorningOutcomes): string[] {
   if (!expiry.ok) problems.push(`expiry sweep failed: ${expiry.error ?? "unknown"}`);
   if (!watchdog.ok) problems.push(`watchdog failed: ${watchdog.error ?? "unknown"}`);
   if (!siteHealth.ok) problems.push(`site health failed: ${siteHealth.error ?? "unknown"}`);
+  // Named on its own morning: the watchdog reads yesterday's record and would
+  // only notice tomorrow, and itemsFailed on the run is the rail's generic
+  // vocabulary (R58).
+  if (siteHealth.ok && !siteHealth.snapshotStored) {
+    problems.push("site reading could not be stored");
+  }
   // Distinct wording from composeDigest's "pipeline check unavailable", which
   // means the /attention call failed. Both can be true at once — one API, two
   // endpoints — and two identical lines would read as one duplicated bug.

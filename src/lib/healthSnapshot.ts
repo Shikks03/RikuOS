@@ -9,7 +9,10 @@
  * with a made-up checkedAt and an empty sites array, and the health strip
  * would confidently report "checked just now, no sites watched" when in truth
  * nothing has ever run. So getHealthSnapshot() returns null, and Block F says
- * `sites never checked`. The upsert belongs to the write path only (R47).
+ * `sites never checked`. A stored document with no `Date` checkedAt also reads
+ * as null — the absence register — because throwing is worse and R56's failure
+ * register belongs to a read that threw. The upsert belongs to the write path
+ * only (R47).
  *
  * Callers must have connectDB()'d already — same convention as the rest of the
  * lib layer.

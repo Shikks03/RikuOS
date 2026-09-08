@@ -428,6 +428,9 @@ describe("needsYouFigure — the figure Block A's third card shares", () => {
     // A measured count survives a missing overdue feed: the gaps really were
     // counted, and the note under the rows is what says the total may be
     // higher. Routing these rows to `absent` would mirror R54's contradiction.
-    expect(needsYouFigure(build([reply()], null))).toEqual({ kind: "measured", count: 1 });
+    const rowsWithoutOverdueFeed = build([reply()], null);
+    if (rowsWithoutOverdueFeed.kind !== "rows") throw new Error("expected rows");
+    expect(rowsWithoutOverdueFeed.absentNote).not.toBeNull();
+    expect(needsYouFigure(rowsWithoutOverdueFeed)).toEqual({ kind: "measured", count: 1 });
   });
 });

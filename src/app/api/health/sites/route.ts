@@ -8,7 +8,10 @@ import {
   saveHealthSnapshot,
 } from "@/lib/healthSnapshot";
 
-/** Three sites at an 8s timeout each, in parallel, plus two round trips to Atlas. */
+/**
+ * Three sites at an 8s timeout each, in parallel, plus up to three round trips
+ * to Atlas (the read, the upsert, and R55's one retry).
+ */
 export const maxDuration = 30;
 
 /**
@@ -20,6 +23,10 @@ export const maxDuration = 30;
  * The route is deliberately thin. Its one decision — the 60-second floor —
  * lives in isWithinCheckFloor, which is a pure function a test can reach; the
  * repo has no route-level tests and this phase adds none.
+ *
+ * The response body (checkedAt, sites, fresh) is a debugging affordance, not a
+ * contract: the page's `Check now` reads nothing from it and re-renders through
+ * the server, so no shared response type is warranted.
  *
  * NO PROXY CHANGE. This path is under /api/ and is not in isPublicPath, so
  * src/proxy.ts already fails closed in front of it. requireSession runs anyway,
@@ -35,7 +42,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   await connectDB();
 
   const existing = await getHealthSnapshot();
-  if (isWithinCheckFloor(new Date(), existing?.checkedAt ?? null)) {
+  if (existing !== null && isWithinCheckFloor(new Date(), existing.checkedAt)) {
     // Inside the floor, return the EXISTING reading rather than an error: a
     // reading twenty seconds old IS current, and Riku pressing twice is not a
     // mistake that deserves an error state. The floor exists so a stuck finger
@@ -45,8 +52,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // No new collection, no counter, and specifically not an in-memory map: on
     // Vercel that is per-instance and therefore not a limit at all.
     return NextResponse.json({
-      checkedAt: existing!.checkedAt.toISOString(),
-      sites: existing!.sites,
+      checkedAt: existing.checkedAt.toISOString(),
+      sites: existing.sites,
       fresh: false,
     });
   }
