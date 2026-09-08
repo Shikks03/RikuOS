@@ -89,8 +89,14 @@ export interface Cell {
 /** The em-dash for every absence in the app, exported so there is exactly one. */
 export const DASH = "—";
 
-/** The one em-dash cell, shared by every table on the page. */
-export const DASH_CELL: Cell = { text: DASH, tone: "dash" };
+/**
+ * The one em-dash cell, shared by every table on the page.
+ *
+ * Frozen because it is shared: one caller mutating it would corrupt every
+ * absence in the app at once, and nothing between here and the page would say
+ * where the change came from.
+ */
+export const DASH_CELL: Cell = Object.freeze({ text: DASH, tone: "dash" });
 
 /**
  * The page's central correctness rule in four lines: `0` is a measurement and

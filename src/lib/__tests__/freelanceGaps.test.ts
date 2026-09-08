@@ -7,7 +7,7 @@
  * in its Block E rows. Do not "improve" them into curly quotes.
  */
 import { describe, it, expect } from "vitest";
-import { buildBlockE, gapCount, GAP_DISPLAY_BOUND } from "@/lib/freelanceGaps";
+import { buildBlockE, needsYouFigure, GAP_DISPLAY_BOUND } from "@/lib/freelanceGaps";
 import type { AttentionItem, OverdueActionItem } from "@/lib/stApi";
 
 const NOW = new Date("2026-09-05T12:00:00.000Z");
@@ -378,14 +378,14 @@ describe("Block E — the unvalidated boundary", () => {
   });
 });
 
-describe("gapCount — the figure Block A's third card shares", () => {
+describe("needsYouFigure — the figure Block A's third card shares", () => {
   it("is the computed gap count, never the raw feed length", () => {
     const out = build([reply({ replyToLogId: "log-1" }), reply({ contactId: "c2", replyToLogId: "log-2" })], [overdue()], ["log-1"]);
     if (out.kind !== "rows") throw new Error("expected rows");
     // Two replies in, one suppressed, one overdue: the feed had three rows and
     // the answer is two.
     expect(out.count).toBe(2);
-    expect(gapCount(out)).toBe(2);
+    expect(needsYouFigure(out)).toEqual({ kind: "measured", count: 2 });
   });
 
   it("is the PRE-SLICE total, so the hero counts what the bound hid", () => {
@@ -396,7 +396,7 @@ describe("gapCount — the figure Block A's third card shares", () => {
     expect(out.kind).toBe("rows");
     if (out.kind !== "rows") throw new Error("expected rows");
     expect(out.rows).toHaveLength(20);
-    expect(gapCount(out)).toBe(41);
+    expect(needsYouFigure(out)).toEqual({ kind: "measured", count: 41 });
   });
 
   it("answers for all four kinds, and ONLY a measured emptiness is a zero", () => {
@@ -408,19 +408,21 @@ describe("gapCount — the figure Block A's third card shares", () => {
       contactsBaseUrl: CONTACTS_URL,
     });
     expect(failed.kind).toBe("failed");
-    expect(gapCount(failed)).toBeNull();
+    expect(needsYouFigure(failed)).toEqual({ kind: "failed" });
 
-    // R51: a claim of nothing may not rest on a feed that never arrived.
+    // R51/R54: a claim of nothing may not rest on a feed that never arrived,
+    // and an absence reaches the card as an absence rather than as a failure —
+    // the hero and the block then say the same thing.
     const absent = build([], null);
     expect(absent.kind).toBe("absent");
-    expect(gapCount(absent)).toBeNull();
+    expect(needsYouFigure(absent)).toEqual({ kind: "absent" });
 
     const empty = build([], []);
     expect(empty.kind).toBe("empty");
-    expect(gapCount(empty)).toBe(0);
+    expect(needsYouFigure(empty)).toEqual({ kind: "measured", count: 0 });
 
     const rows = build([reply()], []);
     expect(rows.kind).toBe("rows");
-    expect(gapCount(rows)).toBe(1);
+    expect(needsYouFigure(rows)).toEqual({ kind: "measured", count: 1 });
   });
 });

@@ -42,7 +42,7 @@ function blockA(over: Partial<Parameters<typeof buildBlockA>[0]> = {}) {
   return buildBlockA({
     queue: queue(),
     contacts: contacts(),
-    needsYouCount: 0,
+    needsYou: { kind: "measured", count: 0 },
     draftsUrl: DRAFTS_URL,
     ...over,
   });
@@ -57,7 +57,11 @@ const card = (out: ReturnType<typeof buildBlockA>, key: string) => {
 describe("Block A — the three cards always render", () => {
   it("renders exactly three cards, in row order, in every state", () => {
     expect(blockA().cards.map((c) => c.key)).toEqual(["drafts", "contacts", "needs-you"]);
-    const dead = blockA({ queue: queue({ drafts: null }), contacts: null, needsYouCount: null });
+    const dead = blockA({
+      queue: queue({ drafts: null }),
+      contacts: null,
+      needsYou: { kind: "failed" },
+    });
     expect(dead.cards.map((c) => c.key)).toEqual(["drafts", "contacts", "needs-you"]);
   });
 });
@@ -188,7 +192,7 @@ describe("Block A — the contacts card", () => {
 
 describe("Block A — the needs-you card", () => {
   it("goes amber above zero, because every row it counts is a duration", () => {
-    const c = card(blockA({ needsYouCount: 3 }), "needs-you");
+    const c = card(blockA({ needsYou: { kind: "measured", count: 3 } }), "needs-you");
     expect(c.tone).toBe("stale");
     expect(c.label).toBe("Needs you");
     expect(c.figure).toBe("3");
@@ -196,17 +200,28 @@ describe("Block A — the needs-you card", () => {
   });
 
   it("drains at zero but keeps its caption legible — 0 is the answer the page exists to give", () => {
-    const c = card(blockA({ needsYouCount: 0 }), "needs-you");
+    const c = card(blockA({ needsYou: { kind: "measured", count: 0 } }), "needs-you");
     expect(c.tone).toBe("drained");
     expect(c.figure).toBe("0");
     expect(c.caption).toBe("nothing waiting");
   });
 
   it("blanks when the database read failed, exactly like Block E beside it", () => {
-    const c = card(blockA({ needsYouCount: null }), "needs-you");
+    const c = card(blockA({ needsYou: { kind: "failed" } }), "needs-you");
     expect(c.tone).toBe("blank");
     expect(c.figure).toBe("—");
     expect(c.caption).toBe("couldn't load");
+  });
+
+  it("says `didn't report` when the overdue feed never arrived, not `couldn't load` (R54)", () => {
+    // The hero-register form of Block E's own `ShikksTracker didn't report
+    // overdue follow-ups.` — lowercase fragment, no full stop, the pairing R28
+    // established for `nothing waiting` / `Nothing waiting.` The card must not
+    // say the read failed over a block that says the field was not reported.
+    const c = card(blockA({ needsYou: { kind: "absent" } }), "needs-you");
+    expect(c.tone).toBe("blank");
+    expect(c.figure).toBe("—");
+    expect(c.caption).toBe("ShikksTracker didn't report overdue follow-ups");
   });
 });
 
@@ -234,14 +249,14 @@ describe("Block A — the statement lines", () => {
     const all = blockA({
       queue: queue({ drafts: 0, approved: 0 }),
       contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
-      needsYouCount: 0,
+      needsYou: { kind: "measured", count: 0 },
     });
     expect(all.lines).toEqual([{ figure: null, text: "Nothing waiting on you." }]);
 
     const absent = blockA({
       queue: queue({ drafts: null, approved: null }),
       contacts: null,
-      needsYouCount: null,
+      needsYou: { kind: "failed" },
     });
     expect(absent.lines).toEqual([]);
   });
@@ -253,7 +268,7 @@ describe("Block A — the statement lines", () => {
     const stageAbsent = blockA({
       queue: queue({ drafts: 0, approved: 0 }),
       contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: null } }),
-      needsYouCount: 0,
+      needsYou: { kind: "measured", count: 0 },
     });
     expect(stageAbsent.lines).toEqual([]);
     expect(card(stageAbsent, "contacts").tone).toBe("blank");
@@ -261,14 +276,14 @@ describe("Block A — the statement lines", () => {
     const blockAbsent = blockA({
       queue: queue({ drafts: 0, approved: 0 }),
       contacts: null,
-      needsYouCount: 0,
+      needsYou: { kind: "measured", count: 0 },
     });
     expect(blockAbsent.lines).toEqual([]);
 
     const countAbsent = blockA({
       queue: queue({ drafts: 0, approved: 0 }),
       contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
-      needsYouCount: null,
+      needsYou: { kind: "failed" },
     });
     expect(countAbsent.lines).toEqual([]);
     expect(card(countAbsent, "needs-you").tone).toBe("blank");
@@ -276,7 +291,7 @@ describe("Block A — the statement lines", () => {
     const draftsAbsent = blockA({
       queue: queue({ drafts: null, approved: 0 }),
       contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
-      needsYouCount: 0,
+      needsYou: { kind: "measured", count: 0 },
     });
     expect(draftsAbsent.lines).toEqual([]);
     expect(card(draftsAbsent, "drafts").tone).toBe("blank");
@@ -284,9 +299,22 @@ describe("Block A — the statement lines", () => {
     const approvedAbsent = blockA({
       queue: queue({ drafts: 0, approved: null }),
       contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
-      needsYouCount: 0,
+      needsYou: { kind: "measured", count: 0 },
     });
     expect(approvedAbsent.lines).toEqual([]);
+  });
+
+  it("stays silent when the overdue feed never arrived, beside three zeros (R51/R54)", () => {
+    // The door R50 did not cover until R51 opened it: an `absent` figure is an
+    // absence, not a measured zero, so the line may not rest on it — and the
+    // card beside it already says ShikksTracker didn't report.
+    const out = blockA({
+      queue: queue({ drafts: 0, approved: 0 }),
+      contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
+      needsYou: { kind: "absent" },
+    });
+    expect(out.lines).toEqual([]);
+    expect(card(out, "needs-you").tone).toBe("blank");
   });
 
   it("never says it beside a lit needs-you card (R35)", () => {
@@ -295,7 +323,7 @@ describe("Block A — the statement lines", () => {
     const out = blockA({
       queue: queue({ drafts: 0, approved: 0 }),
       contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
-      needsYouCount: 3,
+      needsYou: { kind: "measured", count: 3 },
     });
     expect(out.lines).toEqual([]);
   });
@@ -325,7 +353,7 @@ describe("Block A — the statement lines", () => {
     const out = blockA({
       queue: queue({ drafts: 0, approved: 0 }),
       contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
-      needsYouCount: 0,
+      needsYou: { kind: "measured", count: 0 },
     });
     expect(out.lines).toEqual([{ figure: null, text: "Nothing waiting on you." }]);
     expect(out.cards).toHaveLength(3);

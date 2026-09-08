@@ -73,12 +73,31 @@ export interface BlockA {
   lines: SayLine[];
 }
 
+/**
+ * Block A's third figure, produced by `needsYouFigure()` in freelanceGaps.ts
+ * from Block E's own result:
+ *
+ *   measured  the computed gap count Block E renders (§4.1 — never a raw feed
+ *             length), zero included, because a zero here is a measurement
+ *   absent    the reply feed loaded and ShikksTracker did not report overdue
+ *             follow-ups at all (R51)
+ *   failed    the read failed and nothing about what is waiting could be known
+ *
+ * Declared HERE rather than in freelanceGaps.ts — it is Block A's own
+ * vocabulary — so the import direction stays `freelanceGaps → freelanceView`
+ * and never reverses (R54).
+ */
+export type NeedsYouFigure =
+  | { kind: "measured"; count: number }
+  | { kind: "absent" }
+  | { kind: "failed" };
+
 export interface BlockAInput {
   queue: SummaryQueue;
   /** null = the whole contacts block was absent. */
   contacts: SummaryContacts | null;
-  /** Block E's COMPUTED gap count. null = the database read failed. */
-  needsYouCount: number | null;
+  /** Block E's reading, through `needsYouFigure()`. */
+  needsYou: NeedsYouFigure;
   /** ShikksTracker's draft-review page, built server-side. */
   draftsUrl: string;
 }
@@ -144,13 +163,26 @@ function contactsCard(contacts: SummaryContacts | null): StatCard {
   };
 }
 
-function needsYouCard(count: number | null): StatCard {
+function needsYouCard(figure: NeedsYouFigure): StatCard {
   const base = { key: "needs-you", label: "Needs you", href: null, trackPercent: null } as const;
-  if (count === null) {
+  if (figure.kind === "failed") {
     // The gap count needs a database read, so a failed read reads exactly like
     // Block E beside it rather than pretending to a zero.
     return { ...base, tone: "blank", figure: DASH, caption: "couldn't load" };
   }
+  if (figure.kind === "absent") {
+    // The hero-register form of Block E's own `ShikksTracker didn't report
+    // overdue follow-ups.` — the lowercase fragment R28 pairs with the block's
+    // sentence. This card must never say `couldn't load` above a Block E that
+    // says `didn't report`: one screen, one register (R54).
+    return {
+      ...base,
+      tone: "blank",
+      figure: DASH,
+      caption: "ShikksTracker didn't report overdue follow-ups",
+    };
+  }
+  const count = figure.count;
   if (count === 0) {
     // A card that reads 0 most days is not dead weight: 0 is the answer the page
     // exists to give, which is why this caption stays --ink-3 rather than
@@ -163,13 +195,13 @@ function needsYouCard(count: number | null): StatCard {
 }
 
 export function buildBlockA(input: BlockAInput): BlockA {
-  const { queue, contacts, needsYouCount, draftsUrl } = input;
+  const { queue, contacts, needsYou, draftsUrl } = input;
   const notStarted = contacts?.byPipelineStage.not_started ?? null;
 
   const cards: StatCard[] = [
     draftsCard(queue.drafts, draftsUrl),
     contactsCard(contacts),
-    needsYouCard(needsYouCount),
+    needsYouCard(needsYou),
   ];
 
   const lines: SayLine[] = [];
@@ -180,7 +212,9 @@ export function buildBlockA(input: BlockAInput): BlockA {
   // `3 / waiting on you`, which would be a contradiction on one screen; R50
   // made every term a measurement so it never prints under a blank card either,
   // where the card beside it already says ShikksTracker didn't report and the
-  // line would be resting on a number that never arrived.
+  // line would be resting on a number that never arrived. The fourth term is a
+  // measured zero and nothing else: an `absent` figure — the overdue feed was
+  // never reported — is an absence, not a zero (R51/R54).
   // The hero cards still render, drained.
   //
   // `Sending is off` (the deck's A4) is NOT here: GET /api/os/summary does not
@@ -191,7 +225,8 @@ export function buildBlockA(input: BlockAInput): BlockA {
     isMeasuredZero(queue.drafts) &&
     isMeasuredZero(queue.approved) &&
     isMeasuredZero(notStarted) &&
-    isMeasuredZero(needsYouCount)
+    needsYou.kind === "measured" &&
+    needsYou.count === 0
   ) {
     lines.push({ figure: null, text: "Nothing waiting on you." });
     return { cards, lines };

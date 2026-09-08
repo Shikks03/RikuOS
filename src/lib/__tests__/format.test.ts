@@ -114,6 +114,11 @@ describe("numberCell", () => {
   it("shares ONE em-dash cell with every table on the page", () => {
     expect(DASH_CELL).toEqual({ text: "—", tone: "dash" });
     expect(numberCell(null)).toEqual(DASH_CELL);
+    // Identity, not just shape: every absence in the app is this one object, so
+    // a caller that mutated it would corrupt all of them at once — which is why
+    // the object is frozen.
+    expect(numberCell(null)).toBe(DASH_CELL);
+    expect(Object.isFrozen(DASH_CELL)).toBe(true);
   });
 
   it("distinguishes a measured zero from an absence — the page's core rule", () => {

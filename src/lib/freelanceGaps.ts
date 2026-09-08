@@ -22,6 +22,7 @@
 
 import { formatWaiting, msSince } from "@/lib/format";
 import { FAIL_LINES } from "@/lib/freelanceView";
+import type { NeedsYouFigure } from "@/lib/freelanceView";
 import { isSupportedChannel } from "@/lib/chaser";
 import type { AttentionItem, OverdueActionItem } from "@/lib/stApi";
 
@@ -217,27 +218,30 @@ export function buildBlockE(input: BlockEInput): BlockE {
 }
 
 /**
- * The ONE bridge to Block A's third card (§4.1: the same computed count Block E
- * renders, never a raw feed length).
+ * The ONE bridge to Block A's third card. §4.1's "the same computed count Block
+ * E renders, never a raw feed length" holds by construction: the figure is read
+ * off the block itself, so the card and the block cannot disagree.
  *
  * A MEASURED count is a real number of things waiting on Riku even when the
  * overdue feed was missing — the note under the rows says the total may be
  * higher, and the card is not lying about the rows that exist. It is a claim of
- * NOTHING that may not rest on an absence, so `absent` answers null and the
- * hero reads "didn't report" rather than "Nothing waiting on you."
+ * NOTHING that may not rest on an absence, so an `absent` block reaches the card
+ * as an absence too: the hero says "didn't report", the block says "didn't
+ * report", and the two speak in one register (R54).
  *
- * No `default` on purpose: with `strict` on, TypeScript rejects this function
- * the day a fifth kind arrives without a decision about what the hero says.
+ * No `default` on purpose: exhaustiveness rests on the return annotation under
+ * `strict`, so TypeScript rejects this function the day a fifth kind arrives
+ * without a decision about what the hero says.
  */
-export function gapCount(block: BlockE): number | null {
+export function needsYouFigure(block: BlockE): NeedsYouFigure {
   switch (block.kind) {
     case "failed":
-      return null;
+      return { kind: "failed" };
     case "absent":
-      return null;
+      return { kind: "absent" };
     case "empty":
-      return 0;
+      return { kind: "measured", count: 0 };
     case "rows":
-      return block.count;
+      return { kind: "measured", count: block.count };
   }
 }

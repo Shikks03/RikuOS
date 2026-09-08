@@ -60,19 +60,20 @@ function nameOf(v: VariantStatsItem): string {
 }
 
 /**
- * A rate is printable only on email, only with a measured send count above
+ * A rate is measurable only on email, only with a measured send count above
  * zero, and only with a measured reply count. A channel we cannot read is not
- * email: we can never claim a reply rate for a channel we do not know.
+ * email: we can never claim a reply rate for a channel we do not know. `null`
+ * is therefore "no rate to print", not "a rate of zero".
  *
- * It returns the send count the rate RESTS ON alongside it, so the tie-break
+ * It returns the send count the percent RESTS ON alongside it, so the tie-break
  * below compares a narrowed number rather than re-reading a nullable field
  * behind a `?? 0` that could silently mean "no sends" or "never reported".
  */
-function printableRate(v: VariantStatsItem): { rate: number; sends: number } | null {
+function measuredRate(v: VariantStatsItem): { percent: number; sends: number } | null {
   if (v.channel !== "email") return null;
   if (v.sends === null || v.sends <= 0) return null;
   if (v.replies === null) return null;
-  return { rate: Math.round((v.replies / v.sends) * 100), sends: v.sends };
+  return { percent: Math.round((v.replies / v.sends) * 100), sends: v.sends };
 }
 
 export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
@@ -84,14 +85,14 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
 
   // Measured ONCE. The rows, the collapsed best line and the honesty note all
   // read the same computation rather than three copies of it that can drift.
-  const measured = email.map((v) => ({ v, rate: printableRate(v) }));
+  const measured = email.map((v) => ({ v, rate: measuredRate(v) }));
 
   const measuredRows: ApproachRow[] = measured.map(({ v, rate }) => {
     return {
       key: v.key,
       name: nameOf(v),
       cells: [
-        rate === null ? DASH_CELL : { text: `${rate.rate}%`, tone: "value" },
+        rate === null ? DASH_CELL : { text: `${rate.percent}%`, tone: "value" },
         numberCell(v.sends),
         numberCell(v.replies),
       ],
@@ -114,15 +115,15 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
 
   // The best MEASURED row: highest rate, ties broken by the better-evidenced
   // row (more sends), then by the order the API returned.
-  let best: { row: VariantStatsItem; rate: number; sends: number } | null = null;
+  let best: { row: VariantStatsItem; percent: number; sends: number } | null = null;
   for (const { v, rate } of measured) {
     if (rate === null) continue;
     if (
       best === null ||
-      rate.rate > best.rate ||
-      (rate.rate === best.rate && rate.sends > best.sends)
+      rate.percent > best.percent ||
+      (rate.percent === best.percent && rate.sends > best.sends)
     ) {
-      best = { row: v, rate: rate.rate, sends: rate.sends };
+      best = { row: v, percent: rate.percent, sends: rate.sends };
     }
   }
 
@@ -132,7 +133,7 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
     collapsed:
       best === null
         ? { kind: "statement", text: "No sends yet — nothing to compare." }
-        : { kind: "best", name: nameOf(best.row), rate: `${best.rate}%` },
+        : { kind: "best", name: nameOf(best.row), rate: `${best.percent}%` },
     groups: [
       {
         eyebrow: "Measured — email",
@@ -148,7 +149,7 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
       },
     ],
     // R27, stated as an explicit condition so nobody "fixes" its absence later:
-    // a table with no rates and no sends is not a table of small numbers, and
+    // a table with no printable rate is not a table of small numbers, and
     // printing the note there would be the opposite of an honesty note.
     honesty: measured.some((m) => m.rate !== null)
       ? "Rates are computed over small numbers of sends."
