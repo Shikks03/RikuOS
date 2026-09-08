@@ -398,7 +398,7 @@ function readStamp(value: unknown): string | null {
   return typeof value === "string" ? value : `[${typeof value}]`;
 }
 
-/** A campaign id or name that is not a string is a contract break, not a value. */
+/** A campaign name that is not a string is a contract break, not a value. */
 function readText(value: unknown): string {
   return typeof value === "string" ? value : "";
 }

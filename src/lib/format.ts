@@ -10,7 +10,7 @@
  * (`4 hours ago`, `3 weeks ago`) for what is waiting on a person. Do not merge
  * them, and do not "fix" one to look like the other.
  *
- * These primitives take a FINITE number. An unreadable timestamp is the
+ * The two age grammars take a FINITE number. An unreadable timestamp is the
  * caller's finding, decided where the string arrives (as `evaluateOutreach`'s
  * `engine-unreadable` does), never a duration — there is no honest string for
  * one at this level.
