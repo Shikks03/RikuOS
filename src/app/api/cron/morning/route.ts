@@ -6,6 +6,7 @@ import { runJob } from "@/lib/jobs/runJob";
 import { runExpirySweep } from "@/lib/jobs/expirySweep";
 import { EXPECTATIONS, evaluateWatchdog, fetchLatestRuns } from "@/lib/watchdog";
 import { checkSites } from "@/lib/siteHealth";
+import { saveHealthSnapshot } from "@/lib/healthSnapshot";
 import { evaluateOutreach } from "@/lib/outreachHealth";
 import { buildProblems, composeDigest } from "@/lib/digest";
 import { ATTENTION_LIMIT, fetchAttention, fetchSummary } from "@/lib/stApi";
@@ -87,7 +88,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const health = await runJob("site-health", async () => {
       const results = await checkSites();
-      return { counts: { itemsProcessed: results.length }, data: results };
+      // The snapshot is what lets the Freelance page's health strip survive a
+      // ShikksTracker outage — site results are local. Its write is caught
+      // rather than allowed to fail the job: the dispatcher composes today's
+      // digest from health.data later in this same invocation, and a throw here
+      // would cost the digest its site lines to protect a persistence step.
+      // Counting it as a failed item is the honest report — a failure of our
+      // OWN machinery is a real failed item, which is why this differs from
+      // outreach-health, whose findings are about another system.
+      let saveFailed = false;
+      try {
+        await saveHealthSnapshot(new Date(), results);
+      } catch (err) {
+        saveFailed = true;
+        console.error("[cron/morning] snapshot write failed:", err);
+      }
+      return {
+        counts: { itemsProcessed: results.length, itemsFailed: saveFailed ? 1 : 0 },
+        data: results,
+      };
     });
 
     // Its own job, not part of the watchdog: this one makes a network call to
