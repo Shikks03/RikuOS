@@ -23,7 +23,8 @@
  */
 
 import { pluralise } from "@/lib/format";
-import type { SummaryContacts, SummaryQueue } from "@/lib/stApi";
+import { PIPELINE_STAGES } from "@/lib/stApi";
+import type { PipelineStage, SummaryContacts, SummaryQueue } from "@/lib/stApi";
 
 /** The em-dash used for every absence on the page. */
 const DASH = "—";
@@ -200,4 +201,99 @@ export function buildBlockA(input: BlockAInput): BlockA {
   }
 
   return { cards, lines };
+}
+
+// --- Block B -----------------------------------------------------------------
+
+/** The deck's stage labels, in pipeline order. */
+const STAGE_LABELS: Record<PipelineStage, string> = {
+  not_started: "Not started",
+  contacted: "Contacted",
+  replied: "Replied",
+  call_booked: "Call booked",
+  proposal_sent: "Proposal sent",
+  won: "Won",
+  lost: "Lost",
+};
+
+export interface PipelineSummary {
+  total: number;
+  /** "contacts" | "contact" */
+  totalWord: string;
+  /** null = the `· N hot` clause is dropped entirely. */
+  hot: number | null;
+  hotWord: string;
+}
+
+export interface PipelineStageRow {
+  key: PipelineStage;
+  label: string;
+  count: number;
+}
+
+export type BlockB =
+  | { kind: "failed"; line: string }
+  | { kind: "empty"; line: string }
+  | {
+      kind: "stages";
+      summary: PipelineSummary;
+      rows: PipelineStageRow[];
+      /** .fl-note — a MEASURED emptiness. */
+      emptyNote: string | null;
+      /** .fl-absent — a field that NEVER ARRIVED. */
+      absentNote: string | null;
+      hotAbsentNote: string | null;
+    };
+
+/**
+ * `a, b, c or d` — the deck's grammar, with `or` before the last and no Oxford
+ * comma. One item is just the item; none produces no line at all.
+ */
+function joinWithOr(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} or ${parts[parts.length - 1]}`;
+}
+
+export function buildBlockB(contacts: SummaryContacts | null): BlockB {
+  // A missing block, or a missing total, leaves nothing measured at all. That
+  // is a failure to load the pipeline, not an emptiness — and `No contacts
+  // yet.` would be a claim the data does not support.
+  if (contacts === null || contacts.total === null) {
+    return { kind: "failed", line: FAIL_LINES.pipeline };
+  }
+  if (contacts.total === 0) {
+    return { kind: "empty", line: "No contacts yet." };
+  }
+
+  const rows: PipelineStageRow[] = [];
+  const measuredEmpty: string[] = [];
+  let anyAbsent = false;
+
+  for (const stage of PIPELINE_STAGES) {
+    const count = contacts.byPipelineStage[stage];
+    if (count === null) {
+      // An omitted stage must NOT fold into the `Nothing yet at …` line: that
+      // line means the source answered and the count was zero.
+      anyAbsent = true;
+      continue;
+    }
+    if (count > 0) rows.push({ key: stage, label: STAGE_LABELS[stage], count });
+    else measuredEmpty.push(STAGE_LABELS[stage].toLowerCase());
+  }
+
+  return {
+    kind: "stages",
+    summary: {
+      total: contacts.total,
+      totalWord: pluralise(contacts.total, "contact"),
+      // Dropped at a measured zero and when it never arrived; only the second
+      // case earns a line saying so.
+      hot: contacts.hot !== null && contacts.hot > 0 ? contacts.hot : null,
+      hotWord: "hot",
+    },
+    rows,
+    emptyNote: measuredEmpty.length > 0 ? `Nothing yet at ${joinWithOr(measuredEmpty)}` : null,
+    absentNote: anyAbsent ? "ShikksTracker didn't report every pipeline stage." : null,
+    hotAbsentNote: contacts.hot === null ? "ShikksTracker didn't report how many are hot." : null,
+  };
 }

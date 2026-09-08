@@ -11,7 +11,8 @@
  * under a lit card.
  */
 import { describe, it, expect } from "vitest";
-import { buildBlockA } from "@/lib/freelanceView";
+import { buildBlockA, buildBlockB } from "@/lib/freelanceView";
+import { PIPELINE_STAGES } from "@/lib/stApi";
 import type { SummaryContacts, SummaryQueue } from "@/lib/stApi";
 
 const DRAFTS_URL = "https://st.example.com/review";
@@ -264,5 +265,97 @@ describe("Block A — the statement lines", () => {
     const out = blockA({ queue: queue({ drafts: 0, approved: 0 }), contacts: null });
     expect(out.cards).toHaveLength(3);
     expect(card(out, "drafts").tone).toBe("drained");
+  });
+});
+
+describe("Block B — the pipeline", () => {
+  const b = (over: Partial<SummaryContacts> | null = {}) =>
+    buildBlockB(over === null ? null : contacts(over));
+
+  it("renders today's real reading exactly as the deck writes it", () => {
+    const out = b();
+    if (out.kind !== "stages") throw new Error("expected stages");
+    expect(out.summary).toEqual({ total: 30, totalWord: "contacts", hot: 2, hotWord: "hot" });
+    expect(out.rows).toEqual([
+      { key: "not_started", label: "Not started", count: 25 },
+      { key: "contacted", label: "Contacted", count: 3 },
+      { key: "replied", label: "Replied", count: 2 },
+    ]);
+    expect(out.emptyNote).toBe("Nothing yet at call booked, proposal sent, won or lost");
+    expect(out.absentNote).toBeNull();
+    expect(out.hotAbsentNote).toBeNull();
+  });
+
+  it("goes singular on both halves of the summary line", () => {
+    const out = b({
+      total: 1,
+      hot: 1,
+      byPipelineStage: { ...contacts().byPipelineStage, not_started: 1, contacted: 0, replied: 0 },
+    });
+    if (out.kind !== "stages") throw new Error("expected stages");
+    expect(out.summary.totalWord).toBe("contact");
+    expect(out.summary.hot).toBe(1);
+  });
+
+  it("drops the hot clause at a measured zero, silently", () => {
+    const out = b({ hot: 0 });
+    if (out.kind !== "stages") throw new Error("expected stages");
+    expect(out.summary.hot).toBeNull();
+    expect(out.hotAbsentNote).toBeNull();
+  });
+
+  it("drops the hot clause when it never arrived, and says so", () => {
+    const out = b({ hot: null });
+    if (out.kind !== "stages") throw new Error("expected stages");
+    expect(out.summary.hot).toBeNull();
+    expect(out.hotAbsentNote).toBe("ShikksTracker didn't report how many are hot.");
+  });
+
+  it("writes the Nothing-yet grammar at four, two, one and none", () => {
+    const stages = contacts().byPipelineStage;
+
+    /** Narrows to the stages case so the assertions read as one line each. */
+    const note = (over: Partial<SummaryContacts>) => {
+      const out = b(over);
+      if (out.kind !== "stages") throw new Error("expected stages");
+      return out.emptyNote;
+    };
+
+    expect(note({ byPipelineStage: { ...stages, call_booked: 1, proposal_sent: 1 } })).toBe(
+      "Nothing yet at won or lost"
+    );
+
+    expect(
+      note({ byPipelineStage: { ...stages, call_booked: 1, proposal_sent: 1, won: 1 } })
+    ).toBe("Nothing yet at lost");
+
+    expect(
+      note({ byPipelineStage: { ...stages, call_booked: 1, proposal_sent: 1, won: 1, lost: 1 } })
+    ).toBeNull();
+
+    expect(note({ byPipelineStage: { ...stages, proposal_sent: 1 } })).toBe(
+      "Nothing yet at call booked, won or lost"
+    );
+  });
+
+  it("keeps an omitted stage out of the Nothing-yet line — that line means measured zero", () => {
+    const out = b({ byPipelineStage: { ...contacts().byPipelineStage, won: null, lost: null } });
+    if (out.kind !== "stages") throw new Error("expected stages");
+    // Two measured-empty stages are left, so the grammar is `a or b` — the
+    // omitted pair is not silently appended with a comma.
+    expect(out.emptyNote).toBe("Nothing yet at call booked or proposal sent");
+    expect(out.absentNote).toBe("ShikksTracker didn't report every pipeline stage.");
+    expect(out.rows.some((r) => r.key === "won")).toBe(false);
+  });
+
+  it("says `No contacts yet.` at a measured total of zero", () => {
+    const zeroed = Object.fromEntries(PIPELINE_STAGES.map((s) => [s, 0]));
+    const out = b({ total: 0, hot: 0, byPipelineStage: zeroed as never });
+    expect(out).toEqual({ kind: "empty", line: "No contacts yet." });
+  });
+
+  it("reports a failure to load rather than inventing an emptiness", () => {
+    expect(buildBlockB(null)).toEqual({ kind: "failed", line: "Couldn't load the pipeline." });
+    expect(b({ total: null })).toEqual({ kind: "failed", line: "Couldn't load the pipeline." });
   });
 });
