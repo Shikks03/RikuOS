@@ -18,9 +18,17 @@
  * so the 30-hour rule stays pure and testable. Production passes
  * AGENT_STALE_HOURS from watchdog.ts, which is the same site-health
  * everyHours + graceHours the rail's overdue rule reads.
+ *
+ * The rail and this strip judge two different things, and they are allowed to
+ * disagree in appearance. The rail judges the site-health AGENT's last run;
+ * the strip judges the READING's age. `Check now` writes a snapshot without
+ * running the agent, so a green `checked 2m ago` beside an `overdue` rail
+ * badge is two true statements about two different subjects rather than the
+ * kind of contradiction R30 forbids. Both read AGENT_STALE_HOURS, and both
+ * compare with a strict `>`, so the hour itself can never be read two ways.
  */
 
-import { formatAge, msSince } from "@/lib/format";
+import { formatAge, HOUR_MS, msSince } from "@/lib/format";
 import type { OutreachFinding } from "@/lib/outreachHealth";
 import type { StoredHealth } from "@/lib/healthSnapshot";
 
@@ -45,13 +53,18 @@ export interface HealthStripInput {
   findings: OutreachFinding[] | null;
   /** Only used for the healthy `Engine ran 2h ago` phrase. */
   engineLastRunAt: string | null;
-  /** null = nothing has ever been checked. */
-  snapshot: StoredHealth | null;
+  /**
+   * null = the read succeeded and no reading has ever been written.
+   * "unread" = the read itself failed, so nothing at all is known (R56).
+   *
+   * The distinction is the same one Blocks E and A make between an absence and
+   * a failure: rendering a failed read as `sites never checked` would be this
+   * file claiming to have seen something it never saw.
+   */
+  snapshot: StoredHealth | null | "unread";
   monitoringEnabled: boolean;
   staleHours: number;
 }
-
-const HOUR_MS = 60 * 60 * 1000;
 
 /**
  * Only `engine-stale` is amber. The other three engine findings and the
@@ -78,19 +91,35 @@ function enginePhrase(input: HealthStripInput): string | null {
 export function buildHealthStrip(input: HealthStripInput): BlockF {
   const { now, findings, snapshot, monitoringEnabled, staleHours } = input;
 
-  const ageMs = snapshot === null ? null : now.getTime() - snapshot.checkedAt.getTime();
+  // Everything below reads `reading`, so an unread snapshot contributes no site
+  // warning, no `all sites ok` and no healthy site line — it says only that
+  // nothing is known.
+  const unread = snapshot === "unread";
+  const reading = unread ? null : snapshot;
+
+  const ageMs = reading === null ? null : now.getTime() - reading.checkedAt.getTime();
   const aged = ageMs !== null && ageMs > staleHours * HOUR_MS;
 
   // The stamp. Past the threshold a stored reading no longer supports a claim
   // about the present, so the stamp stops being a timestamp and becomes an
   // amber statement.
   let stamp: HealthPart;
-  if (ageMs === null) {
+  if (unread) {
+    // The register of `Engine — unknown`: our own read failed, and the honest
+    // report of that is not a claim about the sites at all.
+    stamp = { text: "sites — unknown", aged: false };
+  } else if (ageMs === null) {
     // With monitoring off the reading is EXPECTED to be absent, and an alarm
     // about an expected absence is a daily false alarm.
     stamp = { text: "sites never checked", aged: monitoringEnabled };
   } else if (aged) {
-    stamp = { text: `sites not checked since ${formatAge(ageMs)} ago`, aged: true };
+    // R57: the words stay, because they are true — the reading really is that
+    // old. The hue follows the toggle, exactly as `sites never checked` above
+    // already does: with monitoring off the cron writes no snapshot by design,
+    // so ageing amber every day forever is an alarm about an absence Riku
+    // created. `all sites ok` stays suppressed on the raw age below, toggle or
+    // no toggle: a stale reading cannot claim the present.
+    stamp = { text: `sites not checked since ${formatAge(ageMs)} ago`, aged: monitoringEnabled };
   } else {
     stamp = { text: `checked ${formatAge(ageMs)} ago`, aged: false };
   }
@@ -102,7 +131,7 @@ export function buildHealthStrip(input: HealthStripInput): BlockF {
   // A site that was down at the last reading still warns however old the
   // reading is: suppressing a red warning is the wrong direction to fail in,
   // and the stamp above already says how old the reading is.
-  for (const site of snapshot?.sites ?? []) {
+  for (const site of reading?.sites ?? []) {
     if (!site.up) warnings.push({ tone: "missing", text: site.detail });
   }
 
@@ -113,7 +142,7 @@ export function buildHealthStrip(input: HealthStripInput): BlockF {
     if (engine !== null) parts.push({ text: engine, aged: false });
     // `all sites ok` is NOT printed once the reading is aged — that is the
     // whole 30-hour rule — nor when the reading watches no sites at all.
-    if (!aged && snapshot !== null && snapshot.sites.length > 0) {
+    if (!aged && reading !== null && reading.sites.length > 0) {
       parts.push({ text: "all sites ok", aged: false });
     }
     parts.push(stamp);
@@ -125,7 +154,7 @@ export function buildHealthStrip(input: HealthStripInput): BlockF {
   // in both forms.
   const fine: string[] = [];
   if (engine !== null) fine.push(engine);
-  for (const site of snapshot?.sites ?? []) {
+  for (const site of reading?.sites ?? []) {
     if (site.up) fine.push(site.detail);
   }
 

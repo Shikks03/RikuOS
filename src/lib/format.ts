@@ -17,7 +17,8 @@
  */
 
 const MINUTE_MS = 60 * 1000;
-const HOUR_MS = 60 * MINUTE_MS;
+/** Exported so the health strip's threshold arithmetic reads the same constant. */
+export const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const WEEK_MS = 7 * DAY_MS;
 
@@ -96,7 +97,7 @@ export const DASH = "—";
  * absence in the app at once, and nothing between here and the page would say
  * where the change came from.
  */
-export const DASH_CELL: Cell = Object.freeze({ text: DASH, tone: "dash" });
+export const DASH_CELL: Readonly<Cell> = Object.freeze({ text: DASH, tone: "dash" });
 
 /**
  * The page's central correctness rule in four lines: `0` is a measurement and

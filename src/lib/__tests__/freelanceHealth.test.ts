@@ -10,7 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { buildHealthStrip } from "@/lib/freelanceHealth";
 import { evaluateOutreach } from "@/lib/outreachHealth";
-import { AGENT_STALE_HOURS } from "@/lib/watchdog";
+import { AGENT_STALE_HOURS, EXPECTATIONS, classifyAgentRun } from "@/lib/watchdog";
 import type { SummaryResponse } from "@/lib/stApi";
 
 const NOW = new Date("2026-09-05T12:00:00.000Z");
@@ -219,5 +219,142 @@ describe("Block F — the alarm form", () => {
     expect(out.warnings).toEqual([
       { tone: "missing", text: "ShikksTracker send engine reported 1 error" },
     ]);
+  });
+
+  it("never prints the healthy engine phrase beside the engine's own warning", () => {
+    // `fine` is the healthy column. An engine that is itself the warning must
+    // not also appear there saying it ran — one card, two claims, one of them
+    // false.
+    const errored = summary({ engine: { lastRunAt: hoursAgo(2).toISOString(), lastRunErrors: 1 } });
+    const withErrors = buildHealthStrip({
+      now: NOW,
+      findings: evaluateOutreach(NOW, errored),
+      engineLastRunAt: errored.engine.lastRunAt,
+      snapshot: { checkedAt: hoursAgo(6), sites: OK_SITES },
+      monitoringEnabled: true,
+      staleHours: AGENT_STALE_HOURS,
+    });
+    if (withErrors.kind !== "alarm") throw new Error("expected alarm");
+    expect(withErrors.fine).toEqual(["AzeroTech ok", "Meowchi ok", "ShikksTracker ok"]);
+
+    const stalled = summary({ engine: { lastRunAt: hoursAgo(72).toISOString(), lastRunErrors: 0 } });
+    const withStale = buildHealthStrip({
+      now: NOW,
+      findings: evaluateOutreach(NOW, stalled),
+      engineLastRunAt: stalled.engine.lastRunAt,
+      snapshot: { checkedAt: hoursAgo(6), sites: OK_SITES },
+      monitoringEnabled: true,
+      staleHours: AGENT_STALE_HOURS,
+    });
+    if (withStale.kind !== "alarm") throw new Error("expected alarm");
+    expect(withStale.fine.some((line) => line.startsWith("Engine"))).toBe(false);
+  });
+
+  it("orders the findings before the sites", () => {
+    const stalled = summary({ engine: { lastRunAt: hoursAgo(72).toISOString(), lastRunErrors: 0 } });
+    const out = buildHealthStrip({
+      now: NOW,
+      findings: evaluateOutreach(NOW, stalled),
+      engineLastRunAt: stalled.engine.lastRunAt,
+      snapshot: {
+        checkedAt: hoursAgo(6),
+        sites: [{ name: "Meowchi", up: false, detail: "Meowchi returned HTTP 503" }],
+      },
+      monitoringEnabled: true,
+      staleHours: AGENT_STALE_HOURS,
+    });
+    if (out.kind !== "alarm") throw new Error("expected alarm");
+    expect(out.warnings).toEqual([
+      { tone: "stale", text: "ShikksTracker send engine last ran 3d ago" },
+      { tone: "missing", text: "Meowchi returned HTTP 503" },
+    ]);
+  });
+});
+
+describe("Block F — a reading that could not be read (R56)", () => {
+  it("says `sites — unknown` rather than claiming the sites were never checked", () => {
+    const out = strip({ snapshot: "unread" });
+    if (out.kind !== "quiet") throw new Error("expected quiet");
+    expect(out.parts).toEqual([
+      { text: "Engine ran 2h ago", aged: false },
+      { text: "sites — unknown", aged: false },
+    ]);
+  });
+
+  it("stays grey whichever way the monitoring switch is set", () => {
+    // Nothing is known, so there is nothing for the toggle to colour: the
+    // stamp reports our own failure, not the state of the sites.
+    for (const monitoringEnabled of [true, false]) {
+      const out = strip({ snapshot: "unread", monitoringEnabled });
+      if (out.kind !== "quiet") throw new Error("expected quiet");
+      expect(out.parts[1]).toEqual({ text: "sites — unknown", aged: false });
+    }
+  });
+
+  it("contributes no site line to the alarm card either", () => {
+    const stalled = summary({ engine: { lastRunAt: hoursAgo(72).toISOString(), lastRunErrors: 0 } });
+    const out = buildHealthStrip({
+      now: NOW,
+      findings: evaluateOutreach(NOW, stalled),
+      engineLastRunAt: stalled.engine.lastRunAt,
+      snapshot: "unread",
+      monitoringEnabled: true,
+      staleHours: AGENT_STALE_HOURS,
+    });
+    if (out.kind !== "alarm") throw new Error("expected alarm");
+    expect(out.warnings).toEqual([
+      { tone: "stale", text: "ShikksTracker send engine last ran 3d ago" },
+    ]);
+    expect(out.fine).toEqual([]);
+    expect(out.stamp).toEqual({ text: "sites — unknown", aged: false });
+  });
+});
+
+describe("Block F — monitoring off ages the words, not the hue (R57)", () => {
+  it("keeps the aged sentence grey, because the absence is one Riku created", () => {
+    const out = strip({
+      snapshot: { checkedAt: hoursAgo(AGENT_STALE_HOURS + 18), sites: OK_SITES },
+      monitoringEnabled: false,
+    });
+    if (out.kind !== "quiet") throw new Error("expected quiet");
+    expect(out.parts[1]).toEqual({ text: "sites not checked since 2d ago", aged: false });
+    // The claim about the present still goes: a stale reading cannot assert
+    // `all sites ok` whatever the toggle says.
+    expect(out.parts.map((p) => p.text)).not.toContain("all sites ok");
+  });
+
+  it("still raises a down site from that same stale reading", () => {
+    const out = strip({
+      snapshot: {
+        checkedAt: hoursAgo(AGENT_STALE_HOURS + 18),
+        sites: [{ name: "Meowchi", up: false, detail: "Meowchi timed out" }],
+      },
+      monitoringEnabled: false,
+    });
+    if (out.kind !== "alarm") throw new Error("expected alarm");
+    expect(out.warnings.map((w) => w.text)).toEqual(["Meowchi timed out"]);
+    expect(out.stamp).toEqual({ text: "sites not checked since 2d ago", aged: false });
+  });
+});
+
+describe("Block F — one boundary, two rules", () => {
+  it("agrees with the watchdog at exactly AGENT_STALE_HOURS", () => {
+    // The strip's staleness and the rail's overdue rule read the same constant
+    // from two different inputs; pinning both here means neither can be edited
+    // into disagreeing with the other about the same hour.
+    const out = strip({
+      snapshot: { checkedAt: hoursAgo(AGENT_STALE_HOURS), sites: OK_SITES },
+    });
+    if (out.kind !== "quiet") throw new Error("expected quiet");
+    expect(out.parts[2].aged).toBe(false);
+
+    const siteHealth = EXPECTATIONS.find((e) => e.agent === "site-health");
+    if (!siteHealth) throw new Error("site-health has no expectation row");
+    const verdict = classifyAgentRun(
+      NOW,
+      { agent: "site-health", startedAt: hoursAgo(AGENT_STALE_HOURS), ok: true, itemsFailed: 0 },
+      siteHealth
+    );
+    expect(verdict.kind).not.toBe("stale");
   });
 });

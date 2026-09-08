@@ -11,7 +11,7 @@ import ApprovalItem from "@/models/ApprovalItem";
 import AgentRun from "@/models/AgentRun";
 import PushSubscription from "@/models/PushSubscription";
 import OsSettings from "@/models/OsSettings";
-import HealthSnapshot from "@/models/HealthSnapshot";
+import HealthSnapshot, { HEALTH_SNAPSHOT_ID } from "@/models/HealthSnapshot";
 
 const validPayload = {
   contactId: "c1",
@@ -289,5 +289,42 @@ describe("HealthSnapshot", () => {
       .indexes()
       .filter(([, options]) => (options as { expireAfterSeconds?: number }).expireAfterSeconds !== undefined);
     expect(ttl).toEqual([]);
+  });
+
+  it("accepts exactly 20 sites — the ceiling itself, not one under it", async () => {
+    const doc = new HealthSnapshot({
+      checkedAt: new Date(),
+      sites: Array.from({ length: 20 }, (_, i) => ({
+        name: `s${i}`,
+        up: true,
+        detail: "ok",
+      })),
+    });
+    await expect(doc.validate()).resolves.toBeUndefined();
+  });
+
+  it("accepts a string of exactly the bound in both fields", async () => {
+    const doc = new HealthSnapshot({
+      checkedAt: new Date(),
+      sites: [{ name: "x".repeat(60), up: true, detail: "y".repeat(200) }],
+    });
+    await expect(doc.validate()).resolves.toBeUndefined();
+  });
+
+  it("leaves `sites` deliberately not required", () => {
+    // In Mongoose 9.9.4 `required: true` on an array does not reject [], so the
+    // option would add nothing — and an empty reading is valid anyway: the
+    // check ran and watched nothing. This pins the omission as a decision.
+    expect(HealthSnapshot.schema.path("sites").isRequired).toBeFalsy();
+  });
+
+  it("defaults _id to the one singleton id (R55)", () => {
+    const doc = new HealthSnapshot({ checkedAt: new Date(), sites: [] });
+    expect(doc._id).toBe(HEALTH_SNAPSHOT_ID);
+  });
+
+  it("refuses any other _id, so a second document cannot be written", async () => {
+    const doc = new HealthSnapshot({ _id: "other", checkedAt: new Date(), sites: [] });
+    await expect(doc.validate()).rejects.toThrow(/_id/);
   });
 });

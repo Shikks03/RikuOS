@@ -8,8 +8,8 @@
  * models in through `chaser.ts` (R52). This assertion is the check the grep
  * cannot make.
  *
- * Vitest isolates each test file's module graph, so the four imports below are
- * the whole graph this assertion measures.
+ * Vitest isolates each test file's module graph, so the side-effect imports
+ * below are the whole graph this assertion measures.
  */
 import { describe, it, expect } from "vitest";
 import mongoose from "mongoose";

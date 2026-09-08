@@ -7,8 +7,8 @@
  *
  * The load-bearing assertion in this file is the one about
  * `Nothing waiting on you.` — it must fire only when drafts, approved,
- * never-contacted AND the needs-you count are ALL measured zeros (R35, R50) —
- * never under a lit card, never under a blank one.
+ * never-contacted AND the needs-you figure are ALL measured zeros
+ * (R35, R50, R54) — never under a lit card, never under a blank one.
  */
 import { describe, it, expect } from "vitest";
 import { buildBlockA, buildBlockB, buildBlockC, CAMPAIGN_DISPLAY_BOUND } from "@/lib/freelanceView";

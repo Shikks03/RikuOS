@@ -85,14 +85,14 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
 
   // Measured ONCE. The rows, the collapsed best line and the honesty note all
   // read the same computation rather than three copies of it that can drift.
-  const measured = email.map((v) => ({ v, rate: measuredRate(v) }));
+  const measured = email.map((v) => ({ v, measure: measuredRate(v) }));
 
-  const measuredRows: ApproachRow[] = measured.map(({ v, rate }) => {
+  const measuredRows: ApproachRow[] = measured.map(({ v, measure }) => {
     return {
       key: v.key,
       name: nameOf(v),
       cells: [
-        rate === null ? DASH_CELL : { text: `${rate.percent}%`, tone: "value" },
+        measure === null ? DASH_CELL : { text: `${measure.percent}%`, tone: "value" },
         numberCell(v.sends),
         numberCell(v.replies),
       ],
@@ -116,14 +116,14 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
   // The best MEASURED row: highest rate, ties broken by the better-evidenced
   // row (more sends), then by the order the API returned.
   let best: { row: VariantStatsItem; percent: number; sends: number } | null = null;
-  for (const { v, rate } of measured) {
-    if (rate === null) continue;
+  for (const { v, measure } of measured) {
+    if (measure === null) continue;
     if (
       best === null ||
-      rate.percent > best.percent ||
-      (rate.percent === best.percent && rate.sends > best.sends)
+      measure.percent > best.percent ||
+      (measure.percent === best.percent && measure.sends > best.sends)
     ) {
-      best = { row: v, percent: rate.percent, sends: rate.sends };
+      best = { row: v, percent: measure.percent, sends: measure.sends };
     }
   }
 
@@ -151,7 +151,7 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
     // R27, stated as an explicit condition so nobody "fixes" its absence later:
     // a table with no printable rate is not a table of small numbers, and
     // printing the note there would be the opposite of an honesty note.
-    honesty: measured.some((m) => m.rate !== null)
+    honesty: measured.some((m) => m.measure !== null)
       ? "Rates are computed over small numbers of sends."
       : null,
   };

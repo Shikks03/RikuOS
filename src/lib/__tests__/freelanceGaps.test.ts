@@ -424,5 +424,10 @@ describe("needsYouFigure — the figure Block A's third card shares", () => {
     const rows = build([reply()], []);
     expect(rows.kind).toBe("rows");
     expect(needsYouFigure(rows)).toEqual({ kind: "measured", count: 1 });
+
+    // A measured count survives a missing overdue feed: the gaps really were
+    // counted, and the note under the rows is what says the total may be
+    // higher. Routing these rows to `absent` would mirror R54's contradiction.
+    expect(needsYouFigure(build([reply()], null))).toEqual({ kind: "measured", count: 1 });
   });
 });

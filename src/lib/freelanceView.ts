@@ -166,8 +166,9 @@ function contactsCard(contacts: SummaryContacts | null): StatCard {
 function needsYouCard(figure: NeedsYouFigure): StatCard {
   const base = { key: "needs-you", label: "Needs you", href: null, trackPercent: null } as const;
   if (figure.kind === "failed") {
-    // The gap count needs a database read, so a failed read reads exactly like
-    // Block E beside it rather than pretending to a zero.
+    // The gap count needs a live read of the reply feed and of the queue, so a
+    // failed read reads exactly like Block E beside it rather than pretending
+    // to a zero.
     return { ...base, tone: "blank", figure: DASH, caption: "couldn't load" };
   }
   if (figure.kind === "absent") {
