@@ -12,7 +12,9 @@ import {
   createDraft,
   fetchAttention,
   fetchSummary,
+  fetchVariantStats,
   PIPELINE_STAGES,
+  ST_PAGE_TIMEOUT_MS,
   ST_TIMEOUT_MS,
 } from "@/lib/stApi";
 import { evaluateOutreach } from "@/lib/outreachHealth";
@@ -528,5 +530,126 @@ describe("timeouts", () => {
   it("bounds every external call (CLAUDE.md)", () => {
     expect(ST_TIMEOUT_MS).toBeGreaterThan(0);
     expect(ST_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
+  });
+});
+
+describe("fetchVariantStats", () => {
+  const original = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = original;
+    vi.unstubAllEnvs();
+  });
+
+  function respond(body: unknown, status = 200) {
+    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
+    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(body), { status })) as typeof fetch;
+  }
+
+  it("throws with a diagnosable message on a non-200", async () => {
+    respond([], 503);
+    await expect(fetchVariantStats()).rejects.toThrow(/503/);
+  });
+
+  it("parses the row shape from the bare array the endpoint returns", async () => {
+    respond([
+      {
+        key: "email-s1-compliment",
+        label: "Email S1 — specific compliment first",
+        channel: "email",
+        stage: 1,
+        sends: 72,
+        uniqueContacts: 70,
+        replies: 8,
+        replyRate: 0.1111,
+        bySlice: { leadSource: {}, webPresenceTier: {} },
+      },
+    ]);
+    const rows = await fetchVariantStats();
+    expect(rows).toEqual([
+      {
+        key: "email-s1-compliment",
+        label: "Email S1 — specific compliment first",
+        channel: "email",
+        stage: 1,
+        sends: 72,
+        uniqueContacts: 70,
+        replies: 8,
+        replyRate: 0.1111,
+      },
+    ]);
+  });
+
+  it("nulls the metadata a deleted Variant leaves behind rather than inventing it", async () => {
+    respond([{ key: "orphan", label: null, channel: null, stage: null, sends: 4, replies: 0 }]);
+    const rows = await fetchVariantStats();
+    expect(rows[0].label).toBeNull();
+    expect(rows[0].channel).toBeNull();
+    expect(rows[0].sends).toBe(4);
+    expect(rows[0].uniqueContacts).toBeNull();
+  });
+
+  it("survives a body that is not an array rather than throwing", async () => {
+    respond({ variants: [] });
+    expect(await fetchVariantStats()).toEqual([]);
+  });
+
+  it("drops a row with no string key — it can never be identified or keyed", async () => {
+    respond([{ label: "nameless" }, { key: "good", label: "Good" }]);
+    const rows = await fetchVariantStats();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].key).toBe("good");
+  });
+
+  it("sends the secret in the header and never in the URL", async () => {
+    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
+    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
+    let seenUrl = "";
+    let seenHeaders: Record<string, string> = {};
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      seenUrl = String(url);
+      seenHeaders = init.headers as Record<string, string>;
+      return new Response(JSON.stringify([]), { status: 200 });
+    }) as unknown as typeof fetch;
+    await fetchVariantStats();
+    expect(seenUrl).toBe("https://st.example.com/api/os/variant-stats");
+    expect(seenUrl).not.toContain(GOOD_SECRET);
+    expect(seenHeaders["x-os-secret"]).toBe(GOOD_SECRET);
+  });
+});
+
+describe("the page timeout", () => {
+  const original = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = original;
+    vi.unstubAllEnvs();
+  });
+
+  it("is well under the cron timeout — a human must not wait a cron's patience", () => {
+    expect(ST_PAGE_TIMEOUT_MS).toBeGreaterThan(0);
+    expect(ST_PAGE_TIMEOUT_MS).toBeLessThan(ST_TIMEOUT_MS);
+  });
+
+  it("is optional on all three GETs, and defaults to the cron timeout", async () => {
+    // AbortSignal.timeout is the only observable difference, so the assertion
+    // is on the signal each call was handed rather than on wall-clock time.
+    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
+    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
+    const seen: (AbortSignal | undefined)[] = [];
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      seen.push(init.signal ?? undefined);
+      return new Response(JSON.stringify([]), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await fetchSummary();
+    await fetchSummary(ST_PAGE_TIMEOUT_MS);
+    await fetchAttention(3, 50);
+    await fetchAttention(3, 50, ST_PAGE_TIMEOUT_MS);
+    await fetchVariantStats();
+    await fetchVariantStats(ST_PAGE_TIMEOUT_MS);
+
+    expect(seen).toHaveLength(6);
+    for (const signal of seen) expect(signal).toBeInstanceOf(AbortSignal);
   });
 });

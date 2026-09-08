@@ -27,8 +27,17 @@
  *     grows a failure path after the write, this classifier must change with it.
  */
 
-/** Explicit timeout on every external call (CLAUDE.md). */
+/** Explicit timeout on every external call (CLAUDE.md). The cron's patience. */
 export const ST_TIMEOUT_MS = 15_000;
+
+/**
+ * A PAGE's patience, which is a different thing. Three parallel calls at the
+ * cron's 15 s can outlive the function budget and hand Riku a Vercel error page
+ * instead of the deck's `Couldn't reach ShikksTracker.` — the single most likely
+ * way the Freelance page fails badly in production. The page's own
+ * `maxDuration` is a second belt.
+ */
+export const ST_PAGE_TIMEOUT_MS = 6_000;
 
 // --- Contract shapes (../ShikksTracker/docs/os-api.md) -----------------------
 
@@ -135,6 +144,35 @@ export interface SummaryResponse {
   contacts: SummaryContacts | null;
   /** null = the whole block was absent. `[]` = the API reported no campaigns. */
   campaigns: SummaryCampaign[] | null;
+}
+
+/**
+ * One row of GET /api/os/variant-stats. The endpoint returns a BARE ARRAY, not
+ * an envelope, and is documented as deliberately not truncated — so the display
+ * bound is ours to enforce.
+ *
+ * `replyRate` is modelled so the shape is honest about what arrives, and it is
+ * NEVER PRINTED. ShikksTracker computes it as a 4-dp fraction and returns 0 for
+ * zero sends, which is precisely the lie Block D exists to refuse: since S15
+ * replies are only ever detected on email, so a Facebook, Instagram or phone
+ * variant's 0 is not a measurement, it is an absence of measurement. Block D
+ * recomputes from `sends` and `replies`.
+ *
+ * `bySlice` (the lead-source and web-presence breakdowns) is returned by the
+ * endpoint and deliberately left unmodelled: nothing consumes it, and a type
+ * shipped without a consumer is an invitation.
+ */
+export interface VariantStatsItem {
+  key: string;
+  /** null when the Variant was deleted after its logs were stamped. */
+  label: string | null;
+  channel: string | null;
+  stage: number | null;
+  sends: number | null;
+  uniqueContacts: number | null;
+  replies: number | null;
+  /** Never rendered. See above. */
+  replyRate: number | null;
 }
 
 /** Request body for POST /api/os/drafts. */
@@ -267,7 +305,11 @@ async function readErrorMessage(res: Response): Promise<string> {
  * protect, so the caller's ordinary error path (AgentRun + push alert) is the
  * right handling.
  */
-export async function fetchAttention(days: number, limit: number): Promise<AttentionResponse> {
+export async function fetchAttention(
+  days: number,
+  limit: number,
+  timeoutMs: number = ST_TIMEOUT_MS
+): Promise<AttentionResponse> {
   const { baseUrl, secret } = readStConfig();
   const url = `${baseUrl}/api/os/attention?days=${encodeURIComponent(
     String(days)
@@ -275,7 +317,7 @@ export async function fetchAttention(days: number, limit: number): Promise<Atten
 
   const res = await fetch(url, {
     headers: { "x-os-secret": secret },
-    signal: AbortSignal.timeout(ST_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
     cache: "no-store",
   });
 
@@ -368,12 +410,12 @@ function readPipeline(value: unknown): Record<PipelineStage, number | null> {
  * and for the same reason: a GET has no side effect to protect, so the
  * caller's ordinary error path (AgentRun + digest line) is the right handling.
  */
-export async function fetchSummary(): Promise<SummaryResponse> {
+export async function fetchSummary(timeoutMs: number = ST_TIMEOUT_MS): Promise<SummaryResponse> {
   const { baseUrl, secret } = readStConfig();
 
   const res = await fetch(`${baseUrl}/api/os/summary`, {
     headers: { "x-os-secret": secret },
-    signal: AbortSignal.timeout(ST_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
     cache: "no-store",
   });
 
@@ -426,6 +468,54 @@ export async function fetchSummary(): Promise<SummaryResponse> {
           }))
       : null,
   };
+}
+
+/**
+ * GET /api/os/variant-stats. Throws on any failure, exactly as the other two
+ * GETs do and for the same reason: a GET has no side effect to protect.
+ */
+export async function fetchVariantStats(
+  timeoutMs: number = ST_TIMEOUT_MS
+): Promise<VariantStatsItem[]> {
+  const { baseUrl, secret } = readStConfig();
+
+  const res = await fetch(`${baseUrl}/api/os/variant-stats`, {
+    headers: { "x-os-secret": secret },
+    signal: AbortSignal.timeout(timeoutMs),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `GET /api/os/variant-stats returned ${res.status}. ` +
+        "503 = OS_API_SECRET unset or under 32 chars on ShikksTracker; " +
+        "401 = secret mismatch; 404 = the deployment predates the P1 merge."
+    );
+  }
+
+  const parsed: unknown = await res.json();
+  if (!Array.isArray(parsed)) return [];
+
+  const rows: VariantStatsItem[] = [];
+  for (const raw of parsed) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const row = raw as Record<string, unknown>;
+    // A row with no key cannot be identified, keyed or grouped. Dropping it is
+    // the only honest handling; keeping it would put a nameless approach in a
+    // table whose whole job is naming which approach earns replies.
+    if (typeof row.key !== "string" || row.key.length === 0) continue;
+    rows.push({
+      key: row.key,
+      label: typeof row.label === "string" ? row.label : null,
+      channel: typeof row.channel === "string" ? row.channel : null,
+      stage: readCount(row.stage),
+      sends: readCount(row.sends),
+      uniqueContacts: readCount(row.uniqueContacts),
+      replies: readCount(row.replies),
+      replyRate: readCount(row.replyRate),
+    });
+  }
+  return rows;
 }
 
 /**
