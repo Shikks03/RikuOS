@@ -27,11 +27,15 @@ function hoursAgo(hours: number): string {
 }
 
 // The baseline is a HEALTHY summary, so every test asserts against a quiet
-// default rather than around an alarm it never meant to raise.
+// default rather than around an alarm it never meant to raise. `contacts` and
+// `campaigns` are null because evaluateOutreach reads neither — it judges the
+// engine and the queue only.
 function summary(over: Partial<SummaryResponse> = {}): SummaryResponse {
   return {
     queue: { drafts: 24, approved: 0 },
     engine: { lastRunAt: hoursAgo(2), lastRunErrors: 0 },
+    contacts: null,
+    campaigns: null,
     ...over,
   };
 }

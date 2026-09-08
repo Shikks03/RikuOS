@@ -71,12 +71,11 @@ export interface AttentionResponse {
 /**
  * GET /api/os/summary — only the fields RikuOS acts on.
  *
- * `contacts` and `campaigns` are returned too and are deliberately left
- * unmodelled: nothing reads them yet, and the Freelance page (roadmap 8.1) is
- * where they earn a type. Widening this interface is never sufficient on its
- * own — `fetchSummary` RECONSTRUCTS its return value, so a new field must be
- * carried through there in the same change or it silently arrives undefined.
- * That exact pair was missed once already, in P4's `overdueActions`.
+ * `contacts` and `campaigns` earned their types in P8 (the Freelance page).
+ * Widening this file's interfaces is never sufficient on its own — fetchSummary
+ * RECONSTRUCTS its return value, so a new field must be carried through there in
+ * the same change or it silently arrives undefined. That exact pair was missed
+ * once already, in P4's `overdueActions`.
  *
  * `number | null` throughout, and it matters: a field ShikksTracker did not
  * send must never read as a real zero. "The engine reported no errors" and
@@ -96,9 +95,46 @@ export interface SummaryQueue {
   approved: number | null;
 }
 
+/**
+ * The pipeline stages, in pipeline order. Exported because Block B renders in
+ * this order and Block A reads `not_started` from it, and because the key set
+ * is what makes "a stage the API omitted" detectable at all.
+ * Source: ../ShikksTracker/docs/os-api.md and its src/lib/os/summary.ts.
+ */
+export const PIPELINE_STAGES = [
+  "not_started",
+  "contacted",
+  "replied",
+  "call_booked",
+  "proposal_sent",
+  "won",
+  "lost",
+] as const;
+export type PipelineStage = (typeof PIPELINE_STAGES)[number];
+
+export interface SummaryContacts {
+  total: number | null;
+  hot: number | null;
+  /** Always all seven keys. A stage the API omitted is null, never 0. */
+  byPipelineStage: Record<PipelineStage, number | null>;
+}
+
+export interface SummaryCampaign {
+  id: string;
+  name: string;
+  sent: number | null;
+  opened: number | null;
+  clicked: number | null;
+  replied: number | null;
+}
+
 export interface SummaryResponse {
   queue: SummaryQueue;
   engine: SummaryEngine;
+  /** null = the whole block was absent. Distinct from a block of nulls. */
+  contacts: SummaryContacts | null;
+  /** null = the whole block was absent. `[]` = the API reported no campaigns. */
+  campaigns: SummaryCampaign[] | null;
 }
 
 /** Request body for POST /api/os/drafts. */
@@ -311,6 +347,22 @@ function readStamp(value: unknown): string | null {
   return typeof value === "string" ? value : `[${typeof value}]`;
 }
 
+/** A campaign id or name that is not a string is a contract break, not a value. */
+function readText(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+/**
+ * Always returns all seven keys, so `Object.keys` is a reliable statement about
+ * the contract and a stage the API omitted reads as null rather than a zero.
+ */
+function readPipeline(value: unknown): Record<PipelineStage, number | null> {
+  const raw = (value ?? {}) as Record<string, unknown>;
+  const out = {} as Record<PipelineStage, number | null>;
+  for (const stage of PIPELINE_STAGES) out[stage] = readCount(raw[stage]);
+  return out;
+}
+
 /**
  * GET /api/os/summary. Throws on any failure, exactly as fetchAttention does
  * and for the same reason: a GET has no side effect to protect, so the
@@ -336,8 +388,14 @@ export async function fetchSummary(): Promise<SummaryResponse> {
   const parsed = (await res.json()) as {
     queue?: Record<string, unknown>;
     engine?: Record<string, unknown>;
+    contacts?: Record<string, unknown>;
+    campaigns?: unknown;
   };
 
+  // `limit` is not sent, so ShikksTracker applies its own default of 50 to the
+  // campaigns array (docs/os-api.md). Past 50 campaigns the page's
+  // "Showing 20 of N" would understate N; there are 2 today and the ceiling is
+  // recorded rather than defended against.
   return {
     queue: {
       drafts: readCount(parsed.queue?.drafts),
@@ -347,6 +405,26 @@ export async function fetchSummary(): Promise<SummaryResponse> {
       lastRunAt: readStamp(parsed.engine?.lastRunAt),
       lastRunErrors: readCount(parsed.engine?.lastRunErrors),
     },
+    contacts:
+      parsed.contacts === null || parsed.contacts === undefined
+        ? null
+        : {
+            total: readCount(parsed.contacts.total),
+            hot: readCount(parsed.contacts.hot),
+            byPipelineStage: readPipeline(parsed.contacts.byPipelineStage),
+          },
+    campaigns: Array.isArray(parsed.campaigns)
+      ? parsed.campaigns
+          .filter((row): row is Record<string, unknown> => typeof row === "object" && row !== null)
+          .map((row) => ({
+            id: readText(row.id),
+            name: readText(row.name),
+            sent: readCount(row.sent),
+            opened: readCount(row.opened),
+            clicked: readCount(row.clicked),
+            replied: readCount(row.replied),
+          }))
+      : null,
   };
 }
 

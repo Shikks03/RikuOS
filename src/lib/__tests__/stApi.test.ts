@@ -12,6 +12,7 @@ import {
   createDraft,
   fetchAttention,
   fetchSummary,
+  PIPELINE_STAGES,
   ST_TIMEOUT_MS,
 } from "@/lib/stApi";
 import { evaluateOutreach } from "@/lib/outreachHealth";
@@ -329,12 +330,115 @@ describe("fetchSummary", () => {
     respond({
       queue: { drafts: 24, approved: 2 },
       engine: { lastRunAt: "2026-08-01T07:06:27.319Z", lastRunErrors: 3 },
-      contacts: { total: 30 },
+      contacts: {
+        total: 30,
+        hot: 2,
+        byPipelineStage: {
+          not_started: 25,
+          contacted: 3,
+          replied: 2,
+          call_booked: 0,
+          proposal_sent: 0,
+          won: 0,
+          lost: 0,
+        },
+      },
+      campaigns: [{ id: "c1", name: "Test One", sent: 5, opened: 2, clicked: 0, replied: 2 }],
     });
     expect(await fetchSummary()).toEqual({
       queue: { drafts: 24, approved: 2 },
       engine: { lastRunAt: "2026-08-01T07:06:27.319Z", lastRunErrors: 3 },
+      contacts: {
+        total: 30,
+        hot: 2,
+        byPipelineStage: {
+          not_started: 25,
+          contacted: 3,
+          replied: 2,
+          call_booked: 0,
+          proposal_sent: 0,
+          won: 0,
+          lost: 0,
+        },
+      },
+      campaigns: [{ id: "c1", name: "Test One", sent: 5, opened: 2, clicked: 0, replied: 2 }],
     });
+  });
+
+  it("reads a missing contacts block as null, not as seven zeros", async () => {
+    respond({ queue: {}, engine: {} });
+    const out = await fetchSummary();
+    expect(out.contacts).toBeNull();
+    expect(out.campaigns).toBeNull();
+  });
+
+  it("keys byPipelineStage by exactly PIPELINE_STAGES, with absent stages null", async () => {
+    respond({
+      queue: {},
+      engine: {},
+      contacts: { total: 30, hot: 2, byPipelineStage: { not_started: 25, contacted: 3 } },
+    });
+    const out = await fetchSummary();
+    expect(Object.keys(out.contacts!.byPipelineStage)).toEqual([...PIPELINE_STAGES]);
+    expect(out.contacts!.byPipelineStage.not_started).toBe(25);
+    // The stage the API omitted must never read as a measured zero.
+    expect(out.contacts!.byPipelineStage.won).toBeNull();
+  });
+
+  it("reads a non-numeric contacts count as null", async () => {
+    respond({
+      queue: {},
+      engine: {},
+      contacts: { total: "30", hot: null, byPipelineStage: { not_started: Number.NaN } },
+    });
+    const out = await fetchSummary();
+    expect(out.contacts!.total).toBeNull();
+    expect(out.contacts!.hot).toBeNull();
+    expect(out.contacts!.byPipelineStage.not_started).toBeNull();
+  });
+
+  it("keeps a campaigns array that is present but empty distinct from an absent one", async () => {
+    respond({ queue: {}, engine: {}, campaigns: [] });
+    expect((await fetchSummary()).campaigns).toEqual([]);
+
+    respond({ queue: {}, engine: {} });
+    expect((await fetchSummary()).campaigns).toBeNull();
+  });
+
+  it("carries every campaign column through, nulling the ones that did not arrive", async () => {
+    respond({
+      queue: {},
+      engine: {},
+      campaigns: [
+        { id: "c1", name: "Test One", sent: 5, opened: 2, clicked: 0, replied: 2 },
+        { id: "c2", name: "Test number 2" },
+      ],
+    });
+    const rows = (await fetchSummary()).campaigns!;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual({
+      id: "c1",
+      name: "Test One",
+      sent: 5,
+      opened: 2,
+      clicked: 0,
+      replied: 2,
+    });
+    expect(rows[1]).toEqual({
+      id: "c2",
+      name: "Test number 2",
+      sent: null,
+      opened: null,
+      clicked: null,
+      replied: null,
+    });
+  });
+
+  it("drops a campaign row that is not an object rather than throwing", async () => {
+    respond({ queue: {}, engine: {}, campaigns: [null, "nope", { id: "c1", name: "Real" }] });
+    const rows = (await fetchSummary()).campaigns!;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("c1");
   });
 
   it("reads a missing count as null, never as a real zero", async () => {
