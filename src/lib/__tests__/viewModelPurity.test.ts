@@ -15,11 +15,11 @@ import { describe, it, expect } from "vitest";
 import mongoose from "mongoose";
 
 // Imported for their side effects — the module graph IS the subject here.
-// Task 13 adds `@/lib/freelanceHealth` to this list.
 import "@/lib/format";
 import "@/lib/freelanceView";
 import "@/lib/freelanceVariants";
 import "@/lib/freelanceGaps";
+import "@/lib/freelanceHealth";
 
 describe("view-model purity", () => {
   it("registers no Mongoose model when the view models load", () => {
