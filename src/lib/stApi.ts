@@ -39,6 +39,15 @@ export const ST_TIMEOUT_MS = 15_000;
  */
 export const ST_PAGE_TIMEOUT_MS = 6_000;
 
+/**
+ * How many attention rows either consumer asks for. Bounded per CLAUDE.md's
+ * rule on list endpoints, and exported rather than declared in a route because
+ * the morning digest and the Freelance page must bound the same feed the same
+ * way — two copies would let them disagree about what is waiting.
+ * ShikksTracker's own maximum is 200.
+ */
+export const ATTENTION_LIMIT = 50;
+
 // --- Contract shapes (../ShikksTracker/docs/os-api.md) -----------------------
 
 /** One entry of GET /api/os/attention -> repliedUnanswered. */

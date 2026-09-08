@@ -8,7 +8,7 @@ import { EXPECTATIONS, evaluateWatchdog, fetchLatestRuns } from "@/lib/watchdog"
 import { checkSites } from "@/lib/siteHealth";
 import { evaluateOutreach } from "@/lib/outreachHealth";
 import { buildProblems, composeDigest } from "@/lib/digest";
-import { fetchAttention, fetchSummary } from "@/lib/stApi";
+import { ATTENTION_LIMIT, fetchAttention, fetchSummary } from "@/lib/stApi";
 import { buildPushPayload, sendPushToAll } from "@/lib/push";
 import ApprovalItem from "@/models/ApprovalItem";
 
@@ -28,9 +28,6 @@ import ApprovalItem from "@/models/ApprovalItem";
  *    settled, so a notification failure can never corrupt anything.
  */
 export const maxDuration = 60;
-
-/** Bounded, per CLAUDE.md's rule on list endpoints. */
-const ATTENTION_LIMIT = 50;
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const guard = requireCronSecret(request);

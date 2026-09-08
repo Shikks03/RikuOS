@@ -13,6 +13,7 @@ import {
   fetchAttention,
   fetchSummary,
   fetchVariantStats,
+  ATTENTION_LIMIT,
   PIPELINE_STAGES,
   ST_PAGE_TIMEOUT_MS,
   ST_TIMEOUT_MS,
@@ -651,5 +652,14 @@ describe("the page timeout", () => {
 
     expect(seen).toHaveLength(6);
     for (const signal of seen) expect(signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe("ATTENTION_LIMIT", () => {
+  it("is one bounded value both the cron and the page read", () => {
+    // CLAUDE.md: bounded query limits on every list endpoint. It lives here
+    // rather than in a route so the two consumers cannot bound the same feed
+    // differently and then disagree about what is waiting.
+    expect(ATTENTION_LIMIT).toBe(50);
   });
 });
