@@ -11,9 +11,9 @@
  * under a lit card.
  */
 import { describe, it, expect } from "vitest";
-import { buildBlockA, buildBlockB } from "@/lib/freelanceView";
+import { buildBlockA, buildBlockB, buildBlockC } from "@/lib/freelanceView";
 import { PIPELINE_STAGES } from "@/lib/stApi";
-import type { SummaryContacts, SummaryQueue } from "@/lib/stApi";
+import type { SummaryCampaign, SummaryContacts, SummaryQueue } from "@/lib/stApi";
 
 const DRAFTS_URL = "https://st.example.com/review";
 
@@ -357,5 +357,82 @@ describe("Block B — the pipeline", () => {
   it("reports a failure to load rather than inventing an emptiness", () => {
     expect(buildBlockB(null)).toEqual({ kind: "failed", line: "Couldn't load the pipeline." });
     expect(b({ total: null })).toEqual({ kind: "failed", line: "Couldn't load the pipeline." });
+  });
+});
+
+describe("Block C — campaigns", () => {
+  const row = (over: Partial<SummaryCampaign>): SummaryCampaign => ({
+    id: "c1",
+    name: "Test One",
+    sent: 5,
+    opened: 2,
+    clicked: 0,
+    replied: 2,
+    ...over,
+  });
+
+  it("renders today's two real rows with the deck's headers", () => {
+    const out = buildBlockC([
+      row({}),
+      row({ id: "c2", name: "Test number 2", sent: 0, opened: 0, clicked: 0, replied: 0 }),
+    ]);
+    if (out.kind !== "table") throw new Error("expected table");
+    expect(out.headers).toEqual(["Campaign", "Sent", "Opened", "Clicked", "Replied"]);
+    expect(out.count).toBe(2);
+    expect(out.rows[0].name).toBe("Test One");
+    expect(out.rows[0].cells.map((c) => c.text)).toEqual(["5", "2", "0", "2"]);
+    expect(out.bound).toBeNull();
+    expect(out.honesty).toBe(
+      "Open counts come from tracking pixels and undercount anyone whose mail client blocks images."
+    );
+  });
+
+  it("marks a measured zero and an absent cell differently — never the same ink", () => {
+    const out = buildBlockC([row({ clicked: 0, replied: null })]);
+    if (out.kind !== "table") throw new Error("expected table");
+    const cells = out.rows[0].cells;
+    expect(cells[2]).toEqual({ text: "0", tone: "zero" });
+    expect(cells[3]).toEqual({ text: "—", tone: "dash" });
+  });
+
+  it("sorts by Sent, highest first, with unmeasured rows last and ties left in feed order", () => {
+    const out = buildBlockC([
+      row({ id: "a", name: "A", sent: 5 }),
+      row({ id: "b", name: "B", sent: null }),
+      row({ id: "c", name: "C", sent: 142 }),
+      row({ id: "d", name: "D", sent: 5 }),
+    ]);
+    if (out.kind !== "table") throw new Error("expected table");
+    expect(out.rows.map((r) => r.id)).toEqual(["c", "a", "d", "b"]);
+  });
+
+  it("bounds the display at 20 and states what it did, in sentence case", () => {
+    const many = Array.from({ length: 34 }, (_, i) =>
+      row({ id: `c${i}`, name: `Campaign ${i}`, sent: 100 - i })
+    );
+    const out = buildBlockC(many);
+    if (out.kind !== "table") throw new Error("expected table");
+    expect(out.rows).toHaveLength(20);
+    expect(out.count).toBe(34);
+    expect(out.bound).toBe("Showing 20 of 34 campaigns.");
+  });
+
+  it("goes singular in the bound statement when exactly 21 exist", () => {
+    const many = Array.from({ length: 21 }, (_, i) => row({ id: `c${i}`, sent: 100 - i }));
+    const out = buildBlockC(many);
+    if (out.kind !== "table") throw new Error("expected table");
+    expect(out.bound).toBe("Showing 20 of 21 campaigns.");
+  });
+
+  it("says `No campaigns yet.` for a measured emptiness and reports a failure for an absence", () => {
+    expect(buildBlockC([])).toEqual({ kind: "empty", line: "No campaigns yet." });
+    expect(buildBlockC(null)).toEqual({ kind: "failed", line: "Couldn't load campaigns." });
+  });
+
+  it("never produces a rate column", () => {
+    const out = buildBlockC([row({})]);
+    if (out.kind !== "table") throw new Error("expected table");
+    expect(out.headers.join(" ")).not.toMatch(/rate/i);
+    expect(out.rows[0].cells).toHaveLength(4);
   });
 });

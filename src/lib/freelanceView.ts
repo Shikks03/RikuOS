@@ -22,9 +22,10 @@
  * ShikksTracker URLs are passed in, so ST_API_BASE_URL never reaches a client.
  */
 
-import { pluralise } from "@/lib/format";
+import { numberCell, pluralise } from "@/lib/format";
+import type { Cell } from "@/lib/format";
 import { PIPELINE_STAGES } from "@/lib/stApi";
-import type { PipelineStage, SummaryContacts, SummaryQueue } from "@/lib/stApi";
+import type { PipelineStage, SummaryCampaign, SummaryContacts, SummaryQueue } from "@/lib/stApi";
 
 /** The em-dash used for every absence on the page. */
 const DASH = "—";
@@ -295,5 +296,73 @@ export function buildBlockB(contacts: SummaryContacts | null): BlockB {
     emptyNote: measuredEmpty.length > 0 ? `Nothing yet at ${joinWithOr(measuredEmpty)}` : null,
     absentNote: anyAbsent ? "ShikksTracker didn't report every pipeline stage." : null,
     hotAbsentNote: contacts.hot === null ? "ShikksTracker didn't report how many are hot." : null,
+  };
+}
+
+// --- Block C -----------------------------------------------------------------
+
+/**
+ * Settled by the deck's own `Showing 20 of 34 campaigns.` The endpoint's own
+ * ceiling is 50 (fetchSummary sends no `limit`), so `count` understates past
+ * that — recorded in stApi.ts rather than defended against.
+ */
+export const CAMPAIGN_DISPLAY_BOUND = 20;
+
+export interface CampaignRow {
+  id: string;
+  name: string;
+  /** sent, opened, clicked, replied — in header order. */
+  cells: Cell[];
+}
+
+export type BlockC =
+  | { kind: "failed"; line: string }
+  | { kind: "empty"; line: string }
+  | {
+      kind: "table";
+      /** The TOTAL, before the display bound — this is what `.fl-count` shows. */
+      count: number;
+      headers: string[];
+      rows: CampaignRow[];
+      bound: string | null;
+      honesty: string;
+    };
+
+export function buildBlockC(campaigns: SummaryCampaign[] | null): BlockC {
+  if (campaigns === null) return { kind: "failed", line: FAIL_LINES.campaigns };
+  if (campaigns.length === 0) return { kind: "empty", line: "No campaigns yet." };
+
+  // Highest Sent first. An unmeasured `sent` sorts below every measured value
+  // rather than above zero — it is not a bigger number, it is no number. Ties
+  // keep the order the API returned: Array.prototype.sort is stable, so the
+  // result is deterministic without inventing a secondary key.
+  const sorted = [...campaigns].sort((a, b) => (b.sent ?? -1) - (a.sent ?? -1));
+  const shown = sorted.slice(0, CAMPAIGN_DISPLAY_BOUND);
+
+  return {
+    kind: "table",
+    count: campaigns.length,
+    // `Campaign` is the fifth new string, approved 2026-09-07: a headerless name
+    // column beside four headed ones reads unfinished, and it parallels Block
+    // D's deck-authorised `Approach`. No rate column, ever.
+    headers: ["Campaign", "Sent", "Opened", "Clicked", "Replied"],
+    rows: shown.map((c) => ({
+      id: c.id,
+      name: c.name,
+      cells: [numberCell(c.sent), numberCell(c.opened), numberCell(c.clicked), numberCell(c.replied)],
+    })),
+    // A statement to the reader, not a machine label, so it is sentence case in
+    // the body face and never mono caps.
+    bound:
+      campaigns.length > CAMPAIGN_DISPLAY_BOUND
+        ? `Showing ${CAMPAIGN_DISPLAY_BOUND} of ${campaigns.length} ${pluralise(
+            campaigns.length,
+            "campaign"
+          )}.`
+        : null,
+    // Unconditional, unlike Block D's note: these counts always come from
+    // tracking pixels, whatever the numbers are.
+    honesty:
+      "Open counts come from tracking pixels and undercount anyone whose mail client blocks images.",
   };
 }
