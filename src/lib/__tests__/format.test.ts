@@ -8,7 +8,15 @@
  * on the page, not as a crash.
  */
 import { describe, it, expect } from "vitest";
-import { formatAge, formatWaiting, pluralise, numberCell, DASH } from "@/lib/format";
+import {
+  formatAge,
+  formatWaiting,
+  pluralise,
+  numberCell,
+  msSince,
+  DASH,
+  DASH_CELL,
+} from "@/lib/format";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -79,9 +87,33 @@ describe("pluralise", () => {
   });
 });
 
+describe("msSince", () => {
+  const NOW = new Date("2026-09-05T12:00:00.000Z");
+
+  it("returns the difference for a parseable timestamp", () => {
+    expect(msSince(NOW, "2026-09-05T08:00:00.000Z")).toBe(4 * HOUR);
+  });
+
+  it("returns null for an unparseable timestamp rather than NaN", () => {
+    expect(msSince(NOW, "not-a-date")).toBeNull();
+    expect(msSince(NOW, "")).toBeNull();
+  });
+
+  it("does not clamp: a future timestamp reads negative, and the caller decides", () => {
+    // The clamp belongs at each boundary — formatWaiting reads a negative as
+    // `just now`, formatAge as `0h`. This function only parses and subtracts.
+    expect(msSince(NOW, "2026-09-05T13:00:00.000Z")).toBe(-1 * HOUR);
+  });
+});
+
 describe("numberCell", () => {
   it("uses the one exported em-dash, so the glyph is pinned in a single place", () => {
     expect(DASH).toBe("—");
+  });
+
+  it("shares ONE em-dash cell with every table on the page", () => {
+    expect(DASH_CELL).toEqual({ text: "—", tone: "dash" });
+    expect(numberCell(null)).toEqual(DASH_CELL);
   });
 
   it("distinguishes a measured zero from an absence — the page's core rule", () => {

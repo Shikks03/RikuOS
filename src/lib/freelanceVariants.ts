@@ -16,12 +16,10 @@
  * Pure: no database, no network, no clock.
  */
 
-import { DASH, numberCell } from "@/lib/format";
+import { DASH_CELL, numberCell } from "@/lib/format";
 import type { Cell } from "@/lib/format";
 import { FAIL_LINES } from "@/lib/freelanceView";
 import type { VariantStatsItem } from "@/lib/stApi";
-
-const DASH_CELL: Cell = { text: DASH, tone: "dash" };
 
 export interface ApproachRow {
   key: string;
@@ -65,12 +63,16 @@ function nameOf(v: VariantStatsItem): string {
  * A rate is printable only on email, only with a measured send count above
  * zero, and only with a measured reply count. A channel we cannot read is not
  * email: we can never claim a reply rate for a channel we do not know.
+ *
+ * It returns the send count the rate RESTS ON alongside it, so the tie-break
+ * below compares a narrowed number rather than re-reading a nullable field
+ * behind a `?? 0` that could silently mean "no sends" or "never reported".
  */
-function printableRate(v: VariantStatsItem): number | null {
+function printableRate(v: VariantStatsItem): { rate: number; sends: number } | null {
   if (v.channel !== "email") return null;
   if (v.sends === null || v.sends <= 0) return null;
   if (v.replies === null) return null;
-  return Math.round((v.replies / v.sends) * 100);
+  return { rate: Math.round((v.replies / v.sends) * 100), sends: v.sends };
 }
 
 export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
@@ -80,13 +82,16 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
   const email = variants.filter((v) => v.channel === "email");
   const other = variants.filter((v) => v.channel !== "email");
 
-  const measuredRows: ApproachRow[] = email.map((v) => {
-    const rate = printableRate(v);
+  // Measured ONCE. The rows, the collapsed best line and the honesty note all
+  // read the same computation rather than three copies of it that can drift.
+  const measured = email.map((v) => ({ v, rate: printableRate(v) }));
+
+  const measuredRows: ApproachRow[] = measured.map(({ v, rate }) => {
     return {
       key: v.key,
       name: nameOf(v),
       cells: [
-        rate === null ? DASH_CELL : { text: `${rate}%`, tone: "value" },
+        rate === null ? DASH_CELL : { text: `${rate.rate}%`, tone: "value" },
         numberCell(v.sends),
         numberCell(v.replies),
       ],
@@ -109,16 +114,15 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
 
   // The best MEASURED row: highest rate, ties broken by the better-evidenced
   // row (more sends), then by the order the API returned.
-  let best: { row: VariantStatsItem; rate: number } | null = null;
-  for (const v of email) {
-    const rate = printableRate(v);
+  let best: { row: VariantStatsItem; rate: number; sends: number } | null = null;
+  for (const { v, rate } of measured) {
     if (rate === null) continue;
     if (
       best === null ||
-      rate > best.rate ||
-      (rate === best.rate && (v.sends ?? 0) > (best.row.sends ?? 0))
+      rate.rate > best.rate ||
+      (rate.rate === best.rate && rate.sends > best.sends)
     ) {
-      best = { row: v, rate };
+      best = { row: v, rate: rate.rate, sends: rate.sends };
     }
   }
 
@@ -146,9 +150,8 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
     // R27, stated as an explicit condition so nobody "fixes" its absence later:
     // a table with no rates and no sends is not a table of small numbers, and
     // printing the note there would be the opposite of an honesty note.
-    honesty:
-      measuredRows.some((r) => r.cells[0].tone !== "dash")
-        ? "Rates are computed over small numbers of sends."
-        : null,
+    honesty: measured.some((m) => m.rate !== null)
+      ? "Rates are computed over small numbers of sends."
+      : null,
   };
 }

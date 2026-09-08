@@ -75,6 +75,12 @@ describe("Block D — the two groups, always", () => {
     // With no label the key is the only name there is.
     expect(out.groups[1].rows[0].name).toBe("orphan");
   });
+
+  it("names a row by its key when the label is an EMPTY string, not just null", () => {
+    const out = buildBlockD([variant({ key: "e1", label: "", channel: "email" })]);
+    if (out.kind !== "groups") throw new Error("expected groups");
+    expect(out.groups[0].rows[0].name).toBe("e1");
+  });
 });
 
 describe("Block D — the rate, recomputed and rationed", () => {
@@ -107,6 +113,31 @@ describe("Block D — the rate, recomputed and rationed", () => {
     if (out.kind !== "groups") throw new Error("expected groups");
     expect(out.groups[0].rows[0].cells[0]).toEqual({ text: "—", tone: "dash" });
     expect(out.groups[0].rows[0].cells[1]).toEqual({ text: "—", tone: "dash" });
+  });
+
+  it("rounds rather than floors — the deck's own 54/3 row reads 6%, not 5%", () => {
+    // 3/54 = 5.55…%. Math.floor would print 5% and the deck says 6%.
+    const out = buildBlockD([variant({ key: "e2", channel: "email", sends: 54, replies: 3 })]);
+    if (out.kind !== "groups") throw new Error("expected groups");
+    expect(out.groups[0].rows[0].cells[0]).toEqual({ text: "6%", tone: "value" });
+  });
+
+  it("prints no rate when replies never arrived, and dashes the replies cell too", () => {
+    const out = buildBlockD([variant({ key: "e1", channel: "email", sends: 72, replies: null })]);
+    if (out.kind !== "groups") throw new Error("expected groups");
+    expect(out.groups[0].rows[0].cells[0]).toEqual({ text: "—", tone: "dash" });
+    expect(out.groups[0].rows[0].cells[1]).toEqual({ text: "72", tone: "value" });
+    expect(out.groups[0].rows[0].cells[2]).toEqual({ text: "—", tone: "dash" });
+  });
+
+  it("REPORTS an impossible rate rather than repairing it — 10 replies to 5 sends is 200%", () => {
+    // A decision, not an oversight: clamping at 100% would hide a broken feed
+    // behind a plausible number. The page shows what ShikksTracker said, in
+    // both places it says it.
+    const out = buildBlockD([variant({ key: "e1", label: "Broken", channel: "email", sends: 5, replies: 10 })]);
+    if (out.kind !== "groups") throw new Error("expected groups");
+    expect(out.groups[0].rows[0].cells[0]).toEqual({ text: "200%", tone: "value" });
+    expect(out.collapsed).toEqual({ kind: "best", name: "Broken", rate: "200%" });
   });
 });
 

@@ -7,7 +7,7 @@
  * in its Block E rows. Do not "improve" them into curly quotes.
  */
 import { describe, it, expect } from "vitest";
-import { buildBlockE, GAP_DISPLAY_BOUND } from "@/lib/freelanceGaps";
+import { buildBlockE, gapCount, GAP_DISPLAY_BOUND } from "@/lib/freelanceGaps";
 import type { AttentionItem, OverdueActionItem } from "@/lib/stApi";
 
 const NOW = new Date("2026-09-05T12:00:00.000Z");
@@ -49,7 +49,8 @@ function overdue(over: Partial<OverdueActionItem> = {}): OverdueActionItem {
 
 function build(
   replies: AttentionItem[],
-  overdues: OverdueActionItem[],
+  // null = ShikksTracker did not report the overdue block at all (R51).
+  overdues: OverdueActionItem[] | null,
   live: string[] = []
 ) {
   return buildBlockE({
@@ -189,21 +190,93 @@ describe("Block E — channel labels", () => {
   });
 });
 
-describe("Block E — ordering, counting and the bound", () => {
-  it("puts replies before overdue follow-ups and keeps each feed's order", () => {
+describe("Block E — R53: longest wait first, across both feeds", () => {
+  it("orders by how long each row has waited, not by which feed it came from", () => {
     const out = build(
-      [reply({ contactId: "a", replyToLogId: "la" }), reply({ contactId: "b", replyToLogId: "lb" })],
-      [overdue({ contactId: "x" }), overdue({ contactId: "y" })]
+      [
+        reply({ contactId: "young", replyToLogId: "l-young", repliedAt: agoIso(4 * HOUR) }),
+        reply({ contactId: "older", replyToLogId: "l-older", repliedAt: agoIso(2 * DAY) }),
+      ],
+      [overdue({ contactId: "x", nextActionAt: agoIso(3 * DAY) })]
     );
     if (out.kind !== "rows") throw new Error("expected rows");
     expect(out.rows.map((r) => r.id)).toEqual([
-      "reply:la",
-      "reply:lb",
       "overdue:x",
-      "overdue:y",
+      "reply:l-older",
+      "reply:l-young",
     ]);
   });
 
+  it("sorts STABLY, so equal waits keep feed order — replies before overdues", () => {
+    const out = build(
+      [reply({ contactId: "r", replyToLogId: "l-r", repliedAt: agoIso(3 * DAY) })],
+      [overdue({ contactId: "o", nextActionAt: agoIso(3 * DAY) })]
+    );
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.rows.map((r) => r.id)).toEqual(["reply:l-r", "overdue:o"]);
+  });
+
+  it("keeps the amber class visible: 25 fresh replies cannot hide 3 old overdue rows", () => {
+    // The failure R53 exists to prevent: under a replies-first order the bound
+    // truncated the whole amber class, and `Showing 20 of 28.` read as if the
+    // 20 shown were representative.
+    const replies = Array.from({ length: 25 }, (_, i) =>
+      reply({ contactId: `c${i}`, replyToLogId: `log-${i}`, repliedAt: agoIso(4 * HOUR) })
+    );
+    const overdues = Array.from({ length: 3 }, (_, i) =>
+      overdue({ contactId: `o${i}`, nextActionAt: agoIso(3 * DAY) })
+    );
+    const out = build(replies, overdues);
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.count).toBe(28);
+    expect(out.bound).toBe("Showing 20 of 28.");
+    const shown = out.rows.map((r) => r.id);
+    expect(shown).toContain("overdue:o0");
+    expect(shown).toContain("overdue:o1");
+    expect(shown).toContain("overdue:o2");
+    expect(shown.slice(0, 3)).toEqual(["overdue:o0", "overdue:o1", "overdue:o2"]);
+  });
+
+  it("sorts an unparseable timestamp youngest, matching its `just now` reading", () => {
+    const out = build(
+      [
+        reply({ contactId: "broken", replyToLogId: "l-broken", repliedAt: "not-a-date" }),
+        reply({ contactId: "old", replyToLogId: "l-old", repliedAt: agoIso(2 * DAY) }),
+      ],
+      []
+    );
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.rows.map((r) => r.id)).toEqual(["reply:l-old", "reply:l-broken"]);
+  });
+});
+
+describe("Block E — R51: an unreported overdue feed is not a measured emptiness", () => {
+  it("says `ShikksTracker didn't report overdue follow-ups.`, never `Nothing waiting.`", () => {
+    expect(build([], null)).toEqual({
+      kind: "absent",
+      line: "ShikksTracker didn't report overdue follow-ups.",
+    });
+  });
+
+  it("carries the same sentence UNDER measured rows when the overdue feed is missing", () => {
+    const out = build([reply()], null);
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.count).toBe(1);
+    expect(out.absentNote).toBe("ShikksTracker didn't report overdue follow-ups.");
+  });
+
+  it("keeps `empty` for a REPORTED emptiness — both feeds answered, nothing survived", () => {
+    expect(build([], [])).toEqual({ kind: "empty", line: "Nothing waiting." });
+  });
+
+  it("carries no note when the overdue feed reported an empty list", () => {
+    const out = build([reply()], []);
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.absentNote).toBeNull();
+  });
+});
+
+describe("Block E — counting and the bound", () => {
   it("counts every gap, bounds the display at 20, and states what it did", () => {
     const many = Array.from({ length: 41 }, (_, i) =>
       reply({ contactId: `c${i}`, replyToLogId: `log-${i}` })
@@ -241,12 +314,113 @@ describe("Block E — ordering, counting and the bound", () => {
   });
 });
 
-describe("countGaps — the figure Block A's third card shares", () => {
+describe("Block E — the unvalidated boundary", () => {
+  it("suppresses regardless of channel: an instagram reply with a live anchor goes", () => {
+    // Suppression is about whether something else is already handling the
+    // reply, which has nothing to do with what channel it arrived on.
+    const out = build(
+      [reply({ channel: "instagram", replyToLogId: "log-ig" })],
+      [],
+      ["log-ig"]
+    );
+    expect(out).toEqual({ kind: "empty", line: "Nothing waiting." });
+  });
+
+  it("encodes a contact id with URL-significant characters", () => {
+    const out = build([reply({ contactId: "a/b?c", replyToLogId: "log-1" })], []);
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.rows[0].href).toBe("https://st.example.com/contacts/a%2Fb%3Fc");
+  });
+
+  it("reads an unparseable repliedAt as `just now` rather than as NaN", () => {
+    const out = build([reply({ repliedAt: "not-a-date" })], []);
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.rows[0].waiting).toBe("replied just now");
+  });
+
+  it("reads an unparseable nextActionAt as `just now` rather than as NaN", () => {
+    const out = build([], [overdue({ nextActionAt: "not-a-date" })]);
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.rows[0].waiting).toBe("follow-up due just now");
+  });
+
+  it("is `failed` when the reply feed is null even beside overdue rows", () => {
+    // The attention call is the whole read: a null reply feed means it failed,
+    // and rows from the other block cannot make a partial answer look whole.
+    const out = buildBlockE({
+      now: NOW,
+      repliedUnanswered: null,
+      overdueActions: [overdue()],
+      liveAnchorIds: new Set(),
+      contactsBaseUrl: CONTACTS_URL,
+    });
+    expect(out).toEqual({ kind: "failed", line: "Couldn't load what's waiting." });
+  });
+
+  it("treats an EMPTY snippet and an EMPTY note as no snippet, not as `\"\"`", () => {
+    const emptyReply = build([reply({ replySnippet: "" })], []);
+    if (emptyReply.kind !== "rows") throw new Error("expected rows");
+    expect(emptyReply.rows[0].snippet).toBeNull();
+
+    const emptyNote = build([], [overdue({ nextActionNote: "" })]);
+    if (emptyNote.kind !== "rows") throw new Error("expected rows");
+    expect(emptyNote.rows[0].snippet).toBeNull();
+  });
+
+  it("passes a `toString` channel through as a string — the labels are a Map", () => {
+    // An object literal read the prototype chain here: labelFor returned the
+    // function and the reason line printed its source.
+    const out = build([reply({ channel: "toString" })], []);
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.rows[0].channel).toBe("toString");
+    expect(out.rows[0].reason).toBe("Nothing drafts replies for toString.");
+    expect(out.rows[0].kind).toBe("unsupported-channel");
+  });
+});
+
+describe("gapCount — the figure Block A's third card shares", () => {
   it("is the computed gap count, never the raw feed length", () => {
     const out = build([reply({ replyToLogId: "log-1" }), reply({ contactId: "c2", replyToLogId: "log-2" })], [overdue()], ["log-1"]);
     if (out.kind !== "rows") throw new Error("expected rows");
     // Two replies in, one suppressed, one overdue: the feed had three rows and
     // the answer is two.
     expect(out.count).toBe(2);
+    expect(gapCount(out)).toBe(2);
+  });
+
+  it("is the PRE-SLICE total, so the hero counts what the bound hid", () => {
+    const many = Array.from({ length: 41 }, (_, i) =>
+      reply({ contactId: `c${i}`, replyToLogId: `log-${i}` })
+    );
+    const out = build(many, []);
+    expect(out.kind).toBe("rows");
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.rows).toHaveLength(20);
+    expect(gapCount(out)).toBe(41);
+  });
+
+  it("answers for all four kinds, and ONLY a measured emptiness is a zero", () => {
+    const failed = buildBlockE({
+      now: NOW,
+      repliedUnanswered: null,
+      overdueActions: null,
+      liveAnchorIds: new Set(),
+      contactsBaseUrl: CONTACTS_URL,
+    });
+    expect(failed.kind).toBe("failed");
+    expect(gapCount(failed)).toBeNull();
+
+    // R51: a claim of nothing may not rest on a feed that never arrived.
+    const absent = build([], null);
+    expect(absent.kind).toBe("absent");
+    expect(gapCount(absent)).toBeNull();
+
+    const empty = build([], []);
+    expect(empty.kind).toBe("empty");
+    expect(gapCount(empty)).toBe(0);
+
+    const rows = build([reply()], []);
+    expect(rows.kind).toBe("rows");
+    expect(gapCount(rows)).toBe(1);
   });
 });

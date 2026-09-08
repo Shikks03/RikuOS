@@ -15,10 +15,12 @@
  * Every string is quoted from the content deck. The snippet's quotation marks
  * are STRAIGHT, exactly as the deck writes them; do not change them to curly.
  *
- * Pure: no database, no network, and `now` is an argument.
+ * Pure: no database, no network, and `now` is an argument. R52 made that true
+ * at the module-graph level too: `isSupportedChannel`'s vocabulary now lives in
+ * a leaf module, so importing this file no longer registers a Mongoose model.
  */
 
-import { formatWaiting } from "@/lib/format";
+import { formatWaiting, msSince } from "@/lib/format";
 import { FAIL_LINES } from "@/lib/freelanceView";
 import { isSupportedChannel } from "@/lib/chaser";
 import type { AttentionItem, OverdueActionItem } from "@/lib/stApi";
@@ -26,13 +28,27 @@ import type { AttentionItem, OverdueActionItem } from "@/lib/stApi";
 /** The deck's `Showing 20 of 41.` */
 export const GAP_DISPLAY_BOUND = 20;
 
-/** The deck's four channel labels. */
-const CHANNEL_LABELS: Record<string, string> = {
-  email: "Email",
-  facebook: "Facebook",
-  instagram: "Instagram",
-  phone: "Phone",
-};
+/**
+ * The deck's `.fl-absent` sentence for an overdue feed that never arrived. It
+ * is deliberately NOT `Nothing waiting.` — an absence is not a measured
+ * emptiness (R51).
+ */
+const OVERDUE_ABSENT_LINE = "ShikksTracker didn't report overdue follow-ups.";
+
+/**
+ * The deck's four channel labels.
+ *
+ * A Map, not an object literal: `channel` is an unvalidated string straight
+ * from ShikksTracker, and an object literal reads the PROTOTYPE CHAIN —
+ * `labelFor("toString")` returned the function itself and the reason line
+ * printed its source.
+ */
+const CHANNEL_LABELS = new Map<string, string>([
+  ["email", "Email"],
+  ["facebook", "Facebook"],
+  ["instagram", "Instagram"],
+  ["phone", "Phone"],
+]);
 
 export type GapKind = "unsupported-channel" | "no-draft" | "overdue-followup";
 
@@ -51,15 +67,41 @@ export interface GapRow {
 }
 
 export type BlockE =
+  /** The attention call failed: nothing about what is waiting could be read. */
   | { kind: "failed"; line: string }
+  /**
+   * The reply feed loaded, no gap survived suppression, AND the overdue feed
+   * was not reported. The page must not claim nothing is waiting on the
+   * strength of a feed that never arrived (R51).
+   */
+  | { kind: "absent"; line: string }
+  /**
+   * Both feeds reported and nothing survived suppression — a measured zero,
+   * and today's real state.
+   */
   | { kind: "empty"; line: string }
-  | { kind: "rows"; count: number; rows: GapRow[]; bound: string | null };
+  /**
+   * Measured gaps. `absentNote` carries the same "didn't report" sentence when
+   * the overdue feed was missing: these rows are real, and the true total may
+   * be higher than the count beside them.
+   */
+  | {
+      kind: "rows";
+      count: number;
+      rows: GapRow[];
+      bound: string | null;
+      /** .fl-absent — the overdue feed NEVER ARRIVED. */
+      absentNote: string | null;
+    };
 
 export interface BlockEInput {
   now: Date;
   /** null = the attention call failed. */
   repliedUnanswered: AttentionItem[] | null;
-  /** null = the call failed, or the API omitted the block. */
+  /**
+   * null = the API omitted the block. A failed call fails the whole read
+   * through `repliedUnanswered`, so this null only ever means "not reported".
+   */
   overdueActions: OverdueActionItem[] | null;
   liveAnchorIds: Set<string>;
   /** ShikksTracker's contacts route, built server-side; the id is appended. */
@@ -68,12 +110,11 @@ export interface BlockEInput {
 
 /** An unparseable timestamp reads as `just now` rather than as NaN on the page. */
 function waitedMs(now: Date, iso: string): number {
-  const then = new Date(iso).getTime();
-  return Number.isNaN(then) ? 0 : now.getTime() - then;
+  return msSince(now, iso) ?? 0;
 }
 
 function labelFor(channel: string): string {
-  return CHANNEL_LABELS[channel] ?? channel;
+  return CHANNEL_LABELS.get(channel) ?? channel;
 }
 
 export function buildBlockE(input: BlockEInput): BlockE {
@@ -83,7 +124,9 @@ export function buildBlockE(input: BlockEInput): BlockE {
     return { kind: "failed", line: FAIL_LINES.needsYou };
   }
 
-  const rows: GapRow[] = [];
+  // The waited milliseconds ride ALONGSIDE each row rather than inside it:
+  // GapRow is what Plan C renders, and `waiting` is already the rendered form.
+  const measured: { row: GapRow; waited: number }[] = [];
 
   for (const item of repliedUnanswered) {
     // Suppress FIRST. A reply already carrying a live ApprovalItem belongs to
@@ -92,39 +135,70 @@ export function buildBlockE(input: BlockEInput): BlockE {
 
     const supported = isSupportedChannel(item.channel);
     const label = labelFor(item.channel);
-    rows.push({
-      // The anchor is the stable identity where there is one; a reply with no
-      // anchor can never be drafted, so its contact id is the next best key.
-      id: `reply:${item.replyToLogId || item.contactId}`,
-      kind: supported ? "no-draft" : "unsupported-channel",
-      businessName: item.businessName,
-      href: `${contactsBaseUrl}/${encodeURIComponent(item.contactId)}`,
-      channel: label,
-      waiting: `replied ${formatWaiting(waitedMs(now, item.repliedAt))}`,
-      waitingIsStale: false,
-      snippet: item.replySnippet ? `"${item.replySnippet}"` : null,
-      reason: supported ? "No draft in the queue." : `Nothing drafts replies for ${label}.`,
+    const waited = waitedMs(now, item.repliedAt);
+    measured.push({
+      waited,
+      row: {
+        // The anchor is the stable identity where there is one; a reply with no
+        // anchor can never be drafted, so its contact id is the next best key.
+        id: `reply:${item.replyToLogId || item.contactId}`,
+        kind: supported ? "no-draft" : "unsupported-channel",
+        businessName: item.businessName,
+        href: `${contactsBaseUrl}/${encodeURIComponent(item.contactId)}`,
+        channel: label,
+        waiting: `replied ${formatWaiting(waited)}`,
+        waitingIsStale: false,
+        snippet: item.replySnippet ? `"${item.replySnippet}"` : null,
+        reason: supported ? "No draft in the queue." : `Nothing drafts replies for ${label}.`,
+      },
     });
   }
 
-  for (const item of overdueActions ?? []) {
-    rows.push({
-      id: `overdue:${item.contactId}`,
-      kind: "overdue-followup",
-      businessName: item.businessName,
-      href: `${contactsBaseUrl}/${encodeURIComponent(item.contactId)}`,
-      // Inapplicable rather than unmeasured, so no tag and no em-dash.
-      channel: null,
-      waiting: `follow-up due ${formatWaiting(waitedMs(now, item.nextActionAt))}`,
-      waitingIsStale: true,
-      // The note sits in the snippet register, unquoted — it is Riku's own note
-      // to himself, not somebody's words.
-      snippet: item.nextActionNote,
-      reason: null,
-    });
+  // An absence, never an emptiness: the feed was not reported, so there is no
+  // count of overdue follow-ups to add and none to claim is zero (R51).
+  const overdueAbsent = overdueActions === null;
+
+  if (overdueActions !== null) {
+    for (const item of overdueActions) {
+      const waited = waitedMs(now, item.nextActionAt);
+      measured.push({
+        waited,
+        row: {
+          id: `overdue:${item.contactId}`,
+          kind: "overdue-followup",
+          businessName: item.businessName,
+          href: `${contactsBaseUrl}/${encodeURIComponent(item.contactId)}`,
+          // Inapplicable rather than unmeasured, so no tag and no em-dash.
+          channel: null,
+          waiting: `follow-up due ${formatWaiting(waited)}`,
+          // ShikksTracker's classification, not ours — the feed it came from is
+          // named "overdue". A nextActionAt still in the future (a clock skew,
+          // or a note rescheduled after the feed was built) therefore still
+          // reads amber; we do not second-guess the sender's own label.
+          waitingIsStale: true,
+          // The note sits in the snippet register, unquoted — it is Riku's own
+          // note to himself, not somebody's words. An empty note is no note.
+          snippet: item.nextActionNote || null,
+          reason: null,
+        },
+      });
+    }
   }
+
+  // R53: longest wait first, across both feeds. Array.prototype.sort is stable,
+  // so equal waits keep feed order (replies before overdue follow-ups). The
+  // bound below then truncates the YOUNGEST rows — without this, 25 fresh reply
+  // gaps would hide the whole amber class behind `Showing 20 of 28.`, which
+  // reads as if the 20 were representative.
+  measured.sort((a, b) => b.waited - a.waited);
+  const rows = measured.map((m) => m.row);
 
   if (rows.length === 0) {
+    if (overdueAbsent) {
+      // The reply feed reported nothing; the overdue feed reported nothing at
+      // all. That is an absence, not today's state (R51).
+      return { kind: "absent", line: OVERDUE_ABSENT_LINE };
+    }
     // Today's state. It must look intentional rather than like a failure, which
     // is why it is a sentence and not a 0.
     return { kind: "empty", line: "Nothing waiting." };
@@ -138,5 +212,32 @@ export function buildBlockE(input: BlockEInput): BlockE {
       rows.length > GAP_DISPLAY_BOUND
         ? `Showing ${GAP_DISPLAY_BOUND} of ${rows.length}.`
         : null,
+    absentNote: overdueAbsent ? OVERDUE_ABSENT_LINE : null,
   };
+}
+
+/**
+ * The ONE bridge to Block A's third card (§4.1: the same computed count Block E
+ * renders, never a raw feed length).
+ *
+ * A MEASURED count is a real number of things waiting on Riku even when the
+ * overdue feed was missing — the note under the rows says the total may be
+ * higher, and the card is not lying about the rows that exist. It is a claim of
+ * NOTHING that may not rest on an absence, so `absent` answers null and the
+ * hero reads "didn't report" rather than "Nothing waiting on you."
+ *
+ * No `default` on purpose: with `strict` on, TypeScript rejects this function
+ * the day a fifth kind arrives without a decision about what the hero says.
+ */
+export function gapCount(block: BlockE): number | null {
+  switch (block.kind) {
+    case "failed":
+      return null;
+    case "absent":
+      return null;
+    case "empty":
+      return 0;
+    case "rows":
+      return block.count;
+  }
 }

@@ -63,6 +63,21 @@ export function formatWaiting(ms: number): string {
   return `${weeks} ${pluralise(weeks, "week")} ago`;
 }
 
+/**
+ * The parse step every "how long ago" reading shares.
+ *
+ * It returns the RAW difference — a future timestamp comes back negative — and
+ * it does not clamp, because the caller decides what an unreadable or a future
+ * timestamp means at its own boundary: `formatWaiting` reads both as
+ * `just now`, `formatAge` reads a skew as `0h`, and Block F's health strip
+ * calls an unreadable stamp a finding of its own.
+ */
+export function msSince(now: Date, iso: string): number | null {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  return now.getTime() - then;
+}
+
 export type CellTone = "value" | "zero" | "dash";
 
 export interface Cell {
@@ -74,6 +89,9 @@ export interface Cell {
 /** The em-dash for every absence in the app, exported so there is exactly one. */
 export const DASH = "—";
 
+/** The one em-dash cell, shared by every table on the page. */
+export const DASH_CELL: Cell = { text: DASH, tone: "dash" };
+
 /**
  * The page's central correctness rule in four lines: `0` is a measurement and
  * `—` is an absence, and rendering both the same way is a bug rather than a
@@ -82,7 +100,7 @@ export const DASH = "—";
 export function numberCell(value: number | null): Cell {
   // A non-finite number is an absence too: the function whose one job is
   // keeping a measurement apart from a non-measurement must not print `NaN`.
-  if (value === null || !Number.isFinite(value)) return { text: DASH, tone: "dash" };
+  if (value === null || !Number.isFinite(value)) return DASH_CELL;
   if (value === 0) return { text: "0", tone: "zero" };
   return { text: String(value), tone: "value" };
 }
