@@ -11,8 +11,8 @@ import {
   CHASER_MAX_PER_RUN,
 } from "@/lib/chaser";
 import type { SkippedLead } from "@/lib/chaser";
+import { fetchLiveAnchorIds } from "@/lib/queue";
 import { buildPushPayload, sendPushToAll } from "@/lib/push";
-import ApprovalItem from "@/models/ApprovalItem";
 import AgentRun from "@/models/AgentRun";
 import FollowupDraftApproval from "@/models/approvals/FollowupDraftApproval";
 
@@ -71,22 +71,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Idempotency, query layer (P4-e). The unique partial index on
     // { payload.replyToLogId } where status is "pending" is the atomic backstop
-    // under this; the E11000 catch below turns a lost race into a skip.
+    // under this; the E11000 catch below turns a lost race into a skip. The
+    // query itself lives in queue.ts because the Freelance page asks the same
+    // question, and the two must never disagree about the same lead.
     const anchors = attention.repliedUnanswered.map((i) => i.replyToLogId).filter(Boolean);
-    const liveAnchorIds = new Set<string>();
-    if (anchors.length > 0) {
-      const live = await ApprovalItem.find({
-        type: "followup-draft",
-        status: { $in: ["pending", "approved", "edited_approved"] },
-        "payload.replyToLogId": { $in: anchors },
-      })
-        .select({ payload: 1 })
-        .limit(CHASER_ATTENTION_LIMIT)
-        .lean();
-      for (const doc of live as unknown as { payload?: { replyToLogId?: string } }[]) {
-        if (doc.payload?.replyToLogId) liveAnchorIds.add(doc.payload.replyToLogId);
-      }
-    }
+    const liveAnchorIds = await fetchLiveAnchorIds(anchors);
 
     const plan = planChaserRun(
       attention.repliedUnanswered,

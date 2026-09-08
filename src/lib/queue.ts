@@ -427,3 +427,52 @@ export async function runApprovalAction(item: IApprovalItemBase): Promise<void> 
   const record = buildActionOutcomeUpdate(outcome, new Date());
   await ApprovalItem.updateOne({ _id: claimed._id, ...record.filter }, record.update);
 }
+
+/** The three statuses that mean "this reply is already being handled". */
+export const LIVE_APPROVAL_STATUSES = ["pending", "approved", "edited_approved"] as const;
+
+/** The shape of ApprovalItem.find this function needs; injected so it is testable. */
+type AnchorFinder = (filter: Record<string, unknown>) => {
+  select: (projection: Record<string, number>) => {
+    limit: (n: number) => { lean: () => Promise<unknown[]> };
+  };
+};
+
+/**
+ * Which of these reply anchors already carry a live ApprovalItem.
+ *
+ * TWO CONSUMERS, ONE QUERY, DELIBERATELY. The chaser uses it as idempotency —
+ * ShikksTracker keeps proposing a lead until a draft exists THERE, i.e. until
+ * Riku approves, so between creation and approval the same lead returns every
+ * day. The Freelance page uses it as suppression — a reply that already has a
+ * drafted follow-up belongs to /queue, and repeating it in "Needs you" would
+ * make both lists untrustworthy.
+ *
+ * If the two ever queried different status lists they would disagree about the
+ * same lead. That is why this is one function and not two copies.
+ *
+ * Callers must have connectDB()'d already, matching the rest of the lib layer.
+ */
+export async function fetchLiveAnchorIds(
+  anchors: string[],
+  find: AnchorFinder = ((filter: Record<string, unknown>) =>
+    ApprovalItem.find(filter)) as unknown as AnchorFinder
+): Promise<Set<string>> {
+  const live = new Set<string>();
+  // An empty $in matches nothing, so the round trip would be pure cost.
+  if (anchors.length === 0) return live;
+
+  const docs = await find({
+    type: "followup-draft",
+    status: { $in: [...LIVE_APPROVAL_STATUSES] },
+    "payload.replyToLogId": { $in: anchors },
+  })
+    .select({ payload: 1 })
+    .limit(anchors.length)
+    .lean();
+
+  for (const doc of docs as { payload?: { replyToLogId?: string } }[]) {
+    if (doc?.payload?.replyToLogId) live.add(doc.payload.replyToLogId);
+  }
+  return live;
+}
