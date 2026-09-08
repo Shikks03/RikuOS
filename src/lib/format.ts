@@ -71,6 +71,9 @@ export interface Cell {
   tone: CellTone;
 }
 
+/** The em-dash for every absence on the page, exported so there is exactly one. */
+export const DASH = "—";
+
 /**
  * The page's central correctness rule in four lines: `0` is a measurement and
  * `—` is an absence, and rendering both the same way is a bug rather than a
@@ -79,7 +82,7 @@ export interface Cell {
 export function numberCell(value: number | null): Cell {
   // A non-finite number is an absence too: the function whose one job is
   // keeping a measurement apart from a non-measurement must not print `NaN`.
-  if (value === null || !Number.isFinite(value)) return { text: "—", tone: "dash" };
+  if (value === null || !Number.isFinite(value)) return { text: DASH, tone: "dash" };
   if (value === 0) return { text: "0", tone: "zero" };
   return { text: String(value), tone: "value" };
 }

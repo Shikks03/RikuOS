@@ -22,13 +22,10 @@
  * ShikksTracker URLs are passed in, so ST_API_BASE_URL never reaches a client.
  */
 
-import { numberCell, pluralise } from "@/lib/format";
+import { DASH, numberCell, pluralise } from "@/lib/format";
 import type { Cell } from "@/lib/format";
 import { PIPELINE_STAGES } from "@/lib/stApi";
 import type { PipelineStage, SummaryCampaign, SummaryContacts, SummaryQueue } from "@/lib/stApi";
-
-/** The em-dash used for every absence on the page. */
-const DASH = "—";
 
 /**
  * The per-block failure sentences, exported so Plan C's page renders them from
@@ -86,9 +83,13 @@ export interface BlockAInput {
   draftsUrl: string;
 }
 
-/** A field that is zero or was never reported. Both are "nothing to say". */
-function zeroOrAbsent(value: number | null): boolean {
-  return value === null || value === 0;
+/**
+ * Only a MEASURED zero has nothing to say. An absence is not a zero: its card
+ * already reads "didn't report" or "couldn't load", and a claim that nothing
+ * is waiting cannot rest on a number that never arrived (R50).
+ */
+function isMeasuredZero(value: number | null): boolean {
+  return value === 0;
 }
 
 function draftsCard(drafts: number | null, draftsUrl: string): StatCard {
@@ -174,11 +175,12 @@ export function buildBlockA(input: BlockAInput): BlockA {
   const lines: SayLine[] = [];
 
   // The whole-block fallback. It fires ONLY when drafts, approved,
-  // never-contacted AND the needs-you count are all zero or absent (R35) —
-  // never under a lit card. The needs-you count is in the condition because
-  // without it the page could print `Nothing waiting on you.` directly beneath
-  // an amber card reading `3 / waiting on you`, which is a contradiction on one
-  // screen. A null count is an absence, and an absence is not something waiting.
+  // never-contacted AND the needs-you count are all MEASURED zeros. R35 added
+  // the fourth term so it never prints under a lit amber card reading
+  // `3 / waiting on you`, which would be a contradiction on one screen; R50
+  // made every term a measurement so it never prints under a blank card either,
+  // where the card beside it already says ShikksTracker didn't report and the
+  // line would be resting on a number that never arrived.
   // The hero cards still render, drained.
   //
   // `Sending is off` (the deck's A4) is NOT here: GET /api/os/summary does not
@@ -186,10 +188,10 @@ export function buildBlockA(input: BlockAInput): BlockA {
   // repo. It renders nothing today — no drained slot, no placeholder — and
   // nothing infers the switch state from behaviour.
   if (
-    zeroOrAbsent(queue.drafts) &&
-    zeroOrAbsent(queue.approved) &&
-    zeroOrAbsent(notStarted) &&
-    zeroOrAbsent(needsYouCount)
+    isMeasuredZero(queue.drafts) &&
+    isMeasuredZero(queue.approved) &&
+    isMeasuredZero(notStarted) &&
+    isMeasuredZero(needsYouCount)
   ) {
     lines.push({ figure: null, text: "Nothing waiting on you." });
     return { cards, lines };
@@ -304,7 +306,9 @@ export function buildBlockB(contacts: SummaryContacts | null): BlockB {
 /**
  * Settled by the deck's own `Showing 20 of 34 campaigns.` The endpoint's own
  * ceiling is 50 (fetchSummary sends no `limit`), so `count` understates past
- * that — recorded in stApi.ts rather than defended against.
+ * that — recorded in stApi.ts rather than defended against. Since Batch 1
+ * `fetchSummary` also drops a campaign row with no id, so `count` is the number
+ * of campaigns this page can show, not the raw feed length.
  */
 export const CAMPAIGN_DISPLAY_BOUND = 20;
 
@@ -355,10 +359,7 @@ export function buildBlockC(campaigns: SummaryCampaign[] | null): BlockC {
     // the body face and never mono caps.
     bound:
       campaigns.length > CAMPAIGN_DISPLAY_BOUND
-        ? `Showing ${CAMPAIGN_DISPLAY_BOUND} of ${campaigns.length} ${pluralise(
-            campaigns.length,
-            "campaign"
-          )}.`
+        ? `Showing ${CAMPAIGN_DISPLAY_BOUND} of ${campaigns.length} campaigns.`
         : null,
     // Unconditional, unlike Block D's note: these counts always come from
     // tracking pixels, whatever the numbers are.

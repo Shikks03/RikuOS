@@ -8,7 +8,7 @@
  * on the page, not as a crash.
  */
 import { describe, it, expect } from "vitest";
-import { formatAge, formatWaiting, pluralise, numberCell } from "@/lib/format";
+import { formatAge, formatWaiting, pluralise, numberCell, DASH } from "@/lib/format";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -80,6 +80,10 @@ describe("pluralise", () => {
 });
 
 describe("numberCell", () => {
+  it("uses the one exported em-dash, so the glyph is pinned in a single place", () => {
+    expect(DASH).toBe("—");
+  });
+
   it("distinguishes a measured zero from an absence — the page's core rule", () => {
     expect(numberCell(0)).toEqual({ text: "0", tone: "zero" });
     expect(numberCell(null)).toEqual({ text: "—", tone: "dash" });

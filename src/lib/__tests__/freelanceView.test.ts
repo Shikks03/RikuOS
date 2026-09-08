@@ -7,11 +7,11 @@
  *
  * The load-bearing assertion in this file is the one about
  * `Nothing waiting on you.` — it must fire only when drafts, approved,
- * never-contacted AND the needs-you count are ALL zero or absent (R35), never
- * under a lit card.
+ * never-contacted AND the needs-you count are ALL measured zeros (R35, R50) —
+ * never under a lit card, never under a blank one.
  */
 import { describe, it, expect } from "vitest";
-import { buildBlockA, buildBlockB, buildBlockC } from "@/lib/freelanceView";
+import { buildBlockA, buildBlockB, buildBlockC, CAMPAIGN_DISPLAY_BOUND } from "@/lib/freelanceView";
 import { PIPELINE_STAGES } from "@/lib/stApi";
 import type { SummaryCampaign, SummaryContacts, SummaryQueue } from "@/lib/stApi";
 
@@ -150,6 +150,23 @@ describe("Block A — the contacts card", () => {
     expect(c.trackPercent).toBeNull();
   });
 
+  it("clamps the track at 100 when the feed reports more never-contacted than contacts", () => {
+    // Contract garbage from ShikksTracker is reported, not repaired: the figure
+    // stays 40, and only the track — which is a shape, not a fact — is clamped.
+    const c = card(
+      blockA({
+        contacts: contacts({
+          total: 10,
+          byPipelineStage: { ...contacts().byPipelineStage, not_started: 40 },
+        }),
+      }),
+      "contacts"
+    );
+    expect(c.trackPercent).toBe(100);
+    expect(c.tone).toBe("plain");
+    expect(c.figure).toBe("40");
+  });
+
   it("blanks with no track when the block, the total or the stage did not arrive", () => {
     for (const over of [
       { contacts: null },
@@ -213,7 +230,7 @@ describe("Block A — the statement lines", () => {
     expect(texts.join(" ")).not.toContain("Sending");
   });
 
-  it("says `Nothing waiting on you.` only when all four are zero or absent", () => {
+  it("says `Nothing waiting on you.` only when all four are measured zeros (R50)", () => {
     const all = blockA({
       queue: queue({ drafts: 0, approved: 0 }),
       contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
@@ -226,7 +243,35 @@ describe("Block A — the statement lines", () => {
       contacts: null,
       needsYouCount: null,
     });
-    expect(absent.lines).toEqual([{ figure: null, text: "Nothing waiting on you." }]);
+    expect(absent.lines).toEqual([]);
+  });
+
+  it("stays silent when any count never arrived, even beside three zeros (R50)", () => {
+    // The absence is the point of each probe: the card beside the line already
+    // reads `—` and says ShikksTracker didn't report, so a summary claiming
+    // nothing is waiting would rest on a number that never arrived.
+    const stageAbsent = blockA({
+      queue: queue({ drafts: 0, approved: 0 }),
+      contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: null } }),
+      needsYouCount: 0,
+    });
+    expect(stageAbsent.lines).toEqual([]);
+    expect(card(stageAbsent, "contacts").tone).toBe("blank");
+
+    const blockAbsent = blockA({
+      queue: queue({ drafts: 0, approved: 0 }),
+      contacts: null,
+      needsYouCount: 0,
+    });
+    expect(blockAbsent.lines).toEqual([]);
+
+    const countAbsent = blockA({
+      queue: queue({ drafts: 0, approved: 0 }),
+      contacts: contacts({ byPipelineStage: { ...contacts().byPipelineStage, not_started: 0 } }),
+      needsYouCount: null,
+    });
+    expect(countAbsent.lines).toEqual([]);
+    expect(card(countAbsent, "needs-you").tone).toBe("blank");
   });
 
   it("never says it beside a lit needs-you card (R35)", () => {
@@ -348,6 +393,46 @@ describe("Block B — the pipeline", () => {
     expect(out.rows.some((r) => r.key === "won")).toBe(false);
   });
 
+  it("keeps pipeline order whatever order the keys arrive in", () => {
+    // The rows follow PIPELINE_STAGES, never the JSON's key order: a feed that
+    // serialised `lost` first must not put Lost at the top of the pipeline.
+    const out = b({
+      byPipelineStage: {
+        lost: 0,
+        replied: 2,
+        won: 0,
+        not_started: 25,
+        proposal_sent: 0,
+        contacted: 3,
+        call_booked: 0,
+      },
+    });
+    if (out.kind !== "stages") throw new Error("expected stages");
+    expect(out.rows.map((r) => r.key)).toEqual(["not_started", "contacted", "replied"]);
+  });
+
+  it("returns stages with no rows when every stage is absent but the total arrived", () => {
+    // A measured total with no measured stage is not an emptiness and not a
+    // failure: the summary line is true, there is simply nothing to list.
+    const out = b({
+      total: 30,
+      hot: 2,
+      byPipelineStage: {
+        not_started: null,
+        contacted: null,
+        replied: null,
+        call_booked: null,
+        proposal_sent: null,
+        won: null,
+        lost: null,
+      },
+    });
+    if (out.kind !== "stages") throw new Error("expected stages");
+    expect(out.rows).toEqual([]);
+    expect(out.emptyNote).toBeNull();
+    expect(out.absentNote).toBe("ShikksTracker didn't report every pipeline stage.");
+  });
+
   it("says `No contacts yet.` at a measured total of zero", () => {
     const zeroed = Object.fromEntries(PIPELINE_STAGES.map((s) => [s, 0]));
     const out = b({ total: 0, hot: 0, byPipelineStage: zeroed as never });
@@ -395,15 +480,18 @@ describe("Block C — campaigns", () => {
     expect(cells[3]).toEqual({ text: "—", tone: "dash" });
   });
 
-  it("sorts by Sent, highest first, with unmeasured rows last and ties left in feed order", () => {
+  it("sorts by Sent, highest first, with a measured zero above an unmeasured sent, unmeasured last, ties in feed order", () => {
     const out = buildBlockC([
       row({ id: "a", name: "A", sent: 5 }),
       row({ id: "b", name: "B", sent: null }),
       row({ id: "c", name: "C", sent: 142 }),
       row({ id: "d", name: "D", sent: 5 }),
+      row({ id: "z", name: "Z", sent: 0 }),
     ]);
     if (out.kind !== "table") throw new Error("expected table");
-    expect(out.rows.map((r) => r.id)).toEqual(["c", "a", "d", "b"]);
+    // `z` sent nothing and `b` never said: a measured zero is still a number,
+    // so it outranks the row that is no number at all.
+    expect(out.rows.map((r) => r.id)).toEqual(["c", "a", "d", "z", "b"]);
   });
 
   it("bounds the display at 20 and states what it did, in sentence case", () => {
@@ -417,7 +505,17 @@ describe("Block C — campaigns", () => {
     expect(out.bound).toBe("Showing 20 of 34 campaigns.");
   });
 
-  it("goes singular in the bound statement when exactly 21 exist", () => {
+  it("states no bound at exactly twenty, and the bound is twenty", () => {
+    const many = Array.from({ length: 20 }, (_, i) => row({ id: `c${i}`, sent: 100 - i }));
+    const out = buildBlockC(many);
+    if (out.kind !== "table") throw new Error("expected table");
+    expect(out.bound).toBeNull();
+    expect(out.count).toBe(20);
+    expect(out.rows).toHaveLength(20);
+    expect(CAMPAIGN_DISPLAY_BOUND).toBe(20);
+  });
+
+  it("states the bound at twenty-one, the first count that exceeds it", () => {
     const many = Array.from({ length: 21 }, (_, i) => row({ id: `c${i}`, sent: 100 - i }));
     const out = buildBlockC(many);
     if (out.kind !== "table") throw new Error("expected table");
