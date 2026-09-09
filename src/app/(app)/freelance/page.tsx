@@ -5,6 +5,7 @@ import { readOsSettings } from "@/lib/osSettings";
 import type { OsSettingsValues } from "@/lib/osSettings";
 import { getHealthSnapshot } from "@/lib/healthSnapshot";
 import type { StoredHealth } from "@/lib/healthSnapshot";
+import { fetchLiveAnchorIds } from "@/lib/queue";
 import { AGENT_STALE_HOURS } from "@/lib/watchdog";
 import { evaluateOutreach } from "@/lib/outreachHealth";
 import {
@@ -13,11 +14,15 @@ import {
   fetchAttention,
   fetchSummary,
   fetchVariantStats,
+  readStConfig,
 } from "@/lib/stApi";
-import { FAIL_LINES } from "@/lib/freelanceView";
+import { FAIL_LINES, buildBlockA } from "@/lib/freelanceView";
+import { buildBlockE, needsYouFigure } from "@/lib/freelanceGaps";
 import { buildHealthStrip } from "@/lib/freelanceHealth";
 import { OS_SETTINGS_DEFAULTS } from "@/models/OsSettings";
 import HealthStrip from "./_blocks/HealthStrip";
+import HeroRow from "./_blocks/HeroRow";
+import StateOfPlay from "./_blocks/StateOfPlay";
 
 /**
  * Every figure on this page is "what is true right now", so there is nothing to
@@ -74,6 +79,18 @@ async function readLocal(): Promise<{ settings: OsSettingsValues; stored: Stored
 export default async function FreelancePage() {
   const now = new Date();
 
+  // The two ShikksTracker URLs are built HERE, server-side, and passed down as
+  // plain strings. ST_API_BASE_URL never reaches a client bundle and no view
+  // model reads an environment variable. A missing config throws, and the three
+  // calls in phase 2 would throw for the same reason, so the page lands in its
+  // whole-page-down state and the links never render.
+  let baseUrl = "";
+  try {
+    baseUrl = readStConfig().baseUrl;
+  } catch {
+    // Left empty on purpose; see above.
+  }
+
   // --- Phase 1: the local reads, in ONE try/catch ---------------------------
   //
   // A database failure must never blank the route. It degrades exactly four
@@ -95,6 +112,7 @@ export default async function FreelancePage() {
   // (R56). Rendering the second as `sites never checked` would be the strip
   // claiming to have seen something it never saw.
   let snapshot: StoredHealth | null | "unread" = null;
+  let dbOk = false;
   try {
     const { settings, stored } = await withDeadline(
       readLocal(),
@@ -104,6 +122,7 @@ export default async function FreelancePage() {
     chaserNDays = settings.chaserNDays;
     monitoringEnabled = settings.monitoringEnabled;
     snapshot = stored;
+    dbOk = true;
   } catch (err) {
     snapshot = "unread";
     console.error("[freelance] local reads failed:", err);
@@ -127,12 +146,74 @@ export default async function FreelancePage() {
   const attention = settled(attentionResult, "attention");
   const variants = settled(variantsResult, "variant stats");
 
+  // --- Phase 3: the gap read, which needs both ------------------------------
+  //
+  // fetchLiveAnchorIds is the query the chaser uses for idempotency and this
+  // page uses for suppression. Its own try/catch, because it can only run after
+  // phase 2 and a failure here means one thing: the gap list is unavailable.
+  //
+  // Bounded like phase 1, and for the same reason: this is a second Mongo read
+  // on the same request, and Mongoose has no per-call timeout. A timeout lands
+  // in the catch below, which already produces a designed state — liveAnchorIds
+  // stays null and Block E says `Couldn't load what's waiting.` (R63).
+  //
+  // No .filter(Boolean) on the ids: AttentionItem.replyToLogId is a required
+  // string, so it narrowed nothing and only ever dropped empty strings, which
+  // fetchLiveAnchorIds ignores anyway.
+  let liveAnchorIds: Set<string> | null = null;
+  if (attention !== null) {
+    if (dbOk) {
+      try {
+        liveAnchorIds = await withDeadline(
+          fetchLiveAnchorIds(attention.repliedUnanswered.map((item) => item.replyToLogId)),
+          MONGO_READ_TIMEOUT_MS,
+          "freelance anchor read"
+        );
+      } catch (err) {
+        console.error("[freelance] live-anchor read failed:", err);
+      }
+    }
+  }
+
   // --- The view models ------------------------------------------------------
   //
   // Only the strip is built here. Phase 3 and the five block builders arrive in
   // Tasks 3 to 6, each in the task that renders it, so no commit in this plan
   // ever leaves a computed value without a consumer (R47's principle, ruled for
   // Plan C on 2026-09-09).
+
+  const blockE = buildBlockE({
+    now,
+    // A gap list built without the suppression set would repeat leads that
+    // already have a draft in /queue, which is the one thing this block must
+    // never do — so a failed anchor read reads as "couldn't load", not as an
+    // unsuppressed list.
+    //
+    // Written as a two-sided test rather than `liveAnchorIds === null ? null :
+    // attention!.repliedUnanswered`: both halves ARE the precondition, and
+    // saying both lets the compiler narrow `attention` instead of being told to
+    // trust an assertion it cannot check (N8).
+    repliedUnanswered:
+      attention !== null && liveAnchorIds !== null ? attention.repliedUnanswered : null,
+    overdueActions: attention?.overdueActions ?? null,
+    liveAnchorIds: liveAnchorIds ?? new Set<string>(),
+    contactsBaseUrl: `${baseUrl}/contacts`,
+  });
+
+  const blockA = buildBlockA({
+    queue: summary?.queue ?? { drafts: null, approved: null },
+    contacts: summary?.contacts ?? null,
+    // Block A's third card renders the SAME figure Block E renders, by
+    // construction rather than by coincidence. This is an IMPORT, not a
+    // ternary: the inline `rows ? count : empty ? 0 : null` this replaced
+    // collapsed `failed` and `absent` into one null, and the card then said
+    // `couldn't load` above a block saying `didn't report` — two registers
+    // disagreeing on one screen (R54). needsYouFigure is an exhaustive switch,
+    // so a fifth Block E kind is a compile error here rather than a silent
+    // fourth reading.
+    needsYou: needsYouFigure(blockE),
+    draftsUrl: `${baseUrl}/review`,
+  });
 
   const strip = buildHealthStrip({
     now,
@@ -160,7 +241,14 @@ export default async function FreelancePage() {
               <div className="because">{FAIL_LINES.page.because}</div>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <>
+            <div className="fl-body">
+              <HeroRow cards={blockA.cards} />
+              <StateOfPlay lines={blockA.lines} />
+            </div>
+          </>
+        )}
 
         <HealthStrip strip={strip} />
       </div>

@@ -97,7 +97,7 @@ export type BlockE =
 
 export interface BlockEInput {
   now: Date;
-  /** null = the attention call failed. */
+  /** null = the attention call failed, or the suppression set could not be read. */
   repliedUnanswered: AttentionItem[] | null;
   /**
    * null = the API omitted the block. A failed call fails the whole read
