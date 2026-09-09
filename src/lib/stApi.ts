@@ -318,7 +318,9 @@ async function readErrorMessage(res: Response): Promise<string> {
  * and 500s the whole Freelance route — the failure the block's four degradation
  * registers exist to forbid. This is the same rule fetchSummary applies to a
  * campaign `id` and fetchVariantStats to a variant `key`; the attention feed
- * was the one of the three that cast its payload instead.
+ * was the one of the three that cast its payload instead. The parity is per
+ * BLOCK as well as per row: like fetchVariantStats, a body without the array
+ * is a thrown contract error here, never an empty list (R75).
  *
  * It FILTERS and never reconstructs, unlike those two: the chaser consumes the
  * other fields of these same rows (keyPoints, offerSummary, toneNotes, the
@@ -395,9 +397,42 @@ export async function fetchAttention(
   // The cast describes the contract; the guards are what the values have to
   // earn. Each array is read as `unknown[]` so the predicates do real work.
   const parsed = (await res.json()) as Partial<AttentionResponse>;
-  const replied = (
-    Array.isArray(parsed.repliedUnanswered) ? (parsed.repliedUnanswered as unknown[]) : []
-  ).filter(isRenderableAttentionItem);
+  if (!Array.isArray(parsed.repliedUnanswered)) {
+    // A body without the array is a contract break, not an emptiness. Reading
+    // it as [] would make Block E say `Nothing waiting.` and the digest count
+    // zero — a false all-clear, the null-versus-zero failure the rules forbid.
+    // Every consumer already meets a rejection with a designed state (the page
+    // settles to `Couldn't load what's waiting.`, the morning job catches into
+    // "unavailable", the chaser's run fails and pushes), so throwing costs
+    // nothing and says the truth (R75).
+    throw new Error(
+      `GET /api/os/attention returned a body with no repliedUnanswered array ` +
+        `(got ${
+          parsed.repliedUnanswered === null ? "null" : typeof parsed.repliedUnanswered
+        }) — the contract has changed. ` +
+        "repliedUnanswered is REQUIRED; only overdueActions may be omitted."
+    );
+  }
+  const rawReplied = parsed.repliedUnanswered as unknown[];
+  const replied = rawReplied.filter(isRenderableAttentionItem);
+
+  // Presence is decided ONCE, here, and read twice below; the empty array
+  // stands in only so the drop count has something to subtract from.
+  const overdueReported = Array.isArray(parsed.overdueActions);
+  const rawOverdue = overdueReported ? (parsed.overdueActions as unknown[]) : [];
+  const overdue = rawOverdue.filter(isRenderableOverdueItem);
+
+  // Neither guard used to say anything, so a contract break showed only as
+  // leads quietly missing from a list whose whole job is to miss none. One
+  // line, and only when something was actually dropped (R75).
+  const droppedReplied = rawReplied.length - replied.length;
+  const droppedOverdue = rawOverdue.length - overdue.length;
+  if (droppedReplied + droppedOverdue > 0) {
+    console.warn(
+      `[stApi] attention: dropped ${droppedReplied} repliedUnanswered and ` +
+        `${droppedOverdue} overdueActions row(s) that could not render (R75)`
+    );
+  }
 
   return {
     // The local bound: `limit` was sent as a query parameter and then trusted,
@@ -410,9 +445,7 @@ export async function fetchAttention(
     // even when every row in it was dropped, because "reported, all unusable"
     // and "never reported" are different findings and Block E renders them
     // differently.
-    ...(Array.isArray(parsed.overdueActions)
-      ? { overdueActions: (parsed.overdueActions as unknown[]).filter(isRenderableOverdueItem) }
-      : {}),
+    ...(overdueReported ? { overdueActions: overdue } : {}),
   };
 }
 

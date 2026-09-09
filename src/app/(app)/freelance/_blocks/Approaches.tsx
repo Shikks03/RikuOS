@@ -26,10 +26,10 @@ import { IconInfo } from "@/components/icons";
  * with no rendering, assistive-technology or React consequence. For it:
  * <summary> maps to a button-like control with name-from-contents in the major
  * engines, so the eyebrow and the heading reach a screen-reader user as ONE
- * accessible name. Do not "fix"
- * it back to a <span>: that deletes the <h2> with it, and whether a heading
- * nested inside a button survives into heading navigation varies by browser and
- * screen reader. Certain pedantry is not worth an uncertain loss.
+ * accessible name. Do not "fix" it back to a <span>: that deletes the <h2> with
+ * it, and whether a heading nested inside a button survives into heading
+ * navigation varies by browser and screen reader. Certain pedantry is not worth
+ * an uncertain loss.
  *
  * `open` is passed from the view model's defaultOpen (R31): open only while
  * every approach has zero sends, which is today's state and the clearest single

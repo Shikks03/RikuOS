@@ -149,7 +149,15 @@ export function buildBlockE(input: BlockEInput): BlockE {
         channel: label,
         waiting: `replied ${formatWaiting(waited)}`,
         waitingIsStale: false,
-        snippet: item.replySnippet ? `"${item.replySnippet}"` : null,
+        // A non-string is not a snippet. The contract typed it and R74's guard
+        // deliberately did not check it, because the row is the fact and the
+        // snippet is decoration — so the row survives and the snippet does not
+        // (R75). Unguarded, the template literal would print `"[object
+        // Object]"` inside quotation marks, as if it were the customer's words.
+        snippet:
+          typeof item.replySnippet === "string" && item.replySnippet
+            ? `"${item.replySnippet}"`
+            : null,
         reason: supported ? "No draft in the queue." : `Nothing drafts replies for ${label}.`,
       },
     });
@@ -178,8 +186,16 @@ export function buildBlockE(input: BlockEInput): BlockE {
           // reads amber; we do not second-guess the sender's own label.
           waitingIsStale: true,
           // The note sits in the snippet register, unquoted — it is Riku's own
-          // note to himself, not somebody's words. An empty note is no note.
-          snippet: item.nextActionNote || null,
+          // note to himself, not somebody's words. An empty note is no note,
+          // and a non-string is not a note either: the contract typed it and
+          // R74's guard deliberately did not check it, because the row is the
+          // fact and the note is decoration. So the row survives and the note
+          // does not (R75) — dropping a real overdue follow-up to protect an
+          // ornament would lose the wrong thing.
+          snippet:
+            typeof item.nextActionNote === "string" && item.nextActionNote
+              ? item.nextActionNote
+              : null,
           reason: null,
         },
       });

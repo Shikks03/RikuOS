@@ -137,6 +137,30 @@ describe("Block E — the three kinds of row", () => {
     if (out.kind !== "rows") throw new Error("expected rows");
     expect(out.rows[0].snippet).toBeNull();
   });
+
+  // R75. stApi's guard deliberately does not check these two fields, so a
+  // malformed one reaches here. The row is the fact and the note is decoration:
+  // dropping a real overdue follow-up to protect an ornament would lose the
+  // wrong thing. The cast is through `unknown` because the contract types both
+  // fields `string | null` — the point is what arrives when it is not honoured.
+  it("keeps an overdue row whose note is not a string, and drops only the note (R75)", () => {
+    const out = build(
+      [],
+      [overdue({ nextActionNote: { note: "Send the revised proposal" } as unknown as string })]
+    );
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.rows[0].businessName).toBe("Kiddo Co");
+    expect(out.rows[0].snippet).toBeNull();
+  });
+
+  it("keeps a reply row whose snippet is not a string, and drops only the snippet (R75)", () => {
+    // Unguarded, the template literal prints `"[object Object]"` inside
+    // quotation marks, as if the customer had written it.
+    const out = build([reply({ replySnippet: { text: "Do you do logos?" } as unknown as string })], []);
+    if (out.kind !== "rows") throw new Error("expected rows");
+    expect(out.rows[0].businessName).toBe("Nova Dental");
+    expect(out.rows[0].snippet).toBeNull();
+  });
 });
 
 describe("Block E — suppression, which is the whole point", () => {

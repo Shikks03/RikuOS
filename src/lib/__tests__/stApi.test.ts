@@ -238,7 +238,14 @@ describe("fetchAttention", () => {
   afterEach(() => {
     globalThis.fetch = original;
     vi.unstubAllEnvs();
+    // R75's console.warn stubs, put back so a later test can still see it.
+    vi.restoreAllMocks();
   });
+
+  /** R75: dropping rows now says so out loud. The suite stays quiet anyway. */
+  function silenceDropWarning() {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  }
 
   /**
    * A row that survives R74's guard. Since that ruling a stub row is no longer
@@ -321,6 +328,7 @@ describe("fetchAttention", () => {
   // whole route. Each bad row below is invalid in exactly ONE way, so a guard
   // that dropped rows for the wrong reason would still be visible here.
   it("drops a repliedUnanswered row that cannot render and keeps the rest (R74)", async () => {
+    silenceDropWarning();
     const valid = attentionItem();
     respondWith({
       repliedUnanswered: [
@@ -339,6 +347,7 @@ describe("fetchAttention", () => {
   });
 
   it("drops an overdueActions row that cannot render (R74)", async () => {
+    silenceDropWarning();
     const valid = {
       contactId: "c1",
       businessName: "Acme Bakery",
@@ -360,7 +369,16 @@ describe("fetchAttention", () => {
     expect(out.overdueActions).toEqual([valid]);
   });
 
+  // R75. Row-level parity with the siblings was real; block-level was not.
+  // Reading a missing block as [] made Block E say `Nothing waiting.` and the
+  // digest count zero — a false all-clear from a contract break.
+  it("throws when the body carries no repliedUnanswered array (R75)", async () => {
+    respondWith({ repliedUnanswered: { items: [] } });
+    await expect(fetchAttention(3, 50)).rejects.toThrow(/repliedUnanswered/);
+  });
+
   it("bounds repliedUnanswered to limit on this side too (R74)", async () => {
+    silenceDropWarning();
     respondWith({
       repliedUnanswered: ["c1", "c2", "c3", "c4", "c5"].map((contactId) =>
         attentionItem({ contactId })
@@ -749,9 +767,14 @@ describe("the page timeout", () => {
     vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
     vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
     const seen: (AbortSignal | undefined)[] = [];
-    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
       seen.push(init.signal ?? undefined);
-      return new Response(JSON.stringify([]), { status: 200 });
+      // Each GET is answered with a body ITS OWN contract accepts: since R75
+      // /attention rejects a body with no repliedUnanswered array, while the
+      // other two read a bare array. One shared body would fail this test on a
+      // rule it does not test — the subject here is only the timeout argument.
+      const body = String(url).includes("/api/os/attention") ? { repliedUnanswered: [] } : [];
+      return new Response(JSON.stringify(body), { status: 200 });
     }) as unknown as typeof fetch;
     const spy = vi.spyOn(AbortSignal, "timeout");
 
