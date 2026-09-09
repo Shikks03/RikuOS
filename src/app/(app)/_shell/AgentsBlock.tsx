@@ -123,7 +123,8 @@ export default async function AgentsBlock() {
       },
       RAIL_AGENTS
     );
-  } catch {
+  } catch (err) {
+    console.error("[rail] read failed:", err);
     return (
       <div className="agents">
         {RAIL_AGENTS.map((expectation) => (

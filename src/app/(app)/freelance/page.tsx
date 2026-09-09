@@ -27,12 +27,12 @@ export const dynamic = "force-dynamic";
 
 /**
  * A CONTAINMENT bound, and nothing more. maxDuration does not prevent a Vercel
- * error page — it SCHEDULES one, at 30 s instead of 60. The reader's protection
- * is the four timeouts above it: ST_PAGE_TIMEOUT_MS on each of the three
- * ShikksTracker calls, and MONGO_READ_TIMEOUT_MS on each of the two Mongo
- * reads. Those bound the worst case at 5 + 6 + 5 = 16 s and land in catches
- * that produce states this page already designed. This line only stops a
- * pathological render from running to the platform's own limit (R63).
+ * error page — it SCHEDULES one, at 30 s instead of the platform's own default.
+ * The reader's protection is the four timeouts above it: ST_PAGE_TIMEOUT_MS on
+ * each of the three ShikksTracker calls, and MONGO_READ_TIMEOUT_MS on each of
+ * the two Mongo reads. Those bound the worst case at 5 + 6 + 5 = 16 s and land
+ * in catches that produce states this page already designed. This line only
+ * stops a pathological render from running to the platform's own limit (R63).
  */
 export const maxDuration = 30;
 
@@ -43,9 +43,17 @@ export const maxDuration = 30;
  */
 export const metadata: Metadata = { title: "Freelance" };
 
-/** `PromiseSettledResult` -> the value, or null. */
-function settled<T>(result: PromiseSettledResult<T>): T | null {
-  return result.status === "fulfilled" ? result.value : null;
+/**
+ * `PromiseSettledResult` -> the value, or null — and a rejection is LOGGED with
+ * the call named, so `Couldn't reach ShikksTracker.` on screen has a line in
+ * the log saying which of 401 / 503 / 404 / timeout it was; stApi's messages
+ * were written to say exactly that, and readStConfig omits the secret from its
+ * message by design (R70).
+ */
+function settled<T>(result: PromiseSettledResult<T>, label: string): T | null {
+  if (result.status === "fulfilled") return result.value;
+  console.error(`[freelance] ${label} failed:`, result.reason);
+  return null;
 }
 
 /**
@@ -68,11 +76,16 @@ export default async function FreelancePage() {
 
   // --- Phase 1: the local reads, in ONE try/catch ---------------------------
   //
-  // A database failure must never blank the route. It degrades exactly three
+  // A database failure must never blank the route. It degrades exactly four
   // things: the gap figure reads `—` (`couldn't load`), the stored site reading
-  // is UNREADABLE rather than absent (the strip stamps `sites — unknown`), and
-  // the monitoring switch is unknown. Everything ShikksTracker answers still
-  // renders. A TIMEOUT lands in the same catch and therefore in the same three
+  // is UNREADABLE rather than absent (the strip stamps `sites — unknown`), the
+  // monitoring switch is unknown, and `chaserNDays` falls back to
+  // OS_SETTINGS_DEFAULTS.chaserNDays, so the attention call below runs on a
+  // window Riku did not set. The fourth is harmless: `days` bounds only
+  // `repliedUnanswered` on ShikksTracker's side, and phase 3 (Task 3) is gated
+  // on `dbOk`, so a gap list drawn on a guessed window is discarded before
+  // anything renders it. Everything ShikksTracker answers still renders. A
+  // TIMEOUT lands in the same catch and therefore in the same four
   // degradations — there is no new state to draw for it (R63).
   let chaserNDays = OS_SETTINGS_DEFAULTS.chaserNDays;
   let monitoringEnabled = false;
@@ -109,9 +122,9 @@ export default async function FreelancePage() {
     fetchVariantStats(ST_PAGE_TIMEOUT_MS),
   ]);
 
-  const summary = settled(summaryResult);
-  const attention = settled(attentionResult);
-  const variants = settled(variantsResult);
+  const summary = settled(summaryResult, "summary");
+  const attention = settled(attentionResult, "attention");
+  const variants = settled(variantsResult, "variant stats");
 
   // --- The view models ------------------------------------------------------
   //

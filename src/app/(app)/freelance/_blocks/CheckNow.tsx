@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 /**
  * The only control on the page, and the page's only client code.
  *
- * router.refresh() re-runs the server render and reconciles in place, so the
- * new reading arrives through the same server path as a page load and this
- * island never has to know a snapshot's shape. That is also why the EXISTING
- * READING STAYS ON SCREEN while the check runs: nothing here blanks the strip.
+ * router.refresh() re-runs the server render and reconciles in place — with the
+ * one exception named below, a quiet-to-alarm flip that remounts this island —
+ * so the new reading arrives through the same server path as a page load and
+ * this island never has to know a snapshot's shape. That is also why the
+ * EXISTING READING STAYS ON SCREEN while the check runs: nothing here blanks
+ * the strip.
  *
  * `busy` covers the POST and the refresh that follows it — useTransition's
  * isPending is what makes the second half honest, since router.refresh()
@@ -24,8 +26,20 @@ import { useRouter } from "next/navigation";
  * under an hour old stamps `checked 0h ago` on both sides of the press.
  *
  * `Couldn't check` stands only until the next press — setFailed(false) at the
- * top of check() clears it — and .btn uppercases it in CSS, so it renders
- * COULDN'T CHECK beside CHECK NOW and CHECKING….
+ * top of check() clears it — with ONE exception: when the refresh flips the
+ * strip between its quiet and alarm forms, `<CheckNow />` sits at a different
+ * position in each (a child of `.fl-health.quiet` in one, inside `.fl-stamp` in
+ * the other), so React remounts the island with `failed=false` and a
+ * `Couldn't check` shown before the flip is lost. A lost message, never a false
+ * claim; the markup is the mockup's and stays. And .btn uppercases the label in
+ * CSS, so it renders COULDN'T CHECK beside CHECK NOW and CHECKING….
+ *
+ * `failed` is tested BEFORE `busy` (R69). After a failed POST the refresh still
+ * runs and still holds the button, but the label already says what happened
+ * rather than reading `Checking…` for the whole re-render — which this page's
+ * own budget puts at up to 16 s. `disabled={busy}` is unchanged, and the next
+ * press still opens on `Checking…`, because setFailed(false) runs in the same
+ * batch as setPosting(true).
  *
  * The route itself never errors on a rapid second press — a 60-second floor
  * returns the existing reading with 200 rather than a 429.
@@ -54,9 +68,11 @@ export default function CheckNow() {
     setFailed(!ok);
     setPosting(false);
     // Unconditional, INCLUDING after a failure. requireSession returns 401 on
-    // an expired cookie, and this refresh re-runs the server render, which hits
-    // the (app) layout's session check, which redirects to /login. That is the
-    // right outcome for the one failure with a real remedy, and it is free.
+    // an expired cookie, and this refresh's RSC request is redirected to /login
+    // by src/proxy.ts's fail-closed check (proxy.ts:100-102), which answers
+    // before the (app) layout is ever reached; the layout's own session check
+    // is defence in depth for a matcher miss. That is the right outcome for the
+    // one failure with a real remedy, and it is free.
     startTransition(() => {
       router.refresh();
     });
@@ -64,7 +80,7 @@ export default function CheckNow() {
 
   return (
     <button type="button" className="btn" disabled={busy} onClick={() => void check()}>
-      {busy ? "Checking…" : failed ? "Couldn't check" : "Check now"}
+      {failed ? "Couldn't check" : busy ? "Checking…" : "Check now"}
     </button>
   );
 }
