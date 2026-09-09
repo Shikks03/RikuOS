@@ -134,6 +134,8 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
       best === null
         ? { kind: "statement", text: "No sends yet — nothing to compare." }
         : { kind: "best", name: nameOf(best.row), rate: `${best.percent}%` },
+    // R66: a group with no rows is not drawn — a ruled .fl-thead over nothing
+    // reads as a failed table. Never both: `variants.length === 0` returns above.
     groups: [
       {
         eyebrow: "Measured — email",
@@ -147,7 +149,7 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
         headers: ["Approach", "Reply rate", "Sends"],
         rows: otherRows,
       },
-    ],
+    ].filter((g) => g.rows.length > 0),
     // R27, stated as an explicit condition so nobody "fixes" its absence later:
     // a table with no printable rate is not a table of small numbers, and
     // printing the note there would be the opposite of an honesty note.

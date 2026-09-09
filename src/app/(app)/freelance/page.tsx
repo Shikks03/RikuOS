@@ -17,6 +17,7 @@ import {
   readStConfig,
 } from "@/lib/stApi";
 import { FAIL_LINES, buildBlockA, buildBlockB, buildBlockC } from "@/lib/freelanceView";
+import { buildBlockD } from "@/lib/freelanceVariants";
 import { buildBlockE, needsYouFigure } from "@/lib/freelanceGaps";
 import { buildHealthStrip } from "@/lib/freelanceHealth";
 import { OS_SETTINGS_DEFAULTS } from "@/models/OsSettings";
@@ -25,6 +26,7 @@ import HeroRow from "./_blocks/HeroRow";
 import StateOfPlay from "./_blocks/StateOfPlay";
 import Pipeline from "./_blocks/Pipeline";
 import Campaigns from "./_blocks/Campaigns";
+import Approaches from "./_blocks/Approaches";
 
 /**
  * Every figure on this page is "what is true right now", so there is nothing to
@@ -227,6 +229,8 @@ export default async function FreelancePage() {
 
   const blockC = buildBlockC(summary?.campaigns ?? null);
 
+  const blockD = buildBlockD(variants);
+
   const strip = buildHealthStrip({
     now,
     findings: summary === null ? null : evaluateOutreach(now, summary),
@@ -261,6 +265,7 @@ export default async function FreelancePage() {
             </div>
             <Pipeline block={blockB} />
             <Campaigns block={blockC} />
+            <Approaches block={blockD} />
           </>
         )}
 

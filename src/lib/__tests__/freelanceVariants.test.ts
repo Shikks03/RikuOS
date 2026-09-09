@@ -47,6 +47,9 @@ describe("Block D — the two groups, always", () => {
 
   it("drops the replies column from group 2 and keeps sends live", () => {
     const out = buildBlockD([
+      // One email variant so BOTH groups have rows: R66 drops an empty group,
+      // and this test is about the two of them beside each other.
+      variant({ key: "e1", channel: "email" }),
       variant({ key: "f1", channel: "facebook", sends: 31, replies: 4 }),
     ]);
     if (out.kind !== "groups") throw new Error("expected groups");
@@ -70,16 +73,41 @@ describe("Block D — the two groups, always", () => {
   it("treats a channel it cannot read as not measurable — never as email", () => {
     const out = buildBlockD([variant({ key: "orphan", label: null, channel: null, sends: 9 })]);
     if (out.kind !== "groups") throw new Error("expected groups");
-    expect(out.groups[0].rows).toHaveLength(0);
-    expect(out.groups[1].rows).toHaveLength(1);
+    // R66: the measured group has no rows, so it is not drawn at all — which
+    // is itself the proof that the orphan did not land in it.
+    expect(out.groups).toHaveLength(1);
+    expect(out.groups[0].eyebrow).toBe("Not measurable");
+    expect(out.groups[0].rows).toHaveLength(1);
     // With no label the key is the only name there is.
-    expect(out.groups[1].rows[0].name).toBe("orphan");
+    expect(out.groups[0].rows[0].name).toBe("orphan");
   });
 
   it("names a row by its key when the label is an EMPTY string, not just null", () => {
     const out = buildBlockD([variant({ key: "e1", label: "", channel: "email" })]);
     if (out.kind !== "groups") throw new Error("expected groups");
     expect(out.groups[0].rows[0].name).toBe("e1");
+  });
+
+  it("draws no group for a half with no rows, and never zero groups (R66)", () => {
+    const allEmail = buildBlockD([
+      variant({ key: "e1", channel: "email" }),
+      variant({ key: "e2", channel: "email" }),
+    ]);
+    if (allEmail.kind !== "groups") throw new Error("expected groups");
+    expect(allEmail.groups).toHaveLength(1);
+    expect(allEmail.groups[0].eyebrow).toBe("Measured — email");
+
+    const noneEmail = buildBlockD([
+      variant({ key: "f1", channel: "facebook" }),
+      variant({ key: "f2", channel: null }),
+    ]);
+    if (noneEmail.kind !== "groups") throw new Error("expected groups");
+    expect(noneEmail.groups).toHaveLength(1);
+    expect(noneEmail.groups[0].eyebrow).toBe("Not measurable");
+
+    // The two halves can never BOTH be empty: an empty list returns `empty`
+    // before the split, so `groups` is never a zero-length array.
+    expect(buildBlockD([])).toEqual({ kind: "empty", line: "No approaches set up." });
   });
 });
 
@@ -105,7 +133,9 @@ describe("Block D — the rate, recomputed and rationed", () => {
       variant({ key: "f1", channel: "facebook", sends: 500, replies: 250, replyRate: 0.5 }),
     ]);
     if (out.kind !== "groups") throw new Error("expected groups");
-    expect(out.groups[1].rows[0].cells[0]).toEqual({ text: "—", tone: "dash" });
+    // R66: with no email variant the measured group is not drawn, so the
+    // not-measurable group is groups[0] here.
+    expect(out.groups[0].rows[0].cells[0]).toEqual({ text: "—", tone: "dash" });
   });
 
   it("prints no rate when sends never arrived", () => {
