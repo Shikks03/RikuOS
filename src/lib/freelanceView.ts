@@ -100,7 +100,11 @@ export interface BlockAInput {
    * true = the summary call did not answer. Both cards then read `couldn't
    * load`, the third card's R54 form. The `didn't report` captions mean the
    * API REPLIED and omitted the field (the deck's definition), and a failed
-   * call is neither, so the two must not share a register (R72).
+   * call is neither, so the two must not share a register (R72). The LINES
+   * are computed from the values and never from this flag, so a caller
+   * passing `true` passes the null fields beside it — the type cannot
+   * enforce that coupling, and `buildBlockA` has exactly one caller, the
+   * page, which does.
    */
   summaryFailed: boolean;
   /** Block E's reading, through `needsYouFigure()`. */

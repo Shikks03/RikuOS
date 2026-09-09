@@ -30,9 +30,9 @@ import type { StatCard } from "@/lib/freelanceView";
  *
  * The aria-label is hardcoded here for ANY card carrying an href, and only the
  * drafts card has one today — StatCard.href's own docblock says so. The day a
- * second card gains a link, which the money card (components.css:257)
- * anticipates, the label moves onto StatCard: this component cannot tell the
- * two apart.
+ * second card gains a link — the money card, whose place in the grid
+ * components.css:257 already reserves — the label moves onto StatCard: this
+ * component cannot tell the two apart.
  *
  * Markup is specimen 01 / 02 of docs/design/p8-mockup.html, verbatim.
  */
