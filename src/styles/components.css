@@ -461,7 +461,8 @@
 .fl-health.quiet .line{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 .fl-health.quiet .line i{font-style:normal;color:var(--ink-4);margin:0 5px}
 /* the 30-hour rule: past everyHours + graceHours the stamp becomes a statement */
-.fl-health.quiet .line .aged{color:var(--stale)}
+/* not .quiet-scoped: the alarm form nests the same span, and R57's amber stamp must render there too (R60) */
+.fl-health .line .aged{color:var(--stale)}
 .fl-health .btn{margin-left:auto;flex:none}
 /* cards earn their borders, and a structural alarm is quieter and stronger
    than more colour */
