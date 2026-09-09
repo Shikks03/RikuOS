@@ -353,7 +353,8 @@ Violet because violet means decisions, and 24 drafts is 24 decisions not made.
 
 - Above zero → `.stat.stale`, figure and label amber, caption `waiting on you`. Amber because every row it counts is a duration, and red stays rationed to the health strip so the strip can be unmissable.
 - At zero → `.stat.drained`, figure `0`, caption `nothing waiting`. **A card that reads 0 most days is not dead weight; 0 is the answer the page exists to give** — which is why this caption keeps `--ink-3` rather than draining with the figure.
-- The gap count needs a database read, so when that read fails → `.stat.blank`, figure `—`, caption `couldn't load`, exactly like Block E beside it.
+- The gap figure needs a live read of the reply feed **and** of the queue, so when either read fails → `.stat.blank`, figure `—`, caption `couldn't load`, exactly like Block E beside it.
+- **The overdue feed never arrived** → `.stat.blank`, figure `—`, caption `ShikksTracker didn't report overdue follow-ups` — no full stop, because a hero caption is a fragment completing label→figure→caption while a block body is a sentence (the pairing R28 established for `nothing waiting` / `Nothing waiting.`). An absence is not a failure: this card must never read `couldn't load` above a Block E reading `ShikksTracker didn't report overdue follow-ups.` — one screen, one register (R54). The bullet above justified `couldn't load` by saying it reads "exactly like Block E beside it", and that stopped holding the moment R51 gave Block E a fourth kind.
 
 **Cards never disappear. Hue drains, structure stays.**
 
@@ -369,7 +370,7 @@ Violet because violet means decisions, and 24 drafts is 24 decisions not made.
 
 The deck's A1 and A3 lines are not lines any more: they were absorbed into the drafts and contacts card captions. A2 is the only surviving line; A4 is the unshipped one.
 
-**The whole-block fallback.** `Nothing waiting on you.` renders in the `.fl-say` register, with no figure, **only when drafts, approved and never-contacted are all zero or absent** — never under a lit card. The hero cards still render, drained. Pinned in a test.
+**The whole-block fallback.** `Nothing waiting on you.` renders in the `.fl-say` register, with no figure, **only when drafts, approved, never-contacted and the needs-you figure are all a *measured* zero** — never under a lit card, and never on the strength of a number that never arrived. **This amends R35's clause that a failed gap read counts as absent (R50).** Treating an absence as a zero would print the page's central summary directly under a card reading `—` / `ShikksTracker didn't report how many contacts there are`, and under a total outage under three such cards: a claim that nothing is waiting cannot rest on a field the source omitted. The cards already say `didn't report` or `couldn't load`; the line stays silent. The fourth term reads the needs-you figure and is satisfied only by `measured` with `count === 0` (R54). The hero cards still render, drained. Pinned in a test.
 
 ### 4.2 Block B — Pipeline
 
@@ -464,7 +465,11 @@ The heading row is `.fl-headrow` (grid `minmax(0,1fr) auto`, baseline-aligned) w
 
 **Waiting durations:** `just now` under an hour, then `4 hours ago`, `2 days ago`, `3 weeks ago`.
 
-- Nothing waiting → `.fl-empty`: `Nothing waiting.` **Left-aligned where content lives — never centred, never in a dashed box, never with an action pill.** This is today's state and it must look intentional.
+**Row order: longest wait first, ties in feed order (R53).** The `waiting` column each row leads with is the sort key — the milliseconds the row already computes — and the sort is stable, so equal waits keep reply-before-overdue feed order. Replies-then-overdues was a decision nobody made, and under the 20-row bound it starves the amber class first: 25 reply gaps would hide every overdue follow-up, the rows `.is-stale` exists to make unmissable, while `Showing 20 of 28.` read as if the twenty were representative. An unparseable timestamp waits `0` and sorts youngest, consistent with its `just now` rendering.
+
+- Nothing waiting → `.fl-empty`: `Nothing waiting.` **Left-aligned where content lives — never centred, never in a dashed box, never with an action pill.** This is today's state and it must look intentional. It means **both** feeds reported and nothing survived suppression — a measured emptiness.
+- **The overdue feed never arrived and no reply gap survived** → a fourth state beside `failed` / `empty` / `rows`, in the `.fl-absent` register: `ShikksTracker didn't report overdue follow-ups.` **Never `Nothing waiting.`** — an unreported feed is not a measured emptiness, and the block that claims nothing is waiting must not do so on the strength of a feed that never arrived (R51). Its figure reaches Block A's third card as an absence too, so the two speak in one register (R54).
+- **Measured rows with the overdue feed missing** → the rows render normally and one `.fl-absent` note carries the same sentence beneath them (`absentNote`): these gaps are real, and the true total may be higher than the count beside them.
 - Display bound 20 → `.fl-bound`: `Showing 20 of 41.`
 - Failed to load → `.fl-fail`: `Couldn't load what's waiting.`
 
@@ -518,6 +523,10 @@ This closes a hole the cron's own error handling opens: the snapshot write is ca
 
 **`sites never checked`** — amber with monitoring on, grey with monitoring off. With monitoring off the reading is *expected* to be absent, and an alarm about an expected absence is a daily false alarm.
 
+**The aged stamp follows the same rule (R57): with monitoring off it keeps its words and loses its hue** (`aged: monitoringEnabled`). The disabled cron branch files a note-run and writes no snapshot, by design, so a reading taken before the switch was turned off would otherwise age past 30 h into `sites not checked since 2d ago` **in amber, every day, forever** — an alarm about an absence Riku created, and the daily false alarm that is exactly how a monitor gets ignored. The text stays because it is true; only the hue follows the toggle. `all sites ok` stays suppressed on the raw age either way, toggle or no toggle: a stale reading cannot claim the present. Down-site warnings are untouched.
+
+**`sites — unknown`** — em-dash, grey, never aged, when the **local read of the stored reading itself failed**. That is a different fact from `sites never checked`, which is something the page actually knows; rendering a failed read as `never checked` would be the strip claiming to have seen something it never saw — the absence-versus-failure distinction Blocks E and A make, in the register of `Engine — unknown`. In this state the strip says nothing else about the sites: no `all sites ok`, no site warnings, no healthy site lines. Engine handling is unchanged (R56).
+
 **`Engine — unknown`** in grey when the summary call failed.
 
 **`Check now`** — the only control on the page.
@@ -536,8 +545,10 @@ Freelance
 ●  Couldn't reach ShikksTracker.
    State of play, pipeline, campaigns, approaches and what's waiting all come from there.
 
-Engine — unknown · Meowchi ok · checked 6h ago             [Check now]
+Engine — unknown · all sites ok · checked 6h ago           [Check now]
 ```
+
+*Corrected 2026-09-09 (M7), and deck §6 with it: the earlier example read `Engine — unknown · Meowchi ok · checked 6h ago`, a line `buildHealthStrip` cannot produce. A named healthy site appears only in the alarm form's indented `fine` line; while all three sites are up the quiet form collapses them into `all sites ok`, and the moment one is down the strip is the alarm card instead.*
 
 Treatment: `.fl-fail`, grid `5px minmax(0,1fr)`, a 5px `--missing` dot with a 6px glow, the statement at 13px `--ink-2` and the explanation at 12.5px `--ink-3` capped at `62ch`.
 
@@ -914,6 +925,7 @@ export interface SummaryResponse {
 
 **Model — `src/models/HealthSnapshot.ts`** *(new)*. A singleton, following the repo's Mongo rules exactly:
 
+- **A fixed `_id`, not `OsSettings`' `{}` filter (R55).** `export const HEALTH_SNAPSHOT_ID = "singleton"`, and `_id: { type: String, default: HEALTH_SNAPSHOT_ID, enum: [HEALTH_SNAPSHOT_ID], maxlength: 16 }`. The failure modes are not comparable: two first writes racing — the likelier pair is two `Check now` presses, both reading null, both spending 8 s inside `checkSites()`, both upserting — would leave two documents, `findOne({})` returns them in natural order, which Mongo does not specify, and a read that settles on the orphan while the cron writes the other makes the strip **permanently amber** with `Check now` appearing not to fix it. That is a wrong strip, not a stale one, where a settings document written twice is right either way. The `_id` index is always unique and always present, so this costs no new index, no `sync-indexes.mts` change and no migration — where a unique `key` index would have needed `migrate:indexes:apply` by hand in production.
 - `checkedAt: Date`, required.
 - `sites`: a bounded array (validator at 20) of `{ name: String maxlength 60, up: Boolean, detail: String maxlength 200 }`, `_id: false`, `strict: true`.
 - `timestamps: { createdAt: true, updatedAt: true }` — updates are the point of this record.
@@ -933,7 +945,15 @@ export function isWithinCheckFloor(                                            /
 
 **The floor is a pure function, not a branch inside the handler**, so it is unit-testable without a route, a database or a network — the same rule the rest of the logic layer follows.
 
-**One trap that contradicts the house pattern.** `getOsSettings()` reaches its singleton with `findOneAndUpdate({}, …, { upsert: true })` on *read*. **`getHealthSnapshot()` must not.** An upsert-on-read would manufacture a document with a defaulted `checkedAt` and an empty `sites` array, and the strip would confidently report "checked just now, no sites watched" when in truth it has never run. Read with `findOne().lean()`, return `null`, and let Block F say `sites never checked`. The upsert belongs to the write path only.
+**Not a departure from the house pattern — the same rule applied a second time (R47).** `getOsSettings()` reaches its singleton with `findOneAndUpdate({}, …, { upsert: true })` on *read*, and **`getHealthSnapshot()` must not** — but that stopped being an exception when R37 gave settings their own `readOsSettings()`, which already reads with `findOne` and never upserts. **What differs here is what a missing document means.** Settings have honest schema defaults — the values the upsert would have written — so `readOsSettings()` falls back to them; a reading that never happened has none. An upsert-on-read would manufacture a document with a defaulted `checkedAt` and an empty `sites` array, and the strip would confidently report "checked just now, no sites watched" when in truth it has never run. Read with `findOne().lean()`, return `null`, and let Block F say `sites never checked`. The upsert belongs to the write path only.
+
+**As shipped, three clauses of that accessor are worth pinning here.**
+
+- **`getHealthSnapshot()` reads `findOne({ _id: HEALTH_SNAPSHOT_ID }, PROJECTION)`** with a typed projection (`{ _id: 0, checkedAt: 1, sites: 1 }`) on `readOsSettings()`'s pattern, so a third field on `StoredHealth` fails to compile rather than reading as absent forever (R55).
+- **A stored document whose `checkedAt` is not a `Date` also reads as `null`** — the absence register, `sites never checked`. `.lean()` applies no schema defaults and the cast asserts a shape nobody validated on the way out, while `buildHealthStrip` calls `.getTime()` on that field *outside* Plan C's `try`; throwing the whole page is worse, and R56's failure register belongs to a read that actually threw.
+- **`checkedAt` means the moment the reading was TAKEN** — captured *after* `checkSites()` resolves, because the results describe the sites as of then and not as of the eight seconds earlier when the job or the route started. Both writers follow it.
+
+**`saveHealthSnapshot` upserts on that same `_id` and retries exactly once on a duplicate key** (`code === 11000`) — the losing side of the first-write race, by which time the winner's document exists, so the identical call is a plain update and succeeds. Any other error, and a second 11000, propagate to the caller, which writes the failed `AgentRun`: no infinite retry, no silent failure (R55). `runValidators: true` stays on, because Mongoose update validators are off by default and the schema's bounds would otherwise be decorative on this path.
 
 **Route — `POST /api/health/sites`** *(new)*, thin. POST means "take a new reading"; the noun is what is being read, which leaves `GET` free if a JSON view is ever wanted. Handler order, first line first:
 
@@ -958,6 +978,8 @@ const health = await runJob("site-health", async () => {
 ```
 
 **Why that ordering.** The dispatcher composes the digest from `health.data` later in the same invocation. If the snapshot write were allowed to throw, the job would be `ok: false` and today's digest would lose its site lines — trading the outer safety net for a cosmetic persistence step. Catching it and counting it means tomorrow's watchdog names it as `site-health: 1 item failed`, which is the right report: a failure of our own machinery is a real failed item, unlike `outreach-health`'s *findings* about another system.
+
+**But that badge arrives a day late, so the same morning's digest names the failure in its own words (R58).** The watchdog job runs *before* site-health and reads yesterday's record, and `buildProblems` reads only `siteHealth.ok`, which the catch above deliberately keeps true — so on the morning it happens the digest would say `All clear` while the rail carried the heaviest red in the block, in a caption whose "item" reads as a site. `digest.ts`'s own header states the principle: a job that failed in THIS run is reported from its in-memory outcome, not from the watchdog. So `MorningOutcomes.siteHealth` carries `snapshotStored: boolean`, the route lifts `let snapshotStored = true` above the job and sets it false inside the catch, and `buildProblems` pushes **`site reading could not be stored`** when the job succeeded and the write did not — never both this and `site health failed: …`. `itemsFailed: 1` stays: the run did have a failed step, and "item" is the rail's generic vocabulary for every agent, so this badge is no more ambiguous than the others. Pinned in `src/lib/__tests__/buildProblems.test.ts`.
 
 It correctly does **not** run in the monitoring-disabled branch, where `site-health` only files a note-run. The snapshot then ages and Block F says so, which is the truth.
 
@@ -1005,7 +1027,7 @@ All pure, in `src/lib/__tests__/`, in the existing Vitest style — no database,
 |---|---|
 | `watchdog.test.ts` (existing, **unchanged**) | That the `classifyAgentRun` extraction did not move the digest, and that **`watchdog` is deliberately absent from `EXPECTATIONS`** |
 | `agentStatus.test.ts` *(new)* | All six badge states, including **`off` derived from the switches and never from a run's note string**; `expiry-sweep` is never `off`; the boundary at `AGENT_STALE_HOURS`; `itemsFailed > 0` → failed with the `N items failed` caption; totality — one row per expectation, in order; an agent outside `RAIL_AGENTS` never appears |
-| `freelanceView.test.ts` *(new)* | **`Nothing waiting on you.` fires only when drafts, approved and never-contacted are all zero or absent** — never under a lit card. Block A singular and plural; hidden-at-zero; "didn't report" is never a zero; only the drafts card carries a link. Block B stage order and labels; the `Nothing yet at …` grammar at four, two, one and none; the separate not-reported line; the dropped `· N hot` clause at zero and at absent; `No contacts yet.`. Block C bound, the `0`-vs-`—` cell rule, sort order |
+| `freelanceView.test.ts` *(new)* | **`Nothing waiting on you.` fires only when drafts, approved, never-contacted and the needs-you figure are all a *measured* zero (R50)** — never under a lit card, and never when one of the four never arrived. Block A singular and plural; hidden-at-zero; "didn't report" is never a zero; only the drafts card carries a link. Block B stage order and labels; the `Nothing yet at …` grammar at four, two, one and none; the separate not-reported line; the dropped `· N hot` clause at zero and at absent; `No contacts yet.`. Block C bound, the `0`-vs-`—` cell rule, sort order |
 | `freelanceVariants.test.ts` *(new)* | **The reply rate is recomputed locally and the upstream `replyRate` is never printed**; no rate for zero sends; no rate for a non-email channel, ever; the two-group split; the replies column dropped from group 2; `No sends yet — nothing to compare.` when every `sends` is 0; **the honesty note renders only when at least one rate is printed** |
 | `freelanceGaps.test.ts` *(new)* | The three row kinds; `liveAnchorIds` suppression; the overdue row's empty channel slot; the bound and `Showing 20 of 41.`; ordering stability |
 | `freelanceHealth.test.ts` *(new)* | The quiet single line; every `evaluateOutreach` warning passed through verbatim; **the card-vs-footer switch** — quiet form with no warnings, alarm form with one or more; **the 30-hour stamp rule**: past the threshold `all sites ok` is not printed and the stamp becomes `sites not checked since 2d ago`; `sites never checked` amber with monitoring on and grey with it off; `Engine — unknown` |
@@ -1022,7 +1044,7 @@ All pure, in `src/lib/__tests__/`, in the existing Vitest style — no database,
 ## 9. Verification before "done"
 
 1. **The standing trio, all green:** `npm test` · `npx tsc --noEmit` · `npm run build`.
-2. **`git grep "var(--alert)\|var(--amber)" src/` returns nothing.** A custom property that resolves to nothing is invalid at computed-value time, so `color: var(--missing)` would silently **inherit** — a red warning rendering in body grey, in the one place it matters.
+2. **`git grep "var(--alert)\|var(--amber)" -- src/ ':!src/styles/tokens.css'` returns nothing.** A custom property that resolves to nothing is invalid at computed-value time, so `color: var(--missing)` would silently **inherit** — a red warning rendering in body grey, in the one place it matters. **`tokens.css` is excluded because its own opening block comment, at `tokens.css:17`, is the sentence explaining why those two aliases must not exist** — the un-excluded grep hits that comment and fails for the wrong reason. **Write the pathspecs after `--`, not before:** with `--` present a leading `src/` is parsed as a revision and the command exits 128 with `fatal: unable to resolve revision: src/` (verified 2026-09-09; the working form returns no output and exit 1).
 3. **`git grep -n -E "(from|import|href|src|url)[[:space:]]*[:=(]?[[:space:]]*["'][^"']*components\.html" src/ public/` returns nothing.**
 4. **Observed once against real data** (`CLAUDE.md`). Concretely: `/freelance` rendered on Vercel with today's real ShikksTracker numbers and nothing typed by hand — D11 satisfied for one page — with the rail's six badges live beside it showing real agent states. `Check now` pressed once and the strip updated; pressed twice inside a minute without an error.
 5. **`git grep -nE '(^|[^a-zA-Z/])[/]queue' -- src/ public/ next.config.ts` returns exactly three lines** — the redirect's `source`, and the two `proxy.test.ts` fixtures that use `/queue` as an example protected path and a traversal string. Any other hit is an address that was missed.

@@ -152,9 +152,17 @@ export interface GapRow {
 
 export type BlockE =
   | { kind: "failed"; line: string }
+  // The reply feed loaded, nothing survived suppression, and the overdue feed
+  // was NOT reported. `line` is "ShikksTracker didn't report overdue
+  // follow-ups." — never "Nothing waiting." (R51).
+  | { kind: "absent"; line: string }
   | { kind: "empty"; line: string }
-  | { kind: "rows"; count: number; rows: GapRow[]; bound: string | null };
+  // absentNote carries the same sentence under measured rows when only the
+  // overdue feed is missing: the rows are real and the total may be higher.
+  | { kind: "rows"; count: number; rows: GapRow[]; bound: string | null; absentNote: string | null };
 ```
+
+`needsYouFigure(block: BlockE): NeedsYouFigure` is exported from `freelanceGaps.ts` as the one bridge to Block A's third card (R54) — `failed` → failed, `absent` → absent, `empty` → measured 0, `rows` → measured count. `NeedsYouFigure` itself is declared in `freelanceView.ts`, so the import direction stays `freelanceGaps → freelanceView`.
 
 **Block F — `src/lib/freelanceHealth.ts`**
 
@@ -436,8 +444,8 @@ Expected: no output, exit code 0.
 
 - [ ] **Step 8: Confirm there is exactly one implementation**
 
-Run: `git grep -n "export function formatAge" src/`
-Expected: one line, `src/lib/format.ts`.
+Run: `git grep -n --untracked "export function formatAge" src/`
+Expected: one line, `src/lib/format.ts`. **`--untracked` is required** — `format.ts` is new and not yet committed at this step, and `git grep` without it searches only tracked files and would report the move as complete while the new implementation is invisible (Batch 1 review).
 
 - [ ] **Step 9: Commit**
 
@@ -476,7 +484,7 @@ Field names verified against `../ShikksTracker/docs/os-api.md` and `../ShikksTra
 
 - [ ] **Step 1: Write the failing tests**
 
-In `src/lib/__tests__/stApi.test.ts`, replace the existing test named `carries every consumed field through — widening the type alone is not enough` (it currently asserts `toEqual({ queue, engine })`, which two new required keys would break) with this block, and add the four tests after it, all inside the existing `describe("fetchSummary", …)`:
+In `src/lib/__tests__/stApi.test.ts`, replace the existing test named `carries every consumed field through — widening the type alone is not enough` (it currently asserts `toEqual({ queue, engine })`, which two new required keys would break) with this block, and add the **six** tests after it, all inside the existing `describe("fetchSummary", …)` — the prose said four and the block holds six (Batch 1 review):
 
 ```ts
   it("carries every consumed field through — widening the type alone is not enough", async () => {
@@ -1195,8 +1203,8 @@ Expected: `Test Files  1 passed (1)`.
 Run: `npx tsc --noEmit`
 Expected: no output, exit code 0.
 
-Run: `git grep -n "ATTENTION_LIMIT = 50" src/`
-Expected: one line, `src/lib/stApi.ts`. (`CHASER_ATTENTION_LIMIT` in `src/lib/chaser.ts` is a different constant with a different job and is not touched.)
+Run: `git grep -nE "\bATTENTION_LIMIT = 50" src/`
+Expected: one line, `src/lib/stApi.ts`. **The word boundary is required** — `CHASER_ATTENTION_LIMIT` in `src/lib/chaser.ts` is also `= 50`, so the unbounded pattern returns two lines and the step passes for the wrong reason (Batch 1 review). It is a different constant with a different job and is not touched.
 
 - [ ] **Step 6: Commit**
 
@@ -1383,7 +1391,7 @@ Run: `npx tsc --noEmit`
 Expected: no output, exit code 0.
 
 Run: `npm run lint`
-Expected: no errors.
+Expected: **no *new* errors.** Lint exits 1 on the four pre-existing `react-hooks/set-state-in-effect` errors carried forward from Plan A (`queue/PushControls.tsx`, `queue/page.tsx`, `settings/page.tsx`, `login/page.tsx`) plus three warnings; the count must be exactly that and no higher (pre-build re-read, 2026-09-08).
 
 Run: `npm test`
 Expected: every suite passes.
@@ -1416,6 +1424,8 @@ Three cards that never disappear: hue drains, structure stays. The distinction t
 - Test: `src/lib/__tests__/freelanceView.test.ts` (create)
 
 - [ ] **Step 1: Write the failing test**
+
+*Superseded by R50 (`6fb16da`) and R54 (`6638101`) — the shipped shape is in the Post-build record and the code is the authority.*
 
 Create `src/lib/__tests__/freelanceView.test.ts`:
 
@@ -1697,6 +1707,8 @@ Expected: FAIL — `Failed to resolve import "@/lib/freelanceView"`.
 
 - [ ] **Step 3: Create `src/lib/freelanceView.ts` with Block A**
 
+*Superseded by R50 (`6fb16da`) and R54 (`6638101`) — the shipped shape is in the Post-build record and the code is the authority.* In short: `zeroOrAbsent` became a measured-zero test, so an absence suppresses `Nothing waiting on you.` instead of satisfying it; and `BlockAInput.needsYouCount: number | null` became `needsYou: NeedsYouFigure`, with `needsYouCard` gaining an `absent` branch.
+
 ```ts
 /**
  * freelanceView.ts — Blocks A, B and C of the Freelance page as plain data.
@@ -1911,7 +1923,7 @@ Run: `npx vitest run src/lib/__tests__/freelanceView.test.ts`
 Expected: `Test Files  1 passed (1)`, `Tests  21 passed (21)`.
 
 Run: `npx tsc --noEmit`
-Expected: no output, exit code 0. (`numberCell`, `Cell`, `PIPELINE_STAGES`, `PipelineStage` and `SummaryCampaign` are imported for Tasks 7 and 8 and are unused for one commit; TypeScript does not error on unused imports and `npm run lint` is not run until Task 8. If lint is run early and complains, add the remaining tasks before committing rather than deleting the imports.)
+Expected: no output, exit code 0. **Amended before the build (2026-09-08): imports land in the task that consumes them.** Task 6 imports only `pluralise` and the two types Block A reads; Task 7 adds `PIPELINE_STAGES` and `PipelineStage`; Task 8 adds `numberCell`, `Cell` and `SummaryCampaign`. So no commit carries an unused import, and every commit leaves lint's warning count where it found it.
 
 - [ ] **Step 5: Commit**
 
@@ -2375,7 +2387,7 @@ Run: `npx tsc --noEmit`
 Expected: no output, exit code 0.
 
 Run: `npm run lint`
-Expected: no errors — every import added in Task 6 now has a consumer.
+Expected: **no *new* errors** — lint exits 1 on the four pre-existing `react-hooks/set-state-in-effect` errors and three warnings, and this task must not add to them (pre-build re-read, 2026-09-08). Every import this task adds has a consumer in the same commit.
 
 - [ ] **Step 5: Commit**
 
@@ -2644,12 +2656,15 @@ Expected: FAIL — `Failed to resolve import "@/lib/freelanceVariants"`.
  * Pure: no database, no network, no clock.
  */
 
-import { numberCell } from "@/lib/format";
+import { DASH_CELL, numberCell } from "@/lib/format";
 import type { Cell } from "@/lib/format";
 import { FAIL_LINES } from "@/lib/freelanceView";
 import type { VariantStatsItem } from "@/lib/stApi";
 
-const DASH_CELL: Cell = { text: "—", tone: "dash" };
+// DASH_CELL is NOT declared here. The Batch 2 review made `DASH` the one
+// em-dash in format.ts; R53 moved the ruling one level up, so format.ts owns
+// the frozen DASH_CELL and numberCell(null) returns it. One dash cell, one
+// identity, no second copy to drift.
 
 export interface ApproachRow {
   key: string;
@@ -2827,6 +2842,8 @@ MSG
 - Test: `src/lib/__tests__/freelanceGaps.test.ts` (create)
 
 - [ ] **Step 1: Write the failing test**
+
+*Superseded by R51–R54 (`bab6533`, `d5433f2`, `6638101`) — the shipped shape is in the Post-build record and the code is the authority.*
 
 Create `src/lib/__tests__/freelanceGaps.test.ts`:
 
@@ -3092,6 +3109,8 @@ Expected: FAIL — `Failed to resolve import "@/lib/freelanceGaps"`.
 
 - [ ] **Step 3: Create `src/lib/freelanceGaps.ts`**
 
+*Superseded by R51–R54 (`bab6533`, `d5433f2`, `6638101`) — the shipped shape is in the Post-build record and the code is the authority.* In short: `overdueActions ?? []` no longer discards the absence, so `BlockE` gains an `absent` kind and `rows` gains `absentNote` (R51); `DRAFT_CHANNELS` / `DraftChannel` moved to the import-free leaf `src/lib/draftChannels.ts`, which is what keeps this file's "Pure: no database" true at the module-graph level (R52); rows are ordered longest-wait-first with a stable tie (R53); `CHANNEL_LABELS` is a `Map`, not an object literal; and `needsYouFigure(block: BlockE): NeedsYouFigure` is exported from here as the one bridge to Block A's third card (R54).
+
 ```ts
 /**
  * freelanceGaps.ts — Block E, "Needs you".
@@ -3348,6 +3367,8 @@ Expected: FAIL — `Failed to resolve import "@/models/HealthSnapshot"`.
 
 - [ ] **Step 3: Create `src/models/HealthSnapshot.ts`**
 
+*Superseded by R55 (`fe512b1`) — the shipped shape is in the Post-build record and the code is the authority.* In short: the model exports `HEALTH_SNAPSHOT_ID = "singleton"` and declares `_id: { type: String, default: HEALTH_SNAPSHOT_ID, enum: [HEALTH_SNAPSHOT_ID], maxlength: 16 }` (`IHealthSnapshot extends Document<string>`), because `OsSettings`' `{}` filter would let two first writes leave two documents and a read that settles on the orphan makes the strip permanently amber. The `required`-on-an-array paragraph is also rewritten: in Mongoose 9.9.4 `required: true` on an array does **not** reject `[]`, so the option would add nothing — it is omitted on purpose all the same, and the bound validator stays.
+
 ```ts
 import mongoose, { Document, Model, Schema } from "mongoose";
 
@@ -3469,7 +3490,7 @@ MSG
 
 ## Task 12: `healthSnapshot.ts` — the accessor and the 60-second floor
 
-**One trap that contradicts the house pattern.** `getOsSettings()` reaches its singleton with `findOneAndUpdate({}, …, { upsert: true })` on *read*. **`getHealthSnapshot()` must not.** An upsert-on-read would manufacture a document with a defaulted `checkedAt` and an empty `sites` array, and the strip would confidently report "checked just now, no sites watched" when in truth it has never run.
+**This accessor is not a departure from the house pattern; it is the same rule applied a second time (R47).** When this plan was written, the only settings accessor was `getOsSettings()`, which reaches its singleton with `findOneAndUpdate({}, …, { upsert: true })` on *read* — so a read-only health accessor looked like an exception. R37 has since given settings their own `readOsSettings()`, which already reads with `findOne` and never upserts. **What differs here is what a missing document means.** Settings have honest schema defaults — the values the upsert would have written — so `readOsSettings()` falls back to them. A reading that never happened has none: an upsert or a default here would manufacture a document with a made-up `checkedAt` and an empty `sites` array, and the strip would confidently report "checked just now, no sites watched" when in truth it has never run. `null` is the only honest answer, and Block F says `sites never checked`.
 
 **Files:**
 - Create: `src/lib/healthSnapshot.ts`
@@ -3534,6 +3555,8 @@ Run: `npx vitest run src/lib/__tests__/healthSnapshot.test.ts`
 Expected: FAIL — `Failed to resolve import "@/lib/healthSnapshot"`.
 
 - [ ] **Step 3: Create `src/lib/healthSnapshot.ts`**
+
+*Superseded by R55 and R56 (`fe512b1`) — the shipped shape is in the Post-build record and the code is the authority.* In short: both reads and writes address `{ _id: HEALTH_SNAPSHOT_ID }` rather than `{}`, `getHealthSnapshot` takes a typed projection and returns `null` for a document whose `checkedAt` is not a `Date`, and `saveHealthSnapshot` retries exactly once on an `11000` duplicate key — the losing side of the first-write race. The file header is R47's, not the "one trap" wording above.
 
 ```ts
 /**
@@ -3634,8 +3657,8 @@ Expected: no output, exit code 0.
 
 - [ ] **Step 5: Confirm the read path never upserts**
 
-Run: `git grep -n "upsert" src/lib/healthSnapshot.ts`
-Expected: exactly one line, inside `saveHealthSnapshot`.
+Run: `git grep -n --untracked "upsert" src/lib/healthSnapshot.ts`
+Expected: **exactly one *code* occurrence** — `upsert: true`, inside `saveHealthSnapshot`. The file's docblocks say "upsert" in prose seven more times, explaining why the read path does not; read the hits rather than counting them. **`--untracked` is required** — the file is new and not yet committed at this step (Batch 4 review, the same correction Task 1 step 8 took).
 
 - [ ] **Step 6: Commit**
 
@@ -3905,6 +3928,8 @@ Expected: FAIL — `Failed to resolve import "@/lib/freelanceHealth"`.
 
 - [ ] **Step 3: Create `src/lib/freelanceHealth.ts`**
 
+*Superseded by R56 and R57 (`fe512b1`) — the shipped shape is in the Post-build record and the code is the authority.* In short: `enginePhrase` reads `msSince` from `format.ts` instead of building its own `new Date(...).getTime()` / `Number.isNaN` pair (Batch 4 amendment); `HealthStripInput.snapshot` widens to `StoredHealth | null | "unread"`, and `"unread"` prints the stamp `sites — unknown` with no `all sites ok`, no site warnings and no healthy site lines (R56); and the aged stamp reads `aged: monitoringEnabled`, keeping its words and losing its hue while monitoring is off (R57). `HOUR_MS` is imported from `format.ts` rather than declared here.
+
 ```ts
 /**
  * freelanceHealth.ts — Block F, the health strip.
@@ -4095,7 +4120,9 @@ import { saveHealthSnapshot } from "@/lib/healthSnapshot";
 
 - [ ] **Step 2: Replace the `site-health` job**
 
-Replace the whole `const health = await runJob("site-health", …)` block (currently lines 91–94) with:
+Replace the whole `const health = await runJob("site-health", …)` block — **lines 88–91, not 91–94** (the job moved up three lines before this batch ran; anchor by content, never by line number alone) — with:
+
+*The block below was later superseded by R58 (`2e35bca`), which lifts `let snapshotStored = true` above the `runJob` call and sets it `false` beside `saveFailed` in the catch, so the same morning's digest can name the failure. The shipped shape is in the Post-build record and the code is the authority.*
 
 ```ts
     const health = await runJob("site-health", async () => {
@@ -4130,7 +4157,7 @@ Run: `npx tsc --noEmit`
 Expected: no output, exit code 0.
 
 Run: `npm run lint`
-Expected: no errors.
+Expected: **no *new* errors** — the four pre-existing `react-hooks/set-state-in-effect` errors and three warnings, and nothing beyond them (pre-build re-read, 2026-09-08).
 
 Run: `npm run build`
 Expected: `✓ Compiled successfully`.
@@ -4138,7 +4165,7 @@ Expected: `✓ Compiled successfully`.
 - [ ] **Step 4: Confirm the edit is bounded**
 
 Run: `git diff --stat src/app/api/cron/morning/route.ts`
-Expected: one file changed, roughly `18 insertions(+)`, `2 deletions(-)`. **The monitoring-disabled branch must not appear in the diff.**
+Expected: one file changed, **`20 insertions(+)`, `1 deletion(-)`** (measured at `e6cdf8e`). **The monitoring-disabled branch must not appear in the diff.**
 
 Run: `git diff src/app/api/cron/morning/route.ts | grep -c "monitoringEnabled"`
 Expected: `0`
@@ -4175,6 +4202,8 @@ Thin. POST means "take a new reading"; the noun is what is being read, which lea
 - Create: `src/app/api/health/sites/route.ts`
 
 - [ ] **Step 1: Create `src/app/api/health/sites/route.ts`**
+
+*Superseded by the Batch 5 spec review (`9f42f8e`) and R58's fix pass (`2e35bca`) — the shipped shape is in the Post-build record and the code is the authority.* The one ruled change at build time: **`const checkedAt = new Date()` moves BELOW `await checkSites()`**, because `checkedAt` means the moment the reading was taken and the results describe the sites as of then, not as of the eight seconds earlier when the route started — the contract `saveHealthSnapshot`'s docblock states. The fix pass then made the floor branch read `if (existing !== null && isWithinCheckFloor(new Date(), existing.checkedAt))` (behaviour-identical, no `!`), counted R55's retry as a third Atlas round trip in the `maxDuration` docblock, and recorded that the response body is a debugging affordance rather than a contract.
 
 ```ts
 import { NextRequest, NextResponse } from "next/server";
@@ -4253,7 +4282,7 @@ Run: `npx tsc --noEmit`
 Expected: no output, exit code 0.
 
 Run: `npm run lint`
-Expected: no errors.
+Expected: **no *new* errors** — the four pre-existing `react-hooks/set-state-in-effect` errors and three warnings, and nothing beyond them (pre-build re-read, 2026-09-08).
 
 Run: `npm run build`
 Expected: `✓ Compiled successfully`, and the route table lists `/api/health/sites`.
@@ -4291,7 +4320,7 @@ Run every check in order. **Do not claim completion until each one has produced 
 - [ ] **Step 1: The standing trio**
 
 Run: `npm test`
-Expected: all suites pass. The seven files this plan touched or added — `format`, `stApi`, `queue`, `freelanceView`, `freelanceVariants`, `freelanceGaps`, `freelanceHealth`, `healthSnapshot`, `models`, `outreachHealth` — are all green, and `watchdog.test.ts` and `agentStatus.test.ts` from Plan A are still green and still untouched.
+Expected: all suites pass. The ten files this plan touched or added — `format`, `stApi`, `queue`, `freelanceView`, `freelanceVariants`, `freelanceGaps`, `freelanceHealth`, `healthSnapshot`, `models`, `outreachHealth` — are all green, and `watchdog.test.ts` and `agentStatus.test.ts` from Plan A are still green and still untouched.
 
 Run: `npx tsc --noEmit`
 Expected: no output, exit code 0.
@@ -4301,8 +4330,10 @@ Expected: `✓ Compiled successfully`, with `/api/health/sites` in the route tab
 
 - [ ] **Step 2: The two greps from spec §9**
 
-Run: `git grep "var(--alert)\|var(--amber)" src/`
+Run: `git grep "var(--alert)\|var(--amber)" -- src/ ':!src/styles/tokens.css'`
 Expected: **no output**, exit code 1.
+
+**Two corrections to this grep, both measured.** `src/styles/tokens.css:17` is a legitimate hit — the sentence inside the file's opening block comment explaining why those two aliases must not exist — so it is excluded, and the excluded hit is confirmed to be inside a comment. And the pathspecs go **after** `--`: written as `… src/ -- ':!src/styles/tokens.css'` the command exits 128 with `fatal: unable to resolve revision: src/`, because once `--` is present the leading `src/` is parsed as a revision (Task 16 re-run, 2026-09-09).
 
 The four stylesheets name `components.html` in their comments on purpose — that is the audit trail the port was designed to leave — so the grep looks for a real reference (an import, a link, a URL) rather than the bare name. This is the same pattern Plan A's Task 13 step 3 carries at HEAD.
 
@@ -4319,8 +4350,8 @@ Expected: **no output** — no view model reaches for a database, and nothing tu
 
 - [ ] **Step 4: No new dependency, no CSP change, no secret in a client path**
 
-Run: `git diff --stat 169c21e..HEAD -- package.json package-lock.json next.config.ts`
-Expected: **no output.** (`169c21e` is Plan A's own commit; nothing after it touches these three.)
+Run: `git diff --stat 7cbe5d9..HEAD -- package.json package-lock.json next.config.ts`
+Expected: **no output.** **The base is `7cbe5d9`, this plan's own starting commit, not `169c21e`** — A-2's Task 2 edited `next.config.ts` (the `/queue` redirect) after `169c21e`, so the older base reports a change that is not Plan B's (pre-build re-read, 2026-09-08).
 
 Run: `git grep -n "NEXT_PUBLIC" src/lib/ src/models/ src/app/api/health/`
 Expected: **no output** — `ST_API_SECRET` never leaves the server, and the two ShikksTracker URLs are built server-side and passed into the view models as arguments.
@@ -4332,6 +4363,9 @@ Expected: every import is from `@/lib/…` or `@/models/…` type-only. **No `ne
 
 Run: `git grep -c "process.env" src/lib/freelanceView.ts src/lib/freelanceVariants.ts src/lib/freelanceGaps.ts src/lib/freelanceHealth.ts src/lib/format.ts`
 Expected: **no output** — no view model reads an environment variable.
+
+Run: `npx vitest run src/lib/__tests__/viewModelPurity.test.ts`
+Expected: `Test Files  1 passed (1)`. **This is the check the greps above cannot make.** They read one line of one file; the purity test imports `mongoose` and all five view models and asserts `mongoose.modelNames()` is `[]`, which is the *transitive* claim — a value import two modules deep registering a discriminator would pass every grep here and fail this (R52).
 
 - [ ] **Step 6: Deck strings survived the round trip**
 
@@ -4351,11 +4385,53 @@ Run: `git status --porcelain`
 Expected: **no output** — everything is committed.
 
 Run: `ls "src/app/(app)/freelance/"`
-Expected: `page.tsx` only. **No `_blocks/` directory** — that is Plan C's, and this plan must not have created it.
+Expected: **`ViewSwitch.tsx`, `layout.tsx`, `page.tsx` and `queue/`** — A-2's files, not `page.tsx` alone (pre-build re-read, 2026-09-08). The assertion is unchanged: **no `_blocks/` directory**, which is Plan C's and this plan must not have created it.
+
+- [ ] **Step 7b: The lead's extra checks**
+
+Run: `npm run lint`
+Expected: exit 1 with **exactly** the four pre-existing `react-hooks/set-state-in-effect` errors (`queue/PushControls.tsx`, `queue/page.tsx`, `settings/page.tsx`, `login/page.tsx`) and three warnings — the same listing this plan started from, item for item.
+
+Run: `git log --oneline 7cbe5d9..HEAD | wc -l`
+Expected: the number of commits this plan added, reported rather than asserted.
+
+Run: `git status --short`
+Expected: **no output** — the tree is clean at hand-back.
 
 - [ ] **Step 8: Hand back to the design lead**
 
 Report: the trio green, both §9 greps empty, `../ShikksTracker` untouched, and the test totals per file. Spec §9's fourth item — `/freelance` observed on Vercel against real data — belongs to **Plan C** and is not claimed here.
+
+---
+
+## Post-build record
+
+What actually landed, in order, so a later reader is not left inferring it from `git log`. Base `7cbe5d9`; every commit on `master`, unpushed. Six batches, each spec-reviewed and quality-reviewed, each closing with one fix commit before the next began.
+
+- **Before the build** — `feaca0a`. The lead re-read the whole plan against HEAD `7cbe5d9` and rulings R33–R46. **R47:** Task 12's "one trap that contradicts the house pattern" header is false since R37 — `readOsSettings()` already reads with `findOne` and never upserts, so the health accessor is the same rule applied a second time, and what differs is only what a missing document means. Four amendments carried into the build: imports land in the task that consumes them (Task 6 no longer imports five names two commits early); lint expectations read "no new errors"; Task 16's step 4 base is `7cbe5d9` and its step 7 listing is A-2's four entries; the chaser route's idempotency comment starts at line 72, not 73.
+
+- **Batch 1, Tasks 1–5** — `c947047` `edb52c0` `2a8429f` `9ec72b5` `bfd707a`, then `4463bfa` (fixes) and `a8be064` (two comments). All five commits were byte-identical to the plan apart from one accepted type annotation. **R48:** `fetchVariantStats` throws on a 200 whose body is not an array instead of returning `[]`, which would have made a changed ShikksTracker contract read as `No approaches set up.` forever — the 29-day silent failure this repo exists to remember. **R49:** `fetchLiveAnchorIds` queries through the discriminator model (hoisted into one named constant carrying the file's single explained cast) and drops its `.limit`, because under `strictQuery: true` the base model silently strips `payload.replyToLogId` if the `type` key ever goes, and a limit equal to the expected row count turns a violated invariant into a silent wrong answer. Also accepted: the page-timeout test asserts the real argument sequence, `fetchSummary` drops a campaign row with no id, a non-object `contacts` reads as `null`, `numberCell` dashes a non-finite number, `formatAge` clamps a negative age, and `outreachHealth.ts` pluralises through `pluralise`.
+
+- **Batch 2, Tasks 6–8** — `e0802a9` `05d582a` `9c034d7`, then `6fb16da` (fixes) and `ad3b1a9` (three follow-ups). Byte-exact under the import amendment. **R50 — the ruling that changed the most:** `Nothing waiting on you.` requires four **measured** zeros; an absence suppresses it. This amends R35's "a failed gap read counts as absent" clause, which would have printed the page's central summary line directly under a card reading `— / ShikksTracker didn't report how many contacts there are`. `zeroOrAbsent` became a measured-zero test. Also: `DASH` exported from `format.ts` as the one em-dash; Block C's bound sentence uses the literal `campaigns`; six mutation probes added, then two more pinning the `drafts` and `approved` terms on their own.
+
+- **Batch 3, Tasks 9–10** — `563f28a` `001a6af`, then `bab6533` (R52) and `d5433f2` (R51, R53 and the accepted list), then `6638101` (R54). Twenty-four mutation probes; sixteen caught. **R51:** an unreported overdue feed is not a measured emptiness — `BlockE` gains an `absent` kind and `rows` gains `absentNote`, and the hero figure follows, because `overdueActions ?? []` was discarding the distinction in the last line that could use it. **R52:** `DRAFT_CHANNELS` / `DraftChannel` move to `src/lib/draftChannels.ts`, an import-free leaf, because importing `freelanceGaps` was registering three Mongoose models and a discriminator through `chaser.ts`; `src/lib/__tests__/viewModelPurity.test.ts` pins `mongoose.modelNames() === []`, the transitive check Task 16's grep cannot make. **R53:** Block E orders every row longest-wait-first with a stable tie, because replies-then-overdues let 25 reply gaps hide every overdue follow-up under the 20-row bound. **R54:** the `Needs you` card distinguishes an absence from a failure — `BlockAInput.needsYouCount: number | null` became `needsYou: NeedsYouFigure`, and `gapCount` became `needsYouFigure`, so the hero and the block beneath it can never disagree about the register.
+
+- **Batch 4, Tasks 11–13** — `8794284` `a336744` `b5efd55`, then `fe512b1` (fixes). Twenty-seven mutants, twenty-two caught; the pure logic was right and pinned at the exact 30-hour millisecond, and the database half had no tests at all. **R55:** the health snapshot is a fixed-`_id` singleton (`HEALTH_SNAPSHOT_ID = "singleton"`) whose write survives the first-write race with exactly one retry on `11000` — `OsSettings`' `{}` filter would leave two documents on two racing `Check now` presses and make the strip *permanently* amber, a wrong strip rather than a stale one. **R56:** `HealthStripInput.snapshot` widens to `StoredHealth | null | "unread"`, so a *failed* local read prints `sites — unknown` rather than claiming `sites never checked` about a reading it never saw. **R57:** with monitoring off the aged stamp keeps its words and loses its hue, because the disabled cron writes no snapshot by design and ageing amber forever is an alarm about an absence Riku created. The accessor gained its first real test block, and `checkedAt` was fixed as "the moment the reading was taken".
+
+- **Batch 5, Tasks 14–15** — `e6cdf8e` `9f42f8e`, then `2e35bca` (fixes). Byte-exact apart from the ruled `checkedAt` move (captured after `checkSites()` resolves, not before). **R58:** a failed snapshot write is named on its own morning, in its own words. The catch counts `itemsFailed: 1`, but the watchdog runs *before* site-health and reads yesterday's record, so the digest would have said `All clear` beside the heaviest red badge in the rail. `MorningOutcomes.siteHealth` gained `snapshotStored: boolean` and `buildProblems` pushes **`site reading could not be stored`** — pinned in `src/lib/__tests__/buildProblems.test.ts`, which is `buildProblems`' own sibling test file (R58's text first said `digest.test.ts`; corrected at the Batch 5 session close).
+
+- **Batch 6, Task 16** — `c857354`. Run twice: the first attempt reached step 7 and was cut off by the session's rate limit before the lead's extra checks, so it was **re-run in full** at `747958c`. **Verified, every expected value met:** **517 tests across 29 files**; `npx tsc --noEmit` clean; `npm run lint` at the four pre-existing `react-hooks/set-state-in-effect` errors and three warnings; `npm run build` clean with `/api/health/sites`, `/freelance` and `/freelance/queue` in the route table, run beside Riku's dev server with `.next` untouched. Both §9 greps empty; `../ShikksTracker` untouched; no diff to `package.json`, the lockfile or `next.config.ts` since `7cbe5d9`; no `NEXT_PUBLIC` under `src/lib/`, `src/models/` or the health route; every import in the four view models a `@/lib/…` value or `import type`, `format.ts` a true leaf with no imports at all, `viewModelPurity.test.ts` green, no `process.env`; the three deck strings at one each; `freelance/` listing `ViewSwitch.tsx layout.tsx page.tsx queue` and no `_blocks/`; tree clean; **35 commits since `7cbe5d9`.** One correction came out of the re-run: step 2's exclusion grep must be written `git grep "var(--alert)\|var(--amber)" -- src/ ':!src/styles/tokens.css'`, pathspecs after the `--`, or git parses the leading `src/` as a revision and exits 128. Spec §9's fourth item — observed on Vercel against real data — is Plan C's and is not claimed.
+
+**Three strings await Riku's confirmation**, presented as one checklist and marked provisional in the content deck until he answers: `ShikksTracker didn't report overdue follow-ups.` (Block E) and its hero-caption form `ShikksTracker didn't report overdue follow-ups` without the full stop (Block A's third card) — one pair, R51 and R54 — and `sites — unknown` (Block F, R56). Should he reject the pair, the fallback is the block-level `Couldn't load what's waiting.`, the Block B/C precedent for a missing block — never `Nothing waiting.`
+
+**Carried forward, none of it Plan B's to fix:**
+
+- `src/app/(app)/_shell/AgentsBlock.tsx` captions its unknown state with a literal em-dash and should import `DASH` when that Plan A file is next opened.
+- `outreachHealth.ts` and `watchdog.ts` keep their own `HOUR_MS` copies; `format.ts` now exports the one this plan's files read.
+- `chaser.ts`'s `daysSince` could read `msSince`.
+- `fetchAttention` validates no field of `AttentionItem`, so an unreadable `nextActionAt` renders an amber `follow-up due just now` and a missing `contactId` yields `/contacts/undefined`. A boundary read belongs in `stApi.ts` whenever that file is next opened.
+- `stApi.ts` is at ~600 lines and is still one door to ShikksTracker. If a fifth call joins it, split into contract / reads / the draft POST and keep the classifier's docblock with the POST.
+- Two older manual items stay open at Riku's choice: the optional `Send test` push, and whether the switch's `#101318` track reads right on specimen 07.
 
 ---
 

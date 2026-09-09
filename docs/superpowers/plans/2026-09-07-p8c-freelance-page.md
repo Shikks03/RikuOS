@@ -59,6 +59,8 @@ Built first because it is the only block that survives a total ShikksTracker out
 
 - [ ] **Step 1: Create `src/app/(app)/freelance/_blocks/CheckNow.tsx`**
 
+**Amendment from Plan B's Batch 5 review: `check()` must read `res.ok`.** As written below it discards the response entirely, so a request that *succeeds* while the write inside it fails — `getHealthSnapshot` returns, `saveHealthSnapshot` throws, the route 500s — leaves the stamp unchanged with no signal at all, which is indistinguishable from a reading that genuinely did not move. Every other client in this repo checks `res.ok`. Swallowing a **network** failure stays right (the unchanged reading already says nothing new was learned); what must not be swallowed is a response that arrived and said no.
+
 ```tsx
 "use client";
 
@@ -122,9 +124,9 @@ import CheckNow from "./CheckNow";
  * earn their borders, and a structural alarm is quieter and stronger than more
  * colour.
  *
- * The marker is the system's hued dot, never a glyph: U+26A0 renders in emoji
- * presentation on several platforms, and a colour glyph has no place in a
- * monochrome instrument panel.
+ * The marker is the system's hued dot, never a glyph — the reason is written
+ * once, in freelanceHealth.ts's header, and is not copied here: two copies of a
+ * rule drift, and the view model is where the decision lives.
  *
  * Markup is specimen 01 (quiet) and specimen 02 (alarm) of
  * docs/design/p8-mockup.html, verbatim.
@@ -205,7 +207,7 @@ The first renderable page. Blocks A to E arrive in Tasks 3 to 7; until then the 
 
 **Three phases, in this order, and the order is load-bearing:**
 
-1. **The local reads**, in one `try/catch`: `connectDB`, `getOsSettings` (for `chaserNDays` and `monitoringEnabled`) and `getHealthSnapshot`. A failure here must degrade three things and blank nothing.
+1. **The local reads**, in one `try/catch`: `connectDB`, **`readOsSettings`** (for `chaserNDays` and `monitoringEnabled`) and `getHealthSnapshot`. A failure here must degrade three things and blank nothing. **Never `getOsSettings()` — that accessor is `updateOsSettings({})` and therefore a write, so reading it here would make every view of this page a primary write (R37).** `readOsSettings` is the read-only accessor built for exactly this: `findOne`, no upsert, schema defaults for anything the document does not carry.
 2. **The three ShikksTracker calls**, in parallel, through `Promise.allSettled` — that word *is* the per-block degradation mechanism.
 3. **The gap read**, which needs both the attention result and the database, so it cannot join phase 1.
 
@@ -216,7 +218,7 @@ The first renderable page. Blocks A to E arrive in Tasks 3 to 7; until then the 
 
 ```tsx
 import { connectDB } from "@/lib/db";
-import { getOsSettings } from "@/lib/osSettings";
+import { readOsSettings } from "@/lib/osSettings";
 import { getHealthSnapshot } from "@/lib/healthSnapshot";
 import type { StoredHealth } from "@/lib/healthSnapshot";
 import { fetchLiveAnchorIds } from "@/lib/queue";
@@ -232,7 +234,7 @@ import {
 } from "@/lib/stApi";
 import { FAIL_LINES, buildBlockA, buildBlockB, buildBlockC } from "@/lib/freelanceView";
 import { buildBlockD } from "@/lib/freelanceVariants";
-import { buildBlockE } from "@/lib/freelanceGaps";
+import { buildBlockE, needsYouFigure } from "@/lib/freelanceGaps";
 import { buildHealthStrip } from "@/lib/freelanceHealth";
 import HealthStrip from "./_blocks/HealthStrip";
 
@@ -275,21 +277,29 @@ export default async function FreelancePage() {
   // --- Phase 1: the local reads, in ONE try/catch ---------------------------
   //
   // A database failure must never blank the route. It degrades exactly three
-  // things: the gap count reads `—` (`couldn't load`), the stored site reading
-  // is absent, and the monitoring switch is unknown. Everything ShikksTracker
-  // answers still renders.
+  // things: the gap figure reads `—` (`couldn't load`), the stored site reading
+  // is UNREADABLE rather than absent (the strip stamps `sites — unknown`), and
+  // the monitoring switch is unknown. Everything ShikksTracker answers still
+  // renders.
   let chaserNDays = DEFAULT_CHASER_N_DAYS;
   let monitoringEnabled = false;
-  let snapshot: StoredHealth | null = null;
+  // "unread" is not null: null means the read succeeded and nothing has ever
+  // been written, "unread" means the read itself failed and nothing is known
+  // (R56). Rendering the second as `sites never checked` would be the strip
+  // claiming to have seen something it never saw.
+  let snapshot: StoredHealth | null | "unread" = null;
   let dbOk = false;
   try {
     await connectDB();
-    const [settings, stored] = await Promise.all([getOsSettings(), getHealthSnapshot()]);
+    // readOsSettings, never getOsSettings: the latter is updateOsSettings({})
+    // and would make every page view a primary write (R37).
+    const [settings, stored] = await Promise.all([readOsSettings(), getHealthSnapshot()]);
     chaserNDays = settings.chaserNDays;
     monitoringEnabled = settings.monitoringEnabled;
     snapshot = stored;
     dbOk = true;
   } catch (err) {
+    snapshot = "unread";
     console.error("[freelance] local reads failed:", err);
   }
 
@@ -343,16 +353,18 @@ export default async function FreelancePage() {
     contactsBaseUrl: `${baseUrl}/contacts`,
   });
 
-  // Block A's third card renders the SAME computed count Block E renders, by
-  // construction rather than by coincidence: `rows` gives the count, `empty`
-  // gives 0, and anything else is an absence.
-  const needsYouCount =
-    blockE.kind === "rows" ? blockE.count : blockE.kind === "empty" ? 0 : null;
-
   const blockA = buildBlockA({
     queue: summary?.queue ?? { drafts: null, approved: null },
     contacts: summary?.contacts ?? null,
-    needsYouCount,
+    // Block A's third card renders the SAME figure Block E renders, by
+    // construction rather than by coincidence. This is an IMPORT, not a
+    // ternary: the inline `rows ? count : empty ? 0 : null` this replaced
+    // collapsed `failed` and `absent` into one null, and the card then said
+    // `couldn't load` above a block saying `didn't report` — two registers
+    // disagreeing on one screen (R54). needsYouFigure is an exhaustive switch,
+    // so a fifth Block E kind is a compile error here rather than a silent
+    // fourth reading.
+    needsYou: needsYouFigure(blockE),
     draftsUrl: `${baseUrl}/review`,
   });
   const blockB = buildBlockB(summary?.contacts ?? null);
@@ -868,6 +880,8 @@ MSG
 
 The same disclosure, with **no count** in the summary: the collapsed line carries the meaning instead. `open` **is** passed here, from the view model's `defaultOpen` (R31) — open by default only while every approach has zero sends.
 
+**Checkpoint from Plan B's Batch 3 review — a group with zero rows.** Both groups are always built, so if every approach ever sits on one channel (all email, or none of them email) one group arrives with `rows: []`. As the JSX below is written, it still renders an eyebrow, an explanation line and a header row over nothing. **Decide it here**, in this plan: suppress the empty group, or keep the empty header as the standing proof that the other half exists. It is a real state, not a defensive branch — the "not measurable" group is half the table by design, and today's four approaches are two of each.
+
 **Files:**
 - Create: `src/app/(app)/freelance/_blocks/Approaches.tsx`
 - Modify: `src/app/(app)/freelance/page.tsx`
@@ -1295,6 +1309,29 @@ Expected: exactly eight files — `Approaches.tsx`, `Campaigns.tsx`, `CheckNow.t
 
 ---
 
+## Checkpoints from Plan B — 2026-09-09
+
+Plan B is closed (517 tests, `tsc` clean, build clean, 35 commits since `7cbe5d9`). It left this plan seven amendments and four standing questions. **The seven are already written into the text above**; they are listed here so the lead can tick them off in one place when Plan C is reviewed. **This plan is still an unreviewed draft** — nothing below has been ruled on for Plan C itself.
+
+**Applied above, each traceable to a Plan B ruling:**
+
+- [ ] The page reads `chaserNDays` and `monitoringEnabled` through **`readOsSettings()`**, never `getOsSettings()` — prose, import and call site (R37; recorded in the Batch 4 review).
+- [ ] The phase-1 `catch` sets **`snapshot = "unread"`**, and the declaration widens to `StoredHealth | null | "unread"`. `null` means nothing has ever been written; `"unread"` means the read itself failed and the strip stamps `sites — unknown` (R56).
+- [ ] Block A's third card reads **`needsYou: needsYouFigure(blockE)`**, imported from `freelanceGaps.ts`, replacing the inline ternary that collapsed `failed` and `absent` into one null (R54).
+- [ ] The `BlockE` contract in the type-consistency list is a **four**-member union — `absent` and `absentNote` (R51). `NeedsYou.tsx` renders both.
+- [ ] **`CheckNow` checks `res.ok`** (Batch 5 review). A network failure stays swallowed; a response that arrived and said no must not be.
+- [ ] **A Block D group with zero rows** — decide whether an empty group renders its eyebrow, explanation and headers over nothing (Batch 3 review). Stated at Task 6.
+- [ ] **`HealthStrip.tsx` points at `freelanceHealth.ts`'s marker paragraph** rather than copying it (Batch 4 review). Two copies of one rule drift.
+
+**Standing questions, none of them settled:**
+
+- [ ] **`withDeadline` on the snapshot read (R38).** `AgentsBlock` wraps its connect-plus-reads in one `withDeadline(…, 5000, label)` because a degraded Atlas otherwise holds the whole response open for up to ~55 s, and this page's phase-1 block is a Mongo read on the same request path. `withDeadline` is exported from `src/lib/deadline.ts`; the 5 s value is currently a module-local `RAIL_READ_TIMEOUT_MS` inside `src/app/(app)/_shell/AgentsBlock.tsx`, so adopting it means either exporting that constant or declaring this page's own. R38 named this a Plan C review checkpoint and it has not been decided.
+- [ ] **Whether `/freelance` exports `metadata.title`.** Recorded as a Plan C ruling when Plan A shipped its placeholder; this plan currently exports none.
+- [ ] **The `<div className="sumrow">` inside `<summary>`.** Deviation 2 above states the cost in full: `<summary>`'s content model is phrasing content or a single heading element, so a `<div>` wrapper carrying an `<h2>` is not strictly conformant. Implemented as ruled; the alternative — `<span className="fl-h">` inside the two `<summary>` elements only — is a one-word change per file if the lead prefers conformance over heading semantics.
+- [ ] **`lines` under R50.** Block A's fallback `Nothing waiting on you.` now requires four *measured* zeros and is suppressed by any absence, so it arrives as an ordinary `SayLine` with `figure: null` or does not arrive at all. `StateOfPlay` renders `blockA.lines` as it stands — **no change expected**, confirmed by reading rather than assumed.
+
+---
+
 ## Self-review
 
 **1. Spec coverage.** Every section in Plan C's scope maps to a task:
@@ -1303,7 +1340,7 @@ Expected: exactly eight files — `Approaches.tsx`, `Campaigns.tsx`, `CheckNow.t
 |---|---|
 | §7.4 `page.tsx`: `force-dynamic`, `maxDuration = 30`, the `Promise.allSettled` fan-out, `ST_PAGE_TIMEOUT_MS` on all three calls | 2 |
 | §7.4 the two URLs built server-side from `readStConfig().baseUrl` | 2 |
-| §7.4 the local reads (`connectDB`, `getOsSettings`, `getHealthSnapshot`) and `fetchLiveAnchorIds`, in `try/catch` | 2 |
+| §7.4 the local reads (`connectDB`, `readOsSettings`, `getHealthSnapshot`) and `fetchLiveAnchorIds`, in `try/catch` | 2 |
 | §4.1 Block A — three cards, the track, the statement lines | 3 |
 | §4.2 Block B | 4 |
 | §4.3 Block C, the native disclosure, the bound, the honesty note | 5 |
@@ -1340,7 +1377,7 @@ Expected: exactly eight files — `Approaches.tsx`, `Campaigns.tsx`, `CheckNow.t
 - `BlockB` — the three-member union `failed` / `empty` / `stages`; `Pipeline` handles all three, and reads `summary.total`, `summary.totalWord`, `summary.hot`, `summary.hotWord`, `rows[].key/label/count`, `emptyNote`, `absentNote`, `hotAbsentNote`.
 - `BlockC` — `count`, `headers`, `rows[].id/name/cells`, `bound`, `honesty`. Cells are keyed by `headers[index + 1]`, which is why `headers` has one more entry than `cells`.
 - `BlockD` — `defaultOpen`, `collapsed` (the `statement` / `best` union), `groups[].eyebrow/explain/headers/rows`, `honesty`. `ApproachRow.cells` is 3 long in group 1 and 2 long in group 2, and both are keyed by `group.headers[index + 1]`.
-- `BlockE` — `count`, `rows[].id/kind/businessName/href/channel/waiting/waitingIsStale/snippet/reason`, `bound`. `channel === null` renders the empty span.
+- `BlockE` — a **four**-member union since R51: `failed` / **`absent`** / `empty` / `rows`. `absent` carries a `line` (`ShikksTracker didn't report overdue follow-ups.`) and renders in the `.fl-absent` register, never as `Nothing waiting.`; `rows` carries `count`, `rows[].id/kind/businessName/href/channel/waiting/waitingIsStale/snippet/reason`, `bound` and **`absentNote: string | null`**, the same sentence beneath measured rows when only the overdue feed is missing. `NeedsYou.tsx` must render both. `channel === null` renders the empty span.
 - `BlockF` — `quiet` with `parts: HealthPart[]`, `alarm` with `warnings`/`fine`/`stamp`. `HealthWarning.tone` is `"stale" | "missing"`, and `.fl-warn.is-stale` / `.fl-warn.is-missing` are the two classes in `components.css`, so `is-${warning.tone}` is exhaustive.
 - `FAIL_LINES.page.said` / `.because` are the only two `FAIL_LINES` members this plan reads directly; the four per-block sentences arrive inside their block's `failed` member.
 - Every class name used here exists in the shipped `src/styles/components.css`: `.stats`, `.stat`, `.stat-top`, `.lbl`, `.more`, `.fig`, `.track`, `.sub`, `.fl-say`, `.fl-sect`, `.eyebrow`, `.fl-h`, `.fl-title`, `.fl`, `.fl-body`, `.fl-sum`, `.fl-stages`, `.fl-stage`, `.nm`, `.ct`, `.fl-note`, `.fl-absent`, `.fl-empty`, `.disclose`, `.sumrow`, `.fl-count`, `.fl-collapsed`, `.fl-open`, `.fl-table`, `.is-campaigns`, `.fl-thead`, `.fl-trow`, `.zero`, `.dash`, `.fl-group`, `.fl-explain`, `.fl-bound`, `.honesty`, `.fl-headrow`, `.fl-rows`, `.fl-row`, `.fl-biz`, `.arr`, `.tag`, `.pwhen`, `.is-stale`, `.fl-snip`, `.fl-why`, `.fl-fail`, `.said`, `.because`, `.fl-health`, `.quiet`, `.alarm`, `.line`, `.aged`, `.fl-warn`, `.is-missing`, `.fl-fine`, `.fl-stamp`, `.btn`, `.app-content`.

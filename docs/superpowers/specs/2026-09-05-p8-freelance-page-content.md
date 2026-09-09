@@ -141,6 +141,7 @@ The page is six stacked blocks. Order is fixed — it was decided with Riku and 
 **Missing-data forms** (the API replied but omitted the field — visually distinct from a zero):
 - `ShikksTracker didn't report how many drafts are waiting`
 - `ShikksTracker didn't report how many contacts there are`
+- `ShikksTracker didn't report overdue follow-ups` — the caption on the third hero card (spec §4.1, `Needs you`) when the overdue feed never arrived. **No full stop**: it is the hero-register form of Block E's own sentence below, and hero captions are fragments (R54) — *provisional, awaiting Riku's confirmation (2026-09-09)*
 
 **When every line is hidden** (nothing waiting, everyone contacted) the block shows a single line:
 - `Nothing waiting on you.`
@@ -181,6 +182,14 @@ The page is six stacked blocks. Order is fixed — it was decided with Riku and 
 - One remaining: `Nothing yet at lost`
 - None remaining: the line is absent
 
+**A stage the API omitted must not fold into that line** — that line means a measured zero. It gets a line of its own instead:
+- `ShikksTracker didn't report every pipeline stage.`
+
+**Hot not reported:** the `· 2 hot` clause is dropped and one line says so:
+- `ShikksTracker didn't report how many are hot.`
+
+*(Both sentences were ratified in the Batch 2 review, 2026-09-08, and are already the strings `freelanceView.ts` ships; the deck records them here so it stays the authority it claims to be.)*
+
 **No contacts at all:** `No contacts yet.`
 **Failed to load:** `Couldn't load the pipeline.`
 
@@ -219,18 +228,20 @@ Lost            5
 **Collapsed row:** `Campaigns` · `2` · expand affordance
 **Singular:** `1`
 
-**Expanded — column headers:** `Sent` · `Opened` · `Clicked` · `Replied`
+**Expanded — column headers:** `Campaign` · `Sent` · `Opened` · `Clicked` · `Replied`
+
+The name column is headed `Campaign` (R26, ratified 2026-09-07): a headerless name column beside four headed ones reads unfinished, and it parallels Block D's `Approach`. **No rate column, ever.**
 
 **Real rows today:**
 
-| Name | Sent | Opened | Clicked | Replied |
+| Campaign | Sent | Opened | Clicked | Replied |
 |---|---|---|---|---|
 | Test One | 5 | 2 | 0 | 2 |
 | Test number 2 | 0 | 0 | 0 | 0 |
 
 **Plausible full rows** (invented):
 
-| Name | Sent | Opened | Clicked | Replied |
+| Campaign | Sent | Opened | Clicked | Replied |
 |---|---|---|---|---|
 | September cold — Cebu cafés | 142 | 61 | 14 | 11 |
 | August revival — old enquiries | 68 | 40 | 9 | 7 |
@@ -322,7 +333,9 @@ Send the revised proposal
 
 **Waiting durations** read as `4 hours ago`, `2 days ago`, `3 weeks ago`. Under an hour: `just now`.
 
-**Nothing waiting:** `Nothing waiting.` — *not* `0`. This is today's state, so it must look intentional rather than like a failure.
+**Nothing waiting:** `Nothing waiting.` — *not* `0`. This is today's state, so it must look intentional rather than like a failure. It means **both** feeds reported and nothing survived.
+
+**Overdue follow-ups not reported:** `ShikksTracker didn't report overdue follow-ups.` — never `Nothing waiting.`, because an absence is not a measured emptiness (R51). The same sentence sits under the measured rows when gaps exist and only the overdue feed is missing — *provisional, awaiting Riku's confirmation (2026-09-09)*
 
 **Failed to load:** `Couldn't load what's waiting.`
 **Bounded list:** `Showing 20 of 41.`
@@ -352,7 +365,7 @@ Ages read as hours below two days (`6h`, `36h`), then days (`3d`, `29d`).
 - `Meowchi timed out`
 - `Meowchi unreachable`
 
-**Snapshot age:** `checked 6h ago` · never run: `sites never checked`
+**Snapshot age:** `checked 6h ago` · past 30 hours: `sites not checked since 2d ago` (amber with monitoring on, grey with it off — R57) · never run: `sites never checked` · the stored reading could not be read at all: `sites — unknown` — the register of `Engine — unknown`, grey, and distinct from `sites never checked`, which is a thing the page actually knows (R56) — *provisional, awaiting Riku's confirmation (2026-09-09)*
 
 **Control:** `Check now` → while running: `Checking…`
 
@@ -381,8 +394,10 @@ Couldn't reach ShikksTracker.
 State of play, pipeline, campaigns, approaches and what's
 waiting all come from there.
 
-Engine — unknown · Meowchi ok · checked 6h ago
+Engine — unknown · all sites ok · checked 6h ago
 ```
+
+*Corrected 2026-09-09 (M7): the earlier example read `Engine — unknown · Meowchi ok · checked 6h ago`, a line the strip cannot produce. Individual healthy site names appear only in the alarm form's indented `fine` line; while every site is up the quiet form collapses them into `all sites ok`, and the moment one is down the strip becomes the alarm card instead.*
 
 **Busy:** only `Check now` has a busy state. Everything else arrives with the page.
 

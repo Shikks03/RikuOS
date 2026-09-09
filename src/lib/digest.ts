@@ -21,7 +21,10 @@ export interface DigestInput {
   pending: number;
   /** null means the OS API call failed — reported as unavailable, never as zero. */
   attention: { repliedUnanswered: number; overdue: number } | null;
-  /** Watchdog anomalies, down sites, and any job that failed in this same run. */
+  /**
+   * Watchdog anomalies, down sites, and any job that failed in this same run
+   * or whose write failed inside it.
+   */
   problems: string[];
   /** Agents switched off in OsSettings, so a pause cannot be forgotten. */
   offAgents: string[];
@@ -115,12 +118,18 @@ export interface MorningOutcomes {
  * condition would report every healthy site as down, and a route is not
  * testable (CLAUDE.md: handlers stay thin, the logic layer holds behaviour).
  *
- * A job that failed in THIS run is reported from its in-memory outcome, not
- * from the watchdog: the watchdog reads run records, so it would otherwise
- * only notice tomorrow. The expiry sweep is the one job that both runs before
- * the watchdog and writes its record first, so the watchdog re-reads the row
- * that was just written — hence the filter, without which a single failed
- * sweep is counted as two problems and the title's count is wrong.
+ * A job that failed in THIS run — or that ran but could not store its write —
+ * is reported from its in-memory outcome, not from the watchdog: the watchdog
+ * reads run records, so it would otherwise only notice tomorrow. That is why
+ * site-health carries snapshotStored beside ok: the job itself did not fail,
+ * so the watchdog only ever sees the failed write tomorrow, in the run record,
+ * as a red `1 item failed` — and only this file can name it on the morning it
+ * happened (R58).
+ *
+ * The expiry sweep is the one job that both runs before the watchdog and
+ * writes its record first, so the watchdog re-reads the row that was just
+ * written — hence the filter, without which a single failed sweep is counted
+ * as two problems and the title's count is wrong.
  *
  * That filter is deliberately as narrow as the duplicate it removes: only a
  * `failed` anomaly, and only when the sweep really did fail here. A `stale` or
