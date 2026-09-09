@@ -7,11 +7,11 @@ import { useRouter } from "next/navigation";
  * The only control on the page, and the page's only client code.
  *
  * router.refresh() re-runs the server render and reconciles in place — with the
- * one exception named below, a quiet-to-alarm flip that remounts this island —
- * so the new reading arrives through the same server path as a page load and
- * this island never has to know a snapshot's shape. That is also why the
- * EXISTING READING STAYS ON SCREEN while the check runs: nothing here blanks
- * the strip.
+ * one exception named below, a flip between the strip's two forms that remounts
+ * this island — so the new reading arrives through the same server path as a
+ * page load and this island never has to know a snapshot's shape. That is also
+ * why the EXISTING READING STAYS ON SCREEN while the check runs: nothing here
+ * blanks the strip.
  *
  * `busy` covers the POST and the refresh that follows it — useTransition's
  * isPending is what makes the second half honest, since router.refresh()
@@ -67,12 +67,13 @@ export default function CheckNow() {
     }
     setFailed(!ok);
     setPosting(false);
-    // Unconditional, INCLUDING after a failure. requireSession returns 401 on
-    // an expired cookie, and this refresh's RSC request is redirected to /login
-    // by src/proxy.ts's fail-closed check (proxy.ts:100-102), which answers
-    // before the (app) layout is ever reached; the layout's own session check
-    // is defence in depth for a matcher miss. That is the right outcome for the
-    // one failure with a real remedy, and it is free.
+    // Unconditional, INCLUDING after a failure. The proxy returns 401 on an
+    // expired cookie (requireSession behind it), and this refresh's RSC request
+    // is redirected to /login by src/proxy.ts's fail-closed check
+    // (proxy.ts:100-102), which answers before the (app) layout is ever
+    // reached; the layout's own session check is defence in depth for a matcher
+    // miss. That is the right outcome for the one failure with a real remedy,
+    // and it is free.
     startTransition(() => {
       router.refresh();
     });

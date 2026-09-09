@@ -45,10 +45,10 @@ export const metadata: Metadata = { title: "Freelance" };
 
 /**
  * `PromiseSettledResult` -> the value, or null — and a rejection is LOGGED with
- * the call named, so `Couldn't reach ShikksTracker.` on screen has a line in
- * the log saying which of 401 / 503 / 404 / timeout it was; stApi's messages
- * were written to say exactly that, and readStConfig omits the secret from its
- * message by design (R70).
+ * the call named, so the sentence on screen, a block's or the page's, has a
+ * line in the log saying which of 401 / 503 / 404 / timeout it was; stApi's
+ * messages were written to say exactly that, and readStConfig omits the secret
+ * from its message by design (R70).
  */
 function settled<T>(result: PromiseSettledResult<T>, label: string): T | null {
   if (result.status === "fulfilled") return result.value;
@@ -79,7 +79,8 @@ export default async function FreelancePage() {
   // A database failure must never blank the route. It degrades exactly four
   // things: the gap figure reads `—` (`couldn't load`), the stored site reading
   // is UNREADABLE rather than absent (the strip stamps `sites — unknown`), the
-  // monitoring switch is unknown, and `chaserNDays` falls back to
+  // monitoring switch is unknown (which the strip never reads in that state, so
+  // it has no rendered effect either), and `chaserNDays` falls back to
   // OS_SETTINGS_DEFAULTS.chaserNDays, so the attention call below runs on a
   // window Riku did not set. The fourth is harmless: `days` bounds only
   // `repliedUnanswered` on ShikksTracker's side, and phase 3 (Task 3) is gated
