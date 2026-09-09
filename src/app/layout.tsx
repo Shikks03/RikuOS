@@ -35,7 +35,12 @@ const body = IBM_Plex_Sans({
 const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--mono" });
 
 export const metadata: Metadata = {
-  title: APP_NAME,
+  // The product name is joined HERE and nowhere else: a page exports one word
+  // (`title: "Freelance"`) and Next joins it to APP_NAME with the middot the
+  // page already uses for exactly this job — .fl-sum i, .fl-fine i, all at
+  // --ink-4. A page that exports no title falls through to `default` and reads
+  // APP_NAME alone, which is what /settings and /login should say (R64).
+  title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
   // "black", not "black-translucent": translucent slides content under the
   // status bar and needs the safe-area layout work this phase defers.
   appleWebApp: { capable: true, statusBarStyle: "black", title: APP_NAME },

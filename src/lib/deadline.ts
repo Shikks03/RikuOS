@@ -11,6 +11,9 @@
  * that lands late is harmless. It only stops the caller waiting.
  */
 
+/** Clears a cold Atlas connect with room; half connectDB's server-selection bound. */
+export const MONGO_READ_TIMEOUT_MS = 5000;
+
 /**
  * Resolves with `promise` if it settles within `ms`, otherwise rejects with
  * `${label} timed out after ${ms}ms`. A rejection from `promise` propagates

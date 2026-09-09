@@ -1,5 +1,6 @@
 import { connectDB } from "@/lib/db";
-import { withDeadline } from "@/lib/deadline";
+import { MONGO_READ_TIMEOUT_MS, withDeadline } from "@/lib/deadline";
+import { DASH } from "@/lib/format";
 import { readOsSettings } from "@/lib/osSettings";
 import type { OsSettingsValues } from "@/lib/osSettings";
 import { RAIL_AGENTS, deriveAgentStatuses, fetchLatestRuns } from "@/lib/watchdog";
@@ -81,9 +82,6 @@ export function AgentsSkeleton() {
   );
 }
 
-/** Clears a cold Atlas connect with room; half connectDB's server-selection bound. */
-const RAIL_READ_TIMEOUT_MS = 5000;
-
 /** Connect and both reads as one awaitable, so one deadline covers all three. */
 async function readRail(): Promise<{ latest: LatestRun[]; settings: OsSettingsValues }> {
   await connectDB();
@@ -113,7 +111,7 @@ export default async function AgentsBlock() {
   try {
     const { latest, settings } = await withDeadline(
       readRail(),
-      RAIL_READ_TIMEOUT_MS,
+      MONGO_READ_TIMEOUT_MS,
       "rail read"
     );
     statuses = deriveAgentStatuses(
@@ -133,7 +131,7 @@ export default async function AgentsBlock() {
             key={expectation.agent}
             agent={expectation.agent}
             className="agent is-grey"
-            caption="—"
+            caption={DASH}
           />
         ))}
       </div>
