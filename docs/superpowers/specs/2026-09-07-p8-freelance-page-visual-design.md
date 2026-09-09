@@ -408,7 +408,7 @@ Rows: name at 600 / 13px / `--ink`, the four numbers right-aligned at 12.5px `--
 - A measured `0` cell is `0` in `--ink-4` (`.zero`).
 - A missing cell is `—` (`.dash`).
 
-**The pixel footnote sits directly under the table**, in the honesty-note register (`.honesty`, 11.5px `--ink-4` with a 13px info glyph): `Open counts come from tracking pixels and undercount anyone whose mail client blocks images.`
+**The pixel footnote closes the block**, in the honesty-note register (`.honesty`, 11.5px `--ink-4` with a 13px info glyph): `Open counts come from tracking pixels and undercount anyone whose mail client blocks images.` **Order inside `.fl-open`: table, then `.fl-bound`, then `.honesty`** (amended in the 2026-09-09 docs pass, N5 — the earlier wording said "directly under the table" and read against the bound below). The bound at `margin-top:10px` sits tight under the table as a statement about its extent; the honesty note at `margin-top:14px` reads last, as the block's footnote. It is the same order Block E uses, where the bound also closes the list.
 
 **Display bound: 20.** Past that, one `.fl-bound` statement below the table: `Showing 20 of 34 campaigns.` — 11.5px `--ink-4`, **body face, sentence case, left-aligned**. It is a statement to the reader, not a machine label, so it never takes mono caps.
 

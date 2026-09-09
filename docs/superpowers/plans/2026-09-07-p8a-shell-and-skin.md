@@ -76,6 +76,14 @@ P8 is three plans. **Plan A (this file)** builds the shell and the skin. **Plan 
 | `src/app/(app)/freelance/_blocks/NeedsYou.tsx` | Block E. |
 | `src/app/(app)/freelance/_blocks/HealthStrip.tsx` | Block F. |
 | `src/app/(app)/freelance/_blocks/CheckNow.tsx` | `"use client"` — the page's only client island. |
+| `src/styles/components.css` | **C modifies** — one selector. `.fl-health.quiet .line .aged` becomes `.fl-health .line .aged`, so R57's amber stamp renders in the alarm form as well as the quiet one (R60). Plan C's only CSS edit. |
+| `src/lib/deadline.ts` | **C modifies** — gains `export const MONGO_READ_TIMEOUT_MS = 5000`, R38's intended home for the value, so the page and the rail bound their Mongo reads with one constant rather than two copies (R63). |
+| `src/app/(app)/_shell/AgentsBlock.tsx` | **C modifies** — drops its module-local `RAIL_READ_TIMEOUT_MS` and imports `MONGO_READ_TIMEOUT_MS` from `deadline.ts`; its literal `"—"` caption becomes `DASH` from `format.ts`, discharging the standing carry-forward (R63). |
+| `src/app/layout.tsx` | A modifies, **C modifies** — `title` becomes ``{ default: APP_NAME, template: `%s · ${APP_NAME}` }``, so the product name is joined in exactly one place and no page file writes it (R64). |
+| `src/app/(app)/freelance/queue/layout.tsx` | **C creates** — exports `metadata = { title: "Queue" }` and renders its children, because the queue page is `"use client"` and cannot export metadata. R18 stands: the page beside it is not edited (R64). |
+| `src/lib/freelanceVariants.ts` | B creates, **C modifies** — `groups` gains `.filter((g) => g.rows.length > 0)`: an empty group is not drawn, and the view model decides it. A value change inside `ApproachGroup[]`, not a shape change (R66). |
+| `src/lib/__tests__/freelanceVariants.test.ts` | B creates, **C modifies** — one new test pinning R66 (one group each way, never zero), and three existing tests re-based because they indexed `groups` by position on single-channel inputs. |
+| `src/lib/freelanceGaps.ts` | B creates, **C modifies** — one docblock line. `BlockEInput.repliedUnanswered`'s `null` now also means the suppression set could not be read (N8). Comment only. |
 
 ---
 
