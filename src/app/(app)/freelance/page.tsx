@@ -16,13 +16,14 @@ import {
   fetchVariantStats,
   readStConfig,
 } from "@/lib/stApi";
-import { FAIL_LINES, buildBlockA } from "@/lib/freelanceView";
+import { FAIL_LINES, buildBlockA, buildBlockB } from "@/lib/freelanceView";
 import { buildBlockE, needsYouFigure } from "@/lib/freelanceGaps";
 import { buildHealthStrip } from "@/lib/freelanceHealth";
 import { OS_SETTINGS_DEFAULTS } from "@/models/OsSettings";
 import HealthStrip from "./_blocks/HealthStrip";
 import HeroRow from "./_blocks/HeroRow";
 import StateOfPlay from "./_blocks/StateOfPlay";
+import Pipeline from "./_blocks/Pipeline";
 
 /**
  * Every figure on this page is "what is true right now", so there is nothing to
@@ -215,6 +216,8 @@ export default async function FreelancePage() {
     draftsUrl: `${baseUrl}/review`,
   });
 
+  const blockB = buildBlockB(summary?.contacts ?? null);
+
   const strip = buildHealthStrip({
     now,
     findings: summary === null ? null : evaluateOutreach(now, summary),
@@ -247,6 +250,7 @@ export default async function FreelancePage() {
               <HeroRow cards={blockA.cards} />
               <StateOfPlay lines={blockA.lines} />
             </div>
+            <Pipeline block={blockB} />
           </>
         )}
 
