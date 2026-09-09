@@ -310,6 +310,60 @@ async function readErrorMessage(res: Response): Promise<string> {
 // --- Calls -------------------------------------------------------------------
 
 /**
+ * A `repliedUnanswered` row the page can actually render.
+ *
+ * Block E prints `businessName` as the link text and `channel` RAW (its
+ * labelFor returns the value unchanged on a miss), so a single row carrying an
+ * object where a string belongs throws "Objects are not valid as a React child"
+ * and 500s the whole Freelance route — the failure the block's four degradation
+ * registers exist to forbid. This is the same rule fetchSummary applies to a
+ * campaign `id` and fetchVariantStats to a variant `key`; the attention feed
+ * was the one of the three that cast its payload instead.
+ *
+ * It FILTERS and never reconstructs, unlike those two: the chaser consumes the
+ * other fields of these same rows (keyPoints, offerSummary, toneNotes, the
+ * bodies), and rebuilding the row here would be a second copy of the contract,
+ * free to drift from ../ShikksTracker/docs/os-api.md on its own (R74).
+ *
+ * `repliedAt` need only BE a string — it is measured by waitedMs, never
+ * printed, and an unparseable string already has a defined reading downstream.
+ * A non-string is what has to go: it is the shape that throws.
+ */
+function isRenderableAttentionItem(raw: unknown): raw is AttentionItem {
+  if (typeof raw !== "object" || raw === null) return false;
+  const row = raw as Record<string, unknown>;
+  return (
+    typeof row.contactId === "string" &&
+    row.contactId.length > 0 &&
+    typeof row.businessName === "string" &&
+    row.businessName.length > 0 &&
+    typeof row.replyToLogId === "string" &&
+    row.replyToLogId.length > 0 &&
+    typeof row.channel === "string" &&
+    typeof row.repliedAt === "string"
+  );
+}
+
+/**
+ * The same rule for an overdue row, which reaches the same list through the
+ * same component: `businessName` is its link text, `contactId` builds the href
+ * and the React key, and `nextActionAt` is measured rather than printed, so it
+ * need only be a string. Filtered, not reconstructed, for the reason above
+ * (R74).
+ */
+function isRenderableOverdueItem(raw: unknown): raw is OverdueActionItem {
+  if (typeof raw !== "object" || raw === null) return false;
+  const row = raw as Record<string, unknown>;
+  return (
+    typeof row.contactId === "string" &&
+    row.contactId.length > 0 &&
+    typeof row.businessName === "string" &&
+    row.businessName.length > 0 &&
+    typeof row.nextActionAt === "string"
+  );
+}
+
+/**
  * GET /api/os/attention. Throws on any failure — a GET has no side effect to
  * protect, so the caller's ordinary error path (AgentRun + push alert) is the
  * right handling.
@@ -338,10 +392,27 @@ export async function fetchAttention(
     );
   }
 
+  // The cast describes the contract; the guards are what the values have to
+  // earn. Each array is read as `unknown[]` so the predicates do real work.
   const parsed = (await res.json()) as Partial<AttentionResponse>;
+  const replied = (
+    Array.isArray(parsed.repliedUnanswered) ? (parsed.repliedUnanswered as unknown[]) : []
+  ).filter(isRenderableAttentionItem);
+
   return {
-    repliedUnanswered: Array.isArray(parsed.repliedUnanswered) ? parsed.repliedUnanswered : [],
-    ...(Array.isArray(parsed.overdueActions) ? { overdueActions: parsed.overdueActions } : {}),
+    // The local bound: `limit` was sent as a query parameter and then trusted,
+    // never applied on this side — so the `$in` in fetchLiveAnchorIds was
+    // bounded only by however many rows ShikksTracker chose to return, and its
+    // docblock's claim about ATTENTION_LIMIT was true only by their courtesy
+    // (R74).
+    repliedUnanswered: replied.slice(0, limit),
+    // Filtering never changes PRESENCE: a block that arrived stays an array
+    // even when every row in it was dropped, because "reported, all unusable"
+    // and "never reported" are different findings and Block E renders them
+    // differently.
+    ...(Array.isArray(parsed.overdueActions)
+      ? { overdueActions: (parsed.overdueActions as unknown[]).filter(isRenderableOverdueItem) }
+      : {}),
   };
 }
 

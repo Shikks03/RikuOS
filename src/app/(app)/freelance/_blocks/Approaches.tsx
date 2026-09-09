@@ -14,14 +14,19 @@ import { IconInfo } from "@/components/icons";
  * Reply rate · Sends` occupies columns 1–3 and leaves the `Replies` column
  * empty — which is exactly what makes the two groups' Reply rate and Sends
  * columns share an x-position down the whole block. The obvious "fix", an
- * is-3col modifier, would break that alignment (N4).
+ * is-3col modifier, would break that alignment (N4). Since R66 a single-group
+ * state exists as well — no email variant at all — where the `Not measurable`
+ * group's three cells sit alone in the four-track grid with a dead right
+ * gutter and nothing left to align to. That is the mockup's own accepted look
+ * for group 2, not a bug.
  *
  * The <div className="sumrow"> inside <summary> stays a div, and R65 is why.
  * Against it: <summary>'s content model is phrasing content or a single heading
  * element, so the wrapper is not strictly conformant — a validator complaint
  * with no rendering, assistive-technology or React consequence. For it:
- * <summary> maps to role="button" with name-from-contents, so the eyebrow and
- * the heading reach a screen-reader user as ONE accessible name. Do not "fix"
+ * <summary> maps to a button-like control with name-from-contents in the major
+ * engines, so the eyebrow and the heading reach a screen-reader user as ONE
+ * accessible name. Do not "fix"
  * it back to a <span>: that deletes the <h2> with it, and whether a heading
  * nested inside a button survives into heading navigation varies by browser and
  * screen reader. Certain pedantry is not worth an uncertain loss.

@@ -48,7 +48,7 @@ export type BlockD =
       /** R31. */
       defaultOpen: boolean;
       collapsed: CollapsedLine;
-      /** Always exactly two, in order. */
+      /** One or two, measured group first; a group with no rows is dropped (R66). */
       groups: ApproachGroup[];
       /** R27 — null unless at least one rate is printed. */
       honesty: string | null;
@@ -127,6 +127,26 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
     }
   }
 
+  // R66: a group with no rows is not drawn — a ruled .fl-thead over nothing
+  // reads as a failed table. Never both: `variants.length === 0` returns above.
+  // The annotation is what keeps excess-property checking alive on both
+  // literals; `.filter` applied straight to a bare array literal switches it
+  // off, so a stray field on a group would have compiled clean.
+  const allGroups: ApproachGroup[] = [
+    {
+      eyebrow: "Measured — email",
+      explain: null,
+      headers: ["Approach", "Reply rate", "Sends", "Replies"],
+      rows: measuredRows,
+    },
+    {
+      eyebrow: "Not measurable",
+      explain: "Replies are only detected on email, so these can't be scored.",
+      headers: ["Approach", "Reply rate", "Sends"],
+      rows: otherRows,
+    },
+  ];
+
   return {
     kind: "groups",
     defaultOpen,
@@ -134,22 +154,7 @@ export function buildBlockD(variants: VariantStatsItem[] | null): BlockD {
       best === null
         ? { kind: "statement", text: "No sends yet — nothing to compare." }
         : { kind: "best", name: nameOf(best.row), rate: `${best.percent}%` },
-    // R66: a group with no rows is not drawn — a ruled .fl-thead over nothing
-    // reads as a failed table. Never both: `variants.length === 0` returns above.
-    groups: [
-      {
-        eyebrow: "Measured — email",
-        explain: null,
-        headers: ["Approach", "Reply rate", "Sends", "Replies"],
-        rows: measuredRows,
-      },
-      {
-        eyebrow: "Not measurable",
-        explain: "Replies are only detected on email, so these can't be scored.",
-        headers: ["Approach", "Reply rate", "Sends"],
-        rows: otherRows,
-      },
-    ].filter((g) => g.rows.length > 0),
+    groups: allGroups.filter((g) => g.rows.length > 0),
     // R27, stated as an explicit condition so nobody "fixes" its absence later:
     // a table with no printable rate is not a table of small numbers, and
     // printing the note there would be the opposite of an honesty note.

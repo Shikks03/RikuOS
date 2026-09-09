@@ -13,8 +13,9 @@ import { IconInfo } from "@/components/icons";
  * else: <summary>'s content model is phrasing content or a single heading
  * element, so a <div> wrapper inside it is not strictly conformant — with no
  * rendering, assistive-technology or React consequence. What it buys is that
- * <summary> maps to role="button" with name-from-contents, so the eyebrow, the
- * heading and the count reach a screen-reader user as ONE accessible name,
+ * <summary> maps to a button-like control with name-from-contents in the major
+ * engines, so the eyebrow, the heading and the count reach a screen-reader
+ * user as ONE accessible name,
  * roughly "Campaigns Your campaigns 2, collapsed, button". Do not "fix" the
  * <div> back to a <span>: that deletes the <h2> with it, and whether a heading
  * nested inside a button survives into heading navigation varies by browser and

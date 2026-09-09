@@ -240,6 +240,37 @@ describe("fetchAttention", () => {
     vi.unstubAllEnvs();
   });
 
+  /**
+   * A row that survives R74's guard. Since that ruling a stub row is no longer
+   * a usable fixture anywhere in this block: an item missing the fields the
+   * page renders is dropped on purpose, so every test that expects a row to
+   * come back has to send a whole one.
+   */
+  function attentionItem(over: Record<string, unknown> = {}) {
+    return {
+      contactId: "c1",
+      businessName: "Acme Bakery",
+      contactName: null,
+      channel: "email",
+      repliedAt: "2026-09-01T00:00:00.000Z",
+      replySnippet: null,
+      lastOutboundBody: null,
+      keyPoints: "wants a site",
+      offerSummary: null,
+      toneNotes: null,
+      stage: 2,
+      replyToLogId: "log-1",
+      ...over,
+    };
+  }
+
+  function respondWith(body: unknown) {
+    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
+    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(body), { status: 200 })) as typeof fetch;
+  }
+
   it("throws with a diagnosable message on a non-200 — a GET has no side effect to protect", async () => {
     vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
     vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
@@ -248,12 +279,7 @@ describe("fetchAttention", () => {
   });
 
   it("returns the repliedUnanswered array on 200", async () => {
-    vi.stubEnv("ST_API_BASE_URL", "https://st.example.com");
-    vi.stubEnv("ST_API_SECRET", GOOD_SECRET);
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ repliedUnanswered: [{ contactId: "c1" }] }), {
-        status: 200,
-      })) as typeof fetch;
+    respondWith({ repliedUnanswered: [attentionItem()] });
     const out = await fetchAttention(3, 50);
     expect(out.repliedUnanswered).toHaveLength(1);
   });
@@ -288,6 +314,60 @@ describe("fetchAttention", () => {
       new Response(JSON.stringify({ repliedUnanswered: [] }), { status: 200 })) as typeof fetch;
     const out = await fetchAttention(3, 50);
     expect(out.overdueActions).toBeUndefined();
+  });
+
+  // R74. Block E prints `businessName` as link text and `channel` raw, so a row
+  // carrying an object where a string belongs throws inside React and 500s the
+  // whole route. Each bad row below is invalid in exactly ONE way, so a guard
+  // that dropped rows for the wrong reason would still be visible here.
+  it("drops a repliedUnanswered row that cannot render and keeps the rest (R74)", async () => {
+    const valid = attentionItem();
+    respondWith({
+      repliedUnanswered: [
+        valid,
+        attentionItem({ contactId: "c2", businessName: { first: "Acme" } }),
+        attentionItem({ contactId: "" }),
+        attentionItem({ contactId: "c4", replyToLogId: undefined }),
+        attentionItem({ contactId: "c5", channel: 7 }),
+        attentionItem({ contactId: "c6", repliedAt: null }),
+      ],
+    });
+    const out = await fetchAttention(3, 50);
+    // The survivor comes back UNCHANGED — fetchAttention filters, it never
+    // reconstructs, because the chaser reads the fields the page does not.
+    expect(out.repliedUnanswered).toEqual([valid]);
+  });
+
+  it("drops an overdueActions row that cannot render (R74)", async () => {
+    const valid = {
+      contactId: "c1",
+      businessName: "Acme Bakery",
+      nextActionAt: "2026-08-01T00:00:00.000Z",
+      nextActionNote: "call back",
+    };
+    respondWith({
+      repliedUnanswered: [],
+      overdueActions: [
+        valid,
+        { ...valid, contactId: "c2", businessName: 42 },
+        { ...valid, contactId: "" },
+      ],
+    });
+    const out = await fetchAttention(3, 50);
+    // Filtering never changes PRESENCE: the block arrived, so it is still an
+    // array here, and Block E must not read this as "the feed never reported".
+    expect(Array.isArray(out.overdueActions)).toBe(true);
+    expect(out.overdueActions).toEqual([valid]);
+  });
+
+  it("bounds repliedUnanswered to limit on this side too (R74)", async () => {
+    respondWith({
+      repliedUnanswered: ["c1", "c2", "c3", "c4", "c5"].map((contactId) =>
+        attentionItem({ contactId })
+      ),
+    });
+    const out = await fetchAttention(3, 3);
+    expect(out.repliedUnanswered.map((item) => item.contactId)).toEqual(["c1", "c2", "c3"]);
   });
 });
 

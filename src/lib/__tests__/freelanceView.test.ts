@@ -98,8 +98,13 @@ describe("Block A — the three cards always render", () => {
       trackPercent: null,
     });
     expect(out.cards[2]).toEqual({
-      key: "needs-you", label: "Needs you", tone: "blank", figure: "—",
-      caption: "couldn't load", href: null, trackPercent: null,
+      key: "needs-you",
+      label: "Needs you",
+      tone: "blank",
+      figure: "—",
+      caption: "couldn't load",
+      href: null,
+      trackPercent: null,
     });
     expect(out.lines).toEqual([]);
   });

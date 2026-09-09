@@ -103,8 +103,9 @@ export interface BlockAInput {
    * call is neither, so the two must not share a register (R72). The LINES
    * are computed from the values and never from this flag, so a caller
    * passing `true` passes the null fields beside it — the type cannot
-   * enforce that coupling, and `buildBlockA` has exactly one caller, the
-   * page, which does.
+   * enforce that coupling, and `buildBlockA` has exactly one caller in
+   * `src/app`, the page, which does (the test helper in
+   * `freelanceView.test.ts` honours it too).
    */
   summaryFailed: boolean;
   /** Block E's reading, through `needsYouFigure()`. */

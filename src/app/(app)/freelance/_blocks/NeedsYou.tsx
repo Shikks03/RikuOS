@@ -2,8 +2,12 @@ import type { BlockE } from "@/lib/freelanceGaps";
 
 /**
  * Rows built only from fields that exist. An overdue follow-up's channel slot
- * is EMPTY — inapplicable, not unmeasured — so it renders an empty <span/> to
- * hold the grid's second column rather than a tag or an em-dash.
+ * is EMPTY — inapplicable, not unmeasured — so it renders an empty <span/>
+ * rather than a tag or an em-dash. The span reproduces the mockup's empty slot
+ * and keeps every row's DOM shape identical; it holds no column open. The
+ * two-track `.fl-row` grid lays out the same with or without it, unlike
+ * Approaches.tsx's .fl-count span, which really is load-bearing in a
+ * three-track grid.
  *
  * R36: the business name is a plain <a> leaving the app, with a persistent ↗ as
  * a literal character in a .arr span. The ROW is not an anchor.
