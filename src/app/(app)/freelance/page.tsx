@@ -27,6 +27,7 @@ import StateOfPlay from "./_blocks/StateOfPlay";
 import Pipeline from "./_blocks/Pipeline";
 import Campaigns from "./_blocks/Campaigns";
 import Approaches from "./_blocks/Approaches";
+import NeedsYou from "./_blocks/NeedsYou";
 
 /**
  * Every figure on this page is "what is true right now", so there is nothing to
@@ -266,6 +267,7 @@ export default async function FreelancePage() {
             <Pipeline block={blockB} />
             <Campaigns block={blockC} />
             <Approaches block={blockD} />
+            <NeedsYou block={blockE} />
           </>
         )}
 
