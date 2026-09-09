@@ -394,10 +394,20 @@ export async function fetchAttention(
     );
   }
 
-  // The cast describes the contract; the guards are what the values have to
-  // earn. Each array is read as `unknown[]` so the predicates do real work.
-  const parsed = (await res.json()) as Partial<AttentionResponse>;
-  if (!Array.isArray(parsed.repliedUnanswered)) {
+  // The body is read as `unknown`, not cast to the contract: a 200 is no
+  // promise that it is even an object, and a literal `null` body would throw
+  // an unnamed TypeError at the first property access — before the named
+  // contract error below could run. The cast comes after the guard, so the
+  // shape the rest of this function relies on has been earned rather than
+  // asserted, and each array is still read as `unknown[]` so the row
+  // predicates do real work.
+  const body: unknown = await res.json();
+  const bodyType = body === null ? "null" : typeof body;
+  const rawRepliedField =
+    typeof body === "object" && body !== null && "repliedUnanswered" in body
+      ? body.repliedUnanswered
+      : undefined;
+  if (bodyType !== "object" || !Array.isArray(rawRepliedField)) {
     // A body without the array is a contract break, not an emptiness. Reading
     // it as [] would make Block E say `Nothing waiting.` and the digest count
     // zero — a false all-clear, the null-versus-zero failure the rules forbid.
@@ -408,11 +418,16 @@ export async function fetchAttention(
     throw new Error(
       `GET /api/os/attention returned a body with no repliedUnanswered array ` +
         `(got ${
-          parsed.repliedUnanswered === null ? "null" : typeof parsed.repliedUnanswered
+          bodyType !== "object"
+            ? `a ${bodyType} body`
+            : rawRepliedField === null
+              ? "null"
+              : typeof rawRepliedField
         }) — the contract has changed. ` +
         "repliedUnanswered is REQUIRED; only overdueActions may be omitted."
     );
   }
+  const parsed = body as Partial<AttentionResponse>;
   const rawReplied = parsed.repliedUnanswered as unknown[];
   const replied = rawReplied.filter(isRenderableAttentionItem);
 

@@ -377,8 +377,19 @@ describe("fetchAttention", () => {
     await expect(fetchAttention(3, 50)).rejects.toThrow(/repliedUnanswered/);
   });
 
+  // The same contract break arriving as a 200 whose whole body is `null`. The
+  // bare property access does throw — but a TypeError from V8, which happens to
+  // quote the property name, so `/repliedUnanswered/` alone cannot tell the
+  // named error from the accident. The second assertion is what discriminates:
+  // only the guard reports the BODY's own type, and only the guard runs before
+  // anything reads into the body.
+  it("names the contract error for a null body too (R75)", async () => {
+    respondWith(null);
+    await expect(fetchAttention(3, 50)).rejects.toThrow(/repliedUnanswered/);
+    await expect(fetchAttention(3, 50)).rejects.toThrow(/got a null body/);
+  });
+
   it("bounds repliedUnanswered to limit on this side too (R74)", async () => {
-    silenceDropWarning();
     respondWith({
       repliedUnanswered: ["c1", "c2", "c3", "c4", "c5"].map((contactId) =>
         attentionItem({ contactId })
