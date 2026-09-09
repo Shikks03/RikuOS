@@ -50,7 +50,7 @@ Proven in ShikksTracker; follow them here.
 
 ## Verification before "done"
 
-`npm test` (Vitest, logic layer) + `npx tsc --noEmit` + `npm run build` — all green before claiming completion. Tests live beside the logic (`src/lib/__tests__/`); route handlers stay thin so the logic layer holds the behavior. An agent feature is *actually* done when it has been observed doing its job once against real data.
+`npm test` (Vitest, logic layer) + `npx tsc --noEmit` + `npm run build` — all green before claiming completion — and `npm run lint` at its recorded baseline (four pre-existing `react-hooks/set-state-in-effect` errors and three warnings, on which it exits 1); a fifth error or a fourth warning fails the step. Tests live beside the logic (`src/lib/__tests__/`); route handlers stay thin so the logic layer holds the behavior. An agent feature is *actually* done when it has been observed doing its job once against real data.
 
 ## Never do
 

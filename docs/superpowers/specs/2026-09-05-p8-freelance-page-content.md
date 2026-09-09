@@ -143,6 +143,10 @@ The page is six stacked blocks. Order is fixed — it was decided with Riku and 
 - `ShikksTracker didn't report how many contacts there are`
 - `ShikksTracker didn't report overdue follow-ups` — the caption on the third hero card (spec §4.1, `Needs you`) when the overdue feed never arrived. **No full stop**: it is the hero-register form of Block E's own sentence below, and hero captions are fragments (R54) — *provisional, awaiting Riku's confirmation (2026-09-09)*
 
+**The failed form, which is a different fact and takes different words (R72).** The three strings above are defined by the parenthesis at the head of this list — *the API replied but omitted the field*. A summary call that **did not answer at all** — a timeout, or a 500 on that one route while the others answer — is not that, so the drafts and contacts cards take the third card's own failed form instead: `—` with the caption `couldn't load`. **No new string**: the hero register already owns `couldn't load`, and it is the same word the third card uses when its gap read fails. Without this the two halves of one screen would disagree about one cause, because Block B says `Couldn't load the pipeline.` about the very same event.
+
+**The reverse case is unchanged:** a summary that answers and omits a whole block still gives the card its `didn't report` caption, which is true by the definition above, while the block beneath it says `Couldn't load …` — the deck has no absence sentence for a whole missing block, and none is invented.
+
 **When every line is hidden** (nothing waiting, everyone contacted) the block shows a single line:
 - `Nothing waiting on you.`
 
@@ -367,7 +371,7 @@ Ages read as hours below two days (`6h`, `36h`), then days (`3d`, `29d`).
 
 **Snapshot age:** `checked 6h ago` · past 30 hours: `sites not checked since 2d ago` (amber with monitoring on, grey with it off — R57) · never run: `sites never checked` · the stored reading could not be read at all: `sites — unknown` — the register of `Engine — unknown`, grey, and distinct from `sites never checked`, which is a thing the page actually knows (R56) — *provisional, awaiting Riku's confirmation (2026-09-09)*
 
-**Control:** `Check now` → while running: `Checking…`
+**Control:** `Check now` → while running: `Checking…` → after a failed check: `Couldn't check`, cleared when the next press begins. One string for both a non-2xx response and a thrown fetch — they are one fact to the reader, that the reading did not move and the reason is not the sites — and it sits in the button's own label register rather than in the strip, because the strip's lines are claims about the world and a failed press is a fact about a button. The stamp cannot carry it: ages floor to whole hours, so a reading under an hour old says `checked 0h ago` on both sides of the press (R67) — *provisional, awaiting Riku's confirmation (2026-09-09)*
 
 **Worst case render:**
 ```
