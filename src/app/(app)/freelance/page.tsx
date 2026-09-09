@@ -34,7 +34,7 @@ export const dynamic = "force-dynamic";
 /**
  * A CONTAINMENT bound, and nothing more. maxDuration does not prevent a Vercel
  * error page — it SCHEDULES one, at 30 s instead of the platform's own default.
- * The reader's protection is the four timeouts above it: ST_PAGE_TIMEOUT_MS on
+ * The reader's protection is the five timeouts above it: ST_PAGE_TIMEOUT_MS on
  * each of the three ShikksTracker calls, and MONGO_READ_TIMEOUT_MS on each of
  * the two Mongo reads. Those bound the worst case at 5 + 6 + 5 = 16 s and land
  * in catches that produce states this page already designed. This line only
@@ -101,8 +101,8 @@ export default async function FreelancePage() {
   // it has no rendered effect either), and `chaserNDays` falls back to
   // OS_SETTINGS_DEFAULTS.chaserNDays, so the attention call below runs on a
   // window Riku did not set. The fourth is harmless: `days` bounds only
-  // `repliedUnanswered` on ShikksTracker's side, and phase 3 (Task 3) is gated
-  // on `dbOk`, so a gap list drawn on a guessed window is discarded before
+  // `repliedUnanswered` on ShikksTracker's side, and phase 3 is gated on
+  // `dbOk`, so a gap list drawn on a guessed window is discarded before
   // anything renders it. Everything ShikksTracker answers still renders. A
   // TIMEOUT lands in the same catch and therefore in the same four
   // degradations — there is no new state to draw for it (R63).
@@ -159,8 +159,10 @@ export default async function FreelancePage() {
   // stays null and Block E says `Couldn't load what's waiting.` (R63).
   //
   // No .filter(Boolean) on the ids: AttentionItem.replyToLogId is a required
-  // string, so it narrowed nothing and only ever dropped empty strings, which
-  // fetchLiveAnchorIds ignores anyway.
+  // string, so it narrowed nothing and only ever dropped empty strings. The ids
+  // go into the `$in` unfiltered; an empty id matches nothing and the result
+  // loop skips falsy anchors, so the answer is unchanged. The chaser
+  // (route.ts:77) still filters, and the difference is deliberate.
   let liveAnchorIds: Set<string> | null = null;
   if (attention !== null) {
     if (dbOk) {
@@ -178,10 +180,11 @@ export default async function FreelancePage() {
 
   // --- The view models ------------------------------------------------------
   //
-  // Only the strip is built here. Phase 3 and the five block builders arrive in
-  // Tasks 3 to 6, each in the task that renders it, so no commit in this plan
-  // ever leaves a computed value without a consumer (R47's principle, ruled for
-  // Plan C on 2026-09-09).
+  // Each block is built here in the task that renders it, so no commit in this
+  // plan ever leaves a computed value without a consumer (R47's principle,
+  // ruled for Plan C on 2026-09-09). blockE is the exception that proves it:
+  // Block A's third card reads it through needsYouFigure, so it has a consumer
+  // from the moment it exists, and Block E itself renders later.
 
   const blockE = buildBlockE({
     now,
@@ -204,6 +207,9 @@ export default async function FreelancePage() {
   const blockA = buildBlockA({
     queue: summary?.queue ?? { drafts: null, approved: null },
     contacts: summary?.contacts ?? null,
+    // R72: a null summary is a call that did not answer, which is the cards'
+    // failed form — `didn't report` means it answered without the field.
+    summaryFailed: summary === null,
     // Block A's third card renders the SAME figure Block E renders, by
     // construction rather than by coincidence. This is an IMPORT, not a
     // ternary: the inline `rows ? count : empty ? 0 : null` this replaced

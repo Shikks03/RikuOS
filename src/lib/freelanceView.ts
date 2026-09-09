@@ -96,6 +96,13 @@ export interface BlockAInput {
   queue: SummaryQueue;
   /** null = the whole contacts block was absent. */
   contacts: SummaryContacts | null;
+  /**
+   * true = the summary call did not answer. Both cards then read `couldn't
+   * load`, the third card's R54 form. The `didn't report` captions mean the
+   * API REPLIED and omitted the field (the deck's definition), and a failed
+   * call is neither, so the two must not share a register (R72).
+   */
+  summaryFailed: boolean;
   /** Block E's reading, through `needsYouFigure()`. */
   needsYou: NeedsYouFigure;
   /** ShikksTracker's draft-review page, built server-side. */
@@ -111,10 +118,15 @@ function isMeasuredZero(value: number | null): boolean {
   return value === 0;
 }
 
-function draftsCard(drafts: number | null, draftsUrl: string): StatCard {
+function draftsCard(drafts: number | null, draftsUrl: string, summaryFailed: boolean): StatCard {
   // The link stays in every state and inherits --ink-4 on a drained card: it is
   // the page's one exit to ShikksTracker, not ornament.
   const base = { key: "drafts", label: "Drafts", href: draftsUrl, trackPercent: null } as const;
+  // R72: the call did not answer — the third card's failed form, not the
+  // `didn't report` form, which would claim ShikksTracker replied without it.
+  if (summaryFailed) {
+    return { ...base, tone: "blank", figure: DASH, caption: "couldn't load" };
+  }
   if (drafts === null) {
     return {
       ...base,
@@ -131,10 +143,16 @@ function draftsCard(drafts: number | null, draftsUrl: string): StatCard {
   };
 }
 
-function contactsCard(contacts: SummaryContacts | null): StatCard {
+function contactsCard(contacts: SummaryContacts | null, summaryFailed: boolean): StatCard {
   const base = { key: "contacts", label: "Contacts", href: null } as const;
   const notStarted = contacts?.byPipelineStage.not_started ?? null;
   const total = contacts?.total ?? null;
+
+  // R72: the call did not answer — the third card's failed form, not the
+  // `didn't report` form, which would claim ShikksTracker replied without it.
+  if (summaryFailed) {
+    return { ...base, tone: "blank", figure: DASH, caption: "couldn't load", trackPercent: null };
+  }
 
   // Any of the three missing makes the card's sentence unconstructible, and the
   // deck supplies exactly one missing-data string for this card. It is not
@@ -196,12 +214,12 @@ function needsYouCard(figure: NeedsYouFigure): StatCard {
 }
 
 export function buildBlockA(input: BlockAInput): BlockA {
-  const { queue, contacts, needsYou, draftsUrl } = input;
+  const { queue, contacts, needsYou, draftsUrl, summaryFailed } = input;
   const notStarted = contacts?.byPipelineStage.not_started ?? null;
 
   const cards: StatCard[] = [
-    draftsCard(queue.drafts, draftsUrl),
-    contactsCard(contacts),
+    draftsCard(queue.drafts, draftsUrl, summaryFailed),
+    contactsCard(contacts, summaryFailed),
     needsYouCard(needsYou),
   ];
 

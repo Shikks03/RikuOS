@@ -8,6 +8,10 @@ import type { SayLine } from "@/lib/freelanceView";
  * The figure sits in <b> and the rest is plain text, separated by one space:
  * `<b>3</b> approved, not yet sent`. A line with no figure — today's
  * `Nothing waiting on you.` — renders the text alone.
+ *
+ * The key is the line's own text: buildBlockA emits at most one line and a
+ * SayLine has no id, so a second line with identical text would need a real key
+ * first.
  */
 export default function StateOfPlay({ lines }: { lines: SayLine[] }) {
   if (lines.length === 0) return null;

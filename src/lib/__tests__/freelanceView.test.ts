@@ -44,6 +44,7 @@ function blockA(over: Partial<Parameters<typeof buildBlockA>[0]> = {}) {
     contacts: contacts(),
     needsYou: { kind: "measured", count: 0 },
     draftsUrl: DRAFTS_URL,
+    summaryFailed: false,
     ...over,
   });
 }
@@ -63,6 +64,40 @@ describe("Block A — the three cards always render", () => {
       needsYou: { kind: "failed" },
     });
     expect(dead.cards.map((c) => c.key)).toEqual(["drafts", "contacts", "needs-you"]);
+  });
+
+  it("reads a failed summary call as couldn't load on both cards, never as didn't report (R72)", () => {
+    // The page collapses a failed summary into null fields, and the deck defines
+    // `didn't report` as "the API replied but omitted the field". A timeout on
+    // that one route is neither, and Block B below says `Couldn't load the
+    // pipeline.` about the same event — so both cards take the third card's R54
+    // failed form. No new string, and the drafts link stays as it does in every
+    // other state.
+    const out = blockA({
+      summaryFailed: true,
+      queue: queue({ drafts: null, approved: null }),
+      contacts: null,
+      needsYou: { kind: "failed" },
+    });
+    expect(out.cards[0]).toEqual({
+      key: "drafts",
+      label: "Drafts",
+      tone: "blank",
+      figure: "—",
+      caption: "couldn't load",
+      href: DRAFTS_URL,
+      trackPercent: null,
+    });
+    expect(out.cards[1]).toEqual({
+      key: "contacts",
+      label: "Contacts",
+      tone: "blank",
+      figure: "—",
+      caption: "couldn't load",
+      href: null,
+      trackPercent: null,
+    });
+    expect(out.lines).toEqual([]);
   });
 });
 
