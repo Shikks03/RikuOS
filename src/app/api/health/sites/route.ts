@@ -24,9 +24,17 @@ export const maxDuration = 30;
  * lives in isWithinCheckFloor, which is a pure function a test can reach; the
  * repo has no route-level tests and this phase adds none.
  *
- * The response body (checkedAt, sites, fresh) is a debugging affordance, not a
- * contract: the page's `Check now` reads nothing from it and re-renders through
- * the server, so no shared response type is warranted.
+ * `fresh` IS A CONTRACT. `Check now` reads it to tell Riku which kind of
+ * success a press was — a new reading, or this floor returning the existing one
+ * — because neither is visible on screen otherwise: inside the floor the
+ * reading does not move at all, and formatAge floors to whole hours, so even a
+ * genuinely new reading re-stamps `checked 0h ago`. Renaming or dropping the
+ * field silently turns every floored press into `Checked`. The reader is
+ * CheckNow.tsx and the wording is checkNowLabel in freelanceHealth.ts.
+ *
+ * `checkedAt` and `sites` remain a debugging affordance: the page re-renders
+ * through the server and reads neither, so no shared response type is
+ * warranted for them.
  *
  * NO PROXY CHANGE. This path is under /api/ and is not in isPublicPath, so
  * src/proxy.ts already fails closed in front of it. requireSession runs anyway,

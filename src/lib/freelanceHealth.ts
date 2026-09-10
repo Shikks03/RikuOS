@@ -161,3 +161,56 @@ export function buildHealthStrip(input: HealthStripInput): BlockF {
 
   return { kind: "alarm", warnings, fine, stamp };
 }
+
+/**
+ * What a press of `Check now` did. null is "no press has been answered yet" —
+ * the resting state, and the state a press returns to at its own start.
+ *
+ * `current` is NOT a failure and must never be drawn as one: the 60-second
+ * floor answers 200 with the existing reading because a reading twenty seconds
+ * old IS current, and pressing twice is not a mistake (see the route).
+ */
+export type PressOutcome = "fresh" | "current" | "failed" | null;
+
+/**
+ * The `Check now` label, and the whole of Block F's spoken response to a press.
+ *
+ * It exists because a successful press was invisible. The strip's stamp cannot
+ * carry the answer: formatAge floors to whole hours, so a reading taken two
+ * seconds ago and one taken fifty minutes ago both read `checked 0h ago`, and
+ * inside the floor the reading legitimately does not move at all. So a press
+ * that worked looked exactly like a dead button.
+ *
+ * The answer is said HERE rather than as a line in the strip, and that is R67's
+ * own rule rather than a new one: the strip's lines are claims about the world,
+ * and the outcome of a press is a fact about a button. `Couldn't check` was
+ * already said in this register; success is the symmetric case and belongs
+ * beside it.
+ *
+ * EVERY outcome is tested before `busy` — R69 generalised. R69 fixed the
+ * failure path alone: the unconditional router.refresh() that follows a press
+ * holds the button for up to this page's 16-second budget, so a label that
+ * asked `busy` first went on reading `Checking…` long after the answer was
+ * known. That window is identical after a success, so the same rule governs it.
+ * A new press clears the outcome to null in the same batch that sets busy, so
+ * the button still opens on `Checking…` rather than on the last answer.
+ *
+ * The wording carries no elapsed time on purpose. A label stands until the next
+ * press, so `Checked just now` would quietly become false while it sat there;
+ * `Checked` and `Already current` are facts about the last press and stay true.
+ *
+ * .btn uppercases in CSS, so these render CHECKED, ALREADY CURRENT and
+ * COULDN'T CHECK.
+ */
+export function checkNowLabel(outcome: PressOutcome, busy: boolean): string {
+  switch (outcome) {
+    case "failed":
+      return "Couldn't check";
+    case "fresh":
+      return "Checked";
+    case "current":
+      return "Already current";
+    default:
+      return busy ? "Checking…" : "Check now";
+  }
+}

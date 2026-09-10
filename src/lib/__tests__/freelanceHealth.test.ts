@@ -8,7 +8,7 @@
  * VERBATIM. Nothing here rewrites one.
  */
 import { describe, it, expect } from "vitest";
-import { buildHealthStrip } from "@/lib/freelanceHealth";
+import { buildHealthStrip, checkNowLabel } from "@/lib/freelanceHealth";
 import { evaluateOutreach } from "@/lib/outreachHealth";
 import { AGENT_STALE_HOURS, EXPECTATIONS, classifyAgentRun } from "@/lib/watchdog";
 import type { SummaryResponse } from "@/lib/stApi";
@@ -356,5 +356,49 @@ describe("Block F — one boundary, two rules", () => {
       siteHealth
     );
     expect(verdict.kind).not.toBe("stale");
+  });
+});
+
+describe("checkNowLabel", () => {
+  // Riku pressed Check now twice inside a minute on the live page and could
+  // not tell whether anything had happened. Nothing had changed on screen and
+  // nothing could: the floor returns the EXISTING reading with 200, and
+  // formatAge floors to whole hours, so a reading two seconds old and one
+  // fifty minutes old both stamp `checked 0h ago`. A successful press was
+  // therefore indistinguishable from a dead button.
+  //
+  // The remedy follows R67's own reasoning rather than inventing a register:
+  // the strip's lines are claims about the world, and the outcome of a press
+  // is a fact about a button, so it is said where `Couldn't check` is already
+  // said. Success is simply the symmetric case.
+
+  it("names the resting state", () => {
+    expect(checkNowLabel(null, false)).toBe("Check now");
+  });
+
+  it("says a press is in flight", () => {
+    expect(checkNowLabel(null, true)).toBe("Checking…");
+  });
+
+  it("distinguishes a new reading from one the floor returned", () => {
+    // The whole point. `fresh: false` means the reading on screen is under a
+    // minute old and the route declined to re-check the client sites — which
+    // is a success, not a failure, and is the case that read as silence.
+    expect(checkNowLabel("fresh", false)).toBe("Checked");
+    expect(checkNowLabel("current", false)).toBe("Already current");
+  });
+
+  it("keeps R67's failure wording exactly", () => {
+    expect(checkNowLabel("failed", false)).toBe("Couldn't check");
+  });
+
+  it("says what happened before it says it is busy — R69, now for every outcome", () => {
+    // R69 fixed this for failure: the refresh that follows a press still holds
+    // the button for up to this page's 16s budget, so a label that tested busy
+    // first read `Checking…` long after the answer was known. The same window
+    // exists after a success, and the same reasoning applies to it.
+    expect(checkNowLabel("failed", true)).toBe("Couldn't check");
+    expect(checkNowLabel("fresh", true)).toBe("Checked");
+    expect(checkNowLabel("current", true)).toBe("Already current");
   });
 });
