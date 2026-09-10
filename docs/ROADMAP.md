@@ -23,14 +23,30 @@ P1, P5 ──► P8 (Freelance page, built to the design system)
 P1, P2, P3 have no dependencies on each other.
 ```
 
-**Status, 2026-09-05:** P1–P5 shipped. **P6 is DROPPED (S15) and its code is now DELETED** — it was
+**Status, 2026-09-10:** P1–P5 and **P8 shipped**. **P6 is DROPPED (S15) and its code is now DELETED** — it was
 built and deployed, then cut because Meta will never deliver prospect DMs to an unpublished app.
-The deletion landed the same day, in both repos. P7 waits on accumulated send data. P8–P12 are the
-pages; their contents are discussed per phase (S11), not planned here.
+The deletion landed the same day, in both repos. P7 waits on accumulated send data. P9 no longer
+exists as a phase (S17, folded into P8). P9b–P12 remain; their contents are discussed per phase
+(S11), not planned here, and **neither P9b nor P10 may be planned before its own discussion.**
 
-**P8's content discussion happened 2026-09-05** — the first one under S11. Its outcome is
-`docs/superpowers/specs/2026-09-05-p8-freelance-page-design.md`, ratified and awaiting an
-implementation plan. That session also specified the quest board, which became **P9b** (S16):
+**P8 CLOSED 2026-09-10.** Built in four plans over three days — A (shell and skin), A-2 (the queue
+under Freelance), B (data, logic, health) and C (the page) — and shipped designed rather than plain,
+because S17 folded the design foundation into it. The acceptance bar was the page live on real
+OS-API data with nothing typed by hand, and it was met on the deployed site, not inferred from a
+build: `master` was pushed (116 commits, `57475ce..8027ddd`), and Riku confirmed the three real hero
+figures and the six live rail badges on Vercel. **The deployed half earned its keep** — it surfaced
+a defect every local check had passed: a successful `Check now` had no way to say so, because the
+60-second floor returns the reading already on screen and `formatAge` floors to whole hours. Fixed
+in `21e4564`; 531 tests. **Six user-visible strings remain provisional** pending Riku's word, and
+the health stamp's hour-flooring is carried forward as item 8 of the visual spec's §10.
+
+**P8's content discussion happened 2026-09-05** — the first one under S11, and the rule worked:
+the page was built from a deck Riku had shaped rather than from a guess. Its outcome is
+`docs/superpowers/specs/2026-09-05-p8-freelance-page-design.md`, which was ratified, planned as
+P8a/P8a-2/P8b/P8c and **built out in full by 2026-09-10**. The visual layer is
+`docs/superpowers/specs/2026-09-07-p8-freelance-page-visual-design.md`, whose §9 records the
+acceptance evidence and whose §10 carries what P8 deliberately left open. That session also
+specified the quest board, which became **P9b** (S16):
 `docs/superpowers/specs/2026-09-05-p9b-quest-board-design.md`.
 
 ---
@@ -378,7 +394,7 @@ needs Personal's calendar to exist.
 
 | # | Phase | Depends on | Done when |
 |---|-------|-----------|-----------|
-| P8 | **Freelance page.** The pipeline view on real feeds, shipped designed (S17, P9 folded in). | P1, P5 | The page is live on real OS-API data with no manual entry — D11 satisfied for one page. |
+| P8 | **Freelance page.** The pipeline view on real feeds, shipped designed (S17, P9 folded in). **DONE 2026-09-10** — live at `/freelance`, confirmed on the deployed site; four plans, 531 tests, spec §9 item 4 closed. | P1, P5 | The page is live on real OS-API data with no manual entry — D11 satisfied for one page. **Met.** |
 | ~~P9~~ | ~~**Design foundation.**~~ **FOLDED INTO P8 on 2026-09-06 (decision S17).** Riku had the design system built externally from P8's content deck *before* P8 was built, so a plain build followed by a rebuild would build the same page twice. The system is still proven by the Freelance page — that has not changed, only the order. | — | — |
 | P9b | **Quest board.** Ongoing freelance projects from `Freelance Projects`, each with an agent-maintained checklist, synced by a script and shown as quests with a real percentage. Designed 2026-09-05 (S16). | P8 | One real, ongoing freelance project appears with a percentage matching its checklist, put there by a sync of the real folder. Truly finishing it needs a live client project to exist. |
 | P10 | **Personal: calendar, to-dos, Today.** Google sign-in, live calendar read with toggleable layers, create-through-to-Google, the sectioned to-do store, and the Today section added to the morning digest (S13). | P3, P8 | One morning push names what is actually due and scheduled that day — the section P5a-7 dropped for want of a to-do store. |
