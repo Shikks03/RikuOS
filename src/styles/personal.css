@@ -12,14 +12,13 @@
    build difference serves this rule: the narrow band's `.formwell`
    is qualified by `.pe-cell`, marked where it sits.
 
-   Four deliberate differences from the mockup, each marked below:
+   Five deliberate differences from the mockup, each marked below:
      1. `.pe-more` is not ported (R89). The mockup already carries
         the deletion as a comment where the rule used to be; that
         comment is kept.
      2. The page-local :root block — the three tint anchors
-        --tint-save / --tint-spend / --tint-missing — is not ported.
-        They go to tokens.css with the ramp, in one commit (R84). The
-        nine `.pe-tN` classes that read them ARE here.
+        --tint-save / --tint-spend / --tint-missing — is not ported;
+        see DIFFERENCE 2 below. The nine `.pe-tN` classes ARE here.
      3. No second prefers-reduced-motion rule; base.css carries it
         globally (§5.8). (The mockup's `personal` group never held
         one — its copy sits in the mockup's base block — so this
@@ -29,6 +28,11 @@
         grid's own width, declared on .pe-wrap) or `tile` (the
         cell's, declared on .pe-cell) — never the grid, never the
         tile (R2, M2).
+     5. Comments that described the pre-port state — the anchors as
+        page-local, their calibration figures (now in tokens.css
+        only), the OKLab split, the specimen reference — are corrected
+        to the built state. The mockup still carries the old wording;
+        fixing it is the design team's, not this file's.
 
    Imported fourth, after components.css and before legacy.css, from
    src/app/layout.tsx only.
@@ -112,32 +116,16 @@
   background:var(--raised);border:1px solid var(--line);border-radius:var(--r-card);
   padding:15px 16px;min-width:0;overflow:hidden;
 }
-/* R81: the ramp's THREE ANCHORS. Two are ported verbatim from
-   DESIGN-INSPO's Card tint recipe — the shape --tint-roi and
-   --tint-stale already established. The third has no source to port
-   from (no --tint-missing exists anywhere in the system) and is built
-   to the same formula: 155deg, a deep desaturated --missing #F87171,
-   into a near-neutral at 62%. Its two stops were tuned against the
-   four existing tints and measured, not computed:
-     deep  #3A0B0B — WCAG L .01163, between --tint-stale's deep stop
-                     (#241A03, .01121) and --tint-save's (#052620,
-                     .01523); mid-band, so the red end is no more
-                     present than the green end, which is what keeps
-                     it a tint and not an alarm.
-     62%   #191016 — WCAG L .00635, inside the band the other four
-                     near-neutral stops sit in (#141013 .00566,
-                     #111117 .00582, #141209 .00601, #0F1417 .00664)
-                     and 25% darker than --raised, the same direction
-                     all four already go. R81's one hard constraint.
-   Declared as page-local custom properties, not in the tokens block
-   above, because tokens.css does not carry them yet: R84 ships that
-   port — plus the amended hue comments — in the same commit as this
-   page's build. Page-local until then; no other surface may consume
-   them without its own ruling. */
-/* DIFFERENCE 2 (R84): the mockup's page-local :root block declaring
-   --tint-save, --tint-spend and --tint-missing stood here. It is not
-   ported: the three anchors ship in tokens.css with the ramp, in one
-   commit. The nine classes below read them from there. */
+/* R81 · DIFFERENCE 2 (R84): the ramp's THREE ANCHORS — --tint-save,
+   --tint-spend, --tint-missing — live in tokens.css, in the card-tints
+   group, shipped with the ramp in one commit. The mockup declared them
+   in a page-local :root block here; that block is not ported. Their
+   provenance and calibration figures are in tokens.css's comment above
+   them and only there. The one fact this sheet leans on: R81's hard
+   constraint — every tint's 62%-and-beyond region is effectively
+   --raised (each near-neutral stop sits darker than it, the same
+   direction for all five), so contrast on the hero is set by --raised,
+   not by the ramp. The nine classes below read the anchors from there. */
 /* the hero (R8): three structural facts, no hue — the #171B21 ground,
    the border lifted to --ink-4 (.btn:hover's shipped value), and the
    feature radius. All three travel with the tile when it is moved or
@@ -151,9 +139,10 @@
    of the ramp). Green at 0, orange at 3, red at 8, clamped at 8 — a day
    with fourteen things looks like a day with eight. The two segments are
    deliberately unequal: the first three items move the colour 1.8× as far
-   as the next five do — measured, not estimated, as an end-to-end OKLab
-   ΔE of .1110 split .0774 across the first leg and .0422 across the
-   second (R95.1 corrects the earlier "as far as").
+   as the next five do — measured in OKLab between the deep stops: .0774
+   from 0 to 3, then .0422 from 3 to 8 (the straight line from 0 to 8 is
+   .1110; the ramp bends through orange). R95.1 corrects the earlier
+   "as far as".
 
    NINE FROZEN CLASSES, chosen by one pure lookup (R80), for R3's reason
    restated: an out-of-range stored value matches no rule and is
@@ -181,8 +170,9 @@
 
    REGISTER IS WHAT KEEPS THIS HONEST (R84). The ramp is a background
    wash and is never ink. --missing as ink on a row still means exactly
-   one thing — this is late — and it is drawn on the red wash in
-   specimen 01 so that composition can be judged rather than described.
+   one thing — this is late — and the mockup draws it on the red
+   wash in its specimen 01 so that composition can be judged rather
+   than described.
    No surface but this one may carry a semantic hue as a wash. */
 .pe-tile.is-hero.pe-t0{background:var(--tint-save);border-color:rgba(53,211,153,.2)}
 .pe-tile.is-hero.pe-t1{background:linear-gradient(155deg,#16220E,#111316 62%);border-color:rgba(155,196,72,.2)}
