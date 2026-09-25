@@ -168,7 +168,14 @@
    that it stays one honest artifact, so specimen 08 draws the two
    shells side by side with no switch between them. This query is the
    one number in the design that is first seen working in the browser
-   (R87's own cost). */
+   (R87's own cost).
+
+   ITS KNOWN FLOOR. Measured in the browser at 360px and up. At 320 Log
+   out wraps to two lines and spills out of the 44px bar; nowrap alone
+   would overflow the viewport instead (brand + three items + Log out is
+   ~329px). The strip's nav items are ~25px tall, just above WCAG 2.5.8's
+   24px target floor. Both are accepted as this provisional strip's floor
+   and owed to the phone design round (S20). */
 @media (max-width: 438.98px) {
   /* one column, two rows: the strip, then everything else. The rows are
      declared because .app-body keeps its min-height:100dvh: with two
