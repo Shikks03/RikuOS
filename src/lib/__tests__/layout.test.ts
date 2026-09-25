@@ -336,22 +336,37 @@ describe("buildCells", () => {
   });
 });
 
-describe("formCapable — R40's 213px form floor, from the stored span", () => {
-  it("span 2 (141.67px at twelve, 106px at six) is under the 213px floor", () => {
-    expect(formCapable(2)).toBe(false);
+describe("formCapable — R40's 213px form floor, from the row (lead ruling)", () => {
+  it("the default's Today (8) and To-do (4) are both capable", () => {
+    expect(formCapable([8, 4], 0)).toBe(true);
+    expect(formCapable([8, 4], 1)).toBe(true);
   });
 
-  it("span 3 (219.5px at twelve, 226px at six) clears the 213px floor", () => {
-    expect(formCapable(3)).toBe(true);
+  it("span 4 (264px at an 820px grid) clears the 213px floor (R40)", () => {
+    expect(formCapable([4, 8], 0)).toBe(true);
   });
 
-  it("spans 4..12 clear it", () => {
-    for (let n = 4; n <= 12; n++) expect(formCapable(n)).toBe(true);
+  it("span 3 (194.5px at an 820px grid) is under the 213px floor (R40)", () => {
+    expect(formCapable([3, 8], 0)).toBe(false);
   });
 
-  it("an out-of-range span is not capable (clamped to 2 first)", () => {
-    expect(formCapable(Number.NaN)).toBe(false);
-    expect(formCapable(1)).toBe(false);
+  it("span 2 (111px at an 820px grid, 106px at six) is under the 213px floor (R40)", () => {
+    expect(formCapable([2, 10], 0)).toBe(false);
+  });
+
+  it("a span 4 trimmed to one column at six (106px) is under the 213px floor (R40): [3,3,4,2] index 2", () => {
+    expect(collapseRow([3, 3, 4, 2])).toEqual([2, 2, 1, 1]);
+    expect(formCapable([3, 3, 4, 2], 2)).toBe(false);
+  });
+
+  it("[4,4,4]: each two columns at six (226px) and 264px at twelve — all capable", () => {
+    expect([0, 1, 2].map((i) => formCapable([4, 4, 4], i))).toEqual([true, true, true]);
+  });
+
+  it("an out-of-range span or index is not capable", () => {
+    expect(formCapable([Number.NaN, 8], 0)).toBe(false);
+    expect(formCapable([8, 4], 2)).toBe(false);
+    expect(formCapable([8, 4], -1)).toBe(false);
   });
 });
 

@@ -163,14 +163,24 @@ export function buildTracks(layout: PersonalLayout, editing: boolean): string {
 }
 
 /**
- * R40's 213px form floor as one predicate over the stored span. `disabled` is
+ * R40's 213px form floor as one predicate over the stored row. `disabled` is
  * an attribute no container query can set and R33 forbids measuring, so the
- * server decides from the span: span 3 is 219.5px at twelve and 226px at six
- * (over), span 2 is 141.67px and 106px (under). At one column a span-2 tile is
- * 334px and the form would have fitted — the safe mistake.
+ * server decides from spans, at the NARROWEST grid each column count allows.
+ *
+ * Lead ruling, correcting the plan's Task 4 derivation (`span >= 3`, which
+ * used 920px widths): twelve columns begin at an 820px grid, where a column
+ * is (820 − 11×14) / 12 = 55.5px, so span 3 is 194.5px (under) and span 4 is
+ * 264px (over). Six columns begin at 706px, a column (706 − 5×14) / 6 = 106px:
+ * one collapsed column is 106px (under), two are 226px (over). And the trim
+ * (R1) can take a tile to one column at six even at span 3 or 4 — `[3,3,4,2]`
+ * collapses to `[2,2,1,1]` — so the tile's COLLAPSED span decides too, which
+ * is why this takes the row. At one column every tile is the full width and a
+ * form would have fitted — the safe mistake the mockup's caption blesses.
  */
-export function formCapable(span: number): boolean {
-  return clampSpan(span) >= 3;
+export function formCapable(rowSpans: readonly number[], index: number): boolean {
+  if (!Number.isInteger(index) || index < 0 || index >= rowSpans.length) return false;
+  const spans = rowSpans.map((s) => clampSpan(s));
+  return spans[index] >= 4 && collapseRow(spans)[index] >= 2;
 }
 
 // ---- validate (strict on write) and resolve (total on read) ---------------
