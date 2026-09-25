@@ -4,9 +4,14 @@
 
    Two namespaces and no third. Reference names are kept verbatim
    (.stat, .btn, .tag, .eyebrow, .navitem, .agent, .track,
-   .statuspill) so a recipe can be diffed against components.html by
-   eye; anything only the Freelance page has carries the page prefix
-   `fl-`. No BEM, no utility classes.
+   .statuspill, and P10's .tick, .swx, .sq, .fld, .fld-l, .sel,
+   .formwell, .pickrow) so a recipe can be diffed against
+   components.html by eye; anything only the Freelance page has carries
+   the page prefix `fl-`, and anything only the Personal page has
+   carries `pe-` and lives in personal.css. The shared-control block at
+   the foot of this file is the ten entries P10 ships here because the
+   Settings layer picker uses them on a page with no stylesheet of its
+   own (R46) — it is not a third namespace. No BEM, no utility classes.
 
    docs/design/components.html's own article furniture — .frame, its
    .rail, .masthead, .kicker, .standfirst, .well, .caption, .debt,
@@ -511,3 +516,156 @@
   font-size:10.5px;color:#7FE3BE;
 }
 .statuspill i{width:5px;height:5px;border-radius:50%;background:var(--save);box-shadow:0 0 6px var(--save)}
+
+/* ============================================================
+   components — P10 additions
+   The shared-control block: eight controls — .tick, .swx, .sq (the
+   24px icon button), .fld, .fld-l, .sel (the select with the chevron),
+   .formwell (the form well), .pickrow (the Settings picker's row) —
+   plus .tag.is-layer and .btn.hi (the high rung of the pill ladder).
+   R25–R27, R32, R46: they live in components.css, NOT in the Personal
+   page's own sheet, because the Settings layer picker ships this same
+   phase on another page. Nothing above this banner changed shape.
+
+   Names are reference-style, with no page prefix (R46): the Personal
+   page's prefix belongs to that page and nothing else, and there is no
+   third namespace. None of these is element-shaped — a bare `.tile`
+   rule would border and pad `.app-brand .tile`, the 24px sunburst in
+   the rail, on every page (R32 / C7). `.swx` keeps the reference's own
+   name (components.html:475) because it is a port. The "two
+   namespaces" header line in the shipped file is amended to name this
+   block in the same commit.
+   ============================================================ */
+
+/* ---- the tick box (R25) — 14px square, 3px radius, never a fill.
+   `.tick` is (0,1,0) and base.css's :focus-visible is (0,1,0) too,
+   but :focus-visible only sets border-radius when it matches, and this
+   rule is later in the sheet, so the 3px survives a focus ring. */
+.tick{
+  position:relative;width:14px;height:14px;flex:none;padding:0;margin:0;
+  border:1px solid var(--line);border-radius:3px;background:var(--sunk);
+  display:grid;place-items:center;cursor:pointer;color:var(--ink-3);
+}
+/* the hit target, not the drawn size: 40 x 40 with the ::after box
+   (R41). The row's 14px gap puts the edit button 14px away, so 13px on
+   every side stops 1px clear of it. Never negative margins, which would
+   move the drawn box too. */
+.tick::after{content:"";position:absolute;inset:-13px}
+/* the ticked mark is an 8px check, never a fill: solid fills are rationed
+   to one per screen and Done this week alone would put twenty on the page.
+   The check is drawn in a 10-unit viewBox rather than the icon set's 24 so
+   that stroke-width:1.8 — the glyph set's weight — renders at 1.44px here
+   instead of 0.6px. The attribute value is the system's; the box is sized
+   so the value means what it says at 8px. */
+.tick svg{width:8px;height:8px;display:block}
+.tick:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---- the switch (R15, R25) — components.html:475-478 ported verbatim,
+   with one substitution: the reference writes `currentColor` so the ROW
+   supplies the layer hue. Layer hues are declined on this page, so the
+   value is written out as --ink. On = near-white border and knob;
+   off = --line border, --ink-4 knob. A contrast step, not a hue spend. */
+.swx{
+  width:26px;height:15px;border-radius:99px;background:#141820;
+  border:1px solid var(--line);position:relative;flex:none;cursor:pointer;padding:0;
+}
+.swx b{position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:var(--ink-4)}
+.swx.on{border-color:var(--ink);background:rgba(255,255,255,.05)}
+.swx.on b{left:13px;background:var(--ink)}
+/* busy, or a switch whose precondition is not met (`Put on calendar`
+   before a due date exists) — .btn:disabled's values */
+.swx:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---- the square icon button (R26) — components.html:483's values.
+   Serves the four arrows and the − / + stepper. Radius is --r-nav. */
+.sq{
+  width:24px;height:24px;flex:none;padding:0;border-radius:var(--r-nav);
+  background:none;border:1px solid var(--line);color:var(--ink-3);
+  display:grid;place-items:center;cursor:pointer;
+  font-family:var(--mono);font-size:10px;line-height:1;
+}
+.sq:hover{border-color:var(--ink-4);color:var(--ink)}
+.sq:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---- fields and labels (R27) — legacy.css's `input,textarea` and
+   `label` recipe, copied under classes with the source cited, so the
+   forms survive that file's scheduled deletion.
+   TWO deviations from the source recipe, both deliberate:
+     * font-size 16px, not 13px. layout.tsx sets maximumScale:1, which
+       iOS Safari has ignored since iOS 10, so a focused input under
+       16px auto-zooms and never zooms back. This is a CONTROL
+       dimension and is recorded as one in §5.3 — it is never licence
+       for 16px prose.
+     * line-height:1.4 is declared. A UA gives form controls
+       `line-height:normal`, which is font-metric derived, so the
+       field's height would depend on IBM Plex Sans's metrics. 1.4 is
+       the value .btn and legacy.css's bare `button` already declare.
+   caret-color:--spend stays: a caret is the same class of thing as
+   base.css's focus ring — "a reference-level convention, not a hue
+   spend". */
+.fld{
+  font-family:var(--body);font-size:16px;line-height:1.4;width:100%;padding:8px 10px;
+  background:#101318;border:1px solid var(--line);border-radius:var(--r-chip);
+  color:var(--ink);caret-color:var(--spend);
+}
+/* sentence case, not mono caps — a label addresses a person */
+.fld-l{display:block;font-size:12px;color:var(--ink-3);margin-bottom:4px}
+/* the select is a .fld with .sumrow::after's chevron geometry, so the page
+   has ONE chevron shape. The option list stays native. */
+select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
+.sel{position:relative;display:block}
+.sel::after{
+  content:"";position:absolute;right:12px;top:50%;margin-top:-5px;
+  width:6px;height:6px;border-right:1.5px solid var(--ink-4);
+  border-bottom:1.5px solid var(--ink-4);transform:rotate(-45deg);pointer-events:none;
+}
+
+/* ---- the form well (R27) — pre.body's ground, border and radius;
+   --sp-4 padding. The tile is raised, the form is sunk into it, no
+   second border, one card deep. (The Personal page's narrow band drops
+   the padding to --sp-3; that rule lives in the page's own sheet.) */
+.formwell{
+  background:var(--sunk);border:1px solid var(--line-soft);
+  border-radius:var(--r-chip);padding:var(--sp-4);
+}
+
+/* ---- the Settings layer picker's row (R46, the eighth item). It is
+   here for the same reason the other controls are: the picker ships
+   this phase on the Settings page, which has no page sheet of its own.
+   Same hairline grammar as the page's layer list, with a tick where
+   that has a switch. min-height 40px so two 40px tick hit boxes never
+   overlap. A vanished calendar keeps its row and carries its sentence
+   under the name in .fl-note's recipe (R42). */
+.pickrow{
+  display:flex;align-items:center;gap:10px;padding:8px 0;min-height:40px;
+  font-size:12.5px;color:var(--ink-2);
+}
+.pickrow+.pickrow{border-top:1px solid var(--line-soft)}
+.pickrow .fl-note{display:block;margin-top:2px}
+/* a row carrying a note aligns its tick with the name's line, not the
+   middle of the two lines: (18.75px line box − 14px box) / 2. The app
+   targets current Chrome, so :has() is available, as components.css's
+   .stat:not(:has(.track)) already assumes. */
+.pickrow:has(.fl-note){align-items:start}
+.pickrow:has(.fl-note)>.tick{margin-top:2.4px}
+
+/* ---- the layer tag (R13, M5) — .tag's box, de-capsed. Uppercasing
+   `Holidays in Philippines` transforms RIKU's data; mono caps are for
+   what the system names. 10px is .fl-count's size, so no new size.
+   max-width is eleven characters OF NAME: .tag's 10px side padding is
+   added, because border-box would otherwise spend 20px of the 11ch on
+   padding and cut `Classes` to `Classe…`. */
+.tag.is-layer{
+  text-transform:none;letter-spacing:.04em;font-size:10px;max-width:calc(11ch + 20px);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;
+}
+
+/* ---- the high rung of the pill ladder (P8 R18, R46) — .btn:hover's
+   two values at rest, so the one affirmative pill in a row (Save, Add,
+   Keep) sits a step above its neighbours without a fill or a hue; hover
+   lifts the border one more step. A modifier used WITH .btn, so it
+   must restate .btn:disabled's ink and border: at equal specificity the
+   later rule wins, and a disabled Save must still read as disabled. */
+.btn.hi{border-color:var(--ink-4);color:var(--ink)}
+.btn.hi:hover{border-color:var(--ink-3)}
+.btn.hi:disabled{border-color:var(--line);color:var(--ink-4)}
