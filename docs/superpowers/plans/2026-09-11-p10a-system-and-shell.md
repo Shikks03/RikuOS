@@ -883,13 +883,174 @@ Append to this file: the plan-start HEAD, the test count, the nine contrast read
 
 Before handing this plan to Plan B, confirm each of the following is true of the repo, not of the plan:
 
-- [ ] Five stylesheets, imported in the fixed order, `personal.css` fourth.
-- [ ] `personal.css` contains no `@media`, no `@supports`, no `container-type`, exactly two `container:` declarations, and no bare element-shaped selector.
-- [ ] `components.css` contains exactly one `@media`, and its header names the shared-control block.
-- [ ] `tokens.css` carries three tint tokens, R84's exact semantic-hues comment, and three `also P10 R84` pointers — and no `--alert`, no `--amber`, no fourth new token.
-- [ ] `DESIGN-INSPO.md` carries R84's footnote under an unrewritten table. `components.html` is byte-unchanged.
-- [ ] `heroTint` is one function returning `0..8 | null`, `PERSONAL_HERO_ANCHORS` is frozen, `PERSONAL_HERO_BUSY_AT` does not exist anywhere in the repo.
-- [ ] Three nav items, three glyphs, both matching rules unchanged, `/personal` resolving.
-- [ ] The strip switches at 439/438 and gives 334px at 390, on all four `(app)` routes, with `/login` untouched.
-- [ ] `npm test` · `npx tsc --noEmit` · `npm run build` green; `npm run lint` at four errors and three warnings.
-- [ ] `git -C ../ShikksTracker status --porcelain` is empty.
+- [x] Five stylesheets, imported in the fixed order, `personal.css` fourth.
+- [x] `personal.css` contains no `@media`, no `@supports`, no `container-type`, exactly two `container:` declarations, and no bare element-shaped selector. *(True of the rules with comments stripped; a raw grep hits ported comments.)*
+- [x] `components.css` contains exactly one `@media`, and its header names the shared-control block. *(One `@media` rule, at line 179; four more mentions are in its comments.)*
+- [x] `tokens.css` carries three tint tokens, R84's exact semantic-hues comment, and three `also P10 R84` pointers — and no `--alert`, no `--amber`, no fourth new token.
+- [x] `DESIGN-INSPO.md` carries R84's footnote under an unrewritten table. `components.html` is byte-unchanged.
+- [ ] `heroTint` is one function returning `0..8 | null`, `PERSONAL_HERO_ANCHORS` is frozen, `PERSONAL_HERO_BUSY_AT` does not exist anywhere in the repo. **Left unticked (verification 2026-09-26):** the first two clauses are true and no code identifier exists, but the name survives in two "is deleted" comments in `src/` (`personalView.ts:19`, `heroTint.test.ts:7`) and in docs, so the clause as written is not literally true — see the post-build record.
+- [x] Three nav items, three glyphs, both matching rules unchanged, `/personal` resolving.
+- [x] The strip switches at 439/438 and gives 334px at 390, on all four `(app)` routes, with `/login` untouched.
+- [x] `npm test` · `npx tsc --noEmit` · `npm run build` green; `npm run lint` at four errors and three warnings.
+- [x] `git -C ../ShikksTracker status --porcelain` is empty.
+
+---
+
+## Post-build record (executed 2026-09-26)
+
+The verification lead ran these checks against the repo, not against earlier reports. Every figure below was produced in this session.
+
+**HEADs.** Plan start `8fd11d5` (`8fd11d544de95e2f0155d523e52e5f011831dc14`). Build end `11f0c1e` (`11f0c1ee30b6287232d3ca51f30cd6d7268fa508`). This record is the one commit after it. Plans B and C diff against `8fd11d5`.
+
+**Commits.**
+
+- `6c3e74b` Task 1: the fifth stylesheet, namespace `pe-`, imported fourth.
+- `5c803ef` Task 1: narrow-band `.formwell` qualified by `.pe-cell`; five stylesheets.
+- `10d2ac1` Task 2: ten shared controls in components.css, header amended.
+- `1b80429` Task 2: header names only real reference names; three legacy.css leaks pinned.
+- `31165c8` Task 3: the nine-step ramp (tokens, comments, the `heroTint` lookup).
+- `dee91de` Task 3: the ramp's OKLab figures stated as measured.
+- `e1c1752` Task 3: personal.css comments made true after the ramp landed.
+- `f22b02e` Task 4: Personal first in the rail, with its glyph.
+- `98287b5` Task 5: the phone strip, app-wide, below 439px (S20, R87).
+- `11f0c1e` Task 5: the strip's 320px floor stated.
+
+**Files changed** `8fd11d5..11f0c1e`: DESIGN-INSPO.md, NavList.tsx, Rail.tsx, `(app)/personal/page.tsx`, `app/layout.tsx`, `components/icons.tsx`, `heroTint.test.ts`, `personalView.ts`, components.css, personal.css, tokens.css. Step 5 is confirmed. There is no model, API route, Google code, `days.ts` / `todos.ts` / `personalLayout.ts`, or ARCHITECTURE.md edit.
+
+**Tests.** `npm test` passes 30 files, **539 tests**. This is Plan B's baseline.
+
+**Types and build.** `npx tsc --noEmit` exits 0 with no output. `npm run build` prints `✓ Compiled successfully`, with `ƒ /personal` in the route table.
+
+**Lint.** `npm run lint` exits 1 at the baseline: 4 errors and 3 warnings. The four errors are `react-hooks/set-state-in-effect` at `login/page.tsx:23:9`, `settings/page.tsx:35:10`, `freelance/queue/page.tsx:69:10` and `freelance/queue/PushControls.tsx:24:7`. None moved. The three warnings are at `models.test.ts:42`, `queue.test.ts:258` and `db.ts:20`.
+
+**Invariant greps (step 2).**
+
+- No output from the deps/CSP/proxy/login diff, the base.css/legacy.css diff, the mockup/components.html diff, or the `src/app/api/` name list.
+- `"use client"` under `personal/` exits 1, and so does `var(--alert)|var(--amber)`.
+- `PERSONAL_HERO_BUSY_AT` exits 0. Its hits are two `src/` comments that say it is deleted (`personalView.ts:19`, `heroTint.test.ts:7`), plus design docs and plans. There is **no code identifier**.
+- `git -C ../ShikksTracker status --porcelain` printed nothing.
+
+**The nine contrast bands.** These are WCAG 2.x ratios, recomputed from `tokens.css` and the `.pe-tN` stops by an independent script. All 30 readings were computed (three inks against `--raised` and against the nine deep stops), plus the readings on the 62% stops. They agree with the builder's table.
+
+| ink | on `--raised` | on the deep stops (t0 low, t3 high) | on the 62% stops |
+|---|---|---|---|
+| `--ink` `#E9ECF0` | 15.158 | 13.58 – 14.74 | 15.64 – 15.92 |
+| `--ink-3` `#5B6470` | 2.995 | 2.68 – 2.91 | 3.09 – 3.15 |
+| `--missing` `#F87171` | 6.494 | 5.82 – 6.32 | 6.70 – 6.82 |
+
+- **Per stop.** `--ink` on the deep stops, t0 to t8: 13.58 13.96 14.41 14.74 14.67 14.60 14.49 14.48 14.38.
+- **Band ends.** Lower ends are the t0 deep stop; upper ends come from the 62% stops.
+- **Baselines.** The figures 15.1 and 2.99 are truncations of 15.158 and 2.995.
+- **`--ink-3` below 3:1.** It is under 3:1 on every deep stop and on `--raised` itself. That is the tertiary ink's existing level, not something the ramp made worse.
+
+**OKLab distances between the deep stops.**
+
+- Segment A steps are .0312, .0307 and .0310, so they are even at about .031 each.
+- Segment B steps are .0071, .0103, .0072, .0105 and .0086.
+- 0→3 is .0774 and 3→8 is .0422, a ratio of 1.83. The straight line from 0 to 8 is .1110.
+
+**Luminance.** `#241A03` .01120, `#3A0B0B` .01163, `#052620` .01523, `#440D0D` .01546, `#191016` .00635.
+
+**R87 in the browser (step 3).** Setup: a production build served by `next start -p 3001`, headless Chrome at a viewport height of 800, and a session cookie minted in-process. The server was stopped by its PID afterwards.
+
+- **Rail or strip.** Every one of the four `(app)` routes gave the same result at every width.
+  - At 440 and 439 the rail shows. `.app-side` is 170px and laid out as a column, with the agents block and the wordmark visible.
+  - At 438, 390 and 360 the strip shows. `.app-side` is full width by 44px, laid out as a row. `.rail-agents` and the wordmark are `display:none`.
+  - At 768 the rail shows.
+- **Content column** (the inner width of `main`), identical on `/personal`, `/freelance`, `/freelance/queue` and `/settings`:
+
+  | width | 440 | 439 | 438 | 390 | 360 | 768 |
+  |---|---|---|---|---|---|---|
+  | column | 214 | **213** | 382 | **334** | 304 | 542 |
+
+- **No horizontal scroll** at any width on any route (`scrollWidth == clientWidth`). That includes `/login` at 390 and 440.
+- **Active nav item** is correct at every stop: Personal on `/personal`, Freelance on both Freelance views, Settings on `/settings`.
+- **Nav item height.** 30.75px in the rail, 25.25px in the strip.
+- **`/login`.**
+  - It has no shell at 390 or at 440.
+  - Its column is 334 at 390.
+  - Its file has not changed since `8fd11d5`.
+- **Console.** There are no exceptions and no app console errors. The only entries are network 500s from Mongo-backed endpoints, at every width: `/api/queue?status=pending` on `/freelance/queue`, and `/api/settings` on `/settings`.
+- **Mongo is still unreachable from this machine.**
+  - The server log has 43 `querySrv EREFUSED` lines.
+  - The Mongo-backed blocks drew their failure states: `Couldn't load what's waiting.`, `Could not load the queue.` and `Could not load settings.`
+  - The Freelance tiles and pipeline, which come from the ShikksTracker API, loaded real data.
+  - **Clipping and overflow were checked against that content**, not against fully populated Mongo blocks.
+- **Pre-existing, not P10a.** Three spans on `/freelance` reach `right=502` at 440 and 439. They are clipped and the page does not scroll. They do not appear at 438 or below.
+
+**The vocabulary against the mockup (step 4).** Headless Chrome opened `file:///…/docs/design/p10-mockup.html` and read the computed styles. The shipped sheets were then read against it.
+
+- **`.ramp` chips, t0 to t8.** Each computed `background-image` is `linear-gradient(155deg, <deep>, <near> 62%)`.
+  - Deep stops: #052620 #16220E #231B03 #2A1408 #2D1307 #311107 #341007 #370D09 #3A0B0B.
+  - Near stops: #0F1417 #111316 #131114 #141013 #151014 #161014 #171015 #181015 #191016.
+  - All eighteen equal the shipped `.pe-tile.is-hero.pe-tN` rules.
+- **`.tick`.** The drawn box is 14×14. **The `::after` hit area measures 38×38, not 40×40.** See "Found by this verification" below.
+- **`.swx`** is 26×15.
+- **`.sq`** is 24×24, with `letter-spacing:normal`.
+- **`.fld`** is an INPUT, 16px font size, 22.4px line height (1.4).
+- **`.pickrow`** has `min-height:40px`, and its box is 40px tall.
+- **The two chevrons.** `.sel::after` and `.sumrow::after` have the same shape: 6×6, 1px borders on the right and bottom, and the same `rotate(-45deg)` matrix. Only their placement differs, by design. `.sel`'s is absolutely positioned 12px from the right, and `.sumrow`'s sits in the flow.
+- **Container queries.** The shipped `personal.css` has the same nine queries as the mockup:
+  - `@container tile` at 133.98, 199.98, 239.98 and 479.98 (max) and at 406, 480 and 720 (min). These are the six bands 134, 200, 240, 406, 480 and 720.
+  - `@container pgw` at 706 and at 820.
+  - `--tracks` is read only inside the 706 block. Its only other mention is a comment.
+- **`.pe-cell.is-gap{display:none}`** (line 69) is the only rule that hides a cell. The `:not(.pe-x0)` and `:not(.pe-s0)` re-shows sit inside the pgw blocks.
+- **M6.** `.fl>.pe-edit` (line 111) comes after `.pe-edit` (line 103).
+- **`.pe-more`** appears only in comments (lines 16 and 310).
+- **Rules with comments stripped.**
+  - personal.css has no `@media`, no `@supports` and no `container-type`.
+  - It has exactly two `container:` declarations.
+  - None of its 152 rules has a selector that starts with an element.
+  - components.css has exactly one `@media` rule.
+
+**Deviations and carry-forwards (lead rulings during execution).**
+
+- **Mockup line numbers moved after the plan.** The `personal` group ends at 1277, its banner is at 1278, and the `:root` tint block is at 842–846. The port went by banner.
+- **Plan difference 3 (reduced motion) had nothing to remove.** The mockup's personal group never held that rule. The chevron transition lives in components.css.
+- **Two of Task 1's greps hit comments.** `@media` and `container-type` match ported comments, not rules. tokens.css also has one `@media` in a comment. Future checks should strip comments first.
+- **Lead ruling: `.formwell` namespaced.** The mockup's bare `.formwell{padding:var(--sp-3)}` inside `@container tile` shipped as `.pe-cell .formwell`, for R32's namespace rule.
+- **Lead ruling: the components.css header.** It calls only the names that exist in components.html "verbatim reference names": `.stat` through `.statuspill`, and `.swx`. The other P10 controls are "reference-style".
+- **legacy.css leaks.** legacy.css loads across the whole app, but in the mockup it applies only inside `:where(.legacy-doc)`. Three leaks are pinned in components.css:
+  - `.tick:hover` border set to `--line`
+  - `.swx:not(.on):hover` border set to `--line`
+  - `.sq{letter-spacing:normal}`
+- **Not pinned (lead ruling): autofill.**
+  - legacy.css's `input:-webkit-autofill` reaches `input.fld`, and the mockup draws no autofill state.
+  - This carries forward to legacy.css's deletion. After that, autofilled `.fld` inputs will get Chrome's autofill background unless the rule is ported deliberately.
+- **Test count is 539, not the plan's projected 546.** The ramp adds 8 `it()` blocks, and all eight listed cases are covered by grouping.
+- **Lead ruling: `heroTint`'s docblock.** It said `Infinity` returns 8, but the code returns null. The comment was corrected to match the code (`1e9 → 8`, `Infinity → null`).
+- **The OKLab figures.**
+  - .0774 (0→3) and .0422 (3→8) are per-leg distances between deep stops, and they sum to .1196. The straight line from 0 to 8 is .1110.
+  - So the plan's, spec's and mockup's wording ".1110 split .0774/.0422" is arithmetically wrong. It was corrected in personalView.ts and personal.css.
+  - **For the design team, not the build:** the mockup still carries the old wording in its personal-group comments, and its R81 comment still says tokens.css lacks the anchors.
+- **Luminance wording.** `#241A03` is .01120 (the spec said .01121). `#440D0D` is .01546 against green's .01523, which is close but not "exactly".
+- **`PERSONAL_HERO_BUSY_AT` in comments.** It survives only in "is deleted" comments. The plan's "exists nowhere" claim hits those comments, and so will two checks in Plan C: its grep at about line 743, and its self-review line at about 839 ("do not exist anywhere in `src/`"). Plan C's check should look for code identifiers only.
+- **Plan B carry-forward.**
+  - heroTint's "events never counted" and "one overdue counts as one" tests cannot test those claims, because heroTint never sees events or overdue flags.
+  - Plan B must pin them in a view-model test. It should build `pending` from a fixture that has scheduled events and an overdue to-do, and assert the resulting tint.
+- **Plan C carry-forward.** R96's narrow-band `3d late` form has no CSS, so the component must pick the string when the tile is below 240px. Plan C also owns step 6's R88 / R95.2 check that the string fits, since personal.css carries no string.
+- **Task 4: the `/personal` placeholder header.**
+  - It keeps `.fl-headrow` (Plan C's shape), though Freelance's header has none.
+  - It renders the same. The h1 is 12px narrower because of the empty column gap, which only shows if the title wraps.
+- **Task 5: additions beyond the plan, accepted by the lead.**
+  - `.app-body{grid-template-rows:auto 1fr}` in the strip. It fixed a gap under the strip on short pages.
+  - `.app-side .navitem svg{display:none}`. The mockup's strip is text-only, and the glyphs made Log out wrap at 390.
+- **Task 5: the strip's lower limit.**
+  - The strip is verified from 360 up.
+  - At 320, Log out wraps out of the bar, and strip nav items are about 25px tall (measured at 25.25).
+  - The lead ruled both out of scope. They are owed to the phone design round (S20) and noted in the CSS comment.
+- **Pre-existing, not P10a.** Three spans on `/freelance` overflow to right=502 at 440 and 439. They are clipped and the page does not scroll. Worth a later look.
+- **Slips in the plan text.** "The four `tile` thresholds are … six" gives the wrong count, and there is a slip in the `.fl-headrow` snippet.
+
+**Found by this verification.**
+
+- **The tick's hit area is 38×38, not 40×40.**
+  - `.tick::after{position:absolute;inset:-13px}` computes to 38×38 in the mockup, and the shipped rule is byte-identical.
+  - An absolutely positioned box's insets are measured from its containing block's *padding* box. `.tick`'s 1px border leaves 12px, and 12 + 2×13 = 38.
+  - Two statements are off by the border: the spec's R41 line ("`inset:-13px` on all four sides → 40×40") and the components.css comment. The target also stops **2px** short of the edit button, not 1px.
+  - `inset:-14px` would give 40×40 and stop 1px short.
+  - This is a spec and mockup arithmetic slip for the design team and Plan C. The port is faithful, and nothing was changed here.
+- **Self-review.**
+  - The `PERSONAL_HERO_BUSY_AT` line is left unticked, because its last clause is not literally true (see above).
+  - The other lines were verified and ticked.
+  - The personal.css and components.css lines are true of the rules, not of the raw text.
