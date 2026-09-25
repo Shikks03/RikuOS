@@ -20,13 +20,33 @@ A 390px phone therefore takes the strip and gets 334px — the figure the mockup
 
 ---
 
-## R88. `3 days late` stands everywhere. The mockup's `3d late` is a drafting slip
+## R88. ~~`3 days late` stands everywhere~~ — **overturned by its own measurement. See R96.**
 
-**Decision.** The deck's strings `3 days late` and `1 day late` are the only forms. The abbreviated `3d late` / `5d late` that three of specimen 01's 106px panes render is **not a ruled narrow variant** and is corrected in the mockup.
+**What I ruled, and why it was wrong.** I ruled that the deck's `3 days late` and `1 day late` are the only forms and that the abbreviated `3d late` / `5d late` in three of specimen 01's 106px panes was a drafting slip to correct. My reason was that an abbreviation is not needed, because R38's narrow band already moves the due meta **to its own line**, where 80px of inner width holds eleven characters of 9.5px mono.
 
-**Reason.** The deck is the authority on every string, and no ruling introduced an abbreviation. More to the point, an abbreviation is not needed: in the narrow band R38 already moves the due meta **to its own line**, where 80px of inner width comfortably holds eleven characters of 9.5px mono. The room exists; the mockup simply drew the short form by hand.
+**The 80px is not what the string gets.** A to-do row keeps its tick column and the row's 14px gap on that line, so the meta's usable width is **52px**, and `3 days late` measures **62.7px**. It overruns by 10.7px and stops 1.3px inside the tile's border — inside the padding rather than clipped, but not a render this page would ship. I asked the builder to confirm the fit rather than take my word for it; it measured, found the opposite, and correctly **declined to apply the ruling** and flagged the strings as unratified instead. That was the right call and it is the reason the instruction was written that way.
 
-**The builder confirms it rather than taking my word**: render a to-do row with `3 days late` at 106px and report whether it fits on line two. **If it genuinely does not fit, that is a question for Riku** — an abbreviated string is his to approve, exactly as the eleven were — and not something the mockup or the spec may settle on its own.
+**1 of 6 is the only legal cell where the full string does not fit.** Every other drawn width takes it, 164px and up. That cell exists only because the editor can shrink a tile to it.
+
+**The standing rule survives intact:** neither the mockup nor the spec may settle a string. An abbreviation is Riku's to approve, exactly as the eleven were — which is what happened (R96).
+
+---
+
+## R96. `3d late` is ratified as a narrow-band-only form — Riku, 2026-09-25
+
+**Decision.** At tile widths where the full string does not fit, the lateness meta reads `3d late` / `1d late`. **Everywhere else it stays `3 days late` / `1 day late`.** Riku chose this over keeping one wording and accepting the overrun, and over the shorter `3d`, with all three measured consequences in front of him.
+
+He was not offered a fourth option — a span floor that stops a tile reaching 106px — because R28 settled that there is none (`−` runs to 2 on every tile), and reopening a settled interaction rule to avoid a two-character string is the worse trade.
+
+**Why not `3d`**, which fits with room to spare: it drops the word and leaves the red ink carrying the meaning alone. R10's whole argument is that a coloured *word* is unreadable at 80px of inner width but a **dot** is not — colour alone is never the signal on this page. `3d late` keeps a word.
+
+**The form is a narrow variant of one string, not a second string.** It is keyed to the same band that already re-lays every multi-cell row (R38), so it appears exactly where the two-line form appears and nowhere else; nothing chooses between them per-row or per-reader.
+
+**Both files it touches:**
+- The content deck's `§15` gains it, dated **2026-09-25** beside `2 items`, marked as a narrow-band variant of a string the deck already carries rather than a twelfth new sentence.
+- The visual spec's statement that the deck's form is the only form is corrected, with the 52px-against-62.7px measurement as the reason the variant exists.
+
+**Cost.** The page now has one string with two renderings, which is a thing it did not have before, and the spec must say plainly which width picks which — otherwise the next person reads `3d late` as a slip and "fixes" it back, which is exactly the loop this ruling exists to end.
 
 ---
 
@@ -95,4 +115,4 @@ Small, and none of them a design change.
 
 ## What is now closed
 
-Every item the Spec Editor could not resolve is ruled above, and the one string that needed Riku has it. **Nothing in the spec's §10 is a blocker for the build plans.** What remains genuinely open, and is recorded as open rather than guessed, is the phone threshold's *verification* (R87 cannot be drawn, only built) and the two questions that belong to Riku's own hands: the form's fit on his phone (R40) and one observed 07:00 push.
+Every item the Spec Editor could not resolve is ruled above. Two strings needed Riku and both have him: `2 items` (R90) and `3d late` (R96), each ratified 2026-09-25. **Nothing in the spec's §10 is a blocker for the build plans.** What remains genuinely open, and is recorded as open rather than guessed, is the phone threshold's *verification* (R87 cannot be drawn, only built) and the two questions that belong to Riku's own hands: the form's fit on his phone (R40) and one observed 07:00 push.
