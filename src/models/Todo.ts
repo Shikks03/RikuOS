@@ -17,7 +17,7 @@ export interface ITodo extends Document {
   doneAt?: Date;
   calendarId?: string;
   calendarEventId?: string;
-  calendarDayOn?: Date;
+  calendarBehind: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,14 +40,20 @@ export interface ITodo extends Document {
  * cannot orphan an entry written to the old one. 1024 is Google's stated
  * maximum for an event id.
  *
- * `calendarDayOn` is the day the pinned entry was last CONFIRMED to sit on —
- * written only after Google answered a pin or a move, and unset with the id.
- * It exists because the move path is local-first (src/lib/todos.ts): a date
- * change is saved before Google is asked, so after a failed or unanswered move
- * `dueOn` and the entry disagree, and nothing else on the record could say so.
- * `calendarEventId && calendarDayOn ≠ dueOn` is exactly deck §15's
- * `entry on the old day`, and it is also how the next save knows to retry the
- * move. A DAY like dueOn — UTC midnight, read back with dayKey(…, "UTC").
+ * `calendarBehind` is SYNC STATE, not event data. S19 (ARCHITECTURE.md §7)
+ * lets a to-do remember only its entry's id, so nothing about the entry — not
+ * its day, not its title — is stored here. What is stored is a fact about the
+ * to-do's own last write: "a change the entry should show was saved, and
+ * Google has not confirmed it". It is set true in the same atomic write that
+ * changes a to-do's title or due day (the move path is local-first,
+ * src/lib/todoStore.ts), and set false only when a patch to the CURRENT title
+ * and day succeeds, when a pin is claimed, or with the id when the entry is
+ * removed. `calendarEventId && calendarBehind` is deck §15's
+ * `entry on the old day`, and it is also how the next save knows to retry
+ * the move. On a to-do with no `calendarEventId` it means nothing and is read
+ * by nothing; a pin resets it. Required with a default of false; a row
+ * written before the field existed has none, and every reader treats absent
+ * as false.
  *
  * TWO INDEXES, TWO QUERIES, WHOLE PAGE:
  *   { done: 1, dueOn: 1 }    find({ done: false }).sort({ dueOn: 1 }) — every
@@ -79,7 +85,7 @@ const TodoSchema = new Schema<ITodo>(
     doneAt: { type: Date },
     calendarId: { type: String, maxlength: 256 },
     calendarEventId: { type: String, maxlength: 1024 },
-    calendarDayOn: { type: Date },
+    calendarBehind: { type: Boolean, required: true, default: false },
   },
   { timestamps: { createdAt: true, updatedAt: true }, strict: true }
 );

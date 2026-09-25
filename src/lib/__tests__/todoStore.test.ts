@@ -82,7 +82,7 @@ describe("createTodo with the calendar switch on (the pin path)", () => {
     const [filter, update] = m.findOneAndUpdate.mock.calls[0];
     expect(filter).toEqual({ _id: ID, done: false, dueOn: dayStart(DUE), calendarEventId: { $exists: false } });
     expect(update).toEqual({
-      $set: { calendarEventId: EVT, calendarId: PIN_CALENDAR_ID, calendarDayOn: dayStart(DUE) },
+      $set: { calendarEventId: EVT, calendarId: PIN_CALENDAR_ID, calendarBehind: false },
     });
     expect(del).not.toHaveBeenCalled();
   });
@@ -177,8 +177,8 @@ describe("createTodo with the calendar switch on (the pin path)", () => {
   });
 
   it("refuses garbage without touching the store", async () => {
-    expect(await createTodo({ title: "", onCalendar: true })).toEqual({ kind: "invalid", error: "Give it a title." });
-    expect(await createTodo({ title: "a", onCalendar: true })).toEqual({ kind: "invalid", error: "Needs a due date." });
+    expect(await createTodo({ title: "", onCalendar: true })).toEqual({ kind: "invalid", error: "no-title" });
+    expect(await createTodo({ title: "a", onCalendar: true })).toEqual({ kind: "invalid", error: "needs-due" });
     expect(m.create).not.toHaveBeenCalled();
   });
 });
@@ -198,7 +198,7 @@ describe("setTodoDone", () => {
     expect(del).toHaveBeenCalledWith("primary", EVT);
     expect(m.updateOne).toHaveBeenCalledWith(
       { _id: ID, calendarEventId: EVT },
-      { $unset: { calendarEventId: 1, calendarId: 1, calendarDayOn: 1 } },
+      { $unset: { calendarEventId: 1, calendarId: 1 }, $set: { calendarBehind: false } },
     );
     expect(r).toEqual({ kind: "saved", done: true, calendar: { kind: "ok" } });
   });
@@ -287,7 +287,7 @@ describe("setTodoDone", () => {
 
 describe("updateTodo", () => {
   const base = { _id: ID, title: "Renew ID", section: "personal", done: false, dueOn: dayStart(DUE) };
-  const pinnedBefore = { ...base, calendarId: "primary", calendarEventId: EVT, calendarDayOn: dayStart(DUE) };
+  const pinnedBefore = { ...base, calendarId: "primary", calendarEventId: EVT, calendarBehind: false };
 
   it("writes the fields first, returning the record as it was", async () => {
     m.findOneAndUpdate.mockReturnValue(q(base));
@@ -296,12 +296,19 @@ describe("updateTodo", () => {
 
     const [filter, update, options] = m.findOneAndUpdate.mock.calls[0];
     expect(filter).toEqual({ _id: ID });
-    expect(update).toEqual({ $set: { title: "Renew passport", section: "academics" } });
+    // The sync flag rides in the same atomic write as the change it describes.
+    expect(update).toEqual({ $set: { title: "Renew passport", section: "academics", calendarBehind: true } });
     expect(options).toMatchObject({ new: false, runValidators: true });
     expect(r).toEqual({ kind: "saved", calendar: { kind: "none" } });
   });
 
-  it("moves a pinned entry after a date change, then records the confirmed day", async () => {
+  it("does not set the sync flag for a section-only save", async () => {
+    m.findOneAndUpdate.mockReturnValue(q(base));
+    await updateTodo(ID, { section: "academics" });
+    expect(m.findOneAndUpdate.mock.calls[0][1]).toEqual({ $set: { section: "academics" } });
+  });
+
+  it("moves a pinned entry after a date change, then clears the flag guarded on what was patched", async () => {
     m.findOneAndUpdate.mockReturnValue(q(pinnedBefore));
     patch.mockResolvedValue(undefined);
 
@@ -309,13 +316,13 @@ describe("updateTodo", () => {
 
     expect(patch).toHaveBeenCalledWith("primary", EVT, { title: "Renew ID", dayKey: "2026-09-12" });
     expect(m.updateOne).toHaveBeenCalledWith(
-      { _id: ID, calendarEventId: EVT },
-      { $set: { calendarDayOn: dayStart("2026-09-12") } },
+      { _id: ID, calendarEventId: EVT, title: "Renew ID", dueOn: dayStart("2026-09-12") },
+      { $set: { calendarBehind: false } },
     );
     expect(r).toEqual({ kind: "saved", calendar: { kind: "ok" } });
   });
 
-  it("a failed move keeps the old calendarDayOn - the row reads `entry on the old day`", async () => {
+  it("a failed move leaves calendarBehind true - the row reads `entry on the old day`", async () => {
     m.findOneAndUpdate.mockReturnValue(q(pinnedBefore));
     patch.mockRejectedValue(refused());
 
@@ -325,7 +332,7 @@ describe("updateTodo", () => {
     expect(r).toEqual({ kind: "saved", calendar: { kind: "failed", cause: "refused", orphaned: false } });
   });
 
-  it("an unanswered move is unknown and keeps the old day too", async () => {
+  it("an unanswered move is unknown and leaves the flag set too", async () => {
     m.findOneAndUpdate.mockReturnValue(q(pinnedBefore));
     patch.mockRejectedValue(timeout());
 
@@ -336,8 +343,8 @@ describe("updateTodo", () => {
   });
 
   it("the next save retries a failed move even when the date is not changed again", async () => {
-    // Saved on the 12th earlier; the entry is still confirmed on the 10th.
-    m.findOneAndUpdate.mockReturnValue(q({ ...pinnedBefore, dueOn: dayStart("2026-09-12") }));
+    // Moved to the 12th earlier; Google never confirmed it, so the flag is set.
+    m.findOneAndUpdate.mockReturnValue(q({ ...pinnedBefore, dueOn: dayStart("2026-09-12"), calendarBehind: true }));
     patch.mockResolvedValue(undefined);
 
     await updateTodo(ID, { section: "freelance" });
@@ -353,7 +360,7 @@ describe("updateTodo", () => {
 
     expect(m.updateOne).toHaveBeenCalledWith(
       { _id: ID, calendarEventId: EVT },
-      { $unset: { calendarEventId: 1, calendarId: 1, calendarDayOn: 1 } },
+      { $unset: { calendarEventId: 1, calendarId: 1 }, $set: { calendarBehind: false } },
     );
     expect(r).toEqual({ kind: "saved", calendar: { kind: "failed", cause: "gone", orphaned: false } });
   });
@@ -389,7 +396,7 @@ describe("updateTodo", () => {
 
     const r = await updateTodo(ID, { dueOn: null });
 
-    expect(m.findOneAndUpdate.mock.calls[0][1]).toEqual({ $unset: { dueOn: 1 } });
+    expect(m.findOneAndUpdate.mock.calls[0][1]).toEqual({ $set: { calendarBehind: true }, $unset: { dueOn: 1 } });
     expect(del).toHaveBeenCalledWith("primary", EVT);
     expect(r).toEqual({ kind: "saved", calendar: { kind: "ok" } });
   });
@@ -406,10 +413,10 @@ describe("updateTodo", () => {
     expect(r).toEqual({ kind: "saved", calendar: { kind: "ok" } });
   });
 
-  it("switching on an undated to-do is `Needs a due date.`, nothing written", async () => {
+  it("switching on an undated to-do is needs-due, nothing written", async () => {
     m.findOne.mockReturnValueOnce(q(null)).mockReturnValueOnce(q({ ...base, dueOn: undefined }));
 
-    expect(await updateTodo(ID, { onCalendar: true })).toEqual({ kind: "invalid", error: "Needs a due date." });
+    expect(await updateTodo(ID, { onCalendar: true })).toEqual({ kind: "invalid", error: "needs-due" });
     expect(insert).not.toHaveBeenCalled();
   });
 

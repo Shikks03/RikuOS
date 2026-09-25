@@ -20,9 +20,11 @@
  * that is done but still holds `calendarEventId` is one whose entry Google
  * would not remove; its Done row says `entry left on Google` until a retry (a
  * second tick — setTodoDone is idempotent and retries the removal) clears it.
- * A pinned to-do whose `calendarDayOn` differs from `dueOn` is one whose entry
- * could not be moved; its open row says `entry on the old day`, and the next
- * save retries the move. Nothing is silently `pending` and no job sweeps
+ * A pinned to-do with `calendarBehind` set is one whose move or retitle was
+ * saved and not confirmed by Google; its open row says `entry on the old day`,
+ * and the next save retries the patch to the CURRENT title and day.
+ * `calendarBehind` is sync state about the to-do's own write, never event
+ * data: S19 lets a to-do remember only its entry's id (see models/Todo.ts). Nothing is silently `pending` and no job sweeps
  * anything: the stale state is on the row it belongs to (R86 §I item 4).
  * Clearing the id on a failed removal would erase exactly that surface, and
  * with it the only handle a retry has.
@@ -74,7 +76,7 @@ import mongoose from "mongoose";
 import Todo, { type TodoSection } from "@/models/Todo";
 import { dayStart, type DayKey } from "@/lib/days";
 import { deleteEvent, GoogleError, insertEvent, patchEvent } from "@/lib/google";
-import { parseCreateTodo, parseUpdateTodo, todoDueKey } from "@/lib/todos";
+import { parseCreateTodo, parseUpdateTodo, todoDueKey, type TodoInputError } from "@/lib/todos";
 
 /** Every pin goes to the main calendar in this version (deck §7). Stored anyway. */
 export const PIN_CALENDAR_ID = "primary";
@@ -106,16 +108,16 @@ export type CalendarOutcome =
   | { kind: "unknown"; orphaned: boolean };
 
 export type CreateResult =
-  | { kind: "invalid"; error: string }
+  | { kind: "invalid"; error: TodoInputError }
   | { kind: "created"; id: string; calendar: CalendarOutcome };
 
 export type UpdateResult =
-  | { kind: "invalid"; error: string }
+  | { kind: "invalid"; error: TodoInputError }
   | { kind: "not-found" }
   | { kind: "saved"; calendar: CalendarOutcome };
 
 export type DoneResult =
-  | { kind: "invalid"; error: string }
+  | { kind: "invalid"; error: "bad-done" }
   | { kind: "not-found" }
   /** `done` is the state now stored. An already-done tick is `saved`, not an error (§7.3). */
   | { kind: "saved"; done: boolean; calendar: CalendarOutcome };
@@ -165,10 +167,11 @@ interface TodoRecord {
   done: boolean;
   calendarId?: string;
   calendarEventId?: string;
-  calendarDayOn?: Date;
+  calendarBehind?: boolean; // absent reads as false
 }
 
-const UNPIN = { $unset: { calendarEventId: 1, calendarId: 1, calendarDayOn: 1 } } as const;
+/** Forgets the entry; the sync flag goes with it. */
+const UNPIN = { $unset: { calendarEventId: 1, calendarId: 1 }, $set: { calendarBehind: false } } as const;
 
 // --- The three calendar legs -------------------------------------------------
 
@@ -194,7 +197,7 @@ async function pinLeg(id: string, title: string, due: DayKey): Promise<CalendarO
   try {
     const claimed = await Todo.findOneAndUpdate(
       { _id: id, done: false, dueOn: dueDate, calendarEventId: { $exists: false } },
-      { $set: { calendarEventId: entryId, calendarId: PIN_CALENDAR_ID, calendarDayOn: dueDate } },
+      { $set: { calendarEventId: entryId, calendarId: PIN_CALENDAR_ID, calendarBehind: false } },
       { new: true, runValidators: true },
     ).lean<TodoRecord>();
     if (claimed) return { kind: "ok" };
@@ -229,9 +232,11 @@ async function unpinLeg(id: string, calendarId: string, eventId: string): Promis
 
 /**
  * Moves (and retitles) a pinned entry to the to-do's current day and title.
- * The patch is whole, so a retry after any earlier failure converges. Only a
- * CONFIRMED move writes `calendarDayOn`; until then the row reads
- * `entry on the old day`.
+ * The patch is whole, so a retry after any earlier failure converges.
+ * `calendarBehind` was set true by the local write (or an earlier one) and is
+ * cleared only here, only on a confirmed patch, and only while the record
+ * still holds the title and day that were patched — a save that landed in
+ * between keeps its own `true`. Until then the row reads `entry on the old day`.
  */
 async function moveLeg(
   id: string,
@@ -252,7 +257,10 @@ async function moveLeg(
     }
     return outcomeOf(c, false);
   }
-  await Todo.updateOne({ _id: id, calendarEventId: eventId }, { $set: { calendarDayOn: dayStart(due) } });
+  await Todo.updateOne(
+    { _id: id, calendarEventId: eventId, title, dueOn: dayStart(due) },
+    { $set: { calendarBehind: false } },
+  );
   return { kind: "ok" };
 }
 
@@ -278,8 +286,9 @@ export async function createTodo(input: unknown): Promise<CreateResult> {
  *
  *   pinned, switch off or due day cleared   unpin
  *   not pinned, switch on (and dated)       pin
- *   pinned, staying pinned, and the title
- *   or day differs from the entry's         move (also the retry of a failed one)
+ *   pinned, staying pinned, and behind      move (also the retry of a failed one);
+ *   (this save sent a title or day, or an   "behind" is calendarBehind, never a
+ *   earlier move is unconfirmed)            stored copy of the entry (S19)
  */
 export async function updateTodo(id: string, input: unknown): Promise<UpdateResult> {
   const parsed = parseUpdateTodo(input);
@@ -290,6 +299,11 @@ export async function updateTodo(id: string, input: unknown): Promise<UpdateResu
   const $set: Record<string, unknown> = {};
   const $unset: Record<string, 1> = {};
   if (v.title !== undefined) $set.title = v.title;
+  // Sync state, set in the SAME atomic write as the change it describes, so no
+  // crash or failure between here and Google can leave a move unrecorded.
+  // Harmless on an unpinned to-do (read only beside calendarEventId; a pin
+  // resets it).
+  if (v.title !== undefined || v.dueOn !== undefined) $set.calendarBehind = true;
   if (v.section !== undefined) $set.section = v.section;
   if (v.dueOn !== undefined) {
     if (v.dueOn === null) $unset.dueOn = 1;
@@ -312,7 +326,7 @@ export async function updateTodo(id: string, input: unknown): Promise<UpdateResu
   if (!before) {
     if (filter.dueOn === undefined) return { kind: "not-found" };
     const exists = await Todo.findOne({ _id: id }).lean<TodoRecord>();
-    return exists ? { kind: "invalid", error: "Needs a due date." } : { kind: "not-found" };
+    return exists ? { kind: "invalid", error: "needs-due" } : { kind: "not-found" };
   }
 
   const title = v.title ?? before.title;
@@ -327,8 +341,12 @@ export async function updateTodo(id: string, input: unknown): Promise<UpdateResu
   } else if (eventId === undefined && wantPinned && due !== null) {
     calendar = await pinLeg(id, title, due);
   } else if (eventId !== undefined && due !== null) {
-    const stale = title !== before.title || todoDueKey(before.calendarDayOn) !== due;
-    if (stale) calendar = await moveLeg(id, calendarId, eventId, title, due);
+    // Behind if an earlier move is unconfirmed, or this write touched the title
+    // or day. A re-save that sends the same title and day still patches once:
+    // the flag was set blind in the atomic write, and a confirmed patch is the
+    // only thing that may clear it.
+    const behind = before.calendarBehind === true || v.title !== undefined || v.dueOn !== undefined;
+    if (behind) calendar = await moveLeg(id, calendarId, eventId, title, due);
   }
   return { kind: "saved", calendar };
 }
@@ -341,7 +359,7 @@ export async function updateTodo(id: string, input: unknown): Promise<UpdateResu
  * Unticking never re-pins.
  */
 export async function setTodoDone(id: string, done: unknown): Promise<DoneResult> {
-  if (typeof done !== "boolean") return { kind: "invalid", error: "done must be true or false." };
+  if (typeof done !== "boolean") return { kind: "invalid", error: "bad-done" };
   if (!mongoose.isValidObjectId(id)) return { kind: "not-found" };
 
   const update = done ? { $set: { done: true, doneAt: new Date() } } : { $set: { done: false }, $unset: { doneAt: 1 } };

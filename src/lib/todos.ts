@@ -119,18 +119,33 @@ export interface UpdateTodoInput {
   onCalendar?: boolean;
 }
 
-export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
+/**
+ * Why an input was refused — a CODE, never a sentence. Every sentence Riku
+ * reads comes verbatim from the deck and is chosen by the caller: `no-title`
+ * is deck §7's `Give it a title.` and `needs-due` is the note deck §7 puts
+ * under the switch, `Needs a due date.`. The others have no deck sentence
+ * because the form cannot produce them (it bounds the title, offers only the
+ * three sections, sends a real day and a boolean); they reach the route only
+ * from a malformed request, and the route answers them as a plain 400.
+ */
+export type TodoInputError =
+  | "not-object"
+  | "no-title"
+  | "title-too-long"
+  | "bad-section"
+  | "bad-due"
+  | "bad-switch"
+  | "needs-due"
+  | "unknown-field"
+  | "empty-patch";
 
-// Validation messages. `Give it a title.` and `Needs a due date.` are deck §7's;
-// the rest are route-level JSON errors the page never renders verbatim.
-const MSG_TITLE = "Give it a title.";
-const MSG_NEEDS_DUE = "Needs a due date.";
+export type Parsed<T> = { ok: true; value: T } | { ok: false; error: TodoInputError };
 
 function parseTitle(v: unknown): Parsed<string> {
-  if (typeof v !== "string") return { ok: false, error: MSG_TITLE };
+  if (typeof v !== "string") return { ok: false, error: "no-title" };
   const title = v.trim();
-  if (title === "") return { ok: false, error: MSG_TITLE };
-  if (title.length > TODO_TITLE_MAX) return { ok: false, error: `Title is over ${TODO_TITLE_MAX} characters.` };
+  if (title === "") return { ok: false, error: "no-title" };
+  if (title.length > TODO_TITLE_MAX) return { ok: false, error: "title-too-long" };
   return { ok: true, value: title };
 }
 
@@ -144,12 +159,12 @@ const SECTION_KEYS: Record<TodoSection, true> = { personal: true, freelance: tru
 function parseSection(v: unknown): Parsed<TodoSection> {
   return typeof v === "string" && Object.hasOwn(SECTION_KEYS, v)
     ? { ok: true, value: v as TodoSection }
-    : { ok: false, error: "Section must be personal, freelance or academics." };
+    : { ok: false, error: "bad-section" };
 }
 
 function parseDue(v: unknown): Parsed<DayKey | null> {
   if (v === null) return { ok: true, value: null };
-  return isDayKey(v) ? { ok: true, value: v } : { ok: false, error: "Due must be a day, YYYY-MM-DD." };
+  return isDayKey(v) ? { ok: true, value: v } : { ok: false, error: "bad-due" };
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -164,7 +179,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
  * form's own defaults (deck §7).
  */
 export function parseCreateTodo(body: unknown): Parsed<CreateTodoInput> {
-  if (!isRecord(body)) return { ok: false, error: "Expected a JSON object." };
+  if (!isRecord(body)) return { ok: false, error: "not-object" };
   const title = parseTitle(body.title);
   if (!title.ok) return title;
   const section = body.section === undefined ? ({ ok: true, value: "personal" } as const) : parseSection(body.section);
@@ -172,10 +187,10 @@ export function parseCreateTodo(body: unknown): Parsed<CreateTodoInput> {
   const dueOn = body.dueOn === undefined ? ({ ok: true, value: null } as const) : parseDue(body.dueOn);
   if (!dueOn.ok) return dueOn;
   if (body.onCalendar !== undefined && typeof body.onCalendar !== "boolean") {
-    return { ok: false, error: "onCalendar must be true or false." };
+    return { ok: false, error: "bad-switch" };
   }
   const onCalendar = body.onCalendar === true;
-  if (onCalendar && dueOn.value === null) return { ok: false, error: MSG_NEEDS_DUE };
+  if (onCalendar && dueOn.value === null) return { ok: false, error: "needs-due" };
   return { ok: true, value: { title: title.value, section: section.value, dueOn: dueOn.value, onCalendar } };
 }
 
@@ -187,10 +202,10 @@ export function parseCreateTodo(body: unknown): Parsed<CreateTodoInput> {
  * due day by the write-through half.
  */
 export function parseUpdateTodo(body: unknown): Parsed<UpdateTodoInput> {
-  if (!isRecord(body)) return { ok: false, error: "Expected a JSON object." };
+  if (!isRecord(body)) return { ok: false, error: "not-object" };
   const known = ["title", "section", "dueOn", "onCalendar"];
   const unknown = Object.keys(body).filter((k) => !known.includes(k));
-  if (unknown.length > 0) return { ok: false, error: `Unknown field: ${unknown[0].slice(0, 40)}.` };
+  if (unknown.length > 0) return { ok: false, error: "unknown-field" };
   const out: UpdateTodoInput = {};
   if (body.title !== undefined) {
     const t = parseTitle(body.title);
@@ -208,10 +223,10 @@ export function parseUpdateTodo(body: unknown): Parsed<UpdateTodoInput> {
     out.dueOn = d.value;
   }
   if (body.onCalendar !== undefined) {
-    if (typeof body.onCalendar !== "boolean") return { ok: false, error: "onCalendar must be true or false." };
+    if (typeof body.onCalendar !== "boolean") return { ok: false, error: "bad-switch" };
     out.onCalendar = body.onCalendar;
   }
-  if (Object.keys(out).length === 0) return { ok: false, error: "Nothing to change." };
-  if (out.onCalendar === true && out.dueOn === null) return { ok: false, error: MSG_NEEDS_DUE };
+  if (Object.keys(out).length === 0) return { ok: false, error: "empty-patch" };
+  if (out.onCalendar === true && out.dueOn === null) return { ok: false, error: "needs-due" };
   return { ok: true, value: out };
 }

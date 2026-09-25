@@ -183,14 +183,14 @@ describe("parseCreateTodo", () => {
     });
   });
 
-  it("says the deck's `Give it a title.` for a missing or blank title", () => {
-    expect(parseCreateTodo({})).toEqual({ ok: false, error: "Give it a title." });
-    expect(parseCreateTodo({ title: "   " })).toEqual({ ok: false, error: "Give it a title." });
+  it("answers no-title - the caller's `Give it a title.` - for a missing or blank title", () => {
+    expect(parseCreateTodo({})).toEqual({ ok: false, error: "no-title" });
+    expect(parseCreateTodo({ title: "   " })).toEqual({ ok: false, error: "no-title" });
   });
 
   it("takes 140 characters and refuses 141", () => {
     expect(parseCreateTodo({ title: "x".repeat(140) }).ok).toBe(true);
-    expect(parseCreateTodo({ title: "x".repeat(141) }).ok).toBe(false);
+    expect(parseCreateTodo({ title: "x".repeat(141) })).toEqual({ ok: false, error: "title-too-long" });
   });
 
   it("refuses a section outside the three, and Work in particular", () => {
@@ -201,14 +201,33 @@ describe("parseCreateTodo", () => {
     expect(parseCreateTodo({ title: "a", dueOn: "2026-02-31" }).ok).toBe(false);
   });
 
-  it("says the deck's `Needs a due date.` for the calendar switch without one", () => {
-    expect(parseCreateTodo({ title: "a", onCalendar: true })).toEqual({ ok: false, error: "Needs a due date." });
+  it("answers needs-due - the caller's `Needs a due date.` - for the switch without a day", () => {
+    expect(parseCreateTodo({ title: "a", onCalendar: true })).toEqual({ ok: false, error: "needs-due" });
   });
 
   it("refuses a non-object and a non-boolean switch", () => {
     expect(parseCreateTodo(null).ok).toBe(false);
     expect(parseCreateTodo([]).ok).toBe(false);
     expect(parseCreateTodo({ title: "a", onCalendar: "yes" }).ok).toBe(false);
+  });
+});
+
+describe("the parsers speak in codes, never sentences", () => {
+  // Every sentence Riku reads is the deck's, chosen by the caller.
+  it("returns only lowercase codes for every refusal", () => {
+    const refusals = [
+      parseCreateTodo(null),
+      parseCreateTodo({}),
+      parseCreateTodo({ title: "a", section: "work" }),
+      parseCreateTodo({ title: "a", dueOn: "x" }),
+      parseCreateTodo({ title: "a", onCalendar: 1 }),
+      parseUpdateTodo({ nope: 1 }),
+      parseUpdateTodo({}),
+    ];
+    for (const r of refusals) {
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/^[a-z-]+$/);
+    }
   });
 });
 
@@ -222,13 +241,13 @@ describe("parseUpdateTodo", () => {
   });
 
   it("refuses an empty patch and an unknown field", () => {
-    expect(parseUpdateTodo({})).toEqual({ ok: false, error: "Nothing to change." });
+    expect(parseUpdateTodo({})).toEqual({ ok: false, error: "empty-patch" });
     expect(parseUpdateTodo({ done: true }).ok).toBe(false);
     expect(parseUpdateTodo({ calendarEventId: "x" }).ok).toBe(false);
   });
 
   it("refuses switching on while clearing the due day", () => {
-    expect(parseUpdateTodo({ dueOn: null, onCalendar: true })).toEqual({ ok: false, error: "Needs a due date." });
+    expect(parseUpdateTodo({ dueOn: null, onCalendar: true })).toEqual({ ok: false, error: "needs-due" });
   });
 
   it("refuses a blank title and a bad section", () => {
