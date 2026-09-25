@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconFreelance, IconSettings } from "@/components/icons";
+import { IconFreelance, IconPersonal, IconSettings } from "@/components/icons";
 
 /**
  * One of the shell's client islands, each for exactly one reason:
@@ -14,11 +14,14 @@ import { IconFreelance, IconSettings } from "@/components/icons";
  * stay boring. Editing a fail-closed security file to save a kilobyte of
  * hydration is a bad trade.
  *
- * Two items since R42: the queue is a VIEW of Freelance, at /freelance/queue,
- * reached by the view switch the segment layout renders — not a page of its
- * own. Adding /personal later is one entry in this array.
+ * Three items. R42 left two: the queue is a VIEW of Freelance, at
+ * /freelance/queue, reached by the view switch the segment layout renders —
+ * not a page of its own. P10 added /personal as one entry in this array, and
+ * FIRST, because the daily page reads first (D13). Nothing else changed: the
+ * two matching rules below were already right for it, since /personal has no
+ * sub-route and so the prefix match and the equality match agree there.
  *
- * Both items carry a glyph. Never a mix.
+ * All three items carry a glyph. Never a mix.
  *
  * TWO MATCHES, NOT ONE (R44). The prefix match is the OPPOSITE of the view
  * switch's, which compares for equality: /freelance/queue must light
@@ -37,6 +40,7 @@ import { IconFreelance, IconSettings } from "@/components/icons";
  * announce as "navigation" and "navigation".
  */
 const NAV = [
+  { href: "/personal", label: "Personal", Icon: IconPersonal },
   { href: "/freelance", label: "Freelance", Icon: IconFreelance },
   { href: "/settings", label: "Settings", Icon: IconSettings },
 ] as const;

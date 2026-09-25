@@ -19,6 +19,19 @@ const stroke = {
   "aria-hidden": true,
 } as const;
 
+/**
+ * The daily page's glyph, first in the rail (D13). Ported from
+ * docs/design/p10-mockup.html's own rail (specimen 07, first nav item).
+ */
+export function IconPersonal() {
+  return (
+    <svg {...stroke}>
+      <path d="M4 6.5h16v12.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z" />
+      <path d="M8 3.5v4M16 3.5v4M4 11h16" />
+    </svg>
+  );
+}
+
 export function IconFreelance() {
   return (
     <svg {...stroke}>
