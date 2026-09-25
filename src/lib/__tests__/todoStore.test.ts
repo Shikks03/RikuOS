@@ -80,7 +80,14 @@ describe("createTodo with the calendar switch on (the pin path)", () => {
     // All-day, day key only: google.ts sets Google's exclusive end itself.
     expect(insert).toHaveBeenCalledWith(PIN_CALENDAR_ID, { title: "Renew ID", allDay: true, dayKey: DUE });
     const [filter, update] = m.findOneAndUpdate.mock.calls[0];
-    expect(filter).toEqual({ _id: ID, done: false, dueOn: dayStart(DUE), calendarEventId: { $exists: false } });
+    // title is guarded too: a retitle after the insert makes the claim miss.
+    expect(filter).toEqual({
+      _id: ID,
+      done: false,
+      title: "Renew ID",
+      dueOn: dayStart(DUE),
+      calendarEventId: { $exists: false },
+    });
     expect(update).toEqual({
       $set: { calendarEventId: EVT, calendarId: PIN_CALENDAR_ID, calendarBehind: false },
     });
@@ -98,15 +105,39 @@ describe("createTodo with the calendar switch on (the pin path)", () => {
     expect(r).toEqual({ kind: "created", id: ID, calendar: { kind: "failed", cause: "changed", orphaned: false } });
   });
 
-  it("compensates when the claim throws, and reports it rather than throwing - the to-do IS saved", async () => {
+  it("a claim that throws is re-read; absent, it compensates and reports store - the to-do IS saved", async () => {
     insert.mockResolvedValue({ id: EVT, htmlLink: "" });
     m.findOneAndUpdate.mockReturnValue(q(new Error("mongo down")));
+    m.findOne.mockReturnValue(q(null));
     del.mockResolvedValue(undefined);
 
     const r = await createTodo(body);
 
+    expect(m.findOne).toHaveBeenCalledWith({ _id: ID, calendarEventId: EVT });
     expect(del).toHaveBeenCalledWith(PIN_CALENDAR_ID, EVT);
     expect(r).toEqual({ kind: "created", id: ID, calendar: { kind: "failed", cause: "store", orphaned: false } });
+  });
+
+  it("a claim that throws but landed is ok on the re-read - never compensated", async () => {
+    insert.mockResolvedValue({ id: EVT, htmlLink: "" });
+    m.findOneAndUpdate.mockReturnValue(q(new Error("socket closed after write")));
+    m.findOne.mockReturnValue(q({ _id: ID, calendarEventId: EVT }));
+
+    const r = await createTodo(body);
+
+    expect(r).toMatchObject({ calendar: { kind: "ok" } });
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("a claim that throws and cannot be re-read is unknown and orphaned - no compensation", async () => {
+    insert.mockResolvedValue({ id: EVT, htmlLink: "" });
+    m.findOneAndUpdate.mockReturnValue(q(new Error("mongo down")));
+    m.findOne.mockReturnValue(q(new Error("still down")));
+
+    const r = await createTodo(body);
+
+    expect(r).toEqual({ kind: "created", id: ID, calendar: { kind: "unknown", orphaned: true } });
+    expect(del).not.toHaveBeenCalled();
   });
 
   it("says an entry may be left on the calendar when the compensating delete fails", async () => {
@@ -201,6 +232,14 @@ describe("setTodoDone", () => {
       { $unset: { calendarEventId: 1, calendarId: 1 }, $set: { calendarBehind: false } },
     );
     expect(r).toEqual({ kind: "saved", done: true, calendar: { kind: "ok" } });
+  });
+
+  it("reports Google's ok even when the follow-up unset throws - only the to-do's own write throws", async () => {
+    m.findOneAndUpdate.mockReturnValue(q(pinned));
+    del.mockResolvedValue(undefined);
+    m.updateOne.mockRejectedValue(new Error("mongo blip"));
+
+    expect(await setTodoDone(ID, true)).toEqual({ kind: "saved", done: true, calendar: { kind: "ok" } });
   });
 
   it("keeps the id when Google refuses - the Done row reads `entry left on Google`", async () => {
@@ -319,7 +358,43 @@ describe("updateTodo", () => {
       { _id: ID, calendarEventId: EVT, title: "Renew ID", dueOn: dayStart("2026-09-12") },
       { $set: { calendarBehind: false } },
     );
+    // Out-of-order guard: re-flag if the record no longer holds what was patched.
+    expect(m.updateOne).toHaveBeenNthCalledWith(
+      2,
+      {
+        _id: ID,
+        calendarEventId: EVT,
+        $or: [{ title: { $ne: "Renew ID" } }, { dueOn: { $ne: dayStart("2026-09-12") } }],
+      },
+      { $set: { calendarBehind: true } },
+    );
     expect(r).toEqual({ kind: "saved", calendar: { kind: "ok" } });
+  });
+
+  it("a confirmed move stays ok when its follow-up writes throw", async () => {
+    m.findOneAndUpdate.mockReturnValue(q(pinnedBefore));
+    patch.mockResolvedValue(undefined);
+    m.updateOne.mockRejectedValue(new Error("mongo blip"));
+
+    expect(await updateTodo(ID, { dueOn: "2026-09-12" })).toEqual({ kind: "saved", calendar: { kind: "ok" } });
+  });
+
+  it("a move whose entry is gone stays failed/gone when the unset throws", async () => {
+    m.findOneAndUpdate.mockReturnValue(q(pinnedBefore));
+    patch.mockRejectedValue(gone());
+    m.updateOne.mockRejectedValue(new Error("mongo blip"));
+
+    expect(await updateTodo(ID, { dueOn: "2026-09-12" })).toEqual({
+      kind: "saved",
+      calendar: { kind: "failed", cause: "gone", orphaned: false },
+    });
+  });
+
+  it("never moves a done to-do's leftover entry - its retry is removal", async () => {
+    m.findOneAndUpdate.mockReturnValue(q({ ...pinnedBefore, done: true, calendarBehind: true }));
+
+    expect(await updateTodo(ID, { title: "Renew passport" })).toEqual({ kind: "saved", calendar: { kind: "none" } });
+    expect(patch).not.toHaveBeenCalled();
   });
 
   it("a failed move leaves calendarBehind true - the row reads `entry on the old day`", async () => {
@@ -408,9 +483,20 @@ describe("updateTodo", () => {
 
     const r = await updateTodo(ID, { onCalendar: true });
 
-    expect(m.findOne.mock.calls[0][0]).toEqual({ _id: ID, dueOn: { $exists: true } });
+    expect(m.findOne.mock.calls[0][0]).toEqual({ _id: ID, done: false, dueOn: { $exists: true } });
     expect(insert).toHaveBeenCalledWith(PIN_CALENDAR_ID, { title: "Renew ID", allDay: true, dayKey: DUE });
     expect(r).toEqual({ kind: "saved", calendar: { kind: "ok" } });
+  });
+
+  it("switching on a done to-do is done-cannot-pin: nothing written, no Google", async () => {
+    m.findOneAndUpdate.mockReturnValue(q(null));
+    m.findOne.mockReturnValue(q({ ...base, done: true }));
+
+    const r = await updateTodo(ID, { onCalendar: true, title: "x" });
+
+    expect(m.findOneAndUpdate.mock.calls[0][0]).toEqual({ _id: ID, done: false, dueOn: { $exists: true } });
+    expect(r).toEqual({ kind: "invalid", error: "done-cannot-pin" });
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it("switching on an undated to-do is needs-due, nothing written", async () => {

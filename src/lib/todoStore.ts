@@ -53,11 +53,15 @@
  * WHAT THROWS AND WHAT RETURNS. Google outcomes are RETURNED as a
  * discriminated CalendarOutcome — a catch cannot tell `failed` from `unknown`.
  * A Mongo error on the to-do's OWN write throws: nothing was saved, and the
- * route answers `Couldn't save.` / `Couldn't delete.`. A Mongo error on the
- * pin's guarded write is not thrown but returned as `failed`/`store`, after
- * compensation, because by then the to-do itself is saved and a throw would
- * make the route claim otherwise. (The plan said "throw the original error";
- * that is right for pinTodo alone and wrong once the pin rides on a create.)
+ * route answers `Couldn't save.` / `Couldn't delete.`. Every other Mongo
+ * write here runs after Google acted and never throws (see followUp). A throw
+ * from the pin's guarded claim is AMBIGUOUS — it may have landed — so the id
+ * is re-read: recorded → `ok`; absent → compensate, `failed`/`store`; the
+ * re-read throws too → `unknown`, orphaned, and no compensation, because a
+ * delete could remove an entry the record does hold. None of it is thrown:
+ * by then the to-do itself is saved. (The plan said "throw the original
+ * error"; that is right for pinTodo alone and wrong once the pin rides on a
+ * create.)
  *
  * VALIDATION. The routes validate at their top with todos.ts's parsers; these
  * functions run the same parsers again and answer `invalid` without touching
@@ -98,7 +102,8 @@ export type CalendarFailCause =
  *
  * `orphaned` — an entry may now be on Google that no record points at, so no
  * retry can reach it and Riku must remove it by hand: a pin whose compensation
- * failed or could not be confirmed, an unanswered pin insert, or a delete
+ * failed or could not be confirmed, a pin claim that could not be read back,
+ * an unanswered pin insert, or a delete
  * whose entry removal did not take.
  */
 export type CalendarOutcome =
@@ -111,8 +116,11 @@ export type CreateResult =
   | { kind: "invalid"; error: TodoInputError }
   | { kind: "created"; id: string; calendar: CalendarOutcome };
 
+/** A store-level refusal the parser cannot see: it depends on the record. */
+export type TodoStateError = "needs-due" | "done-cannot-pin";
+
 export type UpdateResult =
-  | { kind: "invalid"; error: TodoInputError }
+  | { kind: "invalid"; error: TodoInputError | TodoStateError }
   | { kind: "not-found" }
   | { kind: "saved"; calendar: CalendarOutcome };
 
@@ -176,6 +184,23 @@ const UNPIN = { $unset: { calendarEventId: 1, calendarId: 1 }, $set: { calendarB
 // --- The three calendar legs -------------------------------------------------
 
 /**
+ * A bookkeeping write that runs AFTER Google has acted. It never throws past
+ * the result: the calendar outcome is what Google did, and reporting a Mongo
+ * hiccup here as `Couldn't save.` would claim the opposite. What a failed
+ * follow-up leaves behind is always visible and self-healing — an id Google
+ * has already removed (the next removal answers `gone`, which clears it) or a
+ * `calendarBehind` that is wrongly set or unset until the next save patches
+ * again. This is why the header's rule holds: only the to-do's OWN write throws.
+ */
+async function followUp(write: () => Promise<unknown>): Promise<void> {
+  try {
+    await write();
+  } catch {
+    // Deliberately absorbed; see above.
+  }
+}
+
+/**
  * Google first, then the guarded claim, with a compensating delete. Only an
  * open to-do still due on `due` and not already pinned can take the id — a
  * double tap's second insert is compensated, not recorded twice.
@@ -195,13 +220,25 @@ async function pinLeg(id: string, title: string, due: DayKey): Promise<CalendarO
   const dueDate = dayStart(due);
   let cause: "changed" | "store" = "changed";
   try {
+    // `title` is in the guard too: a retitle that landed after the insert makes
+    // the claim miss and compensate, rather than record an entry with the old
+    // title and clear calendarBehind over it.
     const claimed = await Todo.findOneAndUpdate(
-      { _id: id, done: false, dueOn: dueDate, calendarEventId: { $exists: false } },
+      { _id: id, done: false, title, dueOn: dueDate, calendarEventId: { $exists: false } },
       { $set: { calendarEventId: entryId, calendarId: PIN_CALENDAR_ID, calendarBehind: false } },
       { new: true, runValidators: true },
     ).lean<TodoRecord>();
     if (claimed) return { kind: "ok" };
   } catch {
+    // A throw is ambiguous: the write may have landed before the error. Ask.
+    try {
+      const recorded = await Todo.findOne({ _id: id, calendarEventId: entryId }).lean<TodoRecord>();
+      if (recorded) return { kind: "ok" };
+    } catch {
+      // Cannot tell whether the id is recorded, so neither compensate (that
+      // could delete a recorded entry) nor claim success. Never guess.
+      return { kind: "unknown", orphaned: true };
+    }
     cause = "store";
   }
 
@@ -226,7 +263,7 @@ async function unpinLeg(id: string, calendarId: string, eventId: string): Promis
     const c = classifyWrite(err);
     if (c.kind !== "gone") return outcomeOf(c, false);
   }
-  await Todo.updateOne({ _id: id, calendarEventId: eventId }, UNPIN);
+  await followUp(() => Todo.updateOne({ _id: id, calendarEventId: eventId }, UNPIN));
   return { kind: "ok" };
 }
 
@@ -252,14 +289,23 @@ async function moveLeg(
     if (c.kind === "gone") {
       // Removed on Google's side. Keeping the id would make every retry fail
       // forever; the to-do is simply no longer on the calendar.
-      await Todo.updateOne({ _id: id, calendarEventId: eventId }, UNPIN);
+      await followUp(() => Todo.updateOne({ _id: id, calendarEventId: eventId }, UNPIN));
       return { kind: "failed", cause: "gone", orphaned: false };
     }
     return outcomeOf(c, false);
   }
-  await Todo.updateOne(
-    { _id: id, calendarEventId: eventId, title, dueOn: dayStart(due) },
-    { $set: { calendarBehind: false } },
+  const dueDate = dayStart(due);
+  await followUp(() =>
+    Todo.updateOne({ _id: id, calendarEventId: eventId, title, dueOn: dueDate }, { $set: { calendarBehind: false } }),
+  );
+  // Out-of-order guard: if the record no longer holds what THIS patch sent (a
+  // later save's patch may have landed first and cleared the flag, then this
+  // one overwrote the entry), the entry is behind again. Never under-report.
+  await followUp(() =>
+    Todo.updateOne(
+      { _id: id, calendarEventId: eventId, $or: [{ title: { $ne: title } }, { dueOn: { $ne: dueDate } }] },
+      { $set: { calendarBehind: true } },
+    ),
   );
   return { kind: "ok" };
 }
@@ -310,10 +356,14 @@ export async function updateTodo(id: string, input: unknown): Promise<UpdateResu
     else $set.dueOn = dayStart(v.dueOn);
   }
 
-  // Switching on with no due day in this patch needs one already stored; the
-  // filter makes that part of the same atomic write.
+  // Switching on needs an OPEN to-do, and a due day already stored when this
+  // patch carries none. The filter makes both part of the same atomic write,
+  // so a refused switch writes nothing and calls no Google.
   const filter: Record<string, unknown> = { _id: id };
-  if (v.onCalendar === true && v.dueOn === undefined) filter.dueOn = { $exists: true };
+  if (v.onCalendar === true) {
+    filter.done = false;
+    if (v.dueOn === undefined) filter.dueOn = { $exists: true };
+  }
 
   const update: Record<string, unknown> = {};
   if (Object.keys($set).length > 0) update.$set = $set;
@@ -324,9 +374,11 @@ export async function updateTodo(id: string, input: unknown): Promise<UpdateResu
       ? await Todo.findOneAndUpdate(filter, update, { new: false, runValidators: true }).lean<TodoRecord>()
       : await Todo.findOne(filter).lean<TodoRecord>();
   if (!before) {
-    if (filter.dueOn === undefined) return { kind: "not-found" };
+    if (v.onCalendar !== true) return { kind: "not-found" };
+    // Which guard missed? Read-only; nothing was written.
     const exists = await Todo.findOne({ _id: id }).lean<TodoRecord>();
-    return exists ? { kind: "invalid", error: "needs-due" } : { kind: "not-found" };
+    if (!exists) return { kind: "not-found" };
+    return { kind: "invalid", error: exists.done ? "done-cannot-pin" : "needs-due" };
   }
 
   const title = v.title ?? before.title;
@@ -340,7 +392,9 @@ export async function updateTodo(id: string, input: unknown): Promise<UpdateResu
     calendar = await unpinLeg(id, calendarId, eventId);
   } else if (eventId === undefined && wantPinned && due !== null) {
     calendar = await pinLeg(id, title, due);
-  } else if (eventId !== undefined && due !== null) {
+  } else if (eventId !== undefined && due !== null && !before.done) {
+    // A done to-do's leftover entry is never moved: its retry is removal, by
+    // ticking done again.
     // Behind if an earlier move is unconfirmed, or this write touched the title
     // or day. A re-save that sends the same title and day still patches once:
     // the flag was set blind in the atomic write, and a confirmed patch is the
