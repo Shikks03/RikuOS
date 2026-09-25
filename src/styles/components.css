@@ -4,11 +4,13 @@
 
    Two namespaces and no third. Reference names are kept verbatim
    (.stat, .btn, .tag, .eyebrow, .navitem, .agent, .track,
-   .statuspill, and P10's .tick, .swx, .sq, .fld, .fld-l, .sel,
-   .formwell, .pickrow) so a recipe can be diffed against
-   components.html by eye; anything only the Freelance page has carries
-   the page prefix `fl-`, and anything only the Personal page has
-   carries `pe-` and lives in personal.css. The shared-control block at
+   .statuspill, and P10's .swx) so a recipe can be diffed against
+   components.html by eye. P10's other shared controls — .tick, .sq,
+   .fld, .fld-l, .sel, .formwell, .pickrow — have no counterpart in
+   components.html; they are named in the same reference style, with no
+   page prefix. Anything only the Freelance page has carries the page
+   prefix `fl-`, and anything only the Personal page has carries `pe-`
+   and lives in personal.css. The shared-control block at
    the foot of this file is the ten entries P10 ships here because the
    Settings layer picker uses them on a page with no stylesheet of its
    own (R46) — it is not a third namespace. No BEM, no utility classes.
@@ -669,3 +671,22 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
 .btn.hi{border-color:var(--ink-4);color:var(--ink)}
 .btn.hi:hover{border-color:var(--ink-3)}
 .btn.hi:disabled{border-color:var(--line);color:var(--ink-4)}
+
+/* ---- legacy.css reaches these in the app and not in the mockup; pinned so
+   the render outlives legacy.css's deletion. legacy.css loads last and
+   globally, while the mockup scopes its copy to :where(.legacy-doc) and
+   leaves out `button:hover`. Each pin restates the mockup's own value and
+   no more.
+     * legacy `button:hover{border-color:var(--ink-3)}` is (0,1,1) and beats
+       .tick and .swx (0,1,0), neither of which has a hover rule: a box or
+       an off switch would gain a border the mockup never draws. A tick's
+       border is --line in both states (the ticked state adds a check, not
+       a border), so one rule holds; the switch is pinned only when off,
+       because .swx.on's --ink border must survive its own hover.
+     * legacy `button{letter-spacing:.14em}` reaches .sq, which sets its
+       face and size but not its tracking: the one glyph gains 1.4px of
+       trailing space and sits 0.7px left of centre. The mockup's .sq
+       tracks at the UA's `normal`. */
+.tick:hover{border-color:var(--line)}
+.swx:not(.on):hover{border-color:var(--line)}
+.sq{letter-spacing:normal}
