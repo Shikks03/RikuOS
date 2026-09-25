@@ -134,6 +134,72 @@
    864px of content, at which point four hero cards wrap. */
 .app-content{padding:var(--sp-6) var(--sp-6) var(--sp-8);max-width:none}
 
+/* ---- the phone strip (S20, R87) — THE APP'S ONE NEW @media ------
+   Below 439px of viewport the 170px rail becomes a 44px bar across the
+   top and the page takes the full width. App-wide by construction: the
+   rail's own markup is re-laid-out, so no page learns about phone
+   width and /freelance, /freelance/queue and /settings inherit it
+   without being edited. /login renders no rail and cannot match.
+
+   THE NUMBER IS DERIVED. R40 measured the form floor at 213px of tile.
+   With the rail at 170 and .app-content's 28px each side the content
+   column is `viewport - 226`, so `viewport - 226 >= 213` gives 439 as
+   the last width at which the rail can still leave room for a form to
+   open. Below it the page's one journey is impossible; at or above it
+   it is not. A 390px phone takes the strip and gets 334px; a 768px
+   tablet keeps the rail, takes the one-column stack (its 542px grid is
+   under the 706px threshold) and both forms open.
+
+   WHY @media AND NOT A CONTAINER QUERY, when every threshold on the
+   Personal page is one: the shell is not inside a container and the
+   only element that could serve as one is .app-body — which R30
+   forbids, because containment silently kills .pe-sticky, the sticky
+   edit-mode pill row. base.css carries the only other @media in the
+   app (reduced motion). This is the second and last.
+
+   PROVISIONAL (S20). The phone design round replaces this and owes it
+   nothing. Two costs were stated in the question and accepted: the
+   coloured agent badges are hidden here, because six badges have
+   nowhere to sit in 44px; and the wordmark goes with them, as the
+   mockup's own strip draws it (specimen 08) — at 390px the brand tile,
+   three nav items and Log out already fill the bar.
+
+   THE MOCKUP CANNOT VERIFY THIS RULE. Its constraints forbid @media so
+   that it stays one honest artifact, so specimen 08 draws the two
+   shells side by side with no switch between them. This query is the
+   one number in the design that is first seen working in the browser
+   (R87's own cost). */
+@media (max-width: 438.98px) {
+  /* one column, two rows: the strip, then everything else. The rows are
+     declared because .app-body keeps its min-height:100dvh: with two
+     implicit auto rows a short page's free height is split between them
+     and a gap opens under the 44px strip (measured: 274px on the
+     placeholder /personal at 390). auto | 1fr gives all of it to the page. */
+  .app-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr }
+
+  .app-side {
+    flex-direction: row; align-items: center; gap: 10px;
+    height: 44px; padding: 0 12px;
+    border-right: 0; border-bottom: 1px solid var(--line-soft);
+  }
+  .app-side .app-brand { padding: 0 }
+  /* the wordmark goes with the badges — the mockup's strip draws the
+     brand tile alone (specimen 08) */
+  .app-side .app-brand .wm { display: none }
+  .app-side .app-nav { flex-direction: row; gap: 2px }
+  .app-side .navitem { padding: 4px 7px; font-size: 11.5px }
+  /* text-only items, as the mockup's strip draws them (specimen 08). With
+     the three 13px glyphs and their 9px gaps the bar needs ~394px and at
+     390 Log out wraps to two lines and pokes out of the 44px strip
+     (measured). All three go, so it is never a mix. */
+  .app-side .navitem svg { display: none }
+  /* nowhere for six badges in 44px (R50, S20) */
+  .app-side .rail-agents { display: none }
+  /* margin-top:auto is a column trick; in a row it does nothing and
+     margin-left:auto is what pushes Log out to the end */
+  .app-side .rail-foot { margin-top: 0; margin-left: auto }
+}
+
 /* ---- section rhythm (the eyebrow / title pair) ----------------- */
 .eyebrow{
   display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;

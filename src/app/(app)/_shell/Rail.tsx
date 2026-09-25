@@ -30,7 +30,7 @@ export default function Rail() {
 
       <NavList />
 
-      <div>
+      <div className="rail-agents">
         <span className="grouplabel">Agents</span>
         <Suspense fallback={<AgentsSkeleton />}>
           <AgentsBlock />
