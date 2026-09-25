@@ -15,6 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readOsSettings } from "@/lib/osSettings";
 import OsSettings, { OS_SETTINGS_DEFAULTS } from "@/models/OsSettings";
+import { PERSONAL_LAYOUT_DEFAULT } from "@/lib/personalLayout";
 
 vi.mock("@/models/OsSettings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/models/OsSettings")>();
@@ -62,6 +63,8 @@ describe("readOsSettings", () => {
       chaserEnabled: true,
       chaserNDays: 7,
       monitoringEnabled: true,
+      layers: [],
+      personalLayout: PERSONAL_LAYOUT_DEFAULT,
     });
   });
 
@@ -75,6 +78,8 @@ describe("readOsSettings", () => {
       chaserEnabled: true,
       chaserNDays: OS_SETTINGS_DEFAULTS.chaserNDays,
       monitoringEnabled: OS_SETTINGS_DEFAULTS.monitoringEnabled,
+      layers: [],
+      personalLayout: PERSONAL_LAYOUT_DEFAULT,
     });
   });
 
@@ -91,6 +96,8 @@ describe("readOsSettings", () => {
       chaserEnabled: false,
       chaserNDays: 0,
       monitoringEnabled: false,
+      layers: [],
+      personalLayout: PERSONAL_LAYOUT_DEFAULT,
     });
   });
 
@@ -100,6 +107,70 @@ describe("readOsSettings", () => {
     await readOsSettings();
 
     expect(findOne).toHaveBeenCalledTimes(1);
+    expect(findOneAndUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("readOsSettings — layers and personalLayout (P10b)", () => {
+  const STORED_LAYOUT = [
+    [{ tile: "week", span: 12 }],
+    [{ tile: "today", span: 6 }, { tile: "todos", span: 6 }],
+    [{ tile: "layers", span: 4 }, { tile: "push", span: 8 }],
+    [{ tile: "done", span: 12 }],
+  ];
+
+  it("defaults both new fields when the document predates them", async () => {
+    findOne.mockImplementation(() => query({ chaserEnabled: true }));
+
+    const values = await readOsSettings();
+
+    expect(values.layers).toEqual([]);
+    expect(values.personalLayout).toEqual(PERSONAL_LAYOUT_DEFAULT);
+  });
+
+  it("returns stored layers and layout as stored, keeping an enabled: false", async () => {
+    const layers = [
+      { calendarId: "primary", name: "Me", enabled: true },
+      { calendarId: "abc@group.calendar.google.com", name: "School", enabled: false },
+    ];
+    findOne.mockImplementation(() => query({ layers, personalLayout: STORED_LAYOUT }));
+
+    const values = await readOsSettings();
+
+    expect(values.layers).toStrictEqual(layers);
+    expect(values.layers[1].enabled).toBe(false);
+    expect(values.personalLayout).toStrictEqual(STORED_LAYOUT);
+  });
+
+  it("hands out copies of the defaults: mutating a result cannot rewrite the next read", async () => {
+    findOne.mockImplementation(() => query(null));
+    const pristine = structuredClone(PERSONAL_LAYOUT_DEFAULT);
+
+    const first = await readOsSettings();
+    expect(first.personalLayout).not.toBe(PERSONAL_LAYOUT_DEFAULT);
+    expect(first.personalLayout[0]).not.toBe(PERSONAL_LAYOUT_DEFAULT[0]);
+    expect(first.personalLayout[0][0]).not.toBe(PERSONAL_LAYOUT_DEFAULT[0][0]);
+    expect(first.layers).not.toBe(OS_SETTINGS_DEFAULTS.layers);
+
+    // Mutate at every depth: an entry, a row, the array itself.
+    first.personalLayout[0][0].span = 2;
+    first.personalLayout[1].push({ tile: "done", span: 2 });
+    first.personalLayout.pop();
+    first.layers.push({ calendarId: "x", name: "x", enabled: true });
+
+    const second = await readOsSettings();
+    expect(second.personalLayout).toStrictEqual(pristine);
+    expect(second.layers).toEqual([]);
+    expect(PERSONAL_LAYOUT_DEFAULT).toStrictEqual(pristine);
+    expect(OS_SETTINGS_DEFAULTS.layers).toEqual([]);
+  });
+
+  it("projects both new fields and still never upserts", async () => {
+    findOne.mockImplementation(() => query(null));
+
+    await readOsSettings();
+
+    expect(findOne.mock.calls[0][1]).toMatchObject({ layers: 1, personalLayout: 1, _id: 0 });
     expect(findOneAndUpdate).not.toHaveBeenCalled();
   });
 });

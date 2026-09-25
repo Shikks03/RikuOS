@@ -25,13 +25,18 @@
  * the rest of the lib layer.
  */
 
-import OsSettings, { OS_SETTINGS_DEFAULTS } from "@/models/OsSettings";
-import type { IOsSettings } from "@/models/OsSettings";
+import OsSettings, { OS_SETTINGS_DEFAULTS, copyDefaultLayout } from "@/models/OsSettings";
+import type { IOsSettings, Layer } from "@/models/OsSettings";
+import type { PersonalLayout } from "@/lib/personalLayout";
+
+export type { Layer };
 
 export interface OsSettingsPatch {
   chaserEnabled?: boolean;
   chaserNDays?: number;
   monitoringEnabled?: boolean;
+  layers?: Layer[];
+  personalLayout?: PersonalLayout;
 }
 
 /** The settings themselves — no _id, no __v, no updatedAt. */
@@ -39,6 +44,15 @@ export interface OsSettingsValues {
   chaserEnabled: boolean;
   chaserNDays: number;
   monitoringEnabled: boolean;
+  layers: Layer[];
+  /**
+   * AS STORED, not resolved: a stored value passes through untouched and only
+   * an absent one becomes the default. Render code must run it through
+   * resolvePersonalLayout() — that is where an unreadable arrangement becomes
+   * the default with `fellBack: true`, and resolving here would throw that
+   * flag away (deck 15's sentence needs it).
+   */
+  personalLayout: PersonalLayout;
 }
 
 export async function updateOsSettings(patch: OsSettingsPatch): Promise<IOsSettings> {
@@ -69,13 +83,15 @@ export async function getOsSettings(): Promise<IOsSettings> {
   return updateOsSettings({});
 }
 
-// Typed against OsSettingsValues so a fourth setting must FAIL TO COMPILE here
+// Typed against OsSettingsValues so a new setting must FAIL TO COMPILE here
 // rather than compile into the return object, stay out of the projection, and
 // read as its default forever.
 const SETTINGS_PROJECTION: Record<keyof OsSettingsValues, 1> & { _id: 0 } = {
   chaserEnabled: 1,
   chaserNDays: 1,
   monitoringEnabled: 1,
+  layers: 1,
+  personalLayout: 1,
   _id: 0,
 };
 
@@ -83,7 +99,7 @@ const SETTINGS_PROJECTION: Record<keyof OsSettingsValues, 1> & { _id: 0 } = {
  * The read-only accessor. Never upserts, never saves — a page view must not
  * be a primary write.
  *
- * The three values are copied out by name rather than returned as the lean
+ * The values are copied out by name rather than returned as the lean
  * document, so a projection change can never leak _id, __v or updatedAt to a
  * caller.
  *
@@ -96,16 +112,22 @@ const SETTINGS_PROJECTION: Record<keyof OsSettingsValues, 1> & { _id: 0 } = {
  * absent toggle must never read as `off`: that is the inference from absence
  * the rail exists to refuse. `??` and never `||`, so a stored `false`
  * survives.
+ *
+ * The two array defaults are COPIED on every read, rows and entries both
+ * (R35): OS_SETTINGS_DEFAULTS is shared for the life of the lambda, and
+ * handing out the constant would let one caller's mutation become every later
+ * caller's default. Stored arrays need no copy — .lean() builds fresh objects
+ * per query.
  */
 export async function readOsSettings(): Promise<OsSettingsValues> {
   const doc = await OsSettings.findOne({}, SETTINGS_PROJECTION).lean();
 
-  if (!doc) return { ...OS_SETTINGS_DEFAULTS };
-
-  const row = doc as unknown as Partial<OsSettingsValues>;
+  const row = (doc ?? {}) as unknown as Partial<OsSettingsValues>;
   return {
     chaserEnabled: row.chaserEnabled ?? OS_SETTINGS_DEFAULTS.chaserEnabled,
     chaserNDays: row.chaserNDays ?? OS_SETTINGS_DEFAULTS.chaserNDays,
     monitoringEnabled: row.monitoringEnabled ?? OS_SETTINGS_DEFAULTS.monitoringEnabled,
+    layers: row.layers ?? OS_SETTINGS_DEFAULTS.layers.map((l) => ({ ...l })),
+    personalLayout: row.personalLayout ?? copyDefaultLayout(),
   };
 }

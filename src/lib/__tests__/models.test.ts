@@ -11,6 +11,7 @@ import ApprovalItem from "@/models/ApprovalItem";
 import AgentRun from "@/models/AgentRun";
 import PushSubscription from "@/models/PushSubscription";
 import OsSettings from "@/models/OsSettings";
+import { PERSONAL_LAYOUT_DEFAULT } from "@/lib/personalLayout";
 import HealthSnapshot, { HEALTH_SNAPSHOT_ID } from "@/models/HealthSnapshot";
 
 const validPayload = {
@@ -131,6 +132,83 @@ describe("OsSettings", () => {
   it("bounds chaserNDays to [1, 30]", () => {
     const doc = new OsSettings({ chaserNDays: 45 });
     expect(doc.validateSync()?.errors["chaserNDays"]).toBeDefined();
+  });
+});
+
+describe("OsSettings — layers and personalLayout (P10b)", () => {
+  const layout = () => [
+    [{ tile: "today", span: 8 }, { tile: "todos", span: 4 }],
+    [{ tile: "layers", span: 3 }, { tile: "push", span: 8 }],
+    [{ tile: "week", span: 12 }],
+    [{ tile: "done", span: 12 }],
+  ];
+  const errorPaths = (doc: InstanceType<typeof OsSettings>) =>
+    Object.keys(doc.validateSync()?.errors ?? {});
+  /**
+   * The async validator. validateSync() does NOT descend into the entries of
+   * an array of document arrays - measured: a `{tile: "weather", span: 13}`
+   * entry passes it silently - while validate() reports
+   * `personalLayout.0.0.tile` and `.span`. So the entry-level cases use this.
+   */
+  const asyncErrorPaths = async (doc: InstanceType<typeof OsSettings>) => {
+    try {
+      await doc.validate();
+      return [];
+    } catch (e) {
+      return Object.keys((e as { errors?: Record<string, unknown> }).errors ?? {});
+    }
+  };
+
+  it("defaults to no layers and the default layout, a fresh copy per document", () => {
+    const a = new OsSettings({});
+    const b = new OsSettings({});
+    expect(a.validateSync()).toBeUndefined();
+    expect(a.layers).toHaveLength(0);
+    expect(a.toObject().personalLayout).toEqual(PERSONAL_LAYOUT_DEFAULT);
+    a.personalLayout[0][0].span = 2;
+    expect(b.personalLayout[0][0].span).toBe(8);
+    expect(PERSONAL_LAYOUT_DEFAULT[0][0].span).toBe(8);
+  });
+
+  it("accepts a valid layer and layout, and defaults enabled to true", () => {
+    const doc = new OsSettings({
+      layers: [{ calendarId: "primary", name: "Me" }],
+      personalLayout: layout(),
+    });
+    expect(doc.validateSync()).toBeUndefined();
+    expect(doc.layers[0].enabled).toBe(true);
+  });
+
+  it("async validation accepts the default layout's entries", async () => {
+    expect(await asyncErrorPaths(new OsSettings({}))).toEqual([]);
+  });
+
+  it("rejects an over-length layer name and calendarId", () => {
+    const doc = new OsSettings({
+      layers: [{ calendarId: "c".repeat(257), name: "n".repeat(121), enabled: true }],
+    });
+    expect(errorPaths(doc)).toEqual(expect.arrayContaining(["layers.0.name", "layers.0.calendarId"]));
+  });
+
+  it("rejects an eleventh layer", () => {
+    const layers = Array.from({ length: 11 }, (_, i) => ({ calendarId: `c${i}`, name: `n${i}`, enabled: true }));
+    expect(errorPaths(new OsSettings({ layers }))).toContain("layers");
+  });
+
+  it("rejects a span of 13", async () => {
+    const l = layout();
+    l[2][0].span = 13;
+    expect(await asyncErrorPaths(new OsSettings({ personalLayout: l }))).toContain("personalLayout.2.0.span");
+  });
+
+  it("rejects three rows", () => {
+    expect(errorPaths(new OsSettings({ personalLayout: layout().slice(0, 3) }))).toContain("personalLayout");
+  });
+
+  it("rejects an unknown tile", async () => {
+    const l = layout();
+    l[3][0].tile = "weather";
+    expect(await asyncErrorPaths(new OsSettings({ personalLayout: l }))).toContain("personalLayout.3.0.tile");
   });
 });
 
