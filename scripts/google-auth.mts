@@ -141,6 +141,10 @@ async function main(): Promise<number> {
         return;
       }
 
+      // The code is single-use. Claim this run BEFORE exchanging it, so a second
+      // valid-state callback (a reloaded tab) gets the 404 above instead of
+      // re-sending a spent code and exiting 1 over the good token.
+      finished = true;
       exchange(code, clientId, clientSecret).then(
         (refreshToken) => {
           reply(200, "Signed in. Return to the terminal; you can close this tab.");

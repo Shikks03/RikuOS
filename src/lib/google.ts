@@ -174,7 +174,14 @@ async function guarded<T>(what: string, run: () => Promise<T>): Promise<T> {
     if (isAbort(err)) {
       throw new GoogleError("timeout", `${what} did not answer within ${GOOGLE_TIMEOUT_MS} ms.`);
     }
-    const detail = err instanceof Error ? err.message : "unknown error";
+    // A body that is not JSON gets a fixed phrase: a parser's message quotes the
+    // body it choked on, and no response is echoed whole into an error.
+    const detail =
+      err instanceof Error && err.name === "SyntaxError"
+        ? "unreadable response"
+        : err instanceof Error
+          ? err.message
+          : "unknown error";
     throw new GoogleError("http", `${what} failed: ${bound(detail, GOOGLE_MESSAGE_MAX)}`);
   }
 }
@@ -188,7 +195,10 @@ async function readError(res: Response): Promise<{ code: string | null; message:
   let body: unknown;
   try {
     body = JSON.parse(await res.text());
-  } catch {
+  } catch (err) {
+    // The request's timeout can fire while the error body streams in; that is
+    // still a timeout, not an unreadable body.
+    if (isAbort(err)) throw err;
     return { code: null, message: null };
   }
   if (typeof body !== "object" || body === null) return { code: null, message: null };
@@ -589,6 +599,11 @@ export async function readCalendarWindow(
 ): Promise<CalendarWindow> {
   const enabled = layers.filter((l) => l.enabled);
   if (enabled.length === 0) return { ok: false, reason: "none-enabled" };
+
+  // Checked once, before any HTTP: a malformed or reversed window is a
+  // programming error and throws RangeError, rather than rendering as every
+  // layer failing one by one.
+  windowBounds(fromKey, toKey);
 
   let config: GoogleConfig;
   try {

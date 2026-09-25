@@ -224,6 +224,30 @@ describe("error kinds", () => {
     expect(err.message.length).toBeLessThanOrEqual(300);
   });
 
+  it("keeps a timeout while reading an error body a timeout, not http", async () => {
+    stubConfig();
+    stubFetch(
+      () =>
+        ({
+          ok: false,
+          status: 500,
+          text: async () => {
+            throw new DOMException("aborted", "TimeoutError");
+          },
+        }) as unknown as Response,
+    );
+    expect((await kindOf(listCalendars())).kind).toBe("timeout");
+  });
+
+  it("reports an unparseable 200 body with a fixed phrase, never the parser's message", async () => {
+    stubConfig();
+    stubFetch(() => new Response("<html>not json</html>", { status: 200 }));
+    const err = await kindOf(listCalendars());
+    expect(err.kind).toBe("http");
+    expect(err.message).toContain("unreadable response");
+    expect(err.message).not.toContain("html");
+  });
+
   it("maps a 5xx with a non-JSON body to http", async () => {
     stubConfig();
     stubFetch(() => new Response("<html>oops</html>", { status: 502 }));
@@ -368,6 +392,18 @@ describe("readCalendarWindow", () => {
     });
     stubConfig();
     await readCalendarWindow(off, "2026-09-10", "2026-09-17");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("a reversed or malformed window throws before any HTTP, but none-enabled still wins", async () => {
+    stubConfig();
+    const calls = stubFetch(() => json({ items: [] }));
+    await expect(readCalendarWindow([classes], "2026-09-17", "2026-09-10")).rejects.toThrow(RangeError);
+    await expect(readCalendarWindow([classes], "2026-02-31", "2026-03-07")).rejects.toThrow(RangeError);
+    expect(await readCalendarWindow([{ ...classes, enabled: false }], "2026-09-17", "2026-09-10")).toEqual({
+      ok: false,
+      reason: "none-enabled",
+    });
     expect(calls).toHaveLength(0);
   });
 
