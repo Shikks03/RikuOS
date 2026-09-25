@@ -1,0 +1,2143 @@
+<title>Five Calls</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Libre+Franklin:wght@400;500;600&family=Space+Mono&display=swap">
+<style>
+/* ================== SECTION 1 — tokens (mockup:4-58) ================== */
+/* ============================================================
+   tokens
+   VERBATIM COPY of src/styles/tokens.css. Diff it by eye: nothing
+   below is new, reordered or renamed. The three face variables
+   (--display, --body, --mono) are deliberately absent here, exactly
+   as the shipped file explains; the mockup declares them at the very
+   bottom, in the mockup-only group, because in the app they come from
+   next/font/google via the generated class names on the root element.
+
+   Reference names for the amber and red tokens are --stale and
+   --missing. Never --amber / --alert: a stray var(--alert) resolves
+   to nothing, is invalid at computed-value time, and would make a red
+   warning silently inherit body grey.
+   ============================================================ */
+:root{
+  /* ground & structure */
+  --void:#08090B;
+  --panel:#0E1013;
+  --raised:#14171C;
+  --sunk:#050608;
+  --line:#1D222A;
+  --line-soft:#15191F;
+
+  /* ink */
+  --ink:#E9ECF0;
+  --ink-2:#98A1AD;
+  --ink-3:#5B6470;
+  --ink-4:#3A424C;
+
+  /* semantic hues — meaning is fixed */
+  --spend:#FF8A3D;
+  --save:#35D399;
+  --roi:#A78BFA;
+  --session:#5FA5FA;
+  --stale:#FBBF24;
+  --missing:#F87171;
+
+  /* the one non-hue graphic token */
+  --track:#1A1E25;
+
+  /* card tints — 155deg, deep desaturated hue into near-neutral at 62% */
+  --tint-roi:linear-gradient(155deg,#171233,#111117 62%);
+  --tint-stale:linear-gradient(155deg,#241A03,#141209 62%);
+
+  /* spacing 4 / 6 / 10 / 14 / 20 / 28 / 44 / 72 */
+  --sp-1:4px; --sp-2:6px; --sp-3:10px; --sp-4:14px;
+  --sp-5:20px; --sp-6:28px; --sp-7:44px; --sp-8:72px;
+
+  /* radii */
+  --r-tag:6px; --r-nav:7px; --r-chip:8px; --r-card:10px; --r-feature:14px; --r-pill:999px;
+
+  /* layout */
+  --content-max:920px;
+  --rail-w:170px;
+}
+
+/* ================== SECTION 2 — base (mockup:60-90) ================== */
+/* ============================================================
+   base
+   VERBATIM COPY of src/styles/base.css. The only @media in the whole
+   stylesheet is its reduced-motion rule, as the brief requires.
+   ============================================================ */
+*{box-sizing:border-box}
+/* so the browser paints scrollbars, spinners and number steppers dark */
+html,body{color-scheme:dark}
+body{
+  margin:0;
+  background:var(--void);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:13px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+p{margin:var(--sp-3) 0 0;font-size:13px;color:var(--ink-2)}
+strong{font-weight:600;color:var(--ink)}
+/* A deliberate deviation from components.html, which makes links orange.
+   That is right for a teardown article, where orange is the document's
+   accent. In the app orange is --spend: money out, and the brand mark.
+   A `Settings` link is neither. */
+a{color:var(--ink-2);text-decoration:none;border-bottom:1px solid var(--line)}
+a:hover{color:var(--ink);border-bottom-color:var(--ink-4)}
+/* a reference-level convention, not a hue spend */
+:focus-visible{outline:2px solid var(--spend);outline-offset:3px;border-radius:3px}
+/* neutral, not violet: a selection band is not a decision, and no hue is spent
+   where it does not carry its assigned meaning */
+::selection{background:rgba(233,236,240,.16);color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ================== SECTION 3 — components.css, verbatim (mockup:92-580) ================== */
+/* ============================================================
+   components
+   VERBATIM COPY of src/styles/components.css. Nothing in this block
+   is edited for P10 — the page's additions are the separately
+   bannered block that follows it (R32: "nothing already in
+   components.css changes shape").
+   ============================================================ */
+
+/* ---- shell ---------------------------------------------------- */
+.app{background:var(--void);min-width:0}
+/* DIFFERENCE 5 (R33): min-height:100vh, so the rail's ground reaches the
+   bottom of the viewport on every page. The mockup was drawn inside a
+   fixed-height frame; on a short page such as Plan A's /freelance root the
+   rail column would otherwise stop mid-screen. 100dvh follows as the
+   progressive line: on a phone 100vh is the tallest the viewport ever gets,
+   which leaves the rail overshooting under the browser chrome. */
+.app-body{
+  display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);
+  align-items:stretch;min-height:100vh;min-height:100dvh;
+}
+
+.app-side{
+  background:#0B0D11;border-right:1px solid var(--line-soft);
+  padding:16px 12px 16px 12px;display:flex;flex-direction:column;gap:16px;
+}
+.app-brand{display:flex;align-items:center;gap:9px;padding:0 4px}
+.app-brand .tile{
+  width:24px;height:24px;border-radius:7px;flex:none;display:grid;place-items:center;
+  background:linear-gradient(150deg,#FF9E5C,#F2622B);
+}
+.app-brand .tile svg{width:14px;height:14px;display:block}
+/* overflow-wrap + min-width:0 so nothing assumes the product name's length */
+.app-brand .wm{
+  font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:-.01em;
+  color:var(--ink);overflow-wrap:anywhere;min-width:0;
+}
+
+.app-nav{display:flex;flex-direction:column;gap:2px}
+/* DIFFERENCE 4: border-bottom:0. The mockup draws nav items as <span>;
+   the app draws them as <Link> -> <a>, and base.css puts a hairline
+   under every anchor. .fl-biz below already does the same thing. */
+.navitem{
+  display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:var(--r-nav);
+  font-size:12.5px;color:var(--ink-3);border-bottom:0;
+}
+.navitem svg{width:13px;height:13px;flex:none;opacity:.85;display:block}
+/* a raised fill plus an INSET hairline — never a left accent bar */
+.navitem.is-active{background:#171B21;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+
+.grouplabel{
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-4);padding:0 9px;margin-top:6px;display:block;
+}
+.agents{display:flex;flex-direction:column;gap:6px;margin-top:7px}
+.agent{
+  display:block;padding:8px 9px;border-radius:var(--r-chip);background:#12151A;
+  border:1px solid var(--line);font-family:var(--mono);font-size:10px;
+  font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-4);
+}
+/* ok: green label, thin green border, deliberately NO tinted fill */
+.agent.is-ok{color:var(--save);border-color:rgba(53,211,153,.18)}
+/* overdue / failed: the reference's tinted-badge recipe in --stale / --missing.
+   Failed carries the heavier fill (.14/.03) because amber is intrinsically
+   brighter than red — at equal alpha the merely-late agent outshouts the broken one. */
+.agent.is-overdue{
+  color:var(--stale);border-color:rgba(251,191,36,.22);
+  background:linear-gradient(180deg,rgba(251,191,36,.09),rgba(251,191,36,.02));
+}
+.agent.is-failed{
+  color:var(--missing);border-color:rgba(248,113,113,.22);
+  background:linear-gradient(180deg,rgba(248,113,113,.14),rgba(248,113,113,.03));
+}
+/* off / never run / unknown — inherits .agent's ground; a dead agent must never
+   sit brighter than a live one */
+.agent.is-grey{color:var(--ink-4);border-color:var(--line)}
+.agent-cap{
+  display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;
+  color:var(--ink-4);padding:0 9px;margin-top:4px;font-variant-numeric:tabular-nums;
+}
+.app-side .rail-foot{margin-top:auto}
+/* the app's only sign-out control — --ink-3, never --ink-4 */
+.app-side .btn.ghost{font-size:11.5px;letter-spacing:.1em;padding:6px 9px;color:var(--ink-3)}
+/* .btn.ghost ties .btn:hover on specificity and .app-side .btn.ghost outranks
+   both, so without this rule the app's one sign-out control has no hover
+   feedback at all. */
+.app-side .btn.ghost:hover{color:var(--ink)}
+
+.app-main{min-width:0}
+.topbar{height:44px;border-bottom:1px solid var(--line-soft);padding:0 var(--sp-6);display:flex}
+.topbar-in{width:100%;max-width:var(--content-max);margin:0 auto;display:flex;align-items:center;gap:12px}
+/* the top bar carries the freshness stamp and nothing else: no breadcrumb.
+   `Operator` named nobody in a one-user system and was the bar's brightest
+   element; the crumb's page name restated the title 70px below it. What is
+   left is the only thing in the bar that ever changes. The shell computes it
+   on the client at each navigation (Asia/Manila), so on every page it is the
+   moment that page's data was read. */
+.crumb{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.crumb em{font-style:normal;color:var(--ink-4)}
+/* DIFFERENCE 3: max-width:none, so legacy.css's `main` rule cannot apply a
+   second column to /freelance's own <main className="app-content">. The
+   28px horizontal padding lives HERE and the 920px max-width lives on .fl,
+   because box-sizing:border-box means a 920px element WITH padding gives
+   864px of content, at which point four hero cards wrap. */
+.app-content{padding:var(--sp-6) var(--sp-6) var(--sp-8);max-width:none}
+
+/* ---- section rhythm (the eyebrow / title pair) ----------------- */
+.eyebrow{
+  display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ink-3);
+}
+/* Both carry their own margins rather than leaning on legacy.css's `h1` reset
+   or on the UA heading margins: legacy.css is deleted the phase these pages
+   are rebuilt, and a heading that silently gains a UA margin then is a
+   regression nobody would connect to the deletion. */
+.fl-h{
+  display:block;font-family:var(--display);font-weight:600;font-size:19px;
+  letter-spacing:-.015em;color:var(--ink);margin:5px 0 0;
+}
+.fl-title{
+  font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.02em;color:var(--ink);
+  margin:0;
+  /* Declared, not inherited: §3.4's title→switch gap is derived from this
+     36px line box, and `line-height:1.2` is the most natural tidy anyone
+     would apply to a display heading. Same reason .stat .fig carries an
+     explicit 1.06. This is a PIN, not a difference from the mockup — the
+     value is what the rule already inherited from base.css — so it does not
+     join the numbered differences list above. */
+  line-height:1.5;
+}
+.fl{max-width:var(--content-max);margin:0 auto}
+.fl-sect{margin-top:var(--sp-7)}
+.fl-body{margin-top:var(--sp-5)}
+/* The page title moved into the segment layout, so .fl's first child is now
+   the view's first block, sitting directly under the header. Every candidate
+   still carries the top margin it had for the heading that used to be above
+   it — .fl-body 20px, .fl-fail 20px — and that margin would now double the
+   header's gap and make the number in §3.4 false in the whole-page-down
+   state. Zeroed here.
+   .fl>:first-child is (0,2,0) — a class plus a structural pseudo-class —
+   so it outranks .fl-body and .fl-fail, both (0,1,0), from anywhere in the
+   file. It sits here, beside the rules it overrides, the same way
+   .fl-stages>.fl-stage:first-child and .fl-rows>.fl-row:first-child do. */
+.fl>:first-child{margin-top:0}
+
+/* ---- the page header: title + view switch (R42) ---------------- */
+/* The Freelance segment layout renders these above BOTH views, so the header
+   sits outside every <main>: /freelance brings its own
+   <main class="app-content"> and /freelance/queue brings legacy.css's. It
+   reuses .fl rather than declaring a second 920px column, which is what makes
+   it align with the top bar and both views by construction (R34).
+   padding-bottom is 0 on purpose: the <main> below contributes its own 28px
+   top padding on both views, and legacy.css's `main` cannot be changed
+   because it also serves /login. Any bottom padding here would change that
+   gap on both views and would NOT change the 10px difference between them.
+   Spec §3.4 carries the arithmetic.
+   When a title-level control eventually needs to sit RIGHT of the title, the
+   pattern already exists — .fl-headrow's
+   `grid-template-columns:minmax(0,1fr) auto; align-items:end`. Do not invent
+   a second one. */
+.fl-head{padding:var(--sp-6) var(--sp-6) 0}
+/* ADDED (R42): the design system's VIEW SWITCH, ported from
+   docs/design/components.html's `.segmented`, whose note reads "Sits in a
+   sunken track with a hairline border; the active tab is a raised fill.
+   Left-aligned, directly under the heading it modifies."
+   Values are the reference's, verbatim; the placement margin below is ours.
+   Its sibling `.range` — the floating time-range switch — is NOT ported: P8
+   has no time range, and §5.8 forbids declaring vocabulary with no consumer.
+   It has a named future consumer: the queue page's S11 rebuild ports it for
+   the status-filter row (§6.2).
+   #1D222A happens to equal var(--line). The reference writes the literal for
+   the FILL and the token for the BORDER because they are two different jobs;
+   tidying the fill into var(--line) would tie the raised fill to the hairline
+   colour for ever. .navitem.is-active keeps its literal #171B21 for the same
+   reason — and keeps its INSET HAIRLINE, which this does not need, because
+   this fill sits inside a track that already has a border.
+   GROUND: the reference draws this track inside a --sunk well; here it sits
+   on --void, so the track/ground separation is ~25% smaller than in the
+   specimen and the --line hairline does more of the work. If it reads as a
+   floating lighter bar rather than a recess, the alternative is --sunk for
+   the track, which would make the recess literal — that is a ruling, not a
+   tidy. (#101318 is now written three times in this app — see R34's note on
+   legacy.css.)
+   margin-top is 6px (R43), not the 20px of a heading→content gap: the switch
+   belongs to the title above it. Optical, not declared, is the comparison
+   that matters — .fl-title's 36px line box leaves ~9.7px of dead space under
+   the word, so 6px reads as ~15.6px against a true 28px below (ratio 1.79),
+   where the system's bound pair is ~9px optical and its content gap ~29px.
+   The first label sits 16px in from the track's left edge (1px border + 3px
+   track padding + 12px tab padding). The TRACK's edge, not the label, is what
+   aligns with the title; zeroing the first tab's left padding to "fix" that
+   would break the track. */
+.segmented{
+  display:inline-flex;background:#101318;border:1px solid var(--line);
+  border-radius:9px;padding:3px;gap:3px;margin-top:var(--sp-2);
+}
+/* DIFFERENCE: the reference draws the tabs as <button>; these are two real
+   URLs, so they are <a>. Two declarations are added and one verbatim
+   declaration does double duty:
+     * `border:0` is the reference's own, and it also removes base.css's
+       anchor hairline — the same fix .navitem, .fl-biz and .stat-top .more
+       carry. Verbatim, not an addition.
+     * ADDED line-height:1.4. A <button> takes the UA font shorthand's
+       line-height:normal, which is font-metric-derived (~1.3 for JetBrains
+       Mono), so the reference's track is ~32.5px and this one ~33.3px. 1.4
+       is taken NOT to match that number but to stop the track's height
+       depending on the mono's metrics at all, and because it is the
+       line-height .btn and legacy.css's bare `button` already declare — the
+       switch and the queue view's filter pills sit 38px apart and must
+       share it.
+     * ADDED :hover. base.css's `a:hover` is (0,1,1) and so is this selector;
+       at a tie the later stylesheet wins and this one is later, so the hover
+       would be silently dead. --ink because every hover in this file lands
+       on --ink (.btn:hover, .app-side .btn.ghost:hover, .fl-biz:hover, and
+       base.css's a:hover); the app's one --ink-2 hover is legacy.css's
+       button.secondary, in the layer with an expiry date.
+   base.css's :focus-visible also sets border-radius:3px, which would square
+   these corners while focused — except it is (0,1,0) and this rule is
+   (0,1,1), so the 6px survives. A later radius tidy could break that. */
+.segmented a{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  background:none;border:0;color:var(--ink-3);padding:6px 12px;border-radius:6px;
+  cursor:pointer;line-height:1.4;
+}
+.segmented a:hover{color:var(--ink)}
+/* (0,2,1), tying .segmented a:hover and winning on order. Both rules set the
+   same colour and :hover sets no background, so nothing visible rides on the
+   tie today; it is a fragility note — a hover that later changes background
+   must still lose to this rule. */
+.segmented a.on{background:#1D222A;color:var(--ink)}
+
+/* ---- stat hero cards ------------------------------------------ */
+/* four cards at minmax(215px,1fr) with 14px gaps need 4*215 + 3*14 = 902 <= 920;
+   they land at (920 - 42) / 4 = 219.5px each, so the money-in card fits later
+   with 18px to spare and no deviation from this template */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:var(--sp-4)}
+.stat{
+  position:relative;overflow:hidden;border-radius:var(--r-feature);
+  padding:15px 16px 18px;min-height:132px;
+  border:1px solid var(--line);background:var(--raised);
+  display:flex;flex-direction:column;
+}
+.stat-top{display:flex;align-items:center;gap:7px;position:relative;z-index:2}
+.stat-top .lbl{
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);
+}
+/* border-bottom:0 because this becomes an <a> in Plan C and base.css puts a
+   hairline under every anchor — same reason .navitem and .fl-biz carry it. */
+.stat-top .more{
+  margin-left:auto;font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink-4);border-bottom:0;
+}
+.stat .fig{
+  font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:-.03em;
+  line-height:1.06;margin-top:auto;position:relative;z-index:2;
+  font-variant-numeric:tabular-nums;color:var(--ink);
+}
+/* DIFFERENCE 2: min-height reserves two lines of caption at 10.5px/1.5.
+   .stat .fig is bottom-anchored, so a caption that wraps would otherwise
+   lift its figure above the others — and the "didn't report" captions wrap
+   at 219-297px card widths while `nothing waiting` does not. */
+.stat .sub{
+  font-size:10.5px;color:var(--ink-3);position:relative;z-index:2;margin-top:2px;
+  min-height:32px;
+}
+/* violet — decisions not made */
+.stat.roi{background:var(--tint-roi);border-color:rgba(167,139,250,.2)}
+.stat.roi .lbl,.stat.roi .fig{color:var(--roi)}
+/* this card's `Open ↗` is the page's one exit to ShikksTracker, not ornament */
+.stat.roi .more{color:var(--ink-3)}
+/* amber — a duration is waiting */
+.stat.stale{background:var(--tint-stale);border-color:rgba(251,191,36,.2)}
+.stat.stale .lbl,.stat.stale .fig{color:var(--stale)}
+/* hueless WITH data */
+.stat.plain{background:var(--raised);border-color:var(--line)}
+.stat.plain .fig{color:var(--ink)}
+/* a MEASURED zero (`0`) — the hue drains, the caption still reports.
+   `nothing waiting` is the answer the page exists to give and must not be
+   the dimmest text on the screen. */
+.stat.drained{background:var(--raised);border-color:var(--line)}
+.stat.drained .lbl,.stat.drained .fig{color:var(--ink-4)}
+/* NOTHING WAS MEASURED (`—`) — the whole card drains, caption included,
+   because that caption is a "ShikksTracker didn't report…" sentence. */
+.stat.blank{background:var(--raised);border-color:var(--line)}
+.stat.blank .lbl,.stat.blank .fig,.stat.blank .sub{color:var(--ink-4)}
+/* the one hero graphic: a proportion track, no hue */
+.track{
+  height:4px;border-radius:99px;background:var(--track);overflow:hidden;
+  margin-top:9px;position:relative;z-index:2;
+}
+.track i{display:block;height:100%;border-radius:99px;background:var(--ink-4)}
+/* The track's 13px slot (4px + 9px) is reserved on the cards that have none,
+   so all three figures and all three captions sit on one baseline. Only the
+   contacts card ever fills it. The app targets current Chrome, so :has() is
+   available; the explicit fallback if that ever changes is
+   .stat.roi .sub,.stat.stale .sub,.stat.drained .sub,.stat.blank .sub{margin-top:15px} */
+.stat:not(:has(.track)) .sub{margin-top:15px}
+/* DIFFERENCE 1: the mockup's `.stat .marks` mark-field rule is NOT ported.
+   Riku chose the plain hero row; the only graphic on it is .track above. */
+
+/* ---- statements under the hero row ---------------------------- */
+.fl-say{font-size:13px;color:var(--ink-2);margin-top:var(--sp-4)}
+.fl-say b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* ---- inline stat strip / Block B's summary line ---------------- */
+/* .statstrip ships as declared, unused vocabulary. That list is
+   .statstrip, .btn.go, .statuspill and --session, and it must not grow. */
+.statstrip{display:flex;flex-wrap:wrap;gap:20px;padding:12px 16px;border-top:1px solid var(--line);background:var(--panel)}
+.statstrip div{font-size:11px;color:var(--ink-3)}
+.statstrip b{font-family:var(--display);font-size:13.5px;font-weight:700;margin-right:5px;font-variant-numeric:tabular-nums}
+.fl-sum{
+  border-top:0;background:none;margin:0;padding:6px 0 0;display:block;
+  font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;
+}
+.fl-sum b{font-family:var(--display);font-size:13.5px;font-weight:700;color:var(--ink);margin:0;font-variant-numeric:tabular-nums}
+.fl-sum i{font-style:normal;color:var(--ink-4);margin:0 5px}
+
+/* ---- row grammar: hairlines, a fixed grid, no boxes ------------ */
+.fl-stages{margin-top:var(--sp-4)}
+.fl-stage{
+  display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:var(--sp-4);
+  align-items:baseline;padding:11px 0;border-top:1px solid var(--line-soft);
+}
+.fl-stages>.fl-stage:first-child{border-top:0}
+.fl-stage .nm{font-size:13px;color:var(--ink-2)}
+.fl-stage .ct{
+  font-family:var(--display);font-weight:600;font-size:15px;color:var(--ink);
+  text-align:right;font-variant-numeric:tabular-nums;
+}
+/* Two notes, not rows — deliberately no hairline above either. They are the
+   same shape in two inks because they are two different claims:
+   .fl-note   = a MEASURED emptiness (the source answered, the count was zero)
+   .fl-absent = the field NEVER ARRIVED (--ink-4 is reserved for these) */
+.fl-note{font-size:11px;color:var(--ink-3);margin-top:var(--sp-3)}
+.fl-absent{font-size:11px;color:var(--ink-4);margin-top:var(--sp-3)}
+.fl-empty{font-size:13px;color:var(--ink-3);margin-top:var(--sp-5)}
+
+/* ---- disclosure (Blocks C and D) ------------------------------- */
+.disclose>summary{display:block;list-style:none;cursor:pointer}
+.disclose>summary::-webkit-details-marker{display:none}
+.sumrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:end}
+.sumrow::after{
+  content:"";width:6px;height:6px;align-self:end;margin-bottom:7px;
+  border-right:1.5px solid var(--ink-4);border-bottom:1.5px solid var(--ink-4);
+  transform:rotate(-45deg);transition:transform .14s ease;
+}
+.disclose[open] .sumrow::after{transform:rotate(45deg);margin-bottom:9px}
+.disclose[open] .sumrow .fl-count{color:var(--ink-3)}
+.fl-count{
+  font-family:var(--mono);font-size:10px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;padding-bottom:2px;
+}
+.fl-collapsed{display:block;font-size:11.5px;color:var(--ink-4);margin-top:var(--sp-3)}
+/* when the collapsed line carries a row rather than a sentence, it borrows the
+   summary-line grammar: name at --ink-2, figure at --ink, tabular */
+.fl-collapsed .nm{color:var(--ink-2)}
+.fl-collapsed b{font-weight:600;color:var(--ink);margin-left:var(--sp-4);font-variant-numeric:tabular-nums}
+.disclose[open] .fl-collapsed{display:none}
+/* 28px, not 20px: at 20px the group eyebrow reads as a second eyebrow under
+   the block heading rather than the head of its own group */
+.fl-open{margin-top:var(--sp-6)}
+
+/* ---- table grammar --------------------------------------------
+   The column template is a per-table custom property so one row grammar serves
+   both tables: Block D has four columns, Block C has five. */
+.fl-table{display:block;--fl-cols:minmax(0,1fr) 78px 66px 66px}
+.fl-table.is-campaigns{--fl-cols:minmax(0,1fr) 66px 66px 66px 66px}
+.fl-thead,.fl-trow{
+  display:grid;grid-template-columns:var(--fl-cols);gap:var(--sp-3);
+  align-items:baseline;
+}
+.fl-thead{
+  padding:0 0 9px;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-4);
+}
+.fl-trow{padding:11px 0;border-bottom:1px solid var(--line-soft)}
+.fl-thead>span+span,.fl-trow>span+span{text-align:right;font-variant-numeric:tabular-nums}
+.fl-trow .nm{font-weight:600;font-size:13px;color:var(--ink)}
+.fl-trow>span+span{font-size:12.5px;color:var(--ink-2)}
+.fl-trow .zero{color:var(--ink-4)}
+.fl-trow .dash{color:var(--ink-4)}
+.fl-group{margin-top:var(--sp-6)}
+.fl-group:first-child{margin-top:0}
+.fl-explain{font-size:11.5px;color:var(--ink-3);margin-top:var(--sp-2)}
+.fl-group .fl-table{margin-top:var(--sp-4)}
+/* `Showing 20 of 34 campaigns.` / `Showing 20 of 41.` — a statement to the
+   reader, so sentence case in the body face, not a mono machine label */
+.fl-bound{font-size:11.5px;color:var(--ink-4);margin-top:var(--sp-3)}
+
+/* ---- the honesty note ------------------------------------------ */
+.honesty{
+  display:flex;gap:7px;align-items:flex-start;
+  font-size:11.5px;color:var(--ink-4);margin-top:var(--sp-4);
+}
+.honesty svg{width:13px;height:13px;flex:none;margin-top:2px;display:block}
+
+/* ---- Block E rows ---------------------------------------------- */
+.fl-headrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}
+.fl-rows{margin-top:var(--sp-5)}
+.fl-row{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-4);
+  padding:14px 0;border-top:1px solid var(--line-soft);
+}
+/* both row lists on the page open the same way: no hairline above the first */
+.fl-rows>.fl-row:first-child{border-top:0}
+.fl-row .tag{align-self:start;justify-self:end}
+.fl-biz{
+  font-weight:600;font-size:13px;color:var(--ink);border-bottom:0;
+  display:inline-flex;align-items:baseline;gap:6px;
+}
+.fl-biz:hover{color:var(--ink);border-bottom:0}
+.fl-biz .arr{color:var(--ink-4);font-size:11px}
+.pwhen{
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-4);
+  font-variant-numeric:tabular-nums;margin-top:5px;
+}
+.pwhen.is-stale{color:var(--stale)}
+.fl-snip{font-size:12.5px;color:var(--ink-2);margin-top:6px}
+.fl-why{font-size:11.5px;color:var(--ink-4);margin-top:4px}
+
+/* ---- failed block / failed page -------------------------------- */
+.fl-fail{display:grid;grid-template-columns:5px minmax(0,1fr);gap:9px;margin-top:var(--sp-5)}
+.fl-fail i{
+  width:5px;height:5px;border-radius:50%;background:var(--missing);
+  box-shadow:0 0 6px var(--missing);margin-top:7px;
+}
+.fl-fail .said{font-size:13px;color:var(--ink-2)}
+.fl-fail .because{font-size:12.5px;color:var(--ink-3);margin-top:6px;max-width:62ch}
+
+/* ---- Block F, the health strip --------------------------------- */
+.fl-health{margin-top:var(--sp-8)}
+.fl-health.quiet{
+  border-top:1px solid var(--line);padding-top:var(--sp-4);
+  display:flex;align-items:center;gap:var(--sp-4);
+}
+.fl-health.quiet .line{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.fl-health.quiet .line i{font-style:normal;color:var(--ink-4);margin:0 5px}
+/* the 30-hour rule: past everyHours + graceHours the stamp becomes a statement */
+/* not .quiet-scoped: the alarm form nests the same span, and R57's amber stamp must render there too (R60) */
+.fl-health .line .aged{color:var(--stale)}
+.fl-health .btn{margin-left:auto;flex:none}
+/* cards earn their borders, and a structural alarm is quieter and stronger
+   than more colour */
+.fl-health.alarm{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-card);
+  padding:var(--sp-4) 16px;
+}
+/* the marker is the system's dot, never ⚠ — a coloured emoji glyph has no
+   place in a monochrome instrument panel */
+.fl-warn{display:grid;grid-template-columns:5px minmax(0,1fr);gap:9px;padding:3px 0}
+.fl-warn i{width:5px;height:5px;border-radius:50%;margin-top:7px}
+.fl-warn.is-stale i{background:var(--stale);box-shadow:0 0 6px var(--stale)}
+.fl-warn.is-missing i{background:var(--missing);box-shadow:0 0 6px var(--missing)}
+.fl-warn span{font-size:12.5px;color:var(--ink)}
+.fl-fine{margin-left:14px;font-size:11px;color:var(--ink-3);margin-top:var(--sp-3);font-variant-numeric:tabular-nums}
+.fl-fine i{font-style:normal;color:var(--ink-4);margin:0 5px}
+.fl-stamp{margin-left:14px;margin-top:var(--sp-2);display:flex;align-items:center;gap:var(--sp-4)}
+.fl-stamp .line{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+/* ---- buttons, tags, status pill -------------------------------- */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;cursor:pointer;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  padding:8px 14px;border-radius:var(--r-pill);background:none;
+  border:1px solid var(--line);color:var(--ink-2);
+  /* legacy.css's bare `button` declares this; without it here a .btn on an
+     <a> and a .btn on a <button> are different heights side by side. */
+  line-height:1.4;
+}
+.btn:hover{border-color:var(--ink-4);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed;color:var(--ink-4)}
+.btn:disabled:hover{border-color:var(--line);color:var(--ink-4)}
+/* the affirmative pill — declared vocabulary; P8 uses none */
+.btn.go{border-color:rgba(53,211,153,.4);color:#8AE9C6}
+.btn.go:hover{background:rgba(53,211,153,.09);border-color:var(--save)}
+.btn.ghost{border-color:transparent;color:var(--ink-3)}
+.tag{
+  display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;
+  text-transform:uppercase;padding:5px 10px;border-radius:var(--r-tag);
+  border:1px solid var(--line);color:var(--ink-3);
+}
+/* status pill — declared vocabulary only. P8's top bar carries no pill of any kind. */
+.statuspill{
+  display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:var(--r-pill);
+  background:rgba(53,211,153,.08);border:1px solid rgba(53,211,153,.2);
+  font-size:10.5px;color:#7FE3BE;
+}
+.statuspill i{width:5px;height:5px;border-radius:50%;background:var(--save);box-shadow:0 0 6px var(--save)}
+
+/* ================== SECTION 4 — components.css P10 additions (mockup:582-734) ================== */
+/* ============================================================
+   components — P10 additions
+   The shared-control block: eight controls — .tick, .swx, .sq (the
+   24px icon button), .fld, .fld-l, .sel (the select with the chevron),
+   .formwell (the form well), .pickrow (the Settings picker's row) —
+   plus .tag.is-layer and .btn.hi (the high rung of the pill ladder).
+   R25–R27, R32, R46: they live in components.css, NOT in the Personal
+   page's own sheet, because the Settings layer picker ships this same
+   phase on another page. Nothing above this banner changed shape.
+
+   Names are reference-style, with no page prefix (R46): the Personal
+   page's prefix belongs to that page and nothing else, and there is no
+   third namespace. None of these is element-shaped — a bare `.tile`
+   rule would border and pad `.app-brand .tile`, the 24px sunburst in
+   the rail, on every page (R32 / C7). `.swx` keeps the reference's own
+   name (components.html:475) because it is a port. The "two
+   namespaces" header line in the shipped file is amended to name this
+   block in the same commit.
+   ============================================================ */
+
+/* ---- the tick box (R25) — 14px square, 3px radius, never a fill.
+   `.tick` is (0,1,0) and base.css's :focus-visible is (0,1,0) too,
+   but :focus-visible only sets border-radius when it matches, and this
+   rule is later in the sheet, so the 3px survives a focus ring. */
+.tick{
+  position:relative;width:14px;height:14px;flex:none;padding:0;margin:0;
+  border:1px solid var(--line);border-radius:3px;background:var(--sunk);
+  display:grid;place-items:center;cursor:pointer;color:var(--ink-3);
+}
+/* the hit target, not the drawn size: 40 x 40 with the ::after box
+   (R41). The row's 14px gap puts the edit button 14px away, so 13px on
+   every side stops 1px clear of it. Never negative margins, which would
+   move the drawn box too. */
+.tick::after{content:"";position:absolute;inset:-13px}
+/* the ticked mark is an 8px check, never a fill: solid fills are rationed
+   to one per screen and Done this week alone would put twenty on the page.
+   The check is drawn in a 10-unit viewBox rather than the icon set's 24 so
+   that stroke-width:1.8 — the glyph set's weight — renders at 1.44px here
+   instead of 0.6px. The attribute value is the system's; the box is sized
+   so the value means what it says at 8px. */
+.tick svg{width:8px;height:8px;display:block}
+.tick:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---- the switch (R15, R25) — components.html:475-478 ported verbatim,
+   with one substitution: the reference writes `currentColor` so the ROW
+   supplies the layer hue. Layer hues are declined on this page, so the
+   value is written out as --ink. On = near-white border and knob;
+   off = --line border, --ink-4 knob. A contrast step, not a hue spend. */
+.swx{
+  width:26px;height:15px;border-radius:99px;background:#141820;
+  border:1px solid var(--line);position:relative;flex:none;cursor:pointer;padding:0;
+}
+.swx b{position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:var(--ink-4)}
+.swx.on{border-color:var(--ink);background:rgba(255,255,255,.05)}
+.swx.on b{left:13px;background:var(--ink)}
+/* busy, or a switch whose precondition is not met (`Put on calendar`
+   before a due date exists) — .btn:disabled's values */
+.swx:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---- the square icon button (R26) — components.html:483's values.
+   Serves the four arrows and the − / + stepper. Radius is --r-nav. */
+.sq{
+  width:24px;height:24px;flex:none;padding:0;border-radius:var(--r-nav);
+  background:none;border:1px solid var(--line);color:var(--ink-3);
+  display:grid;place-items:center;cursor:pointer;
+  font-family:var(--mono);font-size:10px;line-height:1;
+}
+.sq:hover{border-color:var(--ink-4);color:var(--ink)}
+.sq:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---- fields and labels (R27) — legacy.css's `input,textarea` and
+   `label` recipe, copied under classes with the source cited, so the
+   forms survive that file's scheduled deletion.
+   TWO deviations from the source recipe, both deliberate:
+     * font-size 16px, not 13px. layout.tsx sets maximumScale:1, which
+       iOS Safari has ignored since iOS 10, so a focused input under
+       16px auto-zooms and never zooms back. This is a CONTROL
+       dimension and is recorded as one in §5.3 — it is never licence
+       for 16px prose.
+     * line-height:1.4 is declared. A UA gives form controls
+       `line-height:normal`, which is font-metric derived, so the
+       field's height would depend on IBM Plex Sans's metrics. 1.4 is
+       the value .btn and legacy.css's bare `button` already declare.
+   caret-color:--spend stays: a caret is the same class of thing as
+   base.css's focus ring — "a reference-level convention, not a hue
+   spend". */
+.fld{
+  font-family:var(--body);font-size:16px;line-height:1.4;width:100%;padding:8px 10px;
+  background:#101318;border:1px solid var(--line);border-radius:var(--r-chip);
+  color:var(--ink);caret-color:var(--spend);
+}
+/* sentence case, not mono caps — a label addresses a person */
+.fld-l{display:block;font-size:12px;color:var(--ink-3);margin-bottom:4px}
+/* the select is a .fld with .sumrow::after's chevron geometry, so the page
+   has ONE chevron shape. The option list stays native. */
+select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
+.sel{position:relative;display:block}
+.sel::after{
+  content:"";position:absolute;right:12px;top:50%;margin-top:-5px;
+  width:6px;height:6px;border-right:1.5px solid var(--ink-4);
+  border-bottom:1.5px solid var(--ink-4);transform:rotate(-45deg);pointer-events:none;
+}
+
+/* ---- the form well (R27) — pre.body's ground, border and radius;
+   --sp-4 padding. The tile is raised, the form is sunk into it, no
+   second border, one card deep. (The Personal page's narrow band drops
+   the padding to --sp-3; that rule lives in the page's own sheet.) */
+.formwell{
+  background:var(--sunk);border:1px solid var(--line-soft);
+  border-radius:var(--r-chip);padding:var(--sp-4);
+}
+
+/* ---- the Settings layer picker's row (R46, the eighth item). It is
+   here for the same reason the other controls are: the picker ships
+   this phase on the Settings page, which has no page sheet of its own.
+   Same hairline grammar as the page's layer list, with a tick where
+   that has a switch. min-height 40px so two 40px tick hit boxes never
+   overlap. A vanished calendar keeps its row and carries its sentence
+   under the name in .fl-note's recipe (R42). */
+.pickrow{
+  display:flex;align-items:center;gap:10px;padding:8px 0;min-height:40px;
+  font-size:12.5px;color:var(--ink-2);
+}
+.pickrow+.pickrow{border-top:1px solid var(--line-soft)}
+.pickrow .fl-note{display:block;margin-top:2px}
+/* a row carrying a note aligns its tick with the name's line, not the
+   middle of the two lines: (18.75px line box − 14px box) / 2. The app
+   targets current Chrome, so :has() is available, as components.css's
+   .stat:not(:has(.track)) already assumes. */
+.pickrow:has(.fl-note){align-items:start}
+.pickrow:has(.fl-note)>.tick{margin-top:2.4px}
+
+/* ---- the layer tag (R13, M5) — .tag's box, de-capsed. Uppercasing
+   `Holidays in Philippines` transforms RIKU's data; mono caps are for
+   what the system names. 10px is .fl-count's size, so no new size.
+   max-width is eleven characters OF NAME: .tag's 10px side padding is
+   added, because border-box would otherwise spend 20px of the 11ch on
+   padding and cut `Classes` to `Classe…`. */
+.tag.is-layer{
+  text-transform:none;letter-spacing:.04em;font-size:10px;max-width:calc(11ch + 20px);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;
+}
+
+/* ---- the high rung of the pill ladder (P8 R18, R46) — .btn:hover's
+   two values at rest, so the one affirmative pill in a row (Save, Add,
+   Keep) sits a step above its neighbours without a fill or a hue; hover
+   lifts the border one more step. A modifier used WITH .btn, so it
+   must restate .btn:disabled's ink and border: at equal specificity the
+   later rule wins, and a disabled Save must still read as disabled. */
+.btn.hi{border-color:var(--ink-4);color:var(--ink)}
+.btn.hi:hover{border-color:var(--ink-3)}
+.btn.hi:disabled{border-color:var(--line);color:var(--ink-4)}
+
+
+/* ================== SECTION 5 — personal.css, verbatim (mockup:735-1147) ================== */
+/* ============================================================
+   personal
+   The new src/styles/personal.css, imported fourth (before
+   legacy.css). Namespace `pe-` and nothing else; no bare
+   element-shaped class names anywhere in this block (R32).
+   ============================================================ */
+
+/* ---- the grid (R2, R3) ------------------------------------------
+   Two named containers. `pgw` sits on the grid's WRAPPER because an
+   element cannot query itself; `tile` sits on every CELL (the padding-
+   less wrapper), not on the tile, for the same reason: a container
+   query measures the container's content box and cannot style the
+   container itself, so a container on the tile would fire 34px late
+   and could never change the tile's own padding. On the cell, every
+   `@container tile` number below is the tile's border-box width — the
+   width the rulings name — and `.pe-tile{padding:12px}` fires because
+   the tile is then a descendant. No @media and no @supports: a browser
+   without container queries takes the one-column base, which is
+   correct. Thresholds come from the legal cell widths — 106 · 141.67 ·
+   219.5 · 226 · 297.33 · 346 … — not from round numbers. */
+.pe-wrap{container:pgw / inline-size}
+
+.pe-grid{
+  display:grid;gap:var(--sp-4);
+  grid-template-columns:minmax(0,1fr);   /* base = the one-column stack */
+  --tb:0px;                              /* edit-mode toolbar allowance */
+}
+/* the cell wrapper is a grid so the tile stretches to the row's height;
+   content inside the tile stays top-aligned, never centred */
+.pe-cell{display:grid;min-width:0;container:tile / inline-size}
+/* A stack has no leftover, so the dashed cell is not drawn at one column.
+   Its span differs between the two column counts — a row can have a
+   leftover at twelve and none at six — so it carries a class for each and
+   `pe-x0` / `pe-s0` mean "no leftover at this count". This is the only
+   rule in the file that ever hides a cell. */
+.pe-cell.is-gap{display:none}
+
+@container pgw (min-width:706px){
+  .pe-grid{grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:var(--tracks)}
+  .pe-r1{grid-row:1}.pe-r2{grid-row:2}.pe-r3{grid-row:3}.pe-r4{grid-row:4}
+  .pe-x1{grid-column:span 1}.pe-x2{grid-column:span 2}.pe-x3{grid-column:span 3}
+  .pe-x4{grid-column:span 4}.pe-x5{grid-column:span 5}.pe-x6{grid-column:span 6}
+  .pe-cell.is-gap:not(.pe-x0){display:grid}
+}
+@container pgw (min-width:820px){
+  .pe-grid{grid-template-columns:repeat(12,minmax(0,1fr))}
+  .pe-s1{grid-column:span 1}
+  .pe-s2{grid-column:span 2}.pe-s3{grid-column:span 3}.pe-s4{grid-column:span 4}
+  .pe-s5{grid-column:span 5}.pe-s6{grid-column:span 6}.pe-s7{grid-column:span 7}
+  .pe-s8{grid-column:span 8}.pe-s9{grid-column:span 9}.pe-s10{grid-column:span 10}
+  .pe-s11{grid-column:span 11}.pe-s12{grid-column:span 12}
+  .pe-cell.is-gap:not(.pe-s0){display:grid}
+}
+/* --tracks is read ONLY inside the two blocks above, so the one-column
+   stack never sees it and needs no override. Columns are never pinned:
+   with grid-row fixed and grid-column:span N, auto-placement packs each
+   row left to right in DOM order, which makes the leftover always trail
+   — the only thing the editor's arrows can express. */
+
+.pe-grid.is-editing{--tb:42px}
+/* the leftover, in edit mode only: one dashed rectangle across the
+   row's whole remaining room. Never focusable, never a drop target,
+   no fill, no caption. It takes the radius of the tile it stands in
+   for — --r-card. */
+.pe-gap{border:1px dashed var(--line);border-radius:var(--r-card)}
+/* the --panel well the grid sits in while editing. The negative margin
+   is exactly the padding, so the grid's own box does not move and the
+   container's inline size is unchanged — which is why the well wraps
+   .pe-wrap rather than being applied to it. */
+.pe-edit{
+  background:var(--panel);border-radius:var(--r-feature);
+  padding:var(--sp-4);margin:calc(-1 * var(--sp-4));
+}
+/* The well is .fl's first child, and the shipped `.fl>:first-child
+   {margin-top:0}` is (0,2,0) — it beats .pe-edit and would zero the top
+   half of the compensation, dropping the grid 14px the moment the mode
+   opens. Restated at the same specificity, later in the sheet (M6). */
+.fl>.pe-edit{margin-top:calc(-1 * var(--sp-4))}
+
+/* ---- the tile (R6) ---------------------------------------------- */
+.pe-tile{
+  display:flex;flex-direction:column;
+  background:var(--raised);border:1px solid var(--line);border-radius:var(--r-card);
+  padding:15px 16px;min-width:0;overflow:hidden;
+}
+/* the hero (R8): three structural facts, no hue — the #171B21 ground,
+   the border lifted to --ink-4 (.btn:hover's shipped value), and the
+   feature radius. All three travel with the tile when it is moved or
+   shrunk. No inset hairline: it would be drawn in the colour of the
+   border it sits inside. */
+.pe-tile.is-hero{background:#171B21;border-color:var(--ink-4);border-radius:var(--r-feature)}
+
+/* ---- head (R11) ------------------------------------------------- */
+.pe-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}
+/* the pill is a pill at every width: once the head stacks (below 200px)
+   the grid would blockify the button and stretch it into a bar, and at
+   106px `+ TO-DO` would break across two lines (S3) */
+.pe-head>.btn{justify-self:start;white-space:nowrap}
+.pe-head .fl-count{display:block;margin-top:5px;padding-bottom:0}
+.pe-head .fl-empty{margin-top:0}
+.pe-stamp{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Done this week is the one tile whose second slot is ADJACENT to the
+   eyebrow rather than flush right: one grammar produces both of the
+   deck's renders — the count when populated, the sentence when empty. */
+.pe-head.is-inline{grid-template-columns:auto minmax(0,1fr);gap:var(--sp-5);align-items:baseline}
+/* in the inline head the count sits BESIDE the eyebrow, not under it */
+.pe-head.is-inline .fl-count{margin-top:0}
+
+/* ---- body, groups, notes ---------------------------------------- */
+.pe-body{margin-top:var(--sp-5);display:flex;flex-direction:column;min-width:0}
+/* R17: space-between fires on the HERO only, and only when BOTH groups
+   are empty — the air is then enclosed by two real findings and the
+   bottom edge carries content. With rows under one group and nothing
+   under the other the tile top-aligns. */
+.pe-body.is-pair{flex:1 1 auto;justify-content:space-between}
+/* the same move .fl>:first-child makes, and for the same reason */
+.pe-body>:first-child{margin-top:0}
+
+/* group labels (R12): .fl-thead's type step at --ink-3, not --ink-4.
+   On the blank week these five labels are the page's whole structure,
+   and --ink-4 is 1.75:1 on --raised. --ink-4 stays where components.css
+   reserves it: absences, .fl-bound, .fl-absent. */
+.pe-grp{
+  display:block;font-family:var(--mono);font-size:9px;font-weight:500;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+}
+/* .fl-empty's 20px was calibrated to sit under a 19px heading; under a
+   9px label it reads as a gap */
+.pe-grp + .fl-empty,.pe-grp + .pe-rows,.pe-grp + .pe-fail{margin-top:var(--sp-3)}
+
+/* press outcomes (R21): .fl-note's recipe. No dot, no hue, does not
+   survive a reload, cleared by the next press in that tile. Also the
+   register for a validation message under a field. */
+.pe-said{font-size:11px;color:var(--ink-3);margin-top:var(--sp-3)}
+.fld + .pe-said,.pe-ctl + .pe-said{margin-top:4px}
+
+/* couldn't-read (R10): .fl-fail's shape with the dot at --stale. A
+   calendar that did not answer is ageing data; red stays on lateness.
+   The same shape at every span, because a 5px dot is visible at 80px
+   of inner width and a coloured word is not. */
+.pe-fail{display:grid;grid-template-columns:5px minmax(0,1fr);gap:9px;margin-top:var(--sp-5)}
+.pe-fail i{
+  width:5px;height:5px;border-radius:50%;background:var(--stale);
+  box-shadow:0 0 6px var(--stale);margin-top:7px;
+}
+.pe-fail .said{font-size:13px;color:var(--ink-2)}
+/* the one --missing dot that is not lateness: an expected event that
+   did not happen, and only once the expected send hour has passed (R22) */
+.pe-fail.is-missing i{background:var(--missing);box-shadow:0 0 6px var(--missing)}
+.pe-fail + .pe-fail{margin-top:var(--sp-3)}
+.pe-fail + .pe-week,.pe-fail + .pe-rows{margin-top:var(--sp-4)}
+/* R49: the one dotted sentence that is a press outcome — `Done, but the
+   calendar entry couldn't be removed…` — sits directly under the head,
+   where every press outcome sits (R16), at .pe-said's distance; the foot
+   holds meta and the toolbar only. R9 gives it the dot, R16 the place. */
+.pe-head + .pe-fail{margin-top:var(--sp-3)}
+
+/* ---- rows (R13): hairline rows, never boxes --------------------- */
+.pe-rows{display:grid;grid-template-columns:minmax(0,1fr)}
+.pe-row{
+  display:grid;gap:var(--sp-4);align-items:center;
+  padding:11px 0;border-top:1px solid var(--line-soft);
+}
+.pe-rows>.pe-row:first-child,.pe-week>.pe-row:first-child,
+.pe-rows>.pe-inline:first-child{border-top:0}
+/* a sentence, then a list: the same 14px the reason line already takes */
+.fl-empty + .pe-week,.fl-empty + .pe-rows{margin-top:var(--sp-4)}
+.pe-row.is-sched{grid-template-columns:72px minmax(0,1fr) auto}
+/* a row with a tick and no second control: the Done row, and Today's DUE
+   rows before the edit form exists on them. R47: the explicit tracks are
+   the leading cell and the title; a tag and a due date, when the row has
+   them, flow into implicit auto columns — so an undated row or a row
+   without a tag emits no empty cell and pays no 14px gap for one. */
+.pe-row.is-item{grid-template-columns:auto minmax(0,1fr);grid-auto-flow:column;grid-auto-columns:auto}
+/* a to-do row is TWO controls: the tick, and one button wrapping title,
+   tag and meta. Never display:contents on the button — several browsers
+   drop a display:contents button out of the accessibility tree. */
+.pe-row.is-todo{grid-template-columns:auto minmax(0,1fr)}
+.pe-row.is-day{grid-template-columns:56px minmax(0,1fr);align-items:baseline}
+
+.pe-time{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pe-nm{font-weight:600;font-size:13px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* an event title leaves the app, so it is .fl-biz's anchor with the
+   persistent arrow — and the ROW is not the anchor (P8 R36) */
+.pe-row .fl-biz{min-width:0;max-width:100%}
+/* the row's second control (R13): named `Edit "…"`, no chevron, no hover
+   lift, inherits everything, carries the row's remaining tracks — the
+   title, then whatever meta the row has, in implicit columns (R47) */
+.pe-edit-row{
+  display:grid;grid-template-columns:minmax(0,1fr);grid-auto-flow:column;grid-auto-columns:auto;
+  gap:var(--sp-4);align-items:center;min-width:0;background:none;border:0;padding:0;margin:0;
+  font:inherit;color:inherit;text-align:left;cursor:pointer;
+}
+/* due meta (R13): a right-aligned mono column, ink not boxes. The ONLY
+   difference between a due date and an overdue one is the ink. */
+.pe-due{
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;
+}
+.pe-due.is-late{color:var(--missing)}
+/* `on calendar` — a lowercase word, body face, no box: an ambient state
+   of the row, not a category */
+.pe-on{font-size:11px;color:var(--ink-3);white-space:nowrap}
+.pe-daylbl{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.pe-items{display:flex;flex-wrap:wrap;gap:4px var(--sp-4);font-size:13px;color:var(--ink-2);min-width:0}
+.pe-items .pe-it{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.pe-items .pe-t{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.pe-items .pe-l{color:var(--ink-3)}
+/* R19: on this page `—` means a day that was read and held nothing.
+   A measurement, so --ink-3 — NOT .fl-trow .dash's absence ink. The
+   guard that keeps it honest is R18: a day whose sources did not all
+   answer prints nothing at all. */
+.pe-dash{color:var(--ink-3)}
+/* `+3 more` in .fl-bound's register, inline at the end of the day */
+.pe-more{font-size:11.5px;color:var(--ink-4)}
+
+/* the week's two inner columns (R4). One grid, seven rows, split into
+   4 | 3 by grid-auto-flow at >=720px of TILE width — so the markup is
+   one chronological list at every width and the hairline suppression
+   is the only thing that moves. */
+.pe-week{display:grid;grid-template-columns:minmax(0,1fr)}
+
+/* ---- the layer row (R15) ---------------------------------------- */
+/* minmax(0,1fr), not a bare auto track: an auto track takes the switch
+   row's min-content, which at 106px is wider than the tile, and the
+   knob lands in the padding. R2's rule, applied to the list too. */
+.pe-layers{display:grid;grid-template-columns:minmax(0,1fr)}
+.pe-sw{
+  display:flex;align-items:center;gap:9px;width:100%;padding:8px 0;margin:0;
+  background:none;border:0;border-top:1px solid var(--line-soft);
+  font:inherit;color:inherit;text-align:left;cursor:pointer;
+}
+.pe-layers>.pe-sw:first-child{border-top:0}
+/* the NAME is --ink-2 in both states; the knob carries the state.
+   35% opacity on an off row would drop the label of a control to 1.8:1.
+   flex:1 1 0 so the name is the part that gives way: at 106px the
+   switch would otherwise be pushed into the tile's padding (S11). */
+.pe-sw .nm{flex:1 1 0;font-size:12.5px;color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pe-sw .swx{margin-left:auto}
+.pe-sw:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---- the push tile (R14) ---------------------------------------- */
+.pe-ptitle{font-weight:600;font-size:13px;color:var(--ink)}
+/* the older push's stamp, and the pre.body well it sits above, so the
+   quotation reads as subordinate to the stamp and not as content under
+   the eyebrow. Values are pre.body's, verbatim. */
+.pe-last{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin-top:var(--sp-4)}
+.pe-quote{
+  white-space:pre-wrap;font-family:var(--body);font-size:12.5px;line-height:1.55;
+  color:var(--ink-2);background:var(--sunk);border:1px solid var(--line-soft);
+  border-radius:var(--r-chip);padding:10px 12px;margin:var(--sp-3) 0 0;
+}
+
+/* ---- the foot (R16) --------------------------------------------- */
+.pe-foot{margin-top:auto}
+
+/* ---- forms (R27, R28) ------------------------------------------- */
+.pe-fields{display:grid;gap:12px}
+.pe-pair{display:grid;gap:12px}
+.pe-ctl{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-2)}
+.pe-acts{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:center;justify-content:flex-end;margin-top:16px}
+/* Delete sits apart at the left at RESTING emphasis with no red — the
+   confirmation is the safety, and the hue budget is spent on lateness */
+.pe-acts .pe-left{margin-right:auto}
+.pe-confirm{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:center;margin-top:16px;font-size:13px;color:var(--ink-2)}
+.pe-confirm .pe-q{margin-right:auto}
+/* the two pills are one group and wrap together, so `Keep` is never
+   orphaned on a line of its own under the destructive pill (S4) */
+.pe-confirm .pe-yn{display:flex;gap:var(--sp-3);flex:none;margin-left:auto}
+/* the edit form replaces a row in place; the rows around it do not move */
+.pe-inline{border-top:1px solid var(--line-soft);padding:11px 0}
+
+/* ---- the edit toolbar (R29) ------------------------------------- */
+/* .course .foot's shipped shape. It wraps before it clips. */
+.pe-bar{
+  display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1);
+  border-top:1px solid var(--line-soft);margin-top:12px;padding-top:11px;
+}
+.pe-arrows{display:flex;flex-wrap:wrap;gap:var(--sp-1);width:108px}
+.pe-step{display:flex;align-items:center;gap:var(--sp-1);margin-left:var(--sp-3)}
+.pe-step .ct{
+  font-family:var(--display);font-weight:600;font-size:15px;color:var(--ink);
+  min-width:22px;text-align:center;font-variant-numeric:tabular-nums;
+}
+/* .pwhen's recipe, sentence case as the deck writes it, on its own line */
+.pe-cap{
+  flex-basis:100%;font-family:var(--mono);font-size:9.5px;color:var(--ink-4);
+  font-variant-numeric:tabular-nums;margin-top:5px;
+}
+/* the sticky header control row, edit mode only. No ancestor of the
+   header may take container-type: containment would silently kill it.
+   The 10px bottom padding is clearance for the stuck state — void
+   ground painted over whatever scrolls under the pills — and the
+   negative margin gives the same 10px back, so the title→grid distance
+   is the same number in and out of the mode (M6). */
+.pe-sticky{
+  position:sticky;top:0;z-index:3;background:var(--void);
+  padding-bottom:var(--sp-3);margin-bottom:calc(-1 * var(--sp-3));
+}
+/* three pills where there was one, ordered Reset to default · gap ·
+   Cancel · Save (R30). Save is .btn.hi, the system's high rung. */
+.pe-pills{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
+.pe-pills .pe-sep{margin-left:var(--sp-4)}
+/* R44: edit mode keeps every tile's contents, controls included. The
+   head and the body take `inert` — out of the tab order, out of hit
+   testing — and the controls inside them render at .btn:disabled's
+   opacity, one recipe for "this does not respond right now". The
+   pills, the switch rows and the tick boxes dim; a to-do row's title
+   does not, because it is the tile's content, not a signal. */
+.pe-tile [inert] .btn,.pe-tile [inert] .pe-sw,.pe-tile [inert] .tick{opacity:.45}
+
+/* ---- the tile's own width bands (R2, R6, R11, R13, R15, R28, R38) --
+   Every one of these is keyed to the TILE's border-box width — the
+   container is the cell — so a tile behaves the same way wherever
+   Riku puts it. Three inner thresholds: 480 (the scheduled row's
+   two-line form, the 44px switch rows, the due column), 240 (padding,
+   the well's padding, the other rows' two-line form, the compact pill)
+   and 200 (the head stacks, the heading steps down). The legal cells
+   they catch: 480 catches everything up to span 7 at twelve (452.5)
+   and 4 of 6 (466); 240 catches the two narrowest spans at each column
+   count — 106 · 141.67 at the bottom, 219.5 · 226 above them — and
+   nothing wider; 200 catches 106 and 141.67 only. */
+
+/* the head stacks and the heading steps down to 15px below 200px
+   (R11). Two heading sizes, never three. */
+@container tile (max-width:199.98px){
+  .pe-head{grid-template-columns:minmax(0,1fr)}
+  .pe-head .fl-h{font-size:15px}
+  .pe-head.is-inline{grid-template-columns:minmax(0,1fr);gap:var(--sp-3)}
+}
+
+/* the narrow band, below 240px (R38): 12px padding; the well's padding
+   drops to --sp-3 so the date field's 164.8px fits at span 3 and at
+   2 of 6; every row with more than two cells goes two-line — the
+   leading cell and the title on line one, the rest (tag, `on calendar`,
+   due meta, `Mon 8`) on line two — because at 226px a title beside
+   `on calendar` and `3 days late` is one letter; the head's pill takes
+   8px 10px so `+ TO-DO` fits 80px of inner width. The scheduled row
+   keeps R13's own two-line form from 480. */
+@container tile (max-width:239.98px){
+  .pe-tile{padding:12px}
+  .formwell{padding:var(--sp-3)}
+  .pe-head>.btn{padding:8px 10px}
+  /* the toolbar's stepper loses its 10px indent, so arrows + stepper
+     (190px) stay on one line at span 3 (193.5px inner) and 2 of 6
+     (200px) instead of wrapping and growing row 2 by a line */
+  .pe-step{margin-left:0}
+  .pe-row.is-item{grid-auto-flow:row;row-gap:4px}
+  .pe-row.is-item>.tick{grid-column:1;grid-row:1}
+  .pe-row.is-item>.pe-nm{grid-column:2 / span 2;grid-row:1}
+  .pe-row.is-item>.tag{grid-column:2;grid-row:2;justify-self:start}
+  .pe-row.is-item>.pe-due{grid-column:3;grid-row:2}
+  .pe-edit-row{display:flex;flex-wrap:wrap;gap:4px var(--sp-3)}
+  .pe-edit-row>.pe-nm{flex:0 0 100%}
+  .pe-edit-row>.pe-due{margin-left:auto}
+  /* the tick sits on the title's line, not between the two lines:
+     (19.5px line box − 14px box) / 2 */
+  .pe-row.is-todo>.tick{align-self:start;margin-top:2.75px}
+}
+
+/* below 480px of tile width the scheduled row goes two-line — time and
+   tag on one mono line, title beneath — and the layer row takes a 44px
+   minimum so it is still a touch target (R13, R15) */
+@container tile (max-width:479.98px){
+  .pe-row.is-sched{grid-template-columns:auto minmax(0,1fr);row-gap:4px}
+  .pe-row.is-sched .pe-time{grid-column:1;grid-row:1}
+  /* the tag keeps its eleven-character cap and never exceeds its column:
+     a name that would clip at the tile's edge ellipsises instead */
+  .pe-row.is-sched .tag{grid-column:2;grid-row:1;justify-self:start;max-width:min(100%,calc(11ch + 20px))}
+  /* the title's grid item is the .fl-biz anchor (the event link), not the
+     span inside it; placing the span would leave the anchor auto-placed
+     in the time column, which then grows to the title's width */
+  .pe-row.is-sched>.fl-biz,.pe-row.is-sched>.pe-nm{grid-column:1 / -1;grid-row:2}
+  .pe-sw{min-height:44px}
+}
+/* from 480px the due column has a floor — .fl-stage's 64px is the
+   precedent — so the right-hand cells of neighbouring rows line up
+   into a column instead of each row placing its own (S2) */
+@container tile (min-width:480px){
+  .pe-due{min-width:64px}
+}
+
+/* the arrow group wraps 2x2 before it clips: 108px of arrows need
+   134px of tile (108 plus 12px padding and 1px border each side), so
+   at 1 of 6 (106px) they do not fit and the tile carries
+   overflow:hidden — the fourth arrow would be invisible AND
+   unreachable by pointer. At span 2 on twelve (141.67) they fit. */
+@container tile (max-width:133.98px){
+  .pe-arrows{width:52px}
+  .pe-step{margin-left:0}
+}
+
+/* the form's pairs (R40). The threshold is MEASURED: the native date
+   field is 164.8px wide at .fld's 16px in Chrome on Windows; two of
+   them plus the 12px gap need 341.6px of well content, which is 406px
+   of tile width once the well's and the tile's padding and borders are
+   added back. So pairs appear at span 6 on twelve (452.5) and 4 of 6
+   (466); span 5 (375.17) and 3 of 6 (346) stay one column. The columns
+   are minmax(min-content,1fr) — the ONE recorded exception to R2's
+   minmax(0,1fr) — because a native control squeezed under its minimum
+   clips its own text silently, and an overflow is at least visible. */
+@container tile (min-width:406px){
+  .pe-pair{grid-template-columns:minmax(min-content,1fr) minmax(min-content,1fr)}
+}
+
+/* the week's two inner columns, at >=720px of tile width (R4) */
+@container tile (min-width:720px){
+  .pe-week{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-flow:column;
+    grid-template-rows:repeat(4,auto);column-gap:var(--sp-4);
+  }
+  .pe-week>.pe-row:nth-child(5){border-top:0}
+}
+
+/* ================== SECTION 6 — mockup-only: face variables (mockup:1155-1163) ================== */
+/* In the app these three come from next/font/google via the generated
+   .variable class names on the root element, which is why tokens.css
+   does not declare them. Declared last so the tokens block above stays
+   a byte-for-byte copy. */
+:root{
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --body:'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,monospace;
+}
+
+/* ================== SECTION 7 — mockup-only: frame/pane/holder chrome + hero alternatives (mockup:1204-1276) ================== */
+.scroll{overflow-x:auto;margin-top:24px;padding-bottom:6px}
+.stack{display:flex;flex-direction:column;gap:28px;margin-top:24px}
+.pair{display:flex;gap:28px;align-items:flex-start;width:max-content}
+/* a two-column sheet of holders, so a comparison never needs a sideways
+   drag: 2 x 608.67 + 14 = 1231.33 and 4 x 297.33 + 3 x 14 = 1231.33, both
+   inside the document's 1240px column */
+.sheet{display:grid;gap:var(--sp-4);justify-content:start;margin-top:24px;align-items:start}
+.sheet.c2{grid-template-columns:repeat(2,608.67px)}
+.sheet.c4{grid-template-columns:repeat(4,297.33px)}
+/* Frames and panes are content-box on purpose: the stated width is the
+   width INSIDE the 1px border, so a 1240px frame gives the page column
+   exactly 920px, a 932px frame exactly 706px and a 390px frame exactly
+   164px (170px rail) or 334px (44px top strip). With border-box the
+   border ate 2px and the six-column queries never fired. */
+.frame{
+  flex:none;box-sizing:content-box;border:1px solid var(--line);border-radius:var(--r-card);
+  overflow:hidden;background:var(--void);
+}
+.f1240{width:1240px}
+.f932{width:932px}
+.f390{width:390px}
+/* a page-column pane: the content column on its own ground, with no
+   shell, used where a specimen is about the tiles and not the page. The
+   width is the column's width; the 20px padding sits outside it. */
+.pane{
+  flex:none;box-sizing:content-box;border:1px solid var(--line);border-radius:var(--r-card);
+  background:var(--void);padding:20px;
+}
+.p920{width:920px}
+.p706{width:706px}
+.tab{
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-4);margin:0 0 9px;
+}
+.tab b{color:var(--ink-3);font-weight:500}
+/* a holder's label in the caption's own register (.spec-cap's 13.5px
+   --ink-2), for the comparisons Riku is asked to judge; .tab is the
+   machine label and stays on frames that only need a name */
+.lbl{font-size:13.5px;color:var(--ink-2);margin:0 0 9px}
+.lbl b{font-weight:600;color:var(--ink)}
+
+/* holders that give a lone tile the exact width it would have on the
+   real grid, so every specimen below is measured, not approximated.
+   The holder is the `tile` container, exactly as .pe-cell is on the
+   page. 920px column, 14px gutter: span 8 = 608.67, 4 = 297.33,
+   3 = 219.5, 2 = 141.67. 706px column: 6 = 706, 4 = 466, 2 = 226,
+   1 = 106. */
+.hold{flex:none;min-width:0;container:tile / inline-size}
+.w920{width:920px}
+.w609{width:608.67px} .w466{width:466px} .w406{width:406px}
+.w297{width:297.33px} .w226{width:226px} .w219{width:219.5px} .w213{width:213px}
+.w142{width:141.67px} .w106{width:106px}
+.w334{width:334px} .w164{width:164px}
+/* the hero comparison and the push tile's states are drawn at the
+   height their row gives them, not at natural height */
+.h340 .pe-tile{min-height:340px}
+
+/* specimen 01's four hero alternatives. (a) is the ruled treatment and
+   uses the shipping .pe-tile.is-hero rule; (b), (c) and (d) exist only
+   on this page so Riku can judge them side by side. */
+.hero-b{background:var(--raised);border-color:var(--line);border-radius:var(--r-card)}
+.hero-c{background:#171B21;border-color:var(--line);border-radius:var(--r-card);box-shadow:inset 0 0 0 1px var(--line)}
+.hero-d{background:linear-gradient(155deg,#0A1A2E,#0F1318 45%);border-color:rgba(95,165,250,.2);border-radius:var(--r-feature)}
+
+/* the provisional phone shell (specimen 08, option A) */
+.phonebar{
+  height:44px;border-bottom:1px solid var(--line-soft);background:#0B0D11;
+  display:flex;align-items:center;gap:10px;padding:0 12px;
+}
+.phonebar .app-brand{padding:0}
+.phonebar .app-nav{flex-direction:row;gap:2px}
+.phonebar .navitem{padding:4px 7px;font-size:11.5px}
+.phonebar .btn.ghost{margin-left:auto;font-size:11.5px;letter-spacing:.1em;padding:6px 9px;color:var(--ink-3)}
+
+/* ================== SHEET CHROME — the decision page around the drawings ==================
+   Everything below is new for this page. Every selector takes an sh- prefix so nothing
+   here can collide with, or be mistaken for, an app class above. Nothing above this
+   banner is touched or restyled — the drawings keep the app's own faces, inks and grounds
+   exactly as they render in the real product; only the sheet around them is designed.
+   This page commits to one fixed dark look (no light variant, no [data-theme] switching) —
+   the specimens are fixed-dark, so a page that changed under the viewer's theme would put
+   one theme's sheet around the other theme's screens. Colour is spent nowhere in this
+   chrome except the one warm highlight below: in this product colour means something, and
+   the sheet holding the choices about it should not spend any of its own. */
+
+:root{
+  --sh-ground:#121318;
+  --sh-ink:#D7D9DE;
+  --sh-ink-2:#8A8F99;
+  --sh-ink-3:#5C616B;
+  --sh-rule:#262A33;
+  --sh-bone:#E8E2D4;
+  --sh-mount:#08090B;
+  --sh-display:'Newsreader',Georgia,'Times New Roman',serif;
+  --sh-body:'Libre Franklin',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --sh-mono:'Space Mono','SFMono-Regular',Consolas,'Liberation Mono',monospace;
+}
+
+/* the one element selector this page overrides: base.css's own body{} rule (verbatim
+   above) paints the app's void ground under the whole document. The sheet needs its own,
+   slightly cooler and a step lighter, so a mounted specimen reads as a screen set into a
+   sheet rather than a continuation of it. Later in the cascade at equal specificity, so
+   this wins outright — nothing about .app, .frame, .pane or .hold changes: each still
+   paints its own var(--void) ground on itself regardless of what body behind it does. */
+body{background:var(--sh-ground);color:var(--sh-ink);font-family:var(--sh-body);font-size:15px}
+p{margin:0}
+
+.sh-page{max-width:1180px;margin:0 auto;padding:72px 40px 120px}
+
+/* ---- intro --------------------------------------------------------- */
+.sh-eyebrow{
+  font-family:var(--sh-mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--sh-ink-3);margin:0;
+}
+.sh-h1{
+  font-family:var(--sh-display);font-weight:600;font-size:clamp(30px,3.6vw,42px);
+  letter-spacing:-.012em;line-height:1.14;color:var(--sh-ink);margin:16px 0 0;
+  text-wrap:balance;max-width:20ch;
+}
+.sh-lede{
+  font-family:var(--sh-body);font-weight:400;font-size:16px;line-height:1.68;
+  color:var(--sh-ink-2);max-width:62ch;margin:22px 0 0;
+}
+.sh-lede + .sh-lede{margin-top:14px}
+.sh-handles{
+  display:flex;flex-wrap:wrap;gap:10px 18px;margin:26px 0 0;padding:0;list-style:none;
+}
+.sh-handles li{
+  font-family:var(--sh-mono);font-size:11px;letter-spacing:.1em;color:var(--sh-ink-3);
+  display:flex;align-items:center;gap:8px;
+}
+.sh-handles b{
+  font-weight:400;color:var(--sh-ink);border:1px solid var(--sh-rule);border-radius:4px;
+  padding:3px 7px;letter-spacing:.14em;
+}
+.sh-intro{padding-bottom:60px;border-bottom:1px solid var(--sh-rule);margin-bottom:8px}
+
+/* ---- band structure -------------------------------------------------
+   Five independent calls, not a sequence — no numbering. Each band opens
+   with its handle (the name Riku answers by) and closes with the
+   recommendation line, so both ends of the argument sit in the same
+   quiet register throughout. */
+.sh-band{padding:60px 0;border-top:1px solid var(--sh-rule)}
+.sh-band:first-of-type{border-top:0;padding-top:52px}
+.sh-band-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 18px}
+.sh-handle{
+  font-family:var(--sh-mono);font-weight:400;font-size:13px;letter-spacing:.16em;
+  color:var(--sh-bone);margin:0;flex:none;
+}
+.sh-band-title{
+  font-family:var(--sh-display);font-weight:600;font-size:27px;letter-spacing:-.012em;
+  color:var(--sh-ink);margin:0;text-wrap:balance;
+}
+.sh-question{
+  font-family:var(--sh-display);font-weight:500;font-size:18.5px;line-height:1.62;
+  color:var(--sh-ink-2);max-width:70ch;margin:22px 0 0;
+}
+.sh-question + .sh-question{margin-top:13px}
+.sh-question b{font-weight:600;color:var(--sh-ink)}
+
+/* ---- specimen mounts --------------------------------------------------
+   The lightness step (--sh-mount vs --sh-ground) plus the border plus the
+   label is what tells Riku which pixels are the product and which are the
+   question. Never a transform, never a scale — every drawing below renders
+   at the exact width its own frame/pane/hold class declares. */
+.sh-specimens{display:flex;flex-wrap:wrap;gap:30px;margin-top:34px;align-items:flex-start}
+/* stretch, not flex-start: a stacked specimen's mount must take the full
+   available width so its own overflow-x:auto can clip/scroll a wider
+   drawing internally, instead of the specimen growing to the drawing's
+   width and pushing the page itself sideways. */
+.sh-specimens.sh-stack{flex-direction:column;flex-wrap:nowrap;align-items:stretch}
+.sh-specimen{min-width:0}
+.sh-specimen-label{
+  font-family:var(--sh-mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--sh-ink-3);margin:0 0 11px;
+}
+.sh-mount{
+  background:var(--sh-mount);border:1px solid var(--sh-rule);border-radius:14px;
+  padding:22px;min-width:0;overflow-x:auto;
+}
+
+/* ---- option copy ------------------------------------------------------ */
+.sh-options{
+  display:grid;gap:26px 32px;margin-top:30px;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+}
+.sh-option{border-top:1px solid var(--sh-rule);padding-top:15px}
+.sh-option-name{
+  font-family:var(--sh-body);font-weight:600;font-size:14.5px;color:var(--sh-ink);margin:0;
+}
+.sh-option-body{
+  font-family:var(--sh-body);font-weight:400;font-size:13.5px;line-height:1.66;
+  color:var(--sh-ink-2);margin:9px 0 0;max-width:44ch;
+}
+.sh-option-body code{
+  font-family:var(--sh-mono);font-size:.92em;color:var(--sh-ink);
+  background:rgba(232,226,212,.06);padding:1px 4px;border-radius:3px;
+}
+
+/* ---- evidence + notes -------------------------------------------------- */
+.sh-evidence{
+  font-family:var(--sh-mono);font-size:11.5px;line-height:2;letter-spacing:.01em;
+  color:var(--sh-ink-3);margin:26px 0 0;font-variant-numeric:tabular-nums;
+  display:flex;flex-wrap:wrap;gap:6px 22px;
+}
+.sh-evidence span{white-space:nowrap}
+.sh-evidence b{font-weight:400;color:var(--sh-ink-2)}
+.sh-note{
+  font-family:var(--sh-body);font-size:13px;line-height:1.65;color:var(--sh-ink-3);
+  max-width:68ch;margin:22px 0 0;padding-left:16px;border-left:2px solid var(--sh-rule);
+}
+.sh-note b{font-weight:600;color:var(--sh-ink-2)}
+
+/* ---- the recommendation device -----------------------------------------
+   One recurring mark, same place in every band: a filled square is a
+   recommendation someone made; an outline square says plainly that no one
+   made one. Same size, same weight, whoever made the call — SHELL puts two
+   filled squares side by side on purpose, because two different people
+   recommended two different things and neither reading should look louder
+   than the other. */
+.sh-recs{display:flex;flex-wrap:wrap;gap:14px 34px;margin:26px 0 0}
+.sh-rec{
+  display:flex;align-items:flex-start;gap:10px;max-width:40ch;
+  font-family:var(--sh-mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  line-height:1.55;color:var(--sh-ink-2);
+}
+.sh-rec-mark{width:8px;height:8px;margin-top:3px;flex:none;background:var(--sh-bone)}
+.sh-rec-mark.is-outline{background:none;border:1px solid var(--sh-ink-3)}
+
+/* ---- WORDS band: read, not looked at ------------------------------------
+   No card shape, no mount grammar — this band is typeset, not drawn, so it
+   does not borrow the four visual bands' apparatus. */
+.sh-words-intro{
+  font-family:var(--sh-body);font-size:14.5px;line-height:1.72;color:var(--sh-ink-2);
+  max-width:66ch;margin:22px 0 0;
+}
+.sh-subhead{
+  font-family:var(--sh-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--sh-ink-3);margin:46px 0 0;
+}
+.sh-subhead:first-of-type{margin-top:36px}
+.sh-subhead-note{
+  font-family:var(--sh-body);font-size:13.5px;line-height:1.6;color:var(--sh-ink-3);
+  max-width:64ch;margin:10px 0 0;
+}
+
+.sh-words-list{
+  list-style:none;counter-reset:sh-words;margin:26px 0 0;padding:0;
+  display:flex;flex-direction:column;
+}
+.sh-words-item{
+  counter-increment:sh-words;display:grid;grid-template-columns:30px minmax(0,1fr);
+  gap:6px 16px;padding:20px 0;border-top:1px solid var(--sh-rule);
+}
+.sh-words-item:first-child{border-top:0;padding-top:0}
+.sh-words-item::before{
+  content:counter(sh-words,decimal-leading-zero);font-family:var(--sh-mono);
+  font-size:11px;color:var(--sh-ink-3);padding-top:3px;
+}
+.sh-words-situation{
+  grid-column:2;font-family:var(--sh-body);font-weight:600;font-size:13.5px;
+  color:var(--sh-ink);margin:0;
+}
+.sh-words-line{
+  grid-column:2;font-family:var(--sh-body);font-weight:400;font-size:13.5px;line-height:1.66;
+  color:var(--sh-ink-2);margin:2px 0 0;
+}
+.sh-words-line em{
+  font-style:normal;color:var(--sh-ink);border-bottom:1px dotted var(--sh-rule);
+}
+.sh-words-line small{
+  font-family:var(--sh-mono);font-size:10px;letter-spacing:.04em;color:var(--sh-ink-3);
+  text-transform:uppercase;
+}
+
+.sh-nods{margin:22px 0 0;display:flex;flex-direction:column;gap:14px}
+.sh-nod{
+  font-family:var(--sh-body);font-size:13.5px;line-height:1.66;color:var(--sh-ink-2);
+  margin:0;padding-left:16px;border-left:2px solid var(--sh-rule);max-width:66ch;
+}
+.sh-nod em{font-style:normal;color:var(--sh-ink);border-bottom:1px dotted var(--sh-rule)}
+
+.sh-changes{margin-top:30px;display:flex;flex-direction:column;gap:44px}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<div class="sh-page">
+
+  <header class="sh-intro">
+    <p class="sh-eyebrow">Personal page &middot; for Riku</p>
+    <h1 class="sh-h1">Five calls before it ships</h1>
+    <p class="sh-lede">Everything else about the Personal page is settled. These five are yours &mdash; each one drawn both ways (four, for the one with four) at the size it would really render, so you can point at what you want instead of reading about it.</p>
+    <p class="sh-lede">The five don&rsquo;t depend on each other and carry no order. Answer by the handle in small type below each one.</p>
+    <ul class="sh-handles">
+      <li><b>SHELL</b> the phone</li>
+      <li><b>TILE</b> the week box</li>
+      <li><b>MARK</b> the hero&rsquo;s look</li>
+      <li><b>ROW</b> a lone small box</li>
+      <li><b>WORDS</b> the sentences</li>
+    </ul>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- SHELL                                                          -->
+  <!-- ============================================================ -->
+  <section class="sh-band">
+    <div class="sh-band-head">
+      <p class="sh-handle">SHELL</p>
+      <h2 class="sh-band-title">The phone</h2>
+    </div>
+    <p class="sh-question">Right now the menu down the left side of every page is a strip 170 pixels wide, even on a phone. That leaves only about a third of a phone&rsquo;s screen for the actual page. Do you want that fixed now, or left for a later, dedicated phone design?</p>
+
+    <div class="sh-specimens">
+      <div class="sh-specimen">
+        <p class="sh-specimen-label">Shell &middot; menu strip kept &middot; 390px frame &middot; 164px page</p>
+        <div class="sh-mount">
+<div class="frame f390"><div class="app"><div class="app-body">
+        <aside class="app-side">
+          <div class="app-brand"><span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span></div>
+          <nav class="app-nav" aria-label="Main">
+            <span class="navitem is-active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16v12.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z"/><path d="M8 3.5v4M16 3.5v4M4 11h16"/></svg>Personal</span>
+            <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h18v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M9 8.5V6.5A1.5 1.5 0 0 1 10.5 5h3A1.5 1.5 0 0 1 15 6.5v2"/><path d="M3 13h18"/></svg>Freelance</span>
+            <span class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5h8.5"/><circle cx="15.5" cy="7.5" r="2.4"/><path d="M18.5 7.5H20"/><path d="M4 16.5h3.5"/><circle cx="10.5" cy="16.5" r="2.4"/><path d="M13.5 16.5H20"/></svg>Settings</span>
+          </nav>
+          <div><span class="grouplabel">Agents</span><div class="agents">
+            <span class="agent is-ok">chaser</span><span class="agent is-ok">expiry-sweep</span><span class="agent is-ok">watchdog</span>
+            <span class="agent is-ok">site-health</span><span class="agent is-ok">outreach-health</span><span class="agent is-ok">dispatcher</span>
+          </div></div>
+          <div class="rail-foot"><button type="button" class="btn ghost">Log out</button></div>
+        </aside>
+        <div class="app-main">
+          <div class="topbar"><div class="topbar-in"><span class="crumb"><em>read 07:04</em></span></div></div>
+          <div class="fl-head"><div class="fl"><div class="fl-headrow"><h3 class="fl-title">Personal</h3><button type="button" class="btn">Edit layout</button></div></div></div>
+          <main class="app-content"><div class="fl">
+            <div class="pe-wrap"><div class="pe-grid">
+              <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+                <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn" disabled aria-describedby="ph-ev">+ Event</button></div>
+                <p class="pe-said" id="ph-ev">Too narrow for the form.</p>
+                <div class="pe-body">
+                  <div class="fl-group"><span class="pe-grp">Scheduled</span><div class="pe-rows">
+                    <div class="pe-row is-sched"><span class="pe-time">07:00&ndash;08:50</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Project Management</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Classes</span></div>
+                    <div class="pe-row is-sched"><span class="pe-time">09:00&ndash;10:50</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Math Methods</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Classes</span></div>
+                  </div></div>
+                  <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+                  </div></div>
+                </div>
+              </section></div>
+              <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">To-do</span><span class="fl-count">6 open</span></div><button type="button" class="btn" disabled aria-describedby="ph-td">+ To-do</button></div>
+                <p class="pe-said" id="ph-td">Too narrow for the form.</p>
+                <div class="pe-body">
+                  <div class="fl-group"><span class="pe-grp">Personal</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Renew ID&quot;"><span class="pe-nm">Renew ID</span><span class="pe-due">Fri 23</span></button></div>
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Book dentist&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Book dentist&quot;"><span class="pe-nm">Book dentist</span></button></div>
+                  </div></div>
+                  <div class="fl-group"><span class="pe-grp">Freelance</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="pe-on">on calendar</span><span class="pe-due is-late">3 days late</span></button></div>
+                  </div></div>
+                  <div class="fl-group"><span class="pe-grp">Academics</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="pe-due">tomorrow</span></button></div>
+                  </div></div>
+                </div>
+              </section></div>
+              <div class="pe-cell pe-r2 pe-s3 pe-x2"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">Layers</span></div></div>
+                <div class="pe-body"><div class="pe-layers">
+                  <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Personal</span><span class="swx on"><b></b></span></button>
+                  <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Classes</span><span class="swx on"><b></b></span></button>
+                  <button type="button" class="pe-sw" role="switch" aria-checked="false"><span class="nm">Events</span><span class="swx"><b></b></span></button>
+                </div></div>
+              </section></div>
+              <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
+                <div class="pe-body"><p class="pe-ptitle">1 problem &middot; 2 to review</p><p class="fl-snip">Meowchi unreachable. Today: Project Management 07:00, Math Methods 09:00, Call with Nova Dental 13:00. Due: Pay tuition (today), Reviewer ch.3 (tomorrow). Overdue: Send invoice (3d). 1 waiting on you, 0 overdue.</p></div>
+              </section></div>
+              <div class="pe-cell is-gap pe-r2 pe-s1 pe-x0"><div class="pe-gap"></div></div>
+              <div class="pe-cell pe-r3 pe-s12 pe-x6"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+                <div class="pe-body"><div class="pe-week">
+                  <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Sun 25</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                </div></div>
+              </section></div>
+              <div class="pe-cell pe-r4 pe-s12 pe-x6"><section class="pe-tile">
+                <div class="pe-head is-inline"><span class="eyebrow">Done this week</span><span class="fl-count">3</span></div>
+                <div class="pe-body"><div class="pe-rows">
+                  <div class="pe-row is-item"><button type="button" class="tick" role="checkbox" aria-checked="true" aria-label="Undo &quot;Submit clearance form&quot;"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.3l2 2L8 2.7"/></svg></button><span class="pe-nm">Submit clearance form</span><span class="tag">Academics</span><span class="pe-due">Sun 18</span></div>
+                  <div class="pe-row is-item"><button type="button" class="tick" role="checkbox" aria-checked="true" aria-label="Undo &quot;Reply to sir Pura&quot;"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.3l2 2L8 2.7"/></svg></button><span class="pe-nm">Reply to sir Pura</span><span class="tag">Personal</span><span class="pe-due">Sat 17</span></div>
+                </div></div>
+              </section></div>
+            </div></div>
+          </div></main>
+        </div>
+      </div></div></div>
+        </div>
+      </div>
+      <div class="sh-specimen">
+        <p class="sh-specimen-label">Shell &middot; thin top bar &middot; 390px frame &middot; 334px page</p>
+        <div class="sh-mount">
+<div class="frame f390"><div class="app">
+        <div class="phonebar">
+          <div class="app-brand"><span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span></div>
+          <nav class="app-nav" aria-label="Main">
+            <span class="navitem is-active">Personal</span>
+            <span class="navitem">Freelance</span>
+            <span class="navitem">Settings</span>
+          </nav>
+          <button type="button" class="btn ghost">Log out</button>
+        </div>
+        <div class="app-main">
+          <div class="fl-head"><div class="fl"><div class="fl-headrow"><h3 class="fl-title">Personal</h3><button type="button" class="btn">Edit layout</button></div></div></div>
+          <main class="app-content"><div class="fl">
+            <div class="pe-wrap"><div class="pe-grid">
+              <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+                <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
+                <div class="pe-body">
+                  <div class="fl-group"><span class="pe-grp">Scheduled</span><div class="pe-rows">
+                    <div class="pe-row is-sched"><span class="pe-time">07:00&ndash;08:50</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Project Management</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Classes</span></div>
+                    <div class="pe-row is-sched"><span class="pe-time">09:00&ndash;10:50</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Math Methods</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Classes</span></div>
+                  </div></div>
+                  <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+                  </div></div>
+                </div>
+              </section></div>
+              <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">To-do</span><span class="fl-count">6 open</span></div><button type="button" class="btn">+ To-do</button></div>
+                <div class="pe-body">
+                  <div class="fl-group"><span class="pe-grp">Personal</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Renew ID&quot;"><span class="pe-nm">Renew ID</span><span class="pe-due">Fri 23</span></button></div>
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Book dentist&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Book dentist&quot;"><span class="pe-nm">Book dentist</span></button></div>
+                  </div></div>
+                  <div class="fl-group"><span class="pe-grp">Freelance</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="pe-on">on calendar</span><span class="pe-due is-late">3 days late</span></button></div>
+                  </div></div>
+                  <div class="fl-group"><span class="pe-grp">Academics</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="pe-due">tomorrow</span></button></div>
+                  </div></div>
+                </div>
+              </section></div>
+              <div class="pe-cell pe-r2 pe-s3 pe-x2"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">Layers</span></div></div>
+                <div class="pe-body"><div class="pe-layers">
+                  <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Personal</span><span class="swx on"><b></b></span></button>
+                  <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Classes</span><span class="swx on"><b></b></span></button>
+                  <button type="button" class="pe-sw" role="switch" aria-checked="false"><span class="nm">Events</span><span class="swx"><b></b></span></button>
+                </div></div>
+              </section></div>
+              <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
+                <div class="pe-body"><p class="pe-ptitle">1 problem &middot; 2 to review</p><p class="fl-snip">Meowchi unreachable. Today: Project Management 07:00, Math Methods 09:00, Call with Nova Dental 13:00. Due: Pay tuition (today), Reviewer ch.3 (tomorrow). Overdue: Send invoice (3d). 1 waiting on you, 0 overdue.</p></div>
+              </section></div>
+              <div class="pe-cell is-gap pe-r2 pe-s1 pe-x0"><div class="pe-gap"></div></div>
+              <div class="pe-cell pe-r3 pe-s12 pe-x6"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+                <div class="pe-body"><div class="pe-week">
+                  <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Sun 25</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                </div></div>
+              </section></div>
+              <div class="pe-cell pe-r4 pe-s12 pe-x6"><section class="pe-tile">
+                <div class="pe-head is-inline"><span class="eyebrow">Done this week</span><span class="fl-count">3</span></div>
+                <div class="pe-body"><div class="pe-rows">
+                  <div class="pe-row is-item"><button type="button" class="tick" role="checkbox" aria-checked="true" aria-label="Undo &quot;Submit clearance form&quot;"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.3l2 2L8 2.7"/></svg></button><span class="pe-nm">Submit clearance form</span><span class="tag">Academics</span><span class="pe-due">Sun 18</span></div>
+                  <div class="pe-row is-item"><button type="button" class="tick" role="checkbox" aria-checked="true" aria-label="Undo &quot;Reply to sir Pura&quot;"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.3l2 2L8 2.7"/></svg></button><span class="pe-nm">Reply to sir Pura</span><span class="tag">Personal</span><span class="pe-due">Sat 17</span></div>
+                </div></div>
+              </section></div>
+            </div></div>
+          </div></main>
+        </div>
+      </div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sh-options">
+      <div class="sh-option">
+        <p class="sh-option-name">A &mdash; fix it now.</p>
+        <p class="sh-option-body">On a narrow phone screen, the left strip turns into a thin bar across the top instead, and the page gets the phone&rsquo;s full width. Both the &ldquo;add an event&rdquo; and &ldquo;add a to-do&rdquo; buttons work at this width. The cost: the small coloured dots that show whether each background helper is running currently have no place to sit on a phone, so they disappear from the phone menu until a proper phone design happens.</p>
+      </div>
+      <div class="sh-option">
+        <p class="sh-option-name">B &mdash; leave it.</p>
+        <p class="sh-option-body">The page stays built for a laptop screen for now; a full phone design comes later, on its own. The cost: with the menu strip still eating a third of the screen, the page is too narrow to open either the &ldquo;add an event&rdquo; or &ldquo;add a to-do&rdquo; box at all &mdash; both buttons are switched off. The whole reason this page exists &mdash; the phone buzzes at 7am, you open it, you deal with your day &mdash; doesn&rsquo;t really work yet on a phone.</p>
+      </div>
+    </div>
+
+    <div class="sh-evidence">
+      <span>170px fixed rail</span>
+      <span>164px page at menu strip &middot; 334px page at top bar</span>
+      <span>form floor &asymp;213px of tile width</span>
+      <span>17 characters before a to-do title truncates at 164px</span>
+    </div>
+
+    <p class="sh-note"><b>What this changes:</b> this is the menu for the whole app, on every phone-width screen &mdash; not just this page. A fixes it now as a placeholder until a real phone-design round. B changes nothing now, and a phone user is limited to reading the morning notification until that later round.</p>
+
+    <div class="sh-recs">
+      <p class="sh-rec"><span class="sh-rec-mark"></span>The lead recommends A &mdash; meant only as a stand-in until a real phone design replaces it.</p>
+      <p class="sh-rec"><span class="sh-rec-mark"></span>Four of the five people on the design team preferred B &mdash; one page&rsquo;s design round shouldn&rsquo;t change the menu for the whole app.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- TILE                                                           -->
+  <!-- ============================================================ -->
+  <section class="sh-band">
+    <div class="sh-band-head">
+      <p class="sh-handle">TILE</p>
+      <h2 class="sh-band-title">The week tile</h2>
+    </div>
+    <p class="sh-question">The &ldquo;Next 7 days&rdquo; box can show its seven days in two side-by-side columns, or in one single list running down the page. Which do you want?</p>
+
+    <div class="sh-specimens sh-stack">
+      <div class="sh-specimen">
+        <p class="sh-specimen-label">Tile &middot; two columns &middot; 920px</p>
+        <div class="sh-mount">
+<div class="hold w920">
+<section class="pe-tile">
+  <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+  <div class="pe-body"><div class="pe-week">
+    <div class="pe-row is-day"><span class="pe-daylbl">Fri 11</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Sat 12</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Sun 13</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Mon 14</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Tue 15</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Wed 16</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Thu 17</span><span class="pe-dash">&mdash;</span></div>
+  </div></div>
+</section>
+</div>
+        </div>
+      </div>
+      <div class="sh-specimen">
+        <p class="sh-specimen-label">Tile &middot; one column &middot; 920px</p>
+        <div class="sh-mount">
+<div class="hold w920">
+<section class="pe-tile">
+  <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+  <div class="pe-body"><div class="pe-rows">
+    <div class="pe-row is-day"><span class="pe-daylbl">Fri 11</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Sat 12</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Sun 13</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Mon 14</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Tue 15</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Wed 16</span><span class="pe-dash">&mdash;</span></div>
+    <div class="pe-row is-day"><span class="pe-daylbl">Thu 17</span><span class="pe-dash">&mdash;</span></div>
+  </div></div>
+</section>
+</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sh-options">
+      <div class="sh-option">
+        <p class="sh-option-name">A &mdash; two columns (four days left, three right).</p>
+        <p class="sh-option-body">This keeps that row a medium height: on the empty week you have today, it&rsquo;s 240 pixels tall; on a busy week (using invented sample data, just to test the design), about 328 pixels. The cost: because the box only splits into two columns once it&rsquo;s wide enough, its shape isn&rsquo;t fixed &mdash; it changes depending on how much room the page has at the time.</p>
+      </div>
+      <div class="sh-option">
+        <p class="sh-option-name">B &mdash; one column, all seven days in a single list.</p>
+        <p class="sh-option-body">On the empty week, this row grows to 361 pixels tall &mdash; taller than the box at the very top of the page. On a busy week the gap narrows to about 363 pixels, because a busy day&rsquo;s details wrap onto a second line in a narrower column. The cost: your own plan for the page reads &ldquo;tall, short, medium, short&rdquo; from top to bottom; one column turns that into &ldquo;tall, short, tall, short&rdquo; instead.</p>
+      </div>
+    </div>
+
+    <div class="sh-evidence">
+      <span>blank week: 340&middot;200&middot;240&middot;120px = 942px total, two columns</span>
+      <span>340&middot;200&middot;365&middot;120px = 1067px total, one column</span>
+      <span>busy week row 3: 328px two columns vs &asymp;363px one column</span>
+    </div>
+
+    <p class="sh-note">The one-column busy week is not pictured above &mdash; only its two numbers are written down, here and in the option text. It doesn&rsquo;t exist as a drawing in the mockup this page is built from.</p>
+
+    <div class="sh-recs">
+      <p class="sh-rec"><span class="sh-rec-mark"></span>The team member who designed the grid ruled for two columns (A). The design critic pushed back &mdash; a box whose shape changes with the page&rsquo;s width feels inconsistent &mdash; but the recommendation stands at two columns until you say otherwise.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- MARK                                                           -->
+  <!-- ============================================================ -->
+  <section class="sh-band">
+    <div class="sh-band-head">
+      <p class="sh-handle">MARK</p>
+      <h2 class="sh-band-title">The hero&rsquo;s look</h2>
+    </div>
+    <p class="sh-question">The &ldquo;Today&rdquo; box, top-left, is the most important one on the page. Four different quiet ways of marking it as special were drawn. Which one ships?</p>
+
+    <div class="sh-specimens sh-stack">
+      <div class="sh-specimen">
+        <p class="sh-specimen-label">Mark &middot; all four at span 8 &middot; 609px each</p>
+        <div class="sh-mount">
+<div class="scroll"><div class="sheet c2 h340">
+      <div class="hold w609"><p class="lbl"><b>A &middot; as ruled</b> &middot; span 8</p>
+        <section class="pe-tile is-hero">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+      <div class="hold w609"><p class="lbl"><b>B &middot; no mark at all</b> &middot; span 8</p>
+        <section class="pe-tile hero-b">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+      <div class="hold w609"><p class="lbl"><b>C &middot; lighter ground and an inset hairline</b> &middot; span 8</p>
+        <section class="pe-tile hero-c">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+      <div class="hold w609"><p class="lbl"><b>D &middot; blue tint, the one permitted accent</b> &middot; span 8</p>
+        <section class="pe-tile hero-d">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+    </div></div>
+        </div>
+      </div>
+      <div class="sh-specimen">
+        <p class="sh-specimen-label">Mark &middot; all four at span 4 &middot; 297px each</p>
+        <div class="sh-mount">
+<div class="scroll"><div class="sheet c4 h340">
+      <div class="hold w297"><p class="lbl"><b>A</b> &middot; span 4</p>
+        <section class="pe-tile is-hero">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+      <div class="hold w297"><p class="lbl"><b>B</b> &middot; span 4</p>
+        <section class="pe-tile hero-b">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+      <div class="hold w297"><p class="lbl"><b>C</b> &middot; span 4</p>
+        <section class="pe-tile hero-c">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+      <div class="hold w297"><p class="lbl"><b>D</b> &middot; span 4</p>
+        <section class="pe-tile hero-d">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+    </div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sh-options">
+      <div class="sh-option">
+        <p class="sh-option-name">A &mdash; as recommended.</p>
+        <p class="sh-option-body">A touch darker background, a touch brighter border, slightly rounder corners than every other box. No colour anywhere.</p>
+      </div>
+      <div class="sh-option">
+        <p class="sh-option-name">B &mdash; no mark at all.</p>
+        <p class="sh-option-body">Looks exactly like every other box on the page.</p>
+      </div>
+      <div class="sh-option">
+        <p class="sh-option-name">C &mdash; lighter background plus an inner line.</p>
+        <p class="sh-option-body">An early idea, tried and dropped: a slightly lighter background with a second thin line drawn just inside the border.</p>
+      </div>
+      <div class="sh-option">
+        <p class="sh-option-name">D &mdash; a touch of blue.</p>
+        <p class="sh-option-body">A faint blue tint in one corner &mdash; the one place the design&rsquo;s rules allow any colour at all, anywhere on the page.</p>
+      </div>
+    </div>
+
+    <div class="sh-evidence">
+      <span>row 1 weight 340px at every variant</span>
+      <span>A &mdash; #171B21 ground &middot; brighter border &middot; 14px radius</span>
+    </div>
+
+    <p class="sh-note">If A ships and you later want it to stand out more, the honest way to do that is a brighter border &mdash; never a splash of colour; that&rsquo;s the one path this decision leaves open.</p>
+
+    <div class="sh-recs">
+      <p class="sh-rec"><span class="sh-rec-mark"></span>Both the design critic and the person leading the design pick A. It also happens to be the only one of the four that keeps the page&rsquo;s &ldquo;no colour except real warnings&rdquo; rule intact.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- ROW                                                            -->
+  <!-- ============================================================ -->
+  <section class="sh-band">
+    <div class="sh-band-head">
+      <p class="sh-handle">ROW</p>
+      <h2 class="sh-band-title">A row holding only one small box</h2>
+    </div>
+    <p class="sh-question">After you rearrange the boxes, you can end up with a row holding just one narrow box &mdash; for example, &ldquo;This morning&rsquo;s push&rdquo; sitting alone in the top row, with a lot of empty space beside it. Should that row shrink down to fit just that one box, or keep the same height as every other row, with open space left under the box?</p>
+
+    <div class="sh-specimens sh-stack">
+      <div class="sh-specimen">
+        <p class="sh-specimen-label">Row &middot; shrinks to fit &middot; 920px</p>
+        <div class="sh-mount">
+<div class="pane p920">
+  <p class="lbl"><b>With the rule</b> &mdash; row 1 shrinks to the push tile</p>
+  <div class="pe-wrap"><div class="pe-grid" style="--tracks:auto minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
+    <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile">
+      <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
+      <div class="pe-body"><p class="pe-ptitle">All clear &middot; 0 to review</p><p class="fl-snip">All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</p></div>
+    </section></div>
+    <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile is-hero">
+      <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+      <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+    </section></div>
+    <div class="pe-cell pe-r2 pe-s4 pe-x2"><section class="pe-tile">
+      <div class="pe-head"><div><span class="eyebrow">To-do</span><span class="fl-count">0 open</span></div><button type="button" class="btn">+ To-do</button></div>
+      <div class="pe-body">
+        <div class="fl-group"><span class="pe-grp">Personal</span><p class="fl-empty">nothing open</p></div>
+        <div class="fl-group"><span class="pe-grp">Freelance</span><p class="fl-empty">nothing open</p></div>
+        <div class="fl-group"><span class="pe-grp">Academics</span><p class="fl-empty">nothing open</p></div>
+      </div>
+    </section></div>
+    <div class="pe-cell pe-r3 pe-s12 pe-x6"><section class="pe-tile">
+      <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+      <div class="pe-body"><div class="pe-week">
+        <div class="pe-row is-day"><span class="pe-daylbl">Fri 11</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Sat 12</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Sun 13</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Mon 14</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Tue 15</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Wed 16</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Thu 17</span><span class="pe-dash">&mdash;</span></div>
+      </div></div>
+    </section></div>
+    <div class="pe-cell pe-r4 pe-s3 pe-x2"><section class="pe-tile">
+      <div class="pe-head"><div><span class="eyebrow">Layers</span></div></div>
+      <div class="pe-body"><div class="pe-layers">
+        <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Personal</span><span class="swx on"><b></b></span></button>
+        <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Classes</span><span class="swx on"><b></b></span></button>
+        <button type="button" class="pe-sw" role="switch" aria-checked="false"><span class="nm">Events</span><span class="swx"><b></b></span></button>
+      </div></div>
+    </section></div>
+    <div class="pe-cell pe-r4 pe-s9 pe-x4"><section class="pe-tile">
+      <div class="pe-head is-inline"><span class="eyebrow">Done this week</span><p class="fl-empty">Nothing ticked off yet this week.</p></div>
+    </section></div>
+  </div></div>
+</div>
+        </div>
+      </div>
+      <div class="sh-specimen">
+        <p class="sh-specimen-label">Row &middot; keeps full height &middot; 920px</p>
+        <div class="sh-mount">
+<div class="pane p920">
+  <p class="lbl"><b>Without it</b> &mdash; row 1 held at 340 pixels</p>
+  <div class="pe-wrap"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
+    <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile">
+      <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
+      <div class="pe-body"><p class="pe-ptitle">All clear &middot; 0 to review</p><p class="fl-snip">All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</p></div>
+    </section></div>
+    <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile is-hero">
+      <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+      <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+    </section></div>
+    <div class="pe-cell pe-r2 pe-s4 pe-x2"><section class="pe-tile">
+      <div class="pe-head"><div><span class="eyebrow">To-do</span><span class="fl-count">0 open</span></div><button type="button" class="btn">+ To-do</button></div>
+      <div class="pe-body">
+        <div class="fl-group"><span class="pe-grp">Personal</span><p class="fl-empty">nothing open</p></div>
+        <div class="fl-group"><span class="pe-grp">Freelance</span><p class="fl-empty">nothing open</p></div>
+        <div class="fl-group"><span class="pe-grp">Academics</span><p class="fl-empty">nothing open</p></div>
+      </div>
+    </section></div>
+    <div class="pe-cell pe-r3 pe-s12 pe-x6"><section class="pe-tile">
+      <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+      <div class="pe-body"><div class="pe-week">
+        <div class="pe-row is-day"><span class="pe-daylbl">Fri 11</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Sat 12</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Sun 13</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Mon 14</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Tue 15</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Wed 16</span><span class="pe-dash">&mdash;</span></div>
+        <div class="pe-row is-day"><span class="pe-daylbl">Thu 17</span><span class="pe-dash">&mdash;</span></div>
+      </div></div>
+    </section></div>
+    <div class="pe-cell pe-r4 pe-s3 pe-x2"><section class="pe-tile">
+      <div class="pe-head"><div><span class="eyebrow">Layers</span></div></div>
+      <div class="pe-body"><div class="pe-layers">
+        <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Personal</span><span class="swx on"><b></b></span></button>
+        <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Classes</span><span class="swx on"><b></b></span></button>
+        <button type="button" class="pe-sw" role="switch" aria-checked="false"><span class="nm">Events</span><span class="swx"><b></b></span></button>
+      </div></div>
+    </section></div>
+    <div class="pe-cell pe-r4 pe-s9 pe-x4"><section class="pe-tile">
+      <div class="pe-head is-inline"><span class="eyebrow">Done this week</span><p class="fl-empty">Nothing ticked off yet this week.</p></div>
+    </section></div>
+  </div></div>
+</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sh-options">
+      <div class="sh-option">
+        <p class="sh-option-name">A &mdash; shrink to fit.</p>
+        <p class="sh-option-body">The row becomes only as tall as the box needs. In the drawn example, the row drops to 131 pixels.</p>
+      </div>
+      <div class="sh-option">
+        <p class="sh-option-name">B &mdash; keep the full height.</p>
+        <p class="sh-option-body">The row always stays at its planned height (340 pixels here), with plain empty ground under the small box. This matches what you originally wrote &mdash; that a row&rsquo;s height doesn&rsquo;t change depending on what&rsquo;s sitting in it.</p>
+      </div>
+    </div>
+
+    <div class="sh-evidence">
+      <span>with the rule: row 1 = 131px</span>
+      <span>without it: row 1 = 340px</span>
+      <span>everything below row 1 is identical in both</span>
+    </div>
+
+    <p class="sh-note">This isn&rsquo;t just about the push box &mdash; it sets a general rule for every future arrangement. Any time you rearrange things and end up with one narrow box alone in a row, this decides whether that row shrinks around it or keeps its full height with open space.</p>
+
+    <div class="sh-recs">
+      <p class="sh-rec"><span class="sh-rec-mark is-outline"></span>No recommendation is on record either way &mdash; this one is entirely yours. It&rsquo;s drawn both ways specifically so you can compare and decide.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- WORDS                                                          -->
+  <!-- ============================================================ -->
+  <section class="sh-band">
+    <div class="sh-band-head">
+      <p class="sh-handle">WORDS</p>
+      <h2 class="sh-band-title">The wording</h2>
+    </div>
+    <p class="sh-question">Eleven new sentences the app will need to show, two small edits to your own content document, and two existing rules that just need your nod.</p>
+    <p class="sh-words-intro">None of this is drawn as a separate &ldquo;pick A or B&rdquo; choice &mdash; it&rsquo;s a straight read-and-approve, with your wording winning over anything proposed here.</p>
+
+    <p class="sh-subhead">Two edits to your content document &mdash; drawn</p>
+
+    <div class="sh-changes">
+      <div>
+        <p class="sh-subhead-note"><b>(a)</b> When both the calendar and the to-do list fail to load, the week box shows only the two failure sentences and no day rows &mdash; because a dash means &ldquo;we looked and the day was free,&rdquo; which isn&rsquo;t true when nothing was looked at. This removes the seven <em>Fri 11 &mdash; &hellip; Thu 17 &mdash;</em> rows from the document&rsquo;s example of that state.</p>
+        <div class="sh-specimens" style="margin-top:20px">
+          <div class="sh-specimen">
+            <p class="sh-specimen-label">Words (a) &middot; both feeds down, no day rows &middot; 920px</p>
+            <div class="sh-mount">
+<div class="scroll">
+  <div class="pane p920">
+    <div class="pe-fail" style="margin-top:0"><i></i><span class="said">Couldn&rsquo;t load your arrangement, so this is the default.</span></div>
+    <div class="pe-wrap" style="margin-top:14px"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
+
+      <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+        <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+        <div class="pe-body">
+          <div class="fl-group"><span class="pe-grp">Scheduled</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load layers, so the calendar wasn&rsquo;t read.</span></div></div>
+          <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div></div>
+        </div>
+      </section></div>
+
+      <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile">
+        <div class="pe-head"><div><span class="eyebrow">To-do</span></div><button type="button" class="btn">+ To-do</button></div>
+        <div class="pe-body"><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div></div>
+      </section></div>
+
+      <div class="pe-cell pe-r2 pe-s3 pe-x2"><section class="pe-tile">
+        <div class="pe-head"><div><span class="eyebrow">Layers</span></div></div>
+        <div class="pe-body"><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load layers.</span></div></div>
+      </section></div>
+
+      <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile">
+        <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div></div>
+        <div class="pe-body"><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load this morning&rsquo;s push.</span></div></div>
+      </section></div>
+
+      <div class="pe-cell pe-r3 pe-s12 pe-x6"><section class="pe-tile">
+        <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+        <div class="pe-body">
+          <div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load layers, so the calendar wasn&rsquo;t read.</span></div>
+          <div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div>
+        </div>
+      </section></div>
+
+      <div class="pe-cell pe-r4 pe-s12 pe-x6"><section class="pe-tile">
+        <div class="pe-head is-inline"><span class="eyebrow">Done this week</span></div>
+        <div class="pe-body"><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div></div>
+      </section></div>
+
+    </div></div>
+  </div>
+</div>
+            </div>
+          </div>
+        </div>
+        <p class="sh-subhead-note" style="margin-top:14px">This render puts eight amber dots in the tiles &mdash; one per failure sentence, one per tile &mdash; plus a ninth above the grid, for the arrangement that also couldn&rsquo;t be read. No header figure is ever zeroed under a failed read: a figure under a failed read is omitted, never set to zero.</p>
+      </div>
+
+      <div>
+        <p class="sh-subhead-note"><b>(b)</b> The problem fragments inside the push are written in lowercase and joined together; <em>Calendar check unavailable.</em> is how it renders first in that list.</p>
+        <div class="sh-specimens" style="margin-top:20px">
+          <div class="sh-specimen">
+            <p class="sh-specimen-label">Words (b) &middot; push, lowercase fragments joined &middot; 609px</p>
+            <div class="sh-mount">
+<div class="hold w609">
+<section class="pe-tile">
+  <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
+  <div class="pe-body">
+    <p class="pe-ptitle">1 problem &middot; 0 to review</p>
+    <p class="fl-snip">Calendar check unavailable. Today: Math Methods 09:00. Classes wasn&rsquo;t read. Due: Pay tuition (today). 0 waiting on you, 0 overdue.</p>
+  </div>
+</section>
+</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="sh-note" style="margin-top:32px">One thing to know about the (a) render: when the database is down, each tile reports it separately &mdash; nine short amber-dotted sentences on one page for one outage. That is per-tile honesty; it can be reduced to one page-level sentence if you&rsquo;d rather.</p>
+
+    <p class="sh-subhead">The eleven sentences</p>
+    <p class="sh-subhead-note">Verbatim from the mockup&rsquo;s closing block. Each is drawn on this page where it would appear, except the two marked not drawn. Proposed wording &mdash; yours wins.</p>
+
+    <ol class="sh-words-list">
+      <li class="sh-words-item">
+        <p class="sh-words-situation">Every calendar layer switched off</p>
+        <p class="sh-words-line">On the page: <em>All layers are switched off.</em> In the push: <em>Today: no layers switched on.</em> <small>not drawn</small> &mdash; or the push&rsquo;s existing Off: shape, e.g. <em>Off: calendar layers.</em></p>
+      </li>
+      <li class="sh-words-item">
+        <p class="sh-words-situation">The morning push went out but its text was not stored</p>
+        <p class="sh-words-line"><em>A push went out this morning. Its text wasn&rsquo;t stored.</em></p>
+      </li>
+      <li class="sh-words-item">
+        <p class="sh-words-situation">One calendar could not be read for the push</p>
+        <p class="sh-words-line"><em>Today: Math Methods 09:00. Classes wasn&rsquo;t read.</em> &mdash; and it counts as a problem in the title.</p>
+      </li>
+      <li class="sh-words-item">
+        <p class="sh-words-situation">The edit form&rsquo;s Delete failed</p>
+        <p class="sh-words-line"><em>Couldn&rsquo;t delete.</em> Busy labels: <em>Saving&hellip;</em> <small>not drawn</small> and <em>Deleting&hellip;</em></p>
+      </li>
+      <li class="sh-words-item">
+        <p class="sh-words-situation">A tick or switch that got no answer in time</p>
+        <p class="sh-words-line"><em>Couldn&rsquo;t tell if that saved.</em></p>
+      </li>
+      <li class="sh-words-item">
+        <p class="sh-words-situation">Deleting a to-do that is on the calendar</p>
+        <p class="sh-words-line"><em>Delete &ldquo;Renew ID&rdquo; and its calendar entry?</em></p>
+      </li>
+      <li class="sh-words-item">
+        <p class="sh-words-situation">A done to-do whose calendar entry could not be removed</p>
+        <p class="sh-words-line">On its Done row: <em>entry left on Google</em> &mdash; and after a failed move, on the open row: <em>entry on the old day</em></p>
+      </li>
+      <li class="sh-words-item">
+        <p class="sh-words-situation">An event added outside the coming week</p>
+        <p class="sh-words-line"><em>Added. It&rsquo;s on Fri 24 Oct, outside this week.</em></p>
+      </li>
+      <li class="sh-words-item">
+        <p class="sh-words-situation">A chosen calendar that no longer exists on Google</p>
+        <p class="sh-words-line"><em>Classes is no longer on your Google account. Untick it in Settings.</em></p>
+      </li>
+      <li class="sh-words-item">
+        <p class="sh-words-situation">Your saved arrangement could not be read</p>
+        <p class="sh-words-line"><em>Couldn&rsquo;t load your arrangement, so this is the default.</em></p>
+      </li>
+      <li class="sh-words-item">
+        <p class="sh-words-situation">The tile is too narrow to open a form in</p>
+        <p class="sh-words-line"><em>Too narrow for the form.</em></p>
+      </li>
+    </ol>
+
+    <p class="sh-note">One sentence from your own document is not drawn anywhere: <em>Up to 10 calendars.</em> It appears under a calendar&rsquo;s row in Settings when you tick an eleventh &mdash; and only then; you currently have six. The team didn&rsquo;t invent five fake calendars just to show it.</p>
+
+    <p class="sh-subhead">Two rules that need only a nod</p>
+    <div class="sh-nods">
+      <p class="sh-nod"><em>Connected.</em> in Settings means your calendar list came back, not just that the sign-in token worked.</p>
+      <p class="sh-nod"><em>No push this morning.</em> only turns red after 07:00.</p>
+    </div>
+
+    <p class="sh-note">Approving the eleven sentences sends them, word for word, into the shipped page and push text. Approving the two document edits updates your content document to match. Nodding to the two rules just confirms the app already behaves that way &mdash; no wording changes needed for those two.</p>
+  </section>
+
+</div>
