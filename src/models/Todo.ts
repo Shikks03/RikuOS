@@ -17,6 +17,7 @@ export interface ITodo extends Document {
   doneAt?: Date;
   calendarId?: string;
   calendarEventId?: string;
+  calendarDayOn?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +39,15 @@ export interface ITodo extends Document {
  * in this version and is stored anyway, so a later change of target calendar
  * cannot orphan an entry written to the old one. 1024 is Google's stated
  * maximum for an event id.
+ *
+ * `calendarDayOn` is the day the pinned entry was last CONFIRMED to sit on —
+ * written only after Google answered a pin or a move, and unset with the id.
+ * It exists because the move path is local-first (src/lib/todos.ts): a date
+ * change is saved before Google is asked, so after a failed or unanswered move
+ * `dueOn` and the entry disagree, and nothing else on the record could say so.
+ * `calendarEventId && calendarDayOn ≠ dueOn` is exactly deck §15's
+ * `entry on the old day`, and it is also how the next save knows to retry the
+ * move. A DAY like dueOn — UTC midnight, read back with dayKey(…, "UTC").
  *
  * TWO INDEXES, TWO QUERIES, WHOLE PAGE:
  *   { done: 1, dueOn: 1 }    find({ done: false }).sort({ dueOn: 1 }) — every
@@ -69,6 +79,7 @@ const TodoSchema = new Schema<ITodo>(
     doneAt: { type: Date },
     calendarId: { type: String, maxlength: 256 },
     calendarEventId: { type: String, maxlength: 1024 },
+    calendarDayOn: { type: Date },
   },
   { timestamps: { createdAt: true, updatedAt: true }, strict: true }
 );

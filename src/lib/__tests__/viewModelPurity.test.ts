@@ -20,6 +20,8 @@ import "@/lib/freelanceView";
 import "@/lib/freelanceVariants";
 import "@/lib/freelanceGaps";
 import "@/lib/freelanceHealth";
+// P10b: the pure half of the to-do store, which personalView.ts will import.
+import "@/lib/todos";
 
 describe("view-model purity", () => {
   it("registers no Mongoose model when the view models load", () => {
