@@ -152,6 +152,31 @@ and the three tokens the ramp anchors on each gain a pointer rather than a resta
 
 ---
 
+## R86. Five additions to round 3's §I list, and the strings question it never asked
+
+The docs-corrections pass surfaced eight things the §I list does not reach. Five are ruled here. Four of those are not new decisions at all — they are rulings already made that §I simply failed to list, and a document still contradicting a ratified ruling is how the ruling gets un-built.
+
+**Added to §I:**
+
+1. **Design doc, *The tiles*: `.tile` → `.pe-tile`, `.fl-head` → `.fl-headrow`** (R32, R11). A design doc that still names the class R32 forbids is how the forbidden class ends up in the build.
+2. **Design doc, *The client module*: R24 in full** — `nextPageToken` followed to a three-page ceiling per layer per window, a layer still truncated at the ceiling reported as *that layer's* failure, `listCalendars` paginated the same way, `404` → `GoogleError("gone")`. §I item 3 cited R24 only for the status-route cut and left the pagination rule stranded in the team papers. R42's render side (`.fl-empty`, no dot, the row kept in the picker) travels with it so the two cannot drift.
+3. **Design doc, *The to-do store*: three `Todo` indexes → two** (round 3's settled list; R35's "two indexes, two queries").
+4. **Design doc, testing: `personalView.test.ts`'s "20 / 8 bounds"** — the 20 bound stands; the 8 bound and `+N more` survive only where a bound still has a consumer, never inside an open day (R51b).
+
+**And the one that is a real decision:**
+
+5. **The eleven ratified strings go into the content deck**, as a new dated section, verbatim as R54 approved them, with the two nodded rules and a note that `Up to 10 calendars.` is Riku's own existing string kept as a press outcome (R43).
+
+**Reason.** The deck is the authority on every string — P8's companions table states it outright and gives the deck the win on any conflict, and P10 inherits that. Eleven approved strings living only in the visual spec would split that authority in two, and the next person to change one would have no way to know which document governs. The strings are Riku's own ratified wording going into Riku's own strings document; that is bookkeeping, not authorship.
+
+**Three things explicitly *not* corrected**, recorded because each looks like an oversight and is not:
+
+- **Deck §13's day rows stay expanded.** §13 specifies what is *on* those days; the disclosure decides how it is *shown*. The deck is content and the mockup is render.
+- **Deck §5's "The accent belongs to the hero (Today) and to real state" stays exactly as written.** That sentence was made false by R8, which took all hue off the hero. R79 makes it true again. The deck was right and the design caught up to it.
+- **R50 stays out of the deck.** The shell is not page content. It belongs in the design doc, in `ARCHITECTURE.md` §7 as S20, and in the visual spec's shell section.
+
+---
+
 ## What this costs the round, and the order that follows
 
 The mark changed after the mockup was redrawn, so the mockup is one mechanism behind again. **The spec is not written against a design that is no longer the design.** The order is:

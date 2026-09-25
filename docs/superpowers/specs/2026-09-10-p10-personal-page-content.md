@@ -145,7 +145,9 @@ Six tiles plus one empty cell, on four weighted rows.
 | 3 | medium | Next 7 days **12** |
 | 4 | short | Done this week **12** |
 
-**Row weights are fixed** — tall, short, medium, short — whatever tiles sit in them. They are minimum heights; content may grow a row but never shrink it below its weight.
+**Row weights are fixed** — tall, short, medium, short — whatever tiles sit in them. They are minimum heights; content may grow a row but never shrink it below its weight. The short second row is **200px**: the three layer switches need 44px each to stay tappable, so a smaller minimum would be one the tile already exceeds. "Short" is a little less short than first written.
+
+**One exception, on Riku's answer of 2026-09-24.** A row whose only occupant is one tile narrower than the row shrinks to fit that tile — the weight gives way to the tile's own height. This is a general rule for every arrangement, not a rule about any one tile: any time rearranging leaves a single narrow tile alone in a row, that row closes up around it. It is suspended while edit mode is open, so moving one tile never resizes a row that is not being touched.
 
 **The empty cell** is whatever a row has left over. The default leaves exactly one. A rearranged layout may leave more or none; that is Riku's choice.
 
@@ -323,7 +325,8 @@ Within a day: all-day events, timed events by start, then to-dos. Each event lin
 - Empty day: `—`
 - Calendar unreadable (any of the Tile 1 calendar states): one line at the top of the tile — the same sentence Tile 1 shows — and the days list to-dos only
 - To-dos unreadable: one line at the top, `Couldn't load to-dos.`, and the days list events only
-- Bound per day: 8 items, then `+3 more` · singular `+1 more`
+- **A day holding two or more items collapses** (Riku, 2026-09-24): it shows a short title naming what the day holds, and opens on a click to that day's full list. A day holding one item shows that item as above — no disclosure, no click. An empty day keeps its `—`
+- **No bound inside an open day.** The earlier bound — 8 items, then `+3 more` · singular `+1 more` — is superseded for the open state: an opened day shows every item it holds, untruncated, so the cap and `+3 more` have nowhere left to apply. A day holding eleven items collapses exactly as a day holding two does, and opening it shows all eleven
 
 ---
 
@@ -477,7 +480,9 @@ Calendar check unavailable. Today: calendar unavailable. Due: Pay tuition (today
 - `Overdue:` names up to 3, each with days late: `(3d)` · `(1d)`; then `+2 more`
 - Absent parts are omitted, except that an entirely empty Today reads `Today: nothing scheduled, nothing due.`
 - A calendar that could not be read: `Today: calendar unavailable.` in the sentence **and** `Calendar check unavailable.` counted in the problems, so the title's count never says all clear over a blind spot
+- **Some layers answered and one did not:** the sentence names what arrived and then names the calendar that was not read — `Today: Math Methods 09:00. Classes wasn't read.` — and the miss is still counted in the problems, so a partial reading never passes as a complete one
 - To-dos that could not be read: `Due: to-dos unavailable.` and `To-do check unavailable.` in the problems, the same way
+- **Problem fragments are written lowercase and without a full stop.** The push joins the fragments and adds the terminal stop itself, so `Calendar check unavailable.` above is the *rendered* form of the fragment `calendar check unavailable`, not the fragment as written. The same holds for `To-do check unavailable.` and every other problem fragment
 - Only switched-on layers count
 - The body limit rises from 200 to 320 characters so Today cannot push the freelance line off the end. Problems still come first, so a bad night is never cut off
 
@@ -505,11 +510,12 @@ Couldn't load layers.     Couldn't load this morning's push.
 NEXT 7 DAYS
 Couldn't load layers, so the calendar wasn't read.
 Couldn't load to-dos.
-Fri 11 — … Thu 17 —
 
 DONE THIS WEEK
 Couldn't load to-dos.
 ```
+
+**Why the week tile shows no day rows there** (Riku's nod, 2026-09-24): `—` means a day that was read and held nothing. With both feeds down nothing was read, so a row of dashes would be seven small lies. The tile shows only its two failure sentences; the row keeps its height.
 
 **Google down, database fine:** every calendar spot says `Couldn't read the calendar.`; to-dos, layers, the push and edit mode all work.
 
@@ -611,3 +617,38 @@ DONE THIS WEEK   3
 - [ ] Edit mode is obviously a mode: the toolbars and dashed cells cannot be mistaken for content
 - [ ] The forms open in place without moving the grid
 - [ ] The product name is replaceable
+
+---
+
+## 15. Strings ratified 2026-09-24
+
+Eleven states had no words when this deck was written. Most of them are failures that only surfaced once the page was drawn — a calendar that vanished from Google, a tick that got no answer, a tile too narrow to hold a form. Riku read all eleven on 2026-09-24 and approved them as written. They live here with the rest, because this deck is where the words live.
+
+**Every calendar layer switched off.** On the page, where the events would have been: `All layers are switched off.` In the morning push: `Today: no layers switched on.` It is a choice and not a fault, so neither is counted as a problem.
+
+**The push went out but its text was not stored.** In Tile 4, in place of the quotation: `A push went out this morning. Its text wasn't stored.`
+
+**One calendar could not be read for the push.** The sentence names what arrived and then names the calendar that did not: `Today: Math Methods 09:00. Classes wasn't read.` — and the miss is counted in the title's problems, so the push never reads all clear over a blind spot (§10).
+
+**The edit form's `Delete` failed.** `Couldn't delete.` under the row. Its busy labels, beside §7's `Adding…`: `Saving…` and `Deleting…`
+
+**A tick or a switch that got no answer in time.** `Couldn't tell if that saved.` Not *couldn't save*: a request that timed out may still have landed, and the page must not claim an outcome nobody knows.
+
+**Deleting a to-do that is on the calendar.** The confirmation names the entry too: `Delete "Renew ID" and its calendar entry?`
+
+**A calendar entry that outlived its to-do.** On the Done row of a to-do whose entry could not be removed: `entry left on Google`. On the open row of a to-do whose entry could not be moved after a date change: `entry on the old day`
+
+**An event added outside the coming week.** `Added. It's on Fri 24 Oct, outside this week.` — so a successful add that lands where the page cannot show it does not read as nothing having happened.
+
+**A chosen calendar that no longer exists on Google.** `Classes is no longer on your Google account. Untick it in Settings.` It is permanent and it hands over a lever, so it reads as a setting to fix rather than a reading to retry. The layer stays in the Settings list, ticked and live, so there is something to untick.
+
+**The saved arrangement could not be read.** `Couldn't load your arrangement, so this is the default.`
+
+**The tile is too narrow to open a form in.** `Too narrow for the form.` — under the head, where the switched-off `+ Event` or `+ To-do` sits. The form is refused before the fact; no arrangement is taken away.
+
+**Two rules nodded to at the same time.**
+
+- `Connected.` on the Settings connection card (§9) means *your calendar list came back* — not merely that the sign-in token refreshed. The state between pasting the token and switching the Calendar API on is the first one Riku will hit, and only the list proves it.
+- `No push this morning.` (§6, Tile 4) turns red only once 07:00 has passed. Before then the sentence stands on its own: it is simply true at 00:30, and only the alarm would be lying.
+
+**One older string, kept where it already was.** `Up to 10 calendars.` (§9) is Riku's own and is not one of the eleven. It stays a press outcome — it appears under the picker row whose tick was refused, at the moment it is refused, and never as a standing note on the card.
