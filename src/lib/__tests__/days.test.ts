@@ -7,7 +7,7 @@
  * ships.
  */
 import { describe, it, expect } from "vitest";
-import { dayKey, dayStart, addDays, daysBetween, formatDay, todayKey } from "@/lib/days";
+import { dayKey, dayStart, isDayKey, addDays, daysBetween, formatDay, todayKey } from "@/lib/days";
 import { APP_TZ, PUSH_EXPECTED_HOUR } from "@/lib/constants";
 
 describe("the constants", () => {
@@ -44,9 +44,40 @@ describe("dayStart", () => {
     expect(dayStart("2026-09-10").toISOString()).toBe("2026-09-10T00:00:00.000Z");
   });
 
+  it("throws for a well-shaped key that is not a real day, rather than rolling it over", () => {
+    expect(() => dayStart("2026-02-31")).toThrow(RangeError);
+    expect(() => dayStart("2026-13-01")).toThrow(RangeError);
+    expect(() => dayStart("2027-02-29")).toThrow(RangeError);
+  });
+
+  it("throws for anything not shaped like a key", () => {
+    expect(() => dayStart("2026-9-10")).toThrow(RangeError);
+    expect(() => dayStart("")).toThrow(RangeError);
+  });
+
   it("round-trips through dayKey in UTC", () => {
     for (const key of ["2026-09-10", "2026-12-31", "2027-01-01", "2028-02-29"]) {
       expect(dayKey(dayStart(key), "UTC")).toBe(key);
+    }
+  });
+});
+
+describe("isDayKey", () => {
+  it("accepts a well-formed, real day", () => {
+    expect(isDayKey("2026-09-10")).toBe(true);
+    expect(isDayKey("2028-02-29")).toBe(true);
+  });
+
+  it("rejects an impossible day without throwing", () => {
+    expect(isDayKey("2026-02-31")).toBe(false);
+    expect(isDayKey("2026-13-01")).toBe(false);
+    expect(isDayKey("2026-00-10")).toBe(false);
+    expect(isDayKey("2027-02-29")).toBe(false);
+  });
+
+  it("rejects anything that is not a key-shaped string", () => {
+    for (const bad of ["2026-9-10", "2026-09-10T00:00:00Z", " 2026-09-10", "", null, undefined, 20260910, new Date()]) {
+      expect(isDayKey(bad)).toBe(false);
     }
   });
 });
@@ -99,9 +130,9 @@ describe("formatDay", () => {
     expect(formatDay("2026-10-02")).toBe("Fri 2 Oct");
   });
 
-  it("names the calendar day, whatever zone the process runs in", () => {
-    // dayStart is 00:00Z; a label formatted in a zone west of UTC would read
-    // the day before. The key IS the day, so the label must not move.
+  it("names the key's own day across a year boundary", () => {
+    // The label is formatted in UTC because dayStart is the key's 00:00Z; a
+    // label formatted in a zone west of UTC would read the day before.
     expect(formatDay("2027-01-01")).toBe("Fri 1 Jan");
   });
 });

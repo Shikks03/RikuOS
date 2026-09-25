@@ -26,8 +26,11 @@ export interface ITodo extends Document {
  * Today sentence was dropped for want of.
  *
  * `dueOn` is a DAY, not an instant: that calendar day at 00:00:00Z, built by
- * dayStart() in src/lib/days.ts. Every comparison goes through dayKey, never
- * raw Date arithmetic.
+ * dayStart() in src/lib/days.ts. Every comparison reads it back with
+ * `dayKey(dueOn, "UTC")` — explicitly UTC, never APP_TZ — and never with raw
+ * Date arithmetic. Reading a UTC midnight in APP_TZ happens to give the same
+ * day only because Manila is ahead of UTC; a zone behind it would read the
+ * day before.
  *
  * `calendarEventId` is present EXACTLY when the to-do is pinned to the
  * calendar. Only the entry's id is stored, never the entry — Google Calendar

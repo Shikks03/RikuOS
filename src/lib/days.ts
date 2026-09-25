@@ -36,11 +36,33 @@ export function dayKey(date: Date, tz: string): DayKey {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
-/** The Date stored in Todo.dueOn: that calendar day at 00:00:00Z. */
+/**
+ * The Date stored in Todo.dueOn: that calendar day at 00:00:00Z.
+ *
+ * Throws a RangeError for anything that is not a real day. The shape check
+ * alone is not enough: Date.UTC rolls "2026-02-31" silently to 3 March, so
+ * the built date must read back as the same key or it was never a day.
+ */
 export function dayStart(key: DayKey): Date {
   const m = KEY_SHAPE.exec(key);
   if (!m) throw new RangeError(`Not a day key: ${JSON.stringify(key)}`);
-  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  const date = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (dayKey(date, "UTC") !== key) throw new RangeError(`Not a real day: ${JSON.stringify(key)}`);
+  return date;
+}
+
+/**
+ * The non-throwing check a route validates a posted due date with: true only
+ * for a well-formed "YYYY-MM-DD" that names a real calendar day.
+ */
+export function isDayKey(s: unknown): s is DayKey {
+  if (typeof s !== "string" || !KEY_SHAPE.test(s)) return false;
+  try {
+    dayStart(s);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function addDays(key: DayKey, n: number): DayKey {
