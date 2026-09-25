@@ -1,0 +1,575 @@
+/* ============================================================
+   personal.css — the Personal page's own sheet, ported from the
+   `personal` group of docs/design/p10-mockup.html (the `personal`
+   banner down to the line above the `mockup-only` banner), comments
+   included: they carry the derivation of every threshold.
+
+   One namespace and no other: `pe-`. Every rule here is a `pe-`
+   class, or a shared class (.fl-*, .btn, .tag, .tick, .fld,
+   .sumrow, …) qualified by a `pe-` class or reached only through a
+   container this file declares. No bare element-shaped class names
+   (R32): a bare `.tile` rule would border and pad the rail's brand
+   tile on every page in the app.
+
+   Four deliberate differences from the mockup, each marked below:
+     1. `.pe-more` is not ported (R89). The mockup already carries
+        the deletion as a comment where the rule used to be; that
+        comment is kept.
+     2. The page-local :root block — the three tint anchors
+        --tint-save / --tint-spend / --tint-missing — is not ported.
+        They go to tokens.css with the ramp, in one commit (R84). The
+        nine `.pe-tN` classes that read them ARE here.
+     3. No second prefers-reduced-motion rule; base.css carries it
+        globally (§5.8). (The mockup's `personal` group never held
+        one — its copy sits in the mockup's base block — so this
+        difference drops nothing from the group.)
+     4. No media queries and no feature queries anywhere in this
+        file: every threshold is a container query on `pgw` (the
+        grid's own width, declared on .pe-wrap) or `tile` (the
+        cell's, declared on .pe-cell) — never the grid, never the
+        tile (R2, M2).
+
+   Imported fourth, after components.css and before legacy.css, from
+   src/app/layout.tsx only.
+   ============================================================ */
+
+/* ---- the grid (R2, R3) ------------------------------------------
+   Two named containers. `pgw` sits on the grid's WRAPPER because an
+   element cannot query itself; `tile` sits on every CELL (the padding-
+   less wrapper), not on the tile, for the same reason: a container
+   query measures the container's content box and cannot style the
+   container itself, so a container on the tile would fire 34px late
+   and could never change the tile's own padding. On the cell, every
+   `@container tile` number below is the tile's border-box width — the
+   width the rulings name — and `.pe-tile{padding:12px}` fires because
+   the tile is then a descendant. No @media and no @supports: a browser
+   without container queries takes the one-column base, which is
+   correct. Thresholds come from the legal cell widths — 106 · 141.67 ·
+   219.5 · 226 · 297.33 · 346 … — not from round numbers. */
+.pe-wrap{container:pgw / inline-size}
+
+.pe-grid{
+  display:grid;gap:var(--sp-4);
+  grid-template-columns:minmax(0,1fr);   /* base = the one-column stack */
+  --tb:0px;                              /* edit-mode toolbar allowance */
+}
+/* the cell wrapper is a grid so the tile stretches to the row's height;
+   content inside the tile stays top-aligned, never centred */
+.pe-cell{display:grid;min-width:0;container:tile / inline-size}
+/* A stack has no leftover, so the dashed cell is not drawn at one column.
+   Its span differs between the two column counts — a row can have a
+   leftover at twelve and none at six — so it carries a class for each and
+   `pe-x0` / `pe-s0` mean "no leftover at this count". This is the only
+   rule in the file that ever hides a cell. */
+.pe-cell.is-gap{display:none}
+
+@container pgw (min-width:706px){
+  .pe-grid{grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:var(--tracks)}
+  .pe-r1{grid-row:1}.pe-r2{grid-row:2}.pe-r3{grid-row:3}.pe-r4{grid-row:4}
+  .pe-x1{grid-column:span 1}.pe-x2{grid-column:span 2}.pe-x3{grid-column:span 3}
+  .pe-x4{grid-column:span 4}.pe-x5{grid-column:span 5}.pe-x6{grid-column:span 6}
+  .pe-cell.is-gap:not(.pe-x0){display:grid}
+}
+@container pgw (min-width:820px){
+  .pe-grid{grid-template-columns:repeat(12,minmax(0,1fr))}
+  .pe-s1{grid-column:span 1}
+  .pe-s2{grid-column:span 2}.pe-s3{grid-column:span 3}.pe-s4{grid-column:span 4}
+  .pe-s5{grid-column:span 5}.pe-s6{grid-column:span 6}.pe-s7{grid-column:span 7}
+  .pe-s8{grid-column:span 8}.pe-s9{grid-column:span 9}.pe-s10{grid-column:span 10}
+  .pe-s11{grid-column:span 11}.pe-s12{grid-column:span 12}
+  .pe-cell.is-gap:not(.pe-s0){display:grid}
+}
+/* --tracks is read ONLY inside the two blocks above, so the one-column
+   stack never sees it and needs no override. Columns are never pinned:
+   with grid-row fixed and grid-column:span N, auto-placement packs each
+   row left to right in DOM order, which makes the leftover always trail
+   — the only thing the editor's arrows can express. */
+
+.pe-grid.is-editing{--tb:42px}
+/* the leftover, in edit mode only: one dashed rectangle across the
+   row's whole remaining room. Never focusable, never a drop target,
+   no fill, no caption. It takes the radius of the tile it stands in
+   for — --r-card. */
+.pe-gap{border:1px dashed var(--line);border-radius:var(--r-card)}
+/* the --panel well the grid sits in while editing. The negative margin
+   is exactly the padding, so the grid's own box does not move and the
+   container's inline size is unchanged — which is why the well wraps
+   .pe-wrap rather than being applied to it. */
+.pe-edit{
+  background:var(--panel);border-radius:var(--r-feature);
+  padding:var(--sp-4);margin:calc(-1 * var(--sp-4));
+}
+/* The well is .fl's first child, and the shipped `.fl>:first-child
+   {margin-top:0}` is (0,2,0) — it beats .pe-edit and would zero the top
+   half of the compensation, dropping the grid 14px the moment the mode
+   opens. Restated at the same specificity, later in the sheet (M6). */
+.fl>.pe-edit{margin-top:calc(-1 * var(--sp-4))}
+
+/* ---- the tile (R6) ---------------------------------------------- */
+.pe-tile{
+  display:flex;flex-direction:column;
+  background:var(--raised);border:1px solid var(--line);border-radius:var(--r-card);
+  padding:15px 16px;min-width:0;overflow:hidden;
+}
+/* R81: the ramp's THREE ANCHORS. Two are ported verbatim from
+   DESIGN-INSPO's Card tint recipe — the shape --tint-roi and
+   --tint-stale already established. The third has no source to port
+   from (no --tint-missing exists anywhere in the system) and is built
+   to the same formula: 155deg, a deep desaturated --missing #F87171,
+   into a near-neutral at 62%. Its two stops were tuned against the
+   four existing tints and measured, not computed:
+     deep  #3A0B0B — WCAG L .01163, between --tint-stale's deep stop
+                     (#241A03, .01121) and --tint-save's (#052620,
+                     .01523); mid-band, so the red end is no more
+                     present than the green end, which is what keeps
+                     it a tint and not an alarm.
+     62%   #191016 — WCAG L .00635, inside the band the other four
+                     near-neutral stops sit in (#141013 .00566,
+                     #111117 .00582, #141209 .00601, #0F1417 .00664)
+                     and 25% darker than --raised, the same direction
+                     all four already go. R81's one hard constraint.
+   Declared as page-local custom properties, not in the tokens block
+   above, because tokens.css does not carry them yet: R84 ships that
+   port — plus the amended hue comments — in the same commit as this
+   page's build. Page-local until then; no other surface may consume
+   them without its own ruling. */
+/* DIFFERENCE 2 (R84): the mockup's page-local :root block declaring
+   --tint-save, --tint-spend and --tint-missing stood here. It is not
+   ported: the three anchors ship in tokens.css with the ramp, in one
+   commit. The nine classes below read them from there. */
+/* the hero (R8): three structural facts, no hue — the #171B21 ground,
+   the border lifted to --ink-4 (.btn:hover's shipped value), and the
+   feature radius. All three travel with the tile when it is moved or
+   shrunk. No inset hairline: it would be drawn in the colour of the
+   border it sits inside. */
+.pe-tile.is-hero{background:#171B21;border-color:var(--ink-4);border-radius:var(--r-feature)}
+/* ---- the hero's tint (R79–R84): a RAMP, not two states. One position
+   on it per day, driven by `pending` = to-dos due today plus anything
+   overdue (R73, confirmed by Riku; scheduled events never count, and an
+   overdue item counts as one like any other, it does not force the top
+   of the ramp). Green at 0, orange at 3, red at 8, clamped at 8 — a day
+   with fourteen things looks like a day with eight. The two segments are
+   deliberately unequal: the first three items move the colour 1.8× as far
+   as the next five do — measured, not estimated, as an end-to-end OKLab
+   ΔE of .1110 split .0774 across the first leg and .0422 across the
+   second (R95.1 corrects the earlier "as far as").
+
+   NINE FROZEN CLASSES, chosen by one pure lookup (R80), for R3's reason
+   restated: an out-of-range stored value matches no rule and is
+   therefore VISIBLE as the untinted hero — the safe render — where an
+   interpolation function would hand back an arbitrary colour,
+   confidently. No inline style, no per-render custom property, no
+   runtime colour maths, no Sass-style function. The six intermediate
+   pairs were interpolated once (OkLCh on the deep stop and the border so
+   the green→orange leg keeps its chroma and passes through amber rather
+   than through grey; OKLab on the near-neutral stop, which is neutral by
+   construction), checked by eye as a strip, measured, and then written
+   here as literal hex. They are page-local: they have exactly one
+   consumer and tokens.css does not carry values one page uses.
+
+   The border moves with the fill and the radius never does (R82). Nine
+   fills under one frozen border colour would be the tinted-fill /
+   hueless-border mistake nine times; --r-feature is invariant across all
+   nine and across the untinted render.
+
+   THE UNTINTED RENDER (.pe-tile.is-hero with no .pe-tN) now means
+   exactly one thing: the to-do store did not answer, so the page has no
+   count and claims nothing (R83). R72's "1–3 pending" middle band is
+   gone — 1, 2 and 3 have tints of their own. A calendar failure never
+   untints the hero, because events never counted (R74).
+
+   REGISTER IS WHAT KEEPS THIS HONEST (R84). The ramp is a background
+   wash and is never ink. --missing as ink on a row still means exactly
+   one thing — this is late — and it is drawn on the red wash in
+   specimen 01 so that composition can be judged rather than described.
+   No surface but this one may carry a semantic hue as a wash. */
+.pe-tile.is-hero.pe-t0{background:var(--tint-save);border-color:rgba(53,211,153,.2)}
+.pe-tile.is-hero.pe-t1{background:linear-gradient(155deg,#16220E,#111316 62%);border-color:rgba(155,196,72,.2)}
+.pe-tile.is-hero.pe-t2{background:linear-gradient(155deg,#231B03,#131114 62%);border-color:rgba(217,169,0,.2)}
+.pe-tile.is-hero.pe-t3{background:var(--tint-spend);border-color:rgba(255,138,61,.2)}
+.pe-tile.is-hero.pe-t4{background:linear-gradient(155deg,#2D1307,#151014 62%);border-color:rgba(255,132,72,.2)}
+.pe-tile.is-hero.pe-t5{background:linear-gradient(155deg,#311107,#161014 62%);border-color:rgba(254,127,83,.2)}
+.pe-tile.is-hero.pe-t6{background:linear-gradient(155deg,#341007,#171015 62%);border-color:rgba(253,122,93,.2)}
+.pe-tile.is-hero.pe-t7{background:linear-gradient(155deg,#370D09,#181015 62%);border-color:rgba(251,117,103,.2)}
+.pe-tile.is-hero.pe-t8{background:var(--tint-missing);border-color:rgba(248,113,113,.2)}
+
+/* ---- head (R11) ------------------------------------------------- */
+.pe-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}
+/* the pill is a pill at every width: once the head stacks (below 200px)
+   the grid would blockify the button and stretch it into a bar, and at
+   106px `+ TO-DO` would break across two lines (S3) */
+.pe-head>.btn{justify-self:start;white-space:nowrap}
+.pe-head .fl-count{display:block;margin-top:5px;padding-bottom:0}
+.pe-head .fl-empty{margin-top:0}
+.pe-stamp{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Done this week is the one tile whose second slot is ADJACENT to the
+   eyebrow rather than flush right: one grammar produces both of the
+   deck's renders — the count when populated, the sentence when empty. */
+.pe-head.is-inline{grid-template-columns:auto minmax(0,1fr);gap:var(--sp-5);align-items:baseline}
+/* in the inline head the count sits BESIDE the eyebrow, not under it */
+.pe-head.is-inline .fl-count{margin-top:0}
+
+/* ---- body, groups, notes ---------------------------------------- */
+.pe-body{margin-top:var(--sp-5);display:flex;flex-direction:column;min-width:0}
+/* R17: space-between fires on the HERO only, and only when BOTH groups
+   are empty — the air is then enclosed by two real findings and the
+   bottom edge carries content. With rows under one group and nothing
+   under the other the tile top-aligns. */
+.pe-body.is-pair{flex:1 1 auto;justify-content:space-between}
+/* the same move .fl>:first-child makes, and for the same reason */
+.pe-body>:first-child{margin-top:0}
+
+/* group labels (R12): .fl-thead's type step at --ink-3, not --ink-4.
+   On the blank week these five labels are the page's whole structure,
+   and --ink-4 is 1.75:1 on --raised. --ink-4 stays where components.css
+   reserves it: absences, .fl-bound, .fl-absent. */
+.pe-grp{
+  display:block;font-family:var(--mono);font-size:9px;font-weight:500;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+}
+/* .fl-empty's 20px was calibrated to sit under a 19px heading; under a
+   9px label it reads as a gap */
+.pe-grp + .fl-empty,.pe-grp + .pe-rows,.pe-grp + .pe-fail{margin-top:var(--sp-3)}
+
+/* press outcomes (R21): .fl-note's recipe. No dot, no hue, does not
+   survive a reload, cleared by the next press in that tile. Also the
+   register for a validation message under a field. */
+.pe-said{font-size:11px;color:var(--ink-3);margin-top:var(--sp-3)}
+.fld + .pe-said,.pe-ctl + .pe-said{margin-top:4px}
+
+/* couldn't-read (R10): .fl-fail's shape with the dot at --stale. A
+   calendar that did not answer is ageing data; red stays on lateness.
+   The same shape at every span, because a 5px dot is visible at 80px
+   of inner width and a coloured word is not. */
+.pe-fail{display:grid;grid-template-columns:5px minmax(0,1fr);gap:9px;margin-top:var(--sp-5)}
+.pe-fail i{
+  width:5px;height:5px;border-radius:50%;background:var(--stale);
+  box-shadow:0 0 6px var(--stale);margin-top:7px;
+}
+.pe-fail .said{font-size:13px;color:var(--ink-2)}
+/* the one --missing dot that is not lateness: an expected event that
+   did not happen, and only once the expected send hour has passed (R22) */
+.pe-fail.is-missing i{background:var(--missing);box-shadow:0 0 6px var(--missing)}
+.pe-fail + .pe-fail{margin-top:var(--sp-3)}
+.pe-fail + .pe-week,.pe-fail + .pe-rows{margin-top:var(--sp-4)}
+/* R49: the one dotted sentence that is a press outcome — `Done, but the
+   calendar entry couldn't be removed…` — sits directly under the head,
+   where every press outcome sits (R16), at .pe-said's distance; the foot
+   holds meta and the toolbar only. R9 gives it the dot, R16 the place. */
+.pe-head + .pe-fail{margin-top:var(--sp-3)}
+
+/* ---- rows (R13): hairline rows, never boxes --------------------- */
+.pe-rows{display:grid;grid-template-columns:minmax(0,1fr)}
+.pe-row{
+  display:grid;gap:var(--sp-4);align-items:center;
+  padding:11px 0;border-top:1px solid var(--line-soft);
+}
+.pe-rows>.pe-row:first-child,.pe-week>.pe-row:first-child,
+.pe-rows>.pe-inline:first-child{border-top:0}
+/* a sentence, then a list: the same 14px the reason line already takes */
+.fl-empty + .pe-week,.fl-empty + .pe-rows{margin-top:var(--sp-4)}
+.pe-row.is-sched{grid-template-columns:72px minmax(0,1fr) auto}
+/* a row with a tick and no second control: the Done row, and Today's DUE
+   rows before the edit form exists on them. R47: the explicit tracks are
+   the leading cell and the title; a tag and a due date, when the row has
+   them, flow into implicit auto columns — so an undated row or a row
+   without a tag emits no empty cell and pays no 14px gap for one. */
+.pe-row.is-item{grid-template-columns:auto minmax(0,1fr);grid-auto-flow:column;grid-auto-columns:auto}
+/* a to-do row is TWO controls: the tick, and one button wrapping title,
+   tag and meta. Never display:contents on the button — several browsers
+   drop a display:contents button out of the accessibility tree. */
+.pe-row.is-todo{grid-template-columns:auto minmax(0,1fr)}
+.pe-row.is-day{grid-template-columns:56px minmax(0,1fr);align-items:baseline}
+
+.pe-time{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pe-nm{font-weight:600;font-size:13px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* an event title leaves the app, so it is .fl-biz's anchor with the
+   persistent arrow — and the ROW is not the anchor (P8 R36) */
+.pe-row .fl-biz{min-width:0;max-width:100%}
+/* the row's second control (R13): named `Edit "…"`, no chevron, no hover
+   lift, inherits everything, carries the row's remaining tracks — the
+   title, then whatever meta the row has, in implicit columns (R47) */
+.pe-edit-row{
+  display:grid;grid-template-columns:minmax(0,1fr);grid-auto-flow:column;grid-auto-columns:auto;
+  gap:var(--sp-4);align-items:center;min-width:0;background:none;border:0;padding:0;margin:0;
+  font:inherit;color:inherit;text-align:left;cursor:pointer;
+}
+/* due meta (R13): a right-aligned mono column, ink not boxes. The ONLY
+   difference between a due date and an overdue one is the ink. */
+.pe-due{
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;
+}
+.pe-due.is-late{color:var(--missing)}
+/* `on calendar` — a lowercase word, body face, no box: an ambient state
+   of the row, not a category */
+.pe-on{font-size:11px;color:var(--ink-3);white-space:nowrap}
+.pe-daylbl{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.pe-items{display:flex;flex-wrap:wrap;gap:4px var(--sp-4);font-size:13px;color:var(--ink-2);min-width:0}
+.pe-items .pe-it{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.pe-items .pe-t{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.pe-items .pe-l{color:var(--ink-3)}
+/* R19: on this page `—` means a day that was read and held nothing.
+   A measurement, so --ink-3 — NOT .fl-trow .dash's absence ink. The
+   guard that keeps it honest is R18: a day whose sources did not all
+   answer prints nothing at all. */
+.pe-dash{color:var(--ink-3)}
+/* DIFFERENCE 1 (R89): the rule the comment below describes is not
+   ported. The comment is the mockup's own, kept verbatim. */
+/* `.pe-more` (`+3 more`) is DELETED (R89). R51b removed its only
+   consumer by making an open day untruncated and R58 declined the
+   `+1 more` summary shape, so it has none left; §5.8's rule — declared
+   vocabulary with no consumer does not ship — outranks "the deck still
+   names the string", because a live class for a superseded string is
+   how the string comes back. The 20-row bound is untouched: it renders
+   `Showing 20 of 34.` through .fl-bound, which keeps its consumer. */
+
+/* ---- the day row's disclosure (R51b, R56–R69, R77) --------------
+   Reuses the shipped .disclose / .sumrow / .fl-count / chevron
+   grammar wholesale (R56): no new vocabulary, no second disclosure.
+   The day-label column (.pe-daylbl) is untouched and sits OUTSIDE
+   .sumrow entirely (R57), so .sumrow's three columns never compete
+   with it for width — which is what makes R66's narrow-band split a
+   plain two-line .sumrow rather than a new mechanism. Two additions
+   only, both scoped to this row kind: */
+/* the leading item's bare title (R58) and the "N items" count (R59)
+   take .pe-items' own 13px / --ink-2 register, so a 1-item day (still
+   a bare .pe-items span, never wrapped in <details> — R57, R77) and a
+   collapsed 2+-item day's summary read as the same kind of sentence.
+   .fl-count keeps its own mono/--ink-3 rule below this one, unaffected
+   (its own class always outranks an inherited value). */
+.pe-row.is-day .sumrow{font-size:13px;color:var(--ink-2)}
+/* .fl-open's shipped 28px margin is tuned for a page-level block —
+   heading, then a table. A day's open list sits directly under a
+   one-line summary, so it takes the tighter "sentence, then a list"
+   spacing this page already uses (--sp-4, 14px, .fl-empty + .pe-week)
+   — measured and confirmed against the row's own rhythm at 10px. */
+.pe-row.is-day .fl-open{margin-top:var(--sp-3)}
+
+/* the week's two inner columns (R4). One grid, seven rows, split into
+   4 | 3 by grid-auto-flow at >=720px of TILE width — so the markup is
+   one chronological list at every width and the hairline suppression
+   is the only thing that moves. */
+.pe-week{display:grid;grid-template-columns:minmax(0,1fr)}
+
+/* ---- the layer row (R15) ---------------------------------------- */
+/* minmax(0,1fr), not a bare auto track: an auto track takes the switch
+   row's min-content, which at 106px is wider than the tile, and the
+   knob lands in the padding. R2's rule, applied to the list too. */
+.pe-layers{display:grid;grid-template-columns:minmax(0,1fr)}
+.pe-sw{
+  display:flex;align-items:center;gap:9px;width:100%;padding:8px 0;margin:0;
+  background:none;border:0;border-top:1px solid var(--line-soft);
+  font:inherit;color:inherit;text-align:left;cursor:pointer;
+}
+.pe-layers>.pe-sw:first-child{border-top:0}
+/* the NAME is --ink-2 in both states; the knob carries the state.
+   35% opacity on an off row would drop the label of a control to 1.8:1.
+   flex:1 1 0 so the name is the part that gives way: at 106px the
+   switch would otherwise be pushed into the tile's padding (S11). */
+.pe-sw .nm{flex:1 1 0;font-size:12.5px;color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pe-sw .swx{margin-left:auto}
+.pe-sw:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---- the push tile (R14) ---------------------------------------- */
+.pe-ptitle{font-weight:600;font-size:13px;color:var(--ink)}
+/* the older push's stamp, and the pre.body well it sits above, so the
+   quotation reads as subordinate to the stamp and not as content under
+   the eyebrow. Values are pre.body's, verbatim. */
+.pe-last{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin-top:var(--sp-4)}
+.pe-quote{
+  white-space:pre-wrap;font-family:var(--body);font-size:12.5px;line-height:1.55;
+  color:var(--ink-2);background:var(--sunk);border:1px solid var(--line-soft);
+  border-radius:var(--r-chip);padding:10px 12px;margin:var(--sp-3) 0 0;
+}
+
+/* ---- the foot (R16) --------------------------------------------- */
+.pe-foot{margin-top:auto}
+
+/* ---- forms (R27, R28) ------------------------------------------- */
+.pe-fields{display:grid;gap:12px}
+.pe-pair{display:grid;gap:12px}
+.pe-ctl{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-2)}
+.pe-acts{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:center;justify-content:flex-end;margin-top:16px}
+/* Delete sits apart at the left at RESTING emphasis with no red — the
+   confirmation is the safety, and the hue budget is spent on lateness */
+.pe-acts .pe-left{margin-right:auto}
+.pe-confirm{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:center;margin-top:16px;font-size:13px;color:var(--ink-2)}
+.pe-confirm .pe-q{margin-right:auto}
+/* the two pills are one group and wrap together, so `Keep` is never
+   orphaned on a line of its own under the destructive pill (S4) */
+.pe-confirm .pe-yn{display:flex;gap:var(--sp-3);flex:none;margin-left:auto}
+/* the edit form replaces a row in place; the rows around it do not move */
+.pe-inline{border-top:1px solid var(--line-soft);padding:11px 0}
+
+/* ---- the edit toolbar (R29) ------------------------------------- */
+/* .course .foot's shipped shape. It wraps before it clips. */
+.pe-bar{
+  display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1);
+  border-top:1px solid var(--line-soft);margin-top:12px;padding-top:11px;
+}
+.pe-arrows{display:flex;flex-wrap:wrap;gap:var(--sp-1);width:108px}
+.pe-step{display:flex;align-items:center;gap:var(--sp-1);margin-left:var(--sp-3)}
+.pe-step .ct{
+  font-family:var(--display);font-weight:600;font-size:15px;color:var(--ink);
+  min-width:22px;text-align:center;font-variant-numeric:tabular-nums;
+}
+/* .pwhen's recipe, sentence case as the deck writes it, on its own line */
+.pe-cap{
+  flex-basis:100%;font-family:var(--mono);font-size:9.5px;color:var(--ink-4);
+  font-variant-numeric:tabular-nums;margin-top:5px;
+}
+/* the sticky header control row, edit mode only. No ancestor of the
+   header may take container-type: containment would silently kill it.
+   The 10px bottom padding is clearance for the stuck state — void
+   ground painted over whatever scrolls under the pills — and the
+   negative margin gives the same 10px back, so the title→grid distance
+   is the same number in and out of the mode (M6). */
+.pe-sticky{
+  position:sticky;top:0;z-index:3;background:var(--void);
+  padding-bottom:var(--sp-3);margin-bottom:calc(-1 * var(--sp-3));
+}
+/* three pills where there was one, ordered Reset to default · gap ·
+   Cancel · Save (R30). Save is .btn.hi, the system's high rung. */
+.pe-pills{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
+.pe-pills .pe-sep{margin-left:var(--sp-4)}
+/* R44: edit mode keeps every tile's contents, controls included. The
+   head and the body take `inert` — out of the tab order, out of hit
+   testing — and the controls inside them render at .btn:disabled's
+   opacity, one recipe for "this does not respond right now". The
+   pills, the switch rows and the tick boxes dim; a to-do row's title
+   does not, because it is the tile's content, not a signal. */
+.pe-tile [inert] .btn,.pe-tile [inert] .pe-sw,.pe-tile [inert] .tick{opacity:.45}
+
+/* ---- the tile's own width bands (R2, R6, R11, R13, R15, R28, R38) --
+   Every one of these is keyed to the TILE's border-box width — the
+   container is the cell — so a tile behaves the same way wherever
+   Riku puts it. Three inner thresholds: 480 (the scheduled row's
+   two-line form, the 44px switch rows, the due column), 240 (padding,
+   the well's padding, the other rows' two-line form, the compact pill)
+   and 200 (the head stacks, the heading steps down). The legal cells
+   they catch: 480 catches everything up to span 6 at twelve (452.5)
+   and 4 of 6 (466) — span 6, not span 7, which measures 530.83 and sits
+   above the threshold (R93 corrects R38's label here too; 480 itself
+   does not move); 240 catches the two narrowest spans at each column
+   count — 106 · 141.67 at the bottom, 219.5 · 226 above them — and
+   nothing wider; 200 catches 106 and 141.67 only. */
+
+/* the head stacks and the heading steps down to 15px below 200px
+   (R11). Two heading sizes, never three. */
+@container tile (max-width:199.98px){
+  .pe-head{grid-template-columns:minmax(0,1fr)}
+  .pe-head .fl-h{font-size:15px}
+  .pe-head.is-inline{grid-template-columns:minmax(0,1fr);gap:var(--sp-3)}
+}
+
+/* the narrow band, below 240px (R38): 12px padding; the well's padding
+   drops to --sp-3 so the date field's 164.8px fits at span 3 and at
+   2 of 6; every row with more than two cells goes two-line — the
+   leading cell and the title on line one, the rest (tag, `on calendar`,
+   due meta, `Mon 8`) on line two — because at 226px a title beside
+   `on calendar` and `3 days late` is one letter; the head's pill takes
+   8px 10px so `+ TO-DO` fits 80px of inner width. The scheduled row
+   keeps R13's own two-line form from 480. */
+@container tile (max-width:239.98px){
+  .pe-tile{padding:12px}
+  .formwell{padding:var(--sp-3)}
+  .pe-head>.btn{padding:8px 10px}
+  /* the toolbar's stepper loses its 10px indent, so arrows + stepper
+     (190px) stay on one line at span 3 (193.5px inner) and 2 of 6
+     (200px) instead of wrapping and growing row 2 by a line */
+  .pe-step{margin-left:0}
+  .pe-row.is-item{grid-auto-flow:row;row-gap:4px}
+  .pe-row.is-item>.tick{grid-column:1;grid-row:1}
+  .pe-row.is-item>.pe-nm{grid-column:2 / span 2;grid-row:1}
+  .pe-row.is-item>.tag{grid-column:2;grid-row:2;justify-self:start}
+  .pe-row.is-item>.pe-due{grid-column:3;grid-row:2}
+  .pe-edit-row{display:flex;flex-wrap:wrap;gap:4px var(--sp-3)}
+  .pe-edit-row>.pe-nm{flex:0 0 100%}
+  .pe-edit-row>.pe-due{margin-left:auto}
+  /* the tick sits on the title's line, not between the two lines:
+     (19.5px line box − 14px box) / 2 */
+  .pe-row.is-todo>.tick{align-self:start;margin-top:2.75px}
+  /* R66: the day row's disclosure summary splits to two lines on the
+     same 240px threshold — the short title alone on line one, the
+     count and the chevron together on line two. .sumrow's own three
+     columns (minmax(0,1fr) auto auto) are untouched; only which ROW
+     each of the three items sits in changes, so column 1's leftover
+     width in row two is what pushes the count+chevron pair toward the
+     row's right edge without a fourth column. The day-label column is
+     unaffected throughout (R57) — it is not part of this grid. */
+  .pe-row.is-day .sumrow{row-gap:2px}
+  .pe-row.is-day .sumrow>span:first-child{grid-column:1 / -1;grid-row:1}
+  .pe-row.is-day .sumrow .fl-count{grid-row:2}
+  .pe-row.is-day .sumrow::after{grid-row:2;align-self:center;margin-bottom:0}
+}
+
+/* below 480px of tile width the scheduled row goes two-line — time and
+   tag on one mono line, title beneath — and the layer row takes a 44px
+   minimum so it is still a touch target (R13, R15) */
+@container tile (max-width:479.98px){
+  .pe-row.is-sched{grid-template-columns:auto minmax(0,1fr);row-gap:4px}
+  .pe-row.is-sched .pe-time{grid-column:1;grid-row:1}
+  /* the tag keeps its eleven-character cap and never exceeds its column:
+     a name that would clip at the tile's edge ellipsises instead */
+  .pe-row.is-sched .tag{grid-column:2;grid-row:1;justify-self:start;max-width:min(100%,calc(11ch + 20px))}
+  /* the title's grid item is the .fl-biz anchor (the event link), not the
+     span inside it; placing the span would leave the anchor auto-placed
+     in the time column, which then grows to the title's width */
+  .pe-row.is-sched>.fl-biz,.pe-row.is-sched>.pe-nm{grid-column:1 / -1;grid-row:2}
+  .pe-sw{min-height:44px}
+}
+/* from 480px the due column has a floor — .fl-stage's 64px is the
+   precedent — so the right-hand cells of neighbouring rows line up
+   into a column instead of each row placing its own (S2) */
+@container tile (min-width:480px){
+  .pe-due{min-width:64px}
+}
+
+/* the arrow group wraps 2x2 before it clips: 108px of arrows need
+   134px of tile (108 plus 12px padding and 1px border each side), so
+   at 1 of 6 (106px) they do not fit and the tile carries
+   overflow:hidden — the fourth arrow would be invisible AND
+   unreachable by pointer. At span 2 on twelve (141.67) they fit. */
+@container tile (max-width:133.98px){
+  .pe-arrows{width:52px}
+  .pe-step{margin-left:0}
+  /* R66's flagged risk, confirmed by measurement: at 106px the day-
+     label's fixed 56px plus the row's 14px gap leave .sumrow a 10px
+     box for 51px of content — it clips. Not a new mechanism: the same
+     move R38 already made for the scheduled row at 480px (time above,
+     title below), applied here because the day label is a pre-existing
+     condition of .pe-row.is-day at this width, not a disclosure-
+     specific one. The day label moves above the content instead of
+     beside it, only for a disclosure row (a plain 1-item or empty day
+     has never needed the room and stays on one line). */
+  .pe-row.is-day:has(details){grid-template-columns:minmax(0,1fr);row-gap:2px}
+  .pe-row.is-day:has(details) .pe-daylbl{grid-row:1}
+  .pe-row.is-day:has(details) details{grid-row:2}
+}
+
+/* the form's pairs (R40). The threshold is MEASURED: the native date
+   field is 164.8px wide at .fld's 16px in Chrome on Windows; two of
+   them plus the 12px gap need 341.6px of well content, which is 406px
+   of tile width once the well's and the tile's padding and borders are
+   added back. So pairs appear at span 6 on twelve (452.5) and 4 of 6
+   (466); span 5 (375.17) and 3 of 6 (346) stay one column. The columns
+   are minmax(min-content,1fr) — the ONE recorded exception to R2's
+   minmax(0,1fr) — because a native control squeezed under its minimum
+   clips its own text silently, and an overflow is at least visible. */
+@container tile (min-width:406px){
+  .pe-pair{grid-template-columns:minmax(min-content,1fr) minmax(min-content,1fr)}
+}
+
+/* the week's two inner columns, at >=720px of tile width (R4) */
+@container tile (min-width:720px){
+  .pe-week{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-flow:column;
+    grid-template-rows:repeat(4,auto);column-gap:var(--sp-4);
+  }
+  .pe-week>.pe-row:nth-child(5){border-top:0}
+}
+
+/* DIFFERENCE 3 (§5.8): no prefers-reduced-motion rule here. base.css
+   carries the one global rule, which also stills the shared chevron's
+   transition; a second copy would be a second place to keep in step. */

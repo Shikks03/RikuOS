@@ -10,6 +10,7 @@ import { APP_NAME } from "@/lib/constants";
 import "../styles/tokens.css";
 import "../styles/base.css";
 import "../styles/components.css";
+import "../styles/personal.css";
 import "../styles/legacy.css";
 
 /**
