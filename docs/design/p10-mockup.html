@@ -817,12 +817,39 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
   background:var(--raised);border:1px solid var(--line);border-radius:var(--r-card);
   padding:15px 16px;min-width:0;overflow:hidden;
 }
+/* R70: the two tint recipes, ported verbatim from DESIGN-INSPO's Card
+   tint recipe — the busy/clear pair --tint-roi and --tint-stale already
+   established the shape for. Declared as page-local custom properties,
+   not in the tokens block above, because tokens.css does not carry them
+   yet (see the note beside .pe-tile.is-hero.is-clear/.is-busy below). */
+:root{
+  --tint-spend:linear-gradient(155deg,#2A1408,#141013 62%);
+  --tint-save:linear-gradient(155deg,#052620,#0F1417 62%);
+}
 /* the hero (R8): three structural facts, no hue — the #171B21 ground,
    the border lifted to --ink-4 (.btn:hover's shipped value), and the
    feature radius. All three travel with the tile when it is moved or
    shrunk. No inset hairline: it would be drawn in the colour of the
    border it sits inside. */
 .pe-tile.is-hero{background:#171B21;border-color:var(--ink-4);border-radius:var(--r-feature)}
+/* ---- the hero's tint (R52, R70–R76): a page-local reading of --spend
+   and --save, keyed to the Due group's own count — nothing else. Ported,
+   not invented, from DESIGN-INSPO's own Card tint recipe (lines 83–91),
+   the same 155deg / deep-stop / near-neutral-at-62% shape --tint-roi and
+   --tint-stale already use in the tokens block above. Declared here,
+   not there, because tokens.css does not carry them yet: R76 ships that
+   port — plus the amended --spend comment — in the same commit as this
+   page's build. Page-local until then; no other surface may consume
+   these two without its own ruling.
+   nothing pending -> --tint-save (green); 4+ pending -> --tint-spend
+   (orange); 1–3 pending, OR the to-do read failed, take neither and
+   fall back to the plain .pe-tile.is-hero render above (R72) — an
+   untinted hero asserts nothing, which is true whether the honest count
+   is "a few" or "unknown". The radius never moves (R71); the border
+   lifts to the tint's own hue at the tint's own alpha, the same rule
+   every other tinted card on this page already follows. */
+.pe-tile.is-hero.is-clear{background:var(--tint-save);border-color:rgba(53,211,153,.2)}
+.pe-tile.is-hero.is-busy{background:var(--tint-spend);border-color:rgba(255,138,61,.2)}
 
 /* ---- head (R11) ------------------------------------------------- */
 .pe-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}
@@ -945,8 +972,34 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
    guard that keeps it honest is R18: a day whose sources did not all
    answer prints nothing at all. */
 .pe-dash{color:var(--ink-3)}
-/* `+3 more` in .fl-bound's register, inline at the end of the day */
+/* `+3 more` in .fl-bound's register, inline at the end of the day —
+   superseded for the OPEN state of a disclosure day (R51b's second
+   correction): the open list is always every item, never truncated,
+   so this class has no consumer inside .fl-open. It stays live for
+   nothing on this page today; kept because the deck still names it. */
 .pe-more{font-size:11.5px;color:var(--ink-4)}
+
+/* ---- the day row's disclosure (R51b, R56–R69, R77) --------------
+   Reuses the shipped .disclose / .sumrow / .fl-count / chevron
+   grammar wholesale (R56): no new vocabulary, no second disclosure.
+   The day-label column (.pe-daylbl) is untouched and sits OUTSIDE
+   .sumrow entirely (R57), so .sumrow's three columns never compete
+   with it for width — which is what makes R66's narrow-band split a
+   plain two-line .sumrow rather than a new mechanism. Two additions
+   only, both scoped to this row kind: */
+/* the leading item's bare title (R58) and the "N items" count (R59)
+   take .pe-items' own 13px / --ink-2 register, so a 1-item day (still
+   a bare .pe-items span, never wrapped in <details> — R57, R77) and a
+   collapsed 2+-item day's summary read as the same kind of sentence.
+   .fl-count keeps its own mono/--ink-3 rule below this one, unaffected
+   (its own class always outranks an inherited value). */
+.pe-row.is-day .sumrow{font-size:13px;color:var(--ink-2)}
+/* .fl-open's shipped 28px margin is tuned for a page-level block —
+   heading, then a table. A day's open list sits directly under a
+   one-line summary, so it takes the tighter "sentence, then a list"
+   spacing this page already uses (--sp-4, 14px, .fl-empty + .pe-week)
+   — measured and confirmed against the row's own rhythm at 10px. */
+.pe-row.is-day .fl-open{margin-top:var(--sp-3)}
 
 /* the week's two inner columns (R4). One grid, seven rows, split into
    4 | 3 by grid-auto-flow at >=720px of TILE width — so the markup is
@@ -1090,6 +1143,18 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
   /* the tick sits on the title's line, not between the two lines:
      (19.5px line box − 14px box) / 2 */
   .pe-row.is-todo>.tick{align-self:start;margin-top:2.75px}
+  /* R66: the day row's disclosure summary splits to two lines on the
+     same 240px threshold — the short title alone on line one, the
+     count and the chevron together on line two. .sumrow's own three
+     columns (minmax(0,1fr) auto auto) are untouched; only which ROW
+     each of the three items sits in changes, so column 1's leftover
+     width in row two is what pushes the count+chevron pair toward the
+     row's right edge without a fourth column. The day-label column is
+     unaffected throughout (R57) — it is not part of this grid. */
+  .pe-row.is-day .sumrow{row-gap:2px}
+  .pe-row.is-day .sumrow>span:first-child{grid-column:1 / -1;grid-row:1}
+  .pe-row.is-day .sumrow .fl-count{grid-row:2}
+  .pe-row.is-day .sumrow::after{grid-row:2;align-self:center;margin-bottom:0}
 }
 
 /* below 480px of tile width the scheduled row goes two-line — time and
@@ -1122,6 +1187,18 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
 @container tile (max-width:133.98px){
   .pe-arrows{width:52px}
   .pe-step{margin-left:0}
+  /* R66's flagged risk, confirmed by measurement: at 106px the day-
+     label's fixed 56px plus the row's 14px gap leave .sumrow a 10px
+     box for 51px of content — it clips. Not a new mechanism: the same
+     move R38 already made for the scheduled row at 480px (time above,
+     title below), applied here because the day label is a pre-existing
+     condition of .pe-row.is-day at this width, not a disclosure-
+     specific one. The day label moves above the content instead of
+     beside it, only for a disclosure row (a plain 1-item or empty day
+     has never needed the room and stays on one line). */
+  .pe-row.is-day:has(details){grid-template-columns:minmax(0,1fr);row-gap:2px}
+  .pe-row.is-day:has(details) .pe-daylbl{grid-row:1}
+  .pe-row.is-day:has(details) details{grid-row:2}
 }
 
 /* the form's pairs (R40). The threshold is MEASURED: the native date
@@ -1148,7 +1225,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
 
 /* ============================================================
    mockup-only: the three face variables, document chrome, frames,
-   captions, the four hero alternatives, and legacy.css scoped to
+   captions, the provisional phone shell, and legacy.css scoped to
    specimen 07. NOTHING BELOW THIS LINE SHIPS TO THE APP.
    ============================================================ */
 
@@ -1258,12 +1335,11 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
    height their row gives them, not at natural height */
 .h340 .pe-tile{min-height:340px}
 
-/* specimen 01's four hero alternatives. (a) is the ruled treatment and
-   uses the shipping .pe-tile.is-hero rule; (b), (c) and (d) exist only
-   on this page so Riku can judge them side by side. */
-.hero-b{background:var(--raised);border-color:var(--line);border-radius:var(--r-card)}
-.hero-c{background:#171B21;border-color:var(--line);border-radius:var(--r-card);box-shadow:inset 0 0 0 1px var(--line)}
-.hero-d{background:linear-gradient(155deg,#0A1A2E,#0F1318 45%);border-color:rgba(95,165,250,.2);border-radius:var(--r-feature)}
+/* R52 closed specimen 01's four hero alternatives (a)-(d) — the mark
+   is a state-driven tint now, not a fixed choice between them. The
+   .hero-b/.hero-c/.hero-d rules that drew (b)-(d) are retired with the
+   markup that used them; .pe-tile.is-hero(.is-clear/.is-busy) above is
+   the shipping rule for every hero on this page now. */
 
 /* the provisional phone shell (specimen 08, option A) */
 .phonebar{
@@ -1327,7 +1403,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
   <section class="spec">
     <span class="spec-eyebrow">Specimen 01 &middot; State</span>
     <h2 class="spec-title">The blank week</h2>
-    <p class="spec-cap">Your page exactly as it is today &mdash; nothing scheduled, nothing due, no to-dos yet, and one real push quoted back at you &mdash; in the default arrangement, with <code>Personal</code> first in the menu. There is not one coloured thing on the page: every finding here is a measured emptiness, and colour on this page is reserved for lateness and for a feed that did not answer.</p>
+    <p class="spec-cap">Your page exactly as it is today &mdash; nothing scheduled, nothing due, no to-dos yet, and one real push quoted back at you &mdash; in the default arrangement, with <code>Personal</code> first in the menu. Every finding here is a measured emptiness. The one hue on the page is the hero&rsquo;s own: it tints green because nothing is pending (R52, R70&ndash;R76) &mdash; a state, not an ornament, and the only other colour this page ever spends is on lateness and on a feed that did not answer.</p>
     <p class="spec-cap"><strong>Measured, not claimed.</strong> The four rows render at <strong>340 &middot; 200 &middot; 240 &middot; 120</strong> pixels, so the grid is <strong>942px</strong> tall. The second row is 200, not the 180 first planned: each of the three layer switches needs 44 pixels to be tappable, so 180 was a number the tile could not meet and 200 is its weight. Left to their own heights the tiles would measure Today 213.35, To-do 270.85, Layers 191.85, push 112.35, Next 7 days 234.25 and Done this week 51.1 &mdash; every one under its row&rsquo;s weight, which is what makes the weights real: no row here is being held open by its contents.</p>
 
     <div class="scroll">
@@ -1368,7 +1444,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
             <main class="app-content"><div class="fl">
               <div class="pe-wrap"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
 
-                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero is-clear">
                   <div class="pe-head">
                     <div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div>
                     <button type="button" class="btn" aria-expanded="false">+ Event</button>
@@ -1439,57 +1515,119 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
       </div>
     </div>
 
-    <p class="spec-cap" style="margin-top:28px"><strong>The hero, four ways.</strong> Each treatment at eight columns, then again at four, every one at the 340 pixels the first row gives it with its two findings spread top and bottom exactly as on the page &mdash; judged against <code>Nothing scheduled.</code> and <code>Nothing due.</code> rather than a full day, because the blank state is the one the page will spend most of its life in. (a) is what is ruled; all four sit side by side so any two can be compared without scrolling.</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>The hero, tinted by state &mdash; answered.</strong> Not one of the four alternatives specimen 01 used to carry: <strong>green when nothing is pending, orange when four or more things are</strong>, and the old untinted mark from R8 for everything between &mdash; one, two or three things pending, or a to-do read that answered nothing at all. &ldquo;Pending&rdquo; is to-dos due today plus anything overdue; a scheduled event is never a task and never counts. Three renders below, at eight columns and again at four: the busy one carries a genuine overdue row so the red <code>3 days late</code> ink sits on the orange tint at the same time, which is the actual worst case for the two hues together, not just a description of it.</p>
 
-    <div class="scroll"><div class="sheet c2 h340">
-      <div class="hold w609"><p class="lbl"><b>A &middot; as ruled</b> &middot; span 8</p>
+    <div class="scroll"><div class="pair">
+      <div class="hold w609"><p class="lbl"><b>1&ndash;3 pending</b> &middot; untinted, R8&rsquo;s render &middot; span 8</p>
         <section class="pe-tile is-hero">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span><span class="pe-due">tomorrow</span></button></div>
+            </div></div>
+          </div>
         </section></div>
-      <div class="hold w609"><p class="lbl"><b>B &middot; no mark at all</b> &middot; span 8</p>
-        <section class="pe-tile hero-b">
+      <div class="hold w609"><p class="lbl"><b>to-do read failed</b> &middot; same untinted render &middot; span 8</p>
+        <section class="pe-tile is-hero">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div></div>
+          </div>
+        </section></div>
+      <div class="hold w609"><p class="lbl"><b>nothing pending</b> &middot; <code>.is-clear</code> &middot; span 8</p>
+        <section class="pe-tile is-hero is-clear">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
           <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
         </section></div>
-      <div class="hold w609"><p class="lbl"><b>C &middot; lighter ground and an inset hairline</b> &middot; span 8</p>
-        <section class="pe-tile hero-c">
+      <div class="hold w609"><p class="lbl"><b>4 or more pending</b> &middot; <code>.is-busy</code> &middot; span 8</p>
+        <section class="pe-tile is-hero is-busy">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
-        </section></div>
-      <div class="hold w609"><p class="lbl"><b>D &middot; blue tint, the one permitted accent</b> &middot; span 8</p>
-        <section class="pe-tile hero-d">
-          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span><span class="pe-due">tomorrow</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span><span class="tag">Academics</span><span class="pe-due">26 Oct</span></button></div>
+            </div></div>
+          </div>
         </section></div>
     </div></div>
-    <div class="scroll"><div class="sheet c4 h340">
-      <div class="hold w297"><p class="lbl"><b>A</b> &middot; span 4</p>
+
+    <div class="scroll"><div class="sheet c4">
+      <div class="hold w297"><p class="lbl"><b>1&ndash;3 pending</b> &middot; span 4</p>
         <section class="pe-tile is-hero">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span><span class="pe-due">tomorrow</span></button></div>
+            </div></div>
+          </div>
         </section></div>
-      <div class="hold w297"><p class="lbl"><b>B</b> &middot; span 4</p>
-        <section class="pe-tile hero-b">
+      <div class="hold w297"><p class="lbl"><b>to-do read failed</b> &middot; span 4</p>
+        <section class="pe-tile is-hero">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div></div>
+          </div>
+        </section></div>
+      <div class="hold w297"><p class="lbl"><b>nothing pending</b> &middot; span 4</p>
+        <section class="pe-tile is-hero is-clear">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
           <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
         </section></div>
-      <div class="hold w297"><p class="lbl"><b>C</b> &middot; span 4</p>
-        <section class="pe-tile hero-c">
+      <div class="hold w297"><p class="lbl"><b>4 or more pending</b> &middot; span 4</p>
+        <section class="pe-tile is-hero is-busy">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span><span class="pe-due">tomorrow</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span><span class="tag">Academics</span><span class="pe-due">26 Oct</span></button></div>
+            </div></div>
+          </div>
         </section></div>
-      <div class="hold w297"><p class="lbl"><b>D</b> &middot; span 4</p>
-        <section class="pe-tile hero-d">
-          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+    </div></div>
+
+    <p class="spec-cap" style="margin-top:9px"><strong>The same three, at the narrowest width the hero can reach through the editor</strong> &mdash; 1 of 6 on a 706px grid, 106 pixels. Specimen 05 already draws the hero here (below); these two are the busy and the middle-band renders it does not.</p>
+    <div class="scroll"><div class="pair">
+      <div class="hold w106"><p class="tab">1&ndash;3 pending</p>
+        <section class="pe-tile is-hero">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
+          <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span></button></div>
+            </div></div>
+          </div>
+        </section></div>
+      <div class="hold w106"><p class="tab">nothing pending</p>
+        <section class="pe-tile is-hero is-clear">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
+          <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+      <div class="hold w106"><p class="tab">4 or more pending</p>
+        <section class="pe-tile is-hero is-busy">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
+          <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="pe-due is-late">3d late</span></button></div>
+            </div></div>
+          </div>
         </section></div>
     </div></div>
 
     <div class="spec-q">
-      <span class="qlbl">For Riku &middot; the hero&rsquo;s look</span>
-      <p>Four versions above. Ruled: a slightly lighter ground, a slightly brighter border and a larger corner radius, no colour. Alternatives: no mark at all; the lighter ground alone; a faint blue tint in the top corner (the one place your spec allows an accent).</p>
-      <p>The critic and the lead both pick (a); its mark is quiet on purpose &mdash; a brighter border, a lighter ground, rounder corners; if you want it louder the honest step is a brighter border still, not colour.</p>
+      <span class="qlbl">For Riku &middot; the hero&rsquo;s look &mdash; answered</span>
+      <p>Not one of the four you were shown: a tinted hero, driven by the day&rsquo;s own state. Green when nothing is pending, orange when four or more things are &mdash; the threshold is one constant and you can move it any time before the spec is written.</p>
+      <p>The old untinted mark stays for everything between, and for a to-do read that did not answer &mdash; both render identically, on purpose, because an untinted hero claims nothing about the count, which is honest whether the true number is &ldquo;a couple&rdquo; or unknown.</p>
     </div>
 
     <p class="spec-cap" style="margin-top:28px"><strong>B-panel &mdash; the week in one column.</strong> The same blank page with the seven days kept in one chronological list at every width. The week tile then measures <strong>361.15px</strong> instead of 234.25px, so row 3 has to be re-weighted to <strong>365px</strong> and the grid becomes <strong>1067px</strong> tall. The rows read <strong>340 &middot; 200 &middot; 365 &middot; 120</strong>: the third row is now the tallest thing on the page.</p>
@@ -1516,7 +1654,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
             <main class="app-content"><div class="fl">
               <div class="pe-wrap"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(365px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
 
-                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero is-clear">
                   <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
                   <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
                 </section></div>
@@ -1569,9 +1707,9 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
     </div>
 
     <div class="spec-q">
-      <span class="qlbl">For Riku &middot; the week tile</span>
-      <p>Ruled: the seven days sit in two columns (four left, three right) when the tile is full width, so the third row stays &ldquo;medium&rdquo; as you specified. The alternative is one column at every width, which makes the third row taller than the first &mdash; your &ldquo;tall, short, medium, short&rdquo; would become &ldquo;tall, short, tall, short&rdquo;. Both are drawn above.</p>
-      <p>On a blank week, two columns keep the third row at 240 against 361 in one column; on a busy week the difference shrinks to 328 against 363, because every full day wraps to two lines in a narrower column. The cadence argument is strongest on the page you have today.</p>
+      <span class="qlbl">For Riku &middot; the week tile &mdash; answered: two columns (R51)</span>
+      <p>The seven days sit in two columns (four left, three right) when the tile is full width, so the third row stays &ldquo;medium&rdquo; as you specified. The alternative was one column at every width, which makes the third row taller than the first &mdash; your &ldquo;tall, short, medium, short&rdquo; would become &ldquo;tall, short, tall, short&rdquo;. Both are drawn above; two columns is what you chose.</p>
+      <p>On a blank week, two columns keep the third row at 240 against 361 in one column. On the busy week this ruling was judged against, the gap has since widened rather than closed: two columns now measures <strong>240px</strong> &mdash; the disclosure collapse (R51b) leaves most days a single summary line, so the week converges on the same floor the blank week already sits on &mdash; against <strong>362.75px</strong> in one column, where the rows were already single-line at that width and the collapse changes almost nothing. The cadence argument is stronger on the page you have today than it was when this was ruled.</p>
       <p>The second row is 200 pixels tall, not 180 &mdash; the three layer switches need 44 pixels each to be tappable &mdash; so &ldquo;short&rdquo; is a little less short.</p>
     </div>
   </section>
@@ -1582,7 +1720,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
   <section class="spec">
     <span class="spec-eyebrow">Specimen 02 &middot; State</span>
     <h2 class="spec-title">The full week</h2>
-    <p class="spec-cap">The same arrangement carrying &sect;13&rsquo;s invented mid-term week, so the design can be judged full as well as empty. In the page, two things carry colour and nothing else does: <code>3 days late</code> on the two overdue rows, in the due column. (The menu&rsquo;s red worker badge is the shell&rsquo;s, not the page&rsquo;s.) The push quotes a morning with a problem in it and stays in plain ink &mdash; this tile quotes, it never evaluates. Content grows a row but never shrinks it: row 1 renders at <strong>463.75px</strong> here, because the To-do tile&rsquo;s six rows in three sections come to 463.75 against a 340px weight. Row 3 grows to <strong>328.25px</strong>, by however much the longer day lines wrap inside their 436px column &mdash; <code>Wed 21</code> is the one your document calls out, and it does wrap. In the hero the due dates sit in a column 64 pixels wide, so the tags of dated rows line up; an undated row&rsquo;s tag runs to the row&rsquo;s edge because there is no date to leave room for.</p>
+    <p class="spec-cap">The same arrangement carrying &sect;13&rsquo;s invented mid-term week, so the design can be judged full as well as empty. In the page, two things carry colour and nothing else does: <code>3 days late</code> on the two overdue rows, in the due column. (The menu&rsquo;s red worker badge is the shell&rsquo;s, not the page&rsquo;s.) The push quotes a morning with a problem in it and stays in plain ink &mdash; this tile quotes, it never evaluates. Content grows a row but never shrinks it: row 1 renders at <strong>463.75px</strong> here, because the To-do tile&rsquo;s six rows in three sections come to 463.75 against a 340px weight. Row 3 is a different story now: five of the seven days collapse to a one-line summary (R51b), so the week no longer needs the room it used to &mdash; it measures <strong>240px</strong>, exactly the floor R51 set on the blank week, a genuinely unplanned finding rather than a designed one (R65). In the hero the due dates sit in a column 64 pixels wide, so the tags of dated rows line up; an undated row&rsquo;s tag runs to the row&rsquo;s edge because there is no date to leave room for.</p>
 
     <div class="scroll">
       <div class="frame f1240">
@@ -1670,32 +1808,32 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
                 <div class="pe-cell pe-r3 pe-s12 pe-x6"><section class="pe-tile">
                   <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
                   <div class="pe-body"><div class="pe-week">
-                    <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><span class="pe-items">
+                    <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items">
                       <span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span>
                       <span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span>
-                    </span></div>
-                    <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><span class="pe-items">
+                    </span></div></details></div>
+                    <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><details class="disclose"><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items">
                       <span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span>
                       <span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><span>Revise proposal</span><span class="pe-l">&middot; Freelance</span></span>
-                    </span></div>
-                    <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><span class="pe-items">
+                    </span></div></details></div>
+                    <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items">
                       <span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span>
                       <span class="pe-it"><span class="pe-t">15:00</span><span>Image Processing</span><span class="pe-l">&middot; Classes</span></span>
-                    </span></div>
-                    <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><span class="pe-items">
+                    </span></div></details></div>
+                    <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><details class="disclose"><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items">
                       <span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span>
                       <span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><span>Renew ID</span><span class="pe-l">&middot; Personal</span></span>
-                    </span></div>
+                    </span></div></details></div>
                     <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items">
                       <span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span>
                     </span></div>
                     <div class="pe-row is-day"><span class="pe-daylbl">Sun 25</span><span class="pe-items">
                       <span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span>
                     </span></div>
-                    <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><span class="pe-items">
+                    <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><details class="disclose"><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items">
                       <span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span>
                       <span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><span>Lab report 2</span><span class="pe-l">&middot; Academics</span></span>
-                    </span></div>
+                    </span></div></details></div>
                   </div></div>
                 </section></div>
 
@@ -1714,6 +1852,137 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
         </div></div>
       </div>
     </div>
+
+    <p class="spec-cap" style="margin-top:28px"><strong>The day row, collapsed and open (R51b, R56&ndash;R69).</strong> Two or more items on a day now disclose: a bare leading title and a count before the click, every item after it &mdash; reusing <code>.disclose</code>/<code>.sumrow</code>/<code>.fl-count</code> wholesale (R56), the exact grammar the Freelance page already ships, no second disclosure invented. A day with one item is untouched, byte-identical to today (R57, R77); a day with none still prints <code>&mdash;</code> (R69). Every day loads closed (R60); opening one never closes another (R61); opening pushes the row&rsquo;s height, it never overlays (R63) &mdash; the same treatment the event and to-do forms already get. <b class="prop">proposed</b> &mdash; the count&rsquo;s format, <code>N items</code> (R59); the leading title itself is not new wording, only a rule for which of your own words gets picked (R58).</p>
+    <div class="scroll"><div class="pair">
+      <div class="hold w297"><p class="lbl"><b>Collapsed</b> &middot; two items</p>
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week">
+            <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          </div></div>
+        </section></div>
+      <div class="hold w297"><p class="lbl"><b>Open</b> &middot; the same day</p>
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week">
+            <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose" open><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          </div></div>
+        </section></div>
+      <div class="hold w297"><p class="lbl"><b>Silhouette</b> &middot; 1 item beside a collapsed 2</p>
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week">
+            <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+            <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          </div></div>
+        </section></div>
+    </div></div>
+
+    <p class="spec-cap" style="margin-top:28px"><strong>A mixed day</strong> &mdash; your own example: a class, a to-do, and an all-day trip. The short title is the leading item by the sort order &sect;7 already defines &mdash; all-day first &mdash; so <code>Baguio trip</code> leads even though it is not the day&rsquo;s only, or most urgent, thing (R58).</p>
+    <div class="scroll"><div class="pair">
+      <div class="hold w297"><p class="lbl"><b>Collapsed</b> &middot; three items</p>
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week">
+            <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><details class="disclose"><summary><div class="sumrow"><span>Baguio trip</span><span class="fl-count">3 items</span></div></summary><div class="fl-open"><span class="pe-items">
+              <span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span>
+              <span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span>
+              <span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><span>Revise proposal</span><span class="pe-l">&middot; Freelance</span></span>
+            </span></div></details></div>
+          </div></div>
+        </section></div>
+      <div class="hold w297"><p class="lbl"><b>Open</b> &middot; the same day</p>
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week">
+            <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><details class="disclose" open><summary><div class="sumrow"><span>Baguio trip</span><span class="fl-count">3 items</span></div></summary><div class="fl-open"><span class="pe-items">
+              <span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span>
+              <span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span>
+              <span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><span>Revise proposal</span><span class="pe-l">&middot; Freelance</span></span>
+            </span></div></details></div>
+          </div></div>
+        </section></div>
+    </div></div>
+
+    <p class="spec-cap" style="margin-top:28px"><strong>The narrow band (R66).</strong> Below 240px of tile width <code>.sumrow</code> splits to two lines &mdash; the title alone, then the count and the chevron together &mdash; on the same threshold R38 already draws every other multi-cell row at. The day-label column never competes for that room; it sits in its own fixed 56px track outside <code>.sumrow</code> entirely (R57).</p>
+    <div class="scroll"><div class="pair">
+      <div class="hold w226"><p class="tab">226px &middot; 2 of 6</p>
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week">
+            <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          </div></div>
+        </section></div>
+      <div class="hold w106"><p class="tab">106px &middot; 1 of 6</p>
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week">
+            <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          </div></div>
+        </section></div>
+      <div class="hold w106"><p class="tab">106px &middot; a 1-item day, for comparison</p>
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week">
+            <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+          </div></div>
+        </section></div>
+    </div></div>
+
+    <p class="spec-cap" style="margin-top:28px"><strong>The full busy week, entirely open</strong> &mdash; the worst case, every disclosure expanded at once, at both column counts. This is never the default (R60 loads every day closed); it is what Riku sees if he opens all five.</p>
+    <div class="stack">
+      <div class="pane p920">
+        <p class="lbl"><b>Two columns</b> &middot; 920px tile</p>
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-flow:column;grid-template-rows:repeat(4,auto);column-gap:14px">
+          <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose" open><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><details class="disclose" open><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><span>Revise proposal</span><span class="pe-l">&middot; Freelance</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><details class="disclose" open><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><span class="pe-t">15:00</span><span>Image Processing</span><span class="pe-l">&middot; Classes</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><details class="disclose" open><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><span>Renew ID</span><span class="pe-l">&middot; Personal</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Sun 25</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><details class="disclose" open><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><span>Lab report 2</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          </div></div>
+        </section>
+      </div>
+      <div class="pane p706">
+        <p class="lbl"><b>One column</b> &middot; 706px tile</p>
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week">
+          <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose" open><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><details class="disclose" open><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><span>Revise proposal</span><span class="pe-l">&middot; Freelance</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><details class="disclose" open><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><span class="pe-t">15:00</span><span>Image Processing</span><span class="pe-l">&middot; Classes</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><details class="disclose" open><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><span>Renew ID</span><span class="pe-l">&middot; Personal</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Sun 25</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><details class="disclose" open><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><span>Lab report 2</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          </div></div>
+        </section>
+      </div>
+    </div>
+
+    <p class="spec-cap" style="margin-top:28px"><strong>A mixed week (R64).</strong> Only <code>Mon 26</code> is open, in column 2. It shares row 3&rsquo;s track with <code>Thu 22</code> in column 1, which is closed and shorter. <code>grid-auto-flow:column</code> pairs day 3 with day 7 into one row-track (days 1&ndash;4 fill column 1, days 5&ndash;7 fill column 2), and grid&rsquo;s default <code>stretch</code> &mdash; the same posture the page&rsquo;s outer grid already uses &mdash; means <code>Thu 22</code>&rsquo;s own box grows to match, leaving real slack under its two lines. This is rendered, not fixed, per R64: report what it does, not paper over it.</p>
+    <div class="scroll">
+      <div class="pane p920">
+        <section class="pe-tile">
+          <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+          <div class="pe-body"><div class="pe-week" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-flow:column;grid-template-rows:repeat(4,auto);column-gap:14px">
+          <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><details class="disclose"><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><span>Revise proposal</span><span class="pe-l">&middot; Freelance</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><span class="pe-t">15:00</span><span>Image Processing</span><span class="pe-l">&middot; Classes</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><details class="disclose"><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><span>Renew ID</span><span class="pe-l">&middot; Personal</span></span></span></div></details></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Sun 25</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+          <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><details class="disclose" open><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><span>Lab report 2</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+          </div></div>
+        </section>
+      </div>
+    </div>
+
+    <p class="spec-cap" style="margin-top:9px"><strong>Edit mode closes every open day (R62).</strong> Not drawn separately: specimen 04&rsquo;s edit-mode <code>Next 7 days</code> tile is the blank week, which never has a 2+-item day to open in the first place, so there is nothing for the mode to close there. The rule itself has nothing left to prove structurally &mdash; <code>inert</code> stops a day row from being <em>clicked</em> in edit mode, but a day left open beforehand would still sit there, dimmed, consuming its expanded height, which is exactly the distortion R5 already suspends the sparse-row shrink to avoid. Entering the mode closes every disclosure first, the same way R30 closes an open form.</p>
   </section>
 
   <!-- ==========================================================
@@ -1724,10 +1993,10 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
     <h2 class="spec-title">When something did not answer</h2>
     <p class="spec-cap">Every sentence that says a feed did not answer carries the same 5px amber dot, at every tile width, because at 80 pixels of inner width a coloured word is unreadable and a dot is not. Amber, not red: a calendar that did not answer is ageing data. Red stays on lateness. A measured emptiness &mdash; <code>Nothing scheduled.</code>, <code>nothing open</code>, <code>&mdash;</code> &mdash; never takes a dot, and that absence is the signal.</p>
 
-    <p class="spec-cap"><strong>Google access expired.</strong> Every calendar spot carries the same sentence; the Layers tile shows it too and drops its switches, because the page tile must match the Settings card; <code>+ Event</code> is disabled and points at the sentence as its reason. The week shows the reason once at the top and then seven days with <em>blank</em> value columns &mdash; not seven dashes, because a dash here means &ldquo;we looked and the day was free&rdquo;.</p>
+    <p class="spec-cap"><strong>Google access expired.</strong> Every calendar spot carries the same sentence; the Layers tile shows it too and drops its switches, because the page tile must match the Settings card; <code>+ Event</code> is disabled and points at the sentence as its reason. The week shows the reason once at the top and then seven days with <em>blank</em> value columns &mdash; not seven dashes, because a dash here means &ldquo;we looked and the day was free&rdquo;. The hero still reads <strong>green</strong>: the tint answers to the to-do read alone (R74), and the to-do store answered &ldquo;nothing due&rdquo; here whether or not the calendar did.</p>
     <div class="scroll"><div class="pair">
       <div class="hold w609"><p class="tab">Today &middot; <b>span 8</b></p>
-        <section class="pe-tile is-hero">
+        <section class="pe-tile is-hero is-clear">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" disabled aria-describedby="x-exp">+ Event</button></div>
           <div class="pe-body">
             <div class="fl-group"><span class="pe-grp">Scheduled</span>
@@ -1843,16 +2112,16 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
     </div>
 
     <div class="spec-q">
-      <span class="qlbl">For Riku &middot; two changes to your content document</span>
+      <span class="qlbl">Two changes to your content document &mdash; both ratified (R54)</span>
       <p>(a) When both the calendar and the to-do list fail to load, the week tile shows only the two failure sentences and no day rows, because a dash means &ldquo;we looked and the day was free&rdquo;. That deletes the seven <code>Fri 11 &mdash; &hellip; Thu 17 &mdash;</code> rows from &sect;11&rsquo;s render.</p>
       <p>(b) The problem fragments in the push are written lowercase and joined; <code>Calendar check unavailable.</code> is how it renders first in the list.</p>
       <p>And one thing to know about that render: when the database is down, each tile reports it separately &mdash; nine short amber-dotted sentences on one page for one outage, eight in the tiles and one above the grid for the arrangement that could not be read. That is per-tile honesty; it can be reduced to one page-level sentence if you would rather.</p>
     </div>
 
-    <p class="spec-cap" style="margin-top:28px"><strong>Every layer switched off.</strong> Nothing was read because a switch says so, so there is no dot and no colour: this is a state you made, and an alarm about it would be a false alarm every day. The sentence names the tile that holds the lever, and <code>+ Event</code> is disabled for the same reason &mdash; refused before the fact, never after it.</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>Every layer switched off.</strong> Nothing was read because a switch says so, so the <code>Scheduled</code> group carries no dot: this is a state you made, and an alarm about it would be a false alarm every day. The sentence names the tile that holds the lever, and <code>+ Event</code> is disabled for the same reason &mdash; refused before the fact, never after it. The hero still tints <strong>green</strong>: <code>none-enabled</code> counts as answered (R45), and it is the to-do read, not the calendar, that decides the tint (R74).</p>
     <div class="scroll"><div class="pair">
       <div class="hold w609"><p class="tab">Today &middot; <b>span 8</b></p>
-        <section class="pe-tile is-hero">
+        <section class="pe-tile is-hero is-clear">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" disabled aria-describedby="x-off">+ Event</button></div>
           <div class="pe-body">
             <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty" id="x-off">All layers are switched off.</p></div>
@@ -1970,7 +2239,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
             <main class="app-content"><div class="fl">
               <div class="pe-edit"><div class="pe-wrap"><div class="pe-grid is-editing" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
 
-                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero is-clear">
                   <div class="pe-head" inert><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" aria-expanded="false">+ Event</button></div>
                   <div class="pe-body is-pair" inert>
                     <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
@@ -2129,7 +2398,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
             </div></div>
           </section></div>
 
-          <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile is-hero">
+          <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile is-hero is-clear">
             <div class="pe-head" inert><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" aria-expanded="false">+ Event</button></div>
             <div class="pe-body is-pair" inert>
               <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
@@ -2254,7 +2523,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
             <main class="app-content"><div class="fl">
               <div class="pe-edit"><div class="pe-wrap"><div class="pe-grid is-editing" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
 
-                <div class="pe-cell pe-r1 pe-s3 pe-x2"><section class="pe-tile is-hero">
+                <div class="pe-cell pe-r1 pe-s3 pe-x2"><section class="pe-tile is-hero is-clear">
                   <div class="pe-head" inert><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" aria-expanded="false">+ Event</button></div>
                   <div class="pe-body is-pair" inert>
                     <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
@@ -2368,16 +2637,16 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
         </div></div>
       </div>
     </div>
-    <p class="spec-cap" style="margin-top:28px"><strong>A row with only a small tile in it.</strong> After a rearrangement the push tile sits alone in the first row at four columns, with eight columns of bare ground beside it. Two ways to draw that row, both in normal view: the ruled way, where a row holding fewer than six columns of tiles gives up its weight and shrinks to the tile it holds &mdash; the first row renders at <strong>131 pixels</strong>, the push tile&rsquo;s own height at four columns; and the way your content document reads literally, where the row keeps its <strong>340 pixels</strong> whatever sits in it, so the push tile is stretched to 340 with bare ground inside it under the message. Everything below the first row is identical in both.</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>A row with only a small tile in it &mdash; answered: shrink to fit.</strong> After a rearrangement the push tile sits alone in the first row at four columns. Shrink-to-fit is now the rule for every arrangement, not only this one (R53) &mdash; the first row renders at <strong>131 pixels</strong>, the push tile&rsquo;s own height at four columns. Kept below only as what it replaces: your content document&rsquo;s literal reading, where the row holds its <strong>340 pixels</strong> whatever sits in it and the push tile is stretched with bare ground under the message. Everything below the first row is identical in both.</p>
     <div class="stack">
       <div class="pane p920">
-        <p class="lbl"><b>With the rule</b> &mdash; row 1 shrinks to the push tile</p>
+        <p class="lbl"><b>Ruled &middot; shrink to fit</b> &mdash; row 1 shrinks to the push tile</p>
         <div class="pe-wrap"><div class="pe-grid" style="--tracks:auto minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
           <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile">
             <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
             <div class="pe-body"><p class="pe-ptitle">All clear &middot; 0 to review</p><p class="fl-snip">All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</p></div>
           </section></div>
-          <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile is-hero">
+          <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile is-hero is-clear">
             <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
             <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
           </section></div>
@@ -2415,13 +2684,13 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
         </div></div>
       </div>
       <div class="pane p920">
-        <p class="lbl"><b>Without it</b> &mdash; row 1 held at 340 pixels</p>
+        <p class="lbl"><b>Rejected</b> &mdash; row 1 held at 340 pixels, whatever sits in it</p>
         <div class="pe-wrap"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
           <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile">
             <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
             <div class="pe-body"><p class="pe-ptitle">All clear &middot; 0 to review</p><p class="fl-snip">All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</p></div>
           </section></div>
-          <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile is-hero">
+          <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile is-hero is-clear">
             <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
             <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
           </section></div>
@@ -2460,8 +2729,8 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
       </div>
     </div>
     <div class="spec-q">
-      <span class="qlbl">For Riku &middot; a row with only a small tile in it</span>
-      <p>A row with only a small tile in it &mdash; shrink to fit, or keep its full height? After you rearrange, a row that ends up holding only a narrow tile would shrink to fit instead of keeping its full height. That deviates from your rule that row heights are fixed whatever sits in them. Both are drawn above. Yes or no.</p>
+      <span class="qlbl">For Riku &middot; a row with only a small tile in it &mdash; answered: A</span>
+      <p>Shrink to fit. A row holding one small tile after a rearrangement now shrinks around it instead of keeping its full height &mdash; a general rule for every arrangement, not just the push tile (R53). The content deck&rsquo;s line that a row&rsquo;s height never depends on what sits in it is amended by this ruling.</p>
     </div>
   </section>
 
@@ -2471,7 +2740,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
   <section class="spec">
     <span class="spec-eyebrow">Specimen 05 &middot; Collapse</span>
     <h2 class="spec-title">Twelve columns to six</h2>
-    <p class="spec-cap">A 932-pixel window leaves a 706-pixel page column, which is below the twelve-column threshold and above the six, so the grid is six wide. Every span halves, rounded up, exactly as you specified: 8 to 4, 4 to 2, 3 to 2, 12 to 6 &mdash; the tiles render at <strong>466 &middot; 226 &middot; 226 &middot; 466 &middot; 706 &middot; 706</strong> pixels. The row weights hold, and the rows render at <strong>551 &middot; 200 &middot; 361 &middot; 210</strong>: the first grows because the To-do tile at 226 pixels puts each row&rsquo;s date and tag on a second line under the title, the third because at 706 the week is one column, not two. <strong>There is no leftover at six columns</strong> &mdash; row 2 is 2 + 4 = 6 and full &mdash; so the one empty cell that makes this a bento closes when the page narrows, and comes back when it widens. The collapse is done by measuring the grid&rsquo;s own width; there is no second set of classes anywhere in the stylesheet, and <code>+ To-do</code> stays live at 226 because the form still fits there.</p>
+    <p class="spec-cap">A 932-pixel window leaves a 706-pixel page column, which is below the twelve-column threshold and above the six, so the grid is six wide. Every span halves, rounded up, exactly as you specified: 8 to 4, 4 to 2, 3 to 2, 12 to 6 &mdash; the tiles render at <strong>466 &middot; 226 &middot; 226 &middot; 466 &middot; 706 &middot; 706</strong> pixels. The row weights hold, and the rows render at <strong>551 &middot; 200 &middot; 362.75 &middot; 210</strong>: the first grows because the To-do tile at 226 pixels puts each row&rsquo;s date and tag on a second line under the title, the third because at 706 the week is one column, not two &mdash; and, after R51b, barely moved by the disclosure collapse: at this width the day rows were already single-line before they could collapse, so there was little left to save (compare specimen 02&rsquo;s two-column busy week, which converges on the 240px floor instead). <strong>There is no leftover at six columns</strong> &mdash; row 2 is 2 + 4 = 6 and full &mdash; so the one empty cell that makes this a bento closes when the page narrows, and comes back when it widens. The collapse is done by measuring the grid&rsquo;s own width; there is no second set of classes anywhere in the stylesheet, and <code>+ To-do</code> stays live at 226 because the form still fits there.</p>
 
     <div class="scroll">
       <div class="frame f932">
@@ -2545,13 +2814,13 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
                 <div class="pe-cell pe-r3 pe-s12 pe-x6"><section class="pe-tile">
                   <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
                   <div class="pe-body"><div class="pe-week">
-                    <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div>
-                    <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><span>Revise proposal</span><span class="pe-l">&middot; Freelance</span></span></span></div>
-                    <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><span class="pe-t">15:00</span><span>Image Processing</span><span class="pe-l">&middot; Classes</span></span></span></div>
-                    <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><span>Renew ID</span><span class="pe-l">&middot; Personal</span></span></span></div>
+                    <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+                    <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><details class="disclose"><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><span>Revise proposal</span><span class="pe-l">&middot; Freelance</span></span></span></div></details></div>
+                    <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><span class="pe-t">15:00</span><span>Image Processing</span><span class="pe-l">&middot; Classes</span></span></span></div></details></div>
+                    <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><details class="disclose"><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><span>Renew ID</span><span class="pe-l">&middot; Personal</span></span></span></div></details></div>
                     <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
                     <div class="pe-row is-day"><span class="pe-daylbl">Sun 25</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
-                    <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><span>Lab report 2</span><span class="pe-l">&middot; Academics</span></span></span></div>
+                    <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><details class="disclose"><summary><div class="sumrow"><span>Project Management</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><span>Lab report 2</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
                   </div></div>
                 </section></div>
 
@@ -2575,7 +2844,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
     <div class="scroll">
       <div class="pane p706">
         <div class="pe-wrap"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto)">
-          <div class="pe-cell pe-r1 pe-s3 pe-x2"><section class="pe-tile is-hero">
+          <div class="pe-cell pe-r1 pe-s3 pe-x2"><section class="pe-tile is-hero is-clear">
             <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
             <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
           </section></div>
@@ -2603,15 +2872,15 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
       </div>
     </div>
 
-    <p class="spec-cap" style="margin-top:28px"><strong>One of six &mdash; 106 pixels, 80 pixels of inner width.</strong> The narrowest cell the collapse can produce. Every tile still renders its eyebrow, so a tile reduced to one sentence still says which tile it is. The failure sentence wraps and the tile grows &mdash; it never truncates, because a failure sentence that truncates is a failure to report. And the distinction the page rests on survives at this width, because it is carried by a 5px dot that is the same size here as it is at 609 pixels, not by a coloured word.</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>One of six &mdash; 106 pixels, 80 pixels of inner width.</strong> The narrowest cell the collapse can produce. Every tile still renders its eyebrow, so a tile reduced to one sentence still says which tile it is. The failure sentence wraps and the tile grows &mdash; it never truncates, because a failure sentence that truncates is a failure to report. And the distinction the page rests on survives at this width, because it is carried by a 5px dot that is the same size here as it is at 609 pixels, not by a coloured word. Both heroes below tint <strong>green</strong>, on purpose: the tint reads the to-do store alone, so a calendar that did not answer (right) tints exactly like one that answered and had nothing (left) &mdash; the amber dot is still the thing that tells them apart (R74).</p>
     <div class="scroll"><div class="pair">
       <div class="hold w106"><p class="tab">Read, empty</p>
-        <section class="pe-tile is-hero">
+        <section class="pe-tile is-hero is-clear">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
           <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
         </section></div>
       <div class="hold w106"><p class="tab">Did not answer</p>
-        <section class="pe-tile is-hero">
+        <section class="pe-tile is-hero is-clear">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
           <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t read the calendar.</span></div></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
         </section></div>
@@ -2653,6 +2922,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
     <h2 class="spec-title">Adding, editing, deleting &mdash; in place</h2>
     <p class="spec-cap">A form replaces the tile&rsquo;s body; it never scrolls and it never opens a dialog. The well is sunk into the tile, so nothing nests a second card. The fields are the browser&rsquo;s own date, time and select controls &mdash; the only genuinely one-handed date entry there is on a phone &mdash; at 16 pixels, which is the size below which iOS zooms into a focused field and does not zoom back out.</p>
     <p class="spec-cap"><strong>Measured.</strong> The event form&rsquo;s well is <strong>322px</strong> tall and the whole tile <strong>421.35px</strong>, so the form grows row 1 from 340 to 421 &mdash; visible, and stated, which is the point; it does not scroll and the columns do not move. At eight columns <code>Calendar</code> and <code>Date</code> sit side by side, and so do <code>Start</code> and <code>End</code>. The to-do form at four columns is one column top to bottom, its well <strong>340.5px</strong> tall and the tile 426.35 &mdash; pairs need 406 pixels of tile, and four columns is 297.</p>
+    <p class="spec-cap"><strong>Not tinted, and left that way on purpose.</strong> The two hero panes below have their <code>Due</code> group replaced by an open form, so nothing here shows what is actually pending. R70&ndash;R76 rule the tint against the <code>Due</code> group's own render and rule edit mode's case explicitly (R75); they do not say whether the tint should survive an add-event form covering that group. Rather than guess, both render in the plain untinted state &mdash; the honest choice when the fact a tint would assert is not on screen &mdash; and this is flagged for a ruling rather than decided here.</p>
 
     <div class="scroll"><div class="pair">
       <div class="hold w609"><p class="tab">Add an event &middot; <b>span 8, two columns</b></p>
@@ -2940,7 +3210,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
       </div>
 
       <div class="hold w609"><p class="tab">An event added outside the coming week</p>
-        <section class="pe-tile is-hero">
+        <section class="pe-tile is-hero is-clear">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
           <p class="pe-said">Added. It&rsquo;s on Fri 24 Oct, outside this week.</p>
           <div class="pe-body">
@@ -3055,7 +3325,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
         <p class="spec-cap" style="margin-top:9px"><b class="prop">proposed</b> &mdash; Classes is no longer on your Google account. Untick it in Settings. A calendar that has gone from Google is something you did, not something that will come back if the page waits, so the sentence carries no dot and no colour &mdash; the same quiet grey as <code>All layers are switched off.</code> The row stays in the list, still ticked and still live, because the sentence tells you to untick it and there has to be something to untick. The list is built from the calendars you chose, not from Google&rsquo;s answer, for exactly this case.</p>
       </div>
       <div class="hold w609"><p class="tab">The same, on the page &middot; <b>span 8</b></p>
-        <section class="pe-tile is-hero">
+        <section class="pe-tile is-hero is-clear">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
           <div class="pe-body">
             <div class="fl-group"><span class="pe-grp">Scheduled</span>
@@ -3067,7 +3337,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
             <div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div>
           </div>
         </section>
-        <p class="spec-cap" style="margin-top:9px">Where the layer&rsquo;s own failure sentence would have sat, after the rows that did arrive. No dot: nothing here is waiting to come back.</p>
+        <p class="spec-cap" style="margin-top:9px">Where the layer&rsquo;s own failure sentence would have sat, after the rows that did arrive. No dot: nothing here is waiting to come back. Green, because the to-do store answered <code>Nothing due.</code> &mdash; a vanished calendar has no bearing on the tint (R74).</p>
       </div>
     </div></div>
   </section>
@@ -3078,9 +3348,90 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
   <section class="spec">
     <span class="spec-eyebrow">Specimen 08 &middot; Phone</span>
     <h2 class="spec-title">The stack, drawn honestly</h2>
-    <p class="spec-cap">Below a 706-pixel grid the page is a one-column stack. On a phone today the menu strip takes 170 of 390 pixels, which leaves the page <strong>164</strong>. That is the left-hand frame, drawn as it actually renders rather than as it would be nice to imagine, with exactly the same rows as the frame beside it; the one thing that differs is the two add buttons, which are switched off at 164 because no form fits under 213 pixels of tile. Nothing is clipped &mdash; every tile keeps its eyebrow, the switches are 44 pixels tall, the dashed leftover is not drawn because a stack has no leftover, each row puts its tag and date on a second line so the title keeps the whole first &mdash; but the tiles are ribbons: a to-do title has 110 pixels, <strong>17 characters</strong> of <code>Submit clearance form</code> before it is cut, the tags and dates stack under it, and the page title collides with its own button in the header. The right-hand frame is the same phone with a thin menu bar across the top instead: the page gets the whole 334 pixels, and the coloured worker badges have nowhere to sit, so they are not there.</p>
+    <p class="spec-cap">Below a 706-pixel grid the page is a one-column stack. <strong>Answered: the thin top strip, app-wide (R50).</strong> That is the left-hand frame &mdash; the ruled shell, not one of two options &mdash; a 44-pixel bar in place of the rail, the page taking the whole <strong>334</strong> pixels, and the coloured worker badges hidden there until the proper phone design (accepted, stated in R50). The right-hand frame is what it replaces: the 170px rail beside a 164-pixel page, drawn as it actually renders, kept only for comparison. On the rail frame the two add buttons are switched off at 164 because no form fits under 213 pixels of tile; on the ruled frame, at 334, both open. Nothing is clipped on either &mdash; every tile keeps its eyebrow, the switches are 44 pixels tall, the dashed leftover is not drawn because a stack has no leftover, each row puts its tag and date on a second line so the title keeps the whole first line &mdash; but the tiles are ribbons: a to-do title has 110 pixels at 164, <strong>17 characters</strong> of <code>Submit clearance form</code> before it is cut.</p>
 
     <div class="scroll"><div class="pair">
+      <div><p class="lbl"><b>The ruled shell</b> &middot; the thin top strip, every page</p>
+      <div class="frame f390"><div class="app">
+        <div class="phonebar">
+          <div class="app-brand"><span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span></div>
+          <nav class="app-nav" aria-label="Main">
+            <span class="navitem is-active">Personal</span>
+            <span class="navitem">Freelance</span>
+            <span class="navitem">Settings</span>
+          </nav>
+          <button type="button" class="btn ghost">Log out</button>
+        </div>
+        <div class="app-main">
+          <div class="fl-head"><div class="fl"><div class="fl-headrow"><h3 class="fl-title">Personal</h3><button type="button" class="btn">Edit layout</button></div></div></div>
+          <main class="app-content"><div class="fl">
+            <div class="pe-wrap"><div class="pe-grid">
+              <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+                <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
+                <div class="pe-body">
+                  <div class="fl-group"><span class="pe-grp">Scheduled</span><div class="pe-rows">
+                    <div class="pe-row is-sched"><span class="pe-time">07:00&ndash;08:50</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Project Management</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Classes</span></div>
+                    <div class="pe-row is-sched"><span class="pe-time">09:00&ndash;10:50</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Math Methods</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Classes</span></div>
+                  </div></div>
+                  <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+                  </div></div>
+                </div>
+              </section></div>
+              <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">To-do</span><span class="fl-count">6 open</span></div><button type="button" class="btn">+ To-do</button></div>
+                <div class="pe-body">
+                  <div class="fl-group"><span class="pe-grp">Personal</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Renew ID&quot;"><span class="pe-nm">Renew ID</span><span class="pe-due">Fri 23</span></button></div>
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Book dentist&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Book dentist&quot;"><span class="pe-nm">Book dentist</span></button></div>
+                  </div></div>
+                  <div class="fl-group"><span class="pe-grp">Freelance</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="pe-on">on calendar</span><span class="pe-due is-late">3 days late</span></button></div>
+                  </div></div>
+                  <div class="fl-group"><span class="pe-grp">Academics</span><div class="pe-rows">
+                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="pe-due">tomorrow</span></button></div>
+                  </div></div>
+                </div>
+              </section></div>
+              <div class="pe-cell pe-r2 pe-s3 pe-x2"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">Layers</span></div></div>
+                <div class="pe-body"><div class="pe-layers">
+                  <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Personal</span><span class="swx on"><b></b></span></button>
+                  <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Classes</span><span class="swx on"><b></b></span></button>
+                  <button type="button" class="pe-sw" role="switch" aria-checked="false"><span class="nm">Events</span><span class="swx"><b></b></span></button>
+                </div></div>
+              </section></div>
+              <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
+                <div class="pe-body"><p class="pe-ptitle">1 problem &middot; 2 to review</p><p class="fl-snip">Meowchi unreachable. Today: Project Management 07:00, Math Methods 09:00, Call with Nova Dental 13:00. Due: Pay tuition (today), Reviewer ch.3 (tomorrow). Overdue: Send invoice (3d). 1 waiting on you, 0 overdue.</p></div>
+              </section></div>
+              <div class="pe-cell is-gap pe-r2 pe-s1 pe-x0"><div class="pe-gap"></div></div>
+              <div class="pe-cell pe-r3 pe-s12 pe-x6"><section class="pe-tile">
+                <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
+                <div class="pe-body"><div class="pe-week">
+                  <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Sun 25</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
+                </div></div>
+              </section></div>
+              <div class="pe-cell pe-r4 pe-s12 pe-x6"><section class="pe-tile">
+                <div class="pe-head is-inline"><span class="eyebrow">Done this week</span><span class="fl-count">3</span></div>
+                <div class="pe-body"><div class="pe-rows">
+                  <div class="pe-row is-item"><button type="button" class="tick" role="checkbox" aria-checked="true" aria-label="Undo &quot;Submit clearance form&quot;"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.3l2 2L8 2.7"/></svg></button><span class="pe-nm">Submit clearance form</span><span class="tag">Academics</span><span class="pe-due">Sun 18</span></div>
+                  <div class="pe-row is-item"><button type="button" class="tick" role="checkbox" aria-checked="true" aria-label="Undo &quot;Reply to sir Pura&quot;"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.3l2 2L8 2.7"/></svg></button><span class="pe-nm">Reply to sir Pura</span><span class="tag">Personal</span><span class="pe-due">Sat 17</span></div>
+                </div></div>
+              </section></div>
+            </div></div>
+          </div></main>
+        </div>
+      </div></div></div>
+
+      <div><p class="lbl"><b>What it replaces</b> &middot; the 170px rail, unchanged</p>
       <div class="frame f390"><div class="app"><div class="app-body">
         <aside class="app-side">
           <div class="app-brand"><span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span></div>
@@ -3146,7 +3497,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
               <div class="pe-cell pe-r3 pe-s12 pe-x6"><section class="pe-tile">
                 <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
                 <div class="pe-body"><div class="pe-week">
-                  <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div>
+                  <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><details class="disclose"><summary><div class="sumrow"><span>Math Methods</span><span class="fl-count">2 items</span></div></summary><div class="fl-open"><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div></details></div>
                   <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
                   <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span></span></div>
                   <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
@@ -3166,105 +3517,25 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
           </div></main>
         </div>
       </div></div></div>
-
-      <div class="frame f390"><div class="app">
-        <div class="phonebar">
-          <div class="app-brand"><span class="tile"><svg viewBox="0 0 24 24" fill="#2A1002" aria-hidden="true"><path d="M12 1.6l1.7 6.1 4.5-4.4-2.4 6 6.1-1.7-5.4 3.3 5.4 3.3-6.1-1.7 2.4 6-4.5-4.4L12 22.4l-1.7-6.1-4.5 4.4 2.4-6-6.1 1.7 5.4-3.3-5.4-3.3 6.1 1.7-2.4-6 4.5 4.4z"/></svg></span></div>
-          <nav class="app-nav" aria-label="Main">
-            <span class="navitem is-active">Personal</span>
-            <span class="navitem">Freelance</span>
-            <span class="navitem">Settings</span>
-          </nav>
-          <button type="button" class="btn ghost">Log out</button>
-        </div>
-        <div class="app-main">
-          <div class="fl-head"><div class="fl"><div class="fl-headrow"><h3 class="fl-title">Personal</h3><button type="button" class="btn">Edit layout</button></div></div></div>
-          <main class="app-content"><div class="fl">
-            <div class="pe-wrap"><div class="pe-grid">
-              <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
-                <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
-                <div class="pe-body">
-                  <div class="fl-group"><span class="pe-grp">Scheduled</span><div class="pe-rows">
-                    <div class="pe-row is-sched"><span class="pe-time">07:00&ndash;08:50</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Project Management</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Classes</span></div>
-                    <div class="pe-row is-sched"><span class="pe-time">09:00&ndash;10:50</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Math Methods</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Classes</span></div>
-                  </div></div>
-                  <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
-                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
-                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
-                  </div></div>
-                </div>
-              </section></div>
-              <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile">
-                <div class="pe-head"><div><span class="eyebrow">To-do</span><span class="fl-count">6 open</span></div><button type="button" class="btn">+ To-do</button></div>
-                <div class="pe-body">
-                  <div class="fl-group"><span class="pe-grp">Personal</span><div class="pe-rows">
-                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Renew ID&quot;"><span class="pe-nm">Renew ID</span><span class="pe-due">Fri 23</span></button></div>
-                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Book dentist&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Book dentist&quot;"><span class="pe-nm">Book dentist</span></button></div>
-                  </div></div>
-                  <div class="fl-group"><span class="pe-grp">Freelance</span><div class="pe-rows">
-                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="pe-on">on calendar</span><span class="pe-due is-late">3 days late</span></button></div>
-                  </div></div>
-                  <div class="fl-group"><span class="pe-grp">Academics</span><div class="pe-rows">
-                    <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="pe-due">tomorrow</span></button></div>
-                  </div></div>
-                </div>
-              </section></div>
-              <div class="pe-cell pe-r2 pe-s3 pe-x2"><section class="pe-tile">
-                <div class="pe-head"><div><span class="eyebrow">Layers</span></div></div>
-                <div class="pe-body"><div class="pe-layers">
-                  <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Personal</span><span class="swx on"><b></b></span></button>
-                  <button type="button" class="pe-sw" role="switch" aria-checked="true"><span class="nm">Classes</span><span class="swx on"><b></b></span></button>
-                  <button type="button" class="pe-sw" role="switch" aria-checked="false"><span class="nm">Events</span><span class="swx"><b></b></span></button>
-                </div></div>
-              </section></div>
-              <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile">
-                <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
-                <div class="pe-body"><p class="pe-ptitle">1 problem &middot; 2 to review</p><p class="fl-snip">Meowchi unreachable. Today: Project Management 07:00, Math Methods 09:00, Call with Nova Dental 13:00. Due: Pay tuition (today), Reviewer ch.3 (tomorrow). Overdue: Send invoice (3d). 1 waiting on you, 0 overdue.</p></div>
-              </section></div>
-              <div class="pe-cell is-gap pe-r2 pe-s1 pe-x0"><div class="pe-gap"></div></div>
-              <div class="pe-cell pe-r3 pe-s12 pe-x6"><section class="pe-tile">
-                <div class="pe-head"><div><span class="eyebrow">Next 7 days</span></div></div>
-                <div class="pe-body"><div class="pe-week">
-                  <div class="pe-row is-day"><span class="pe-daylbl">Tue 20</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span><span class="pe-it"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><span>Reviewer ch.3</span><span class="pe-l">&middot; Academics</span></span></span></div>
-                  <div class="pe-row is-day"><span class="pe-daylbl">Wed 21</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
-                  <div class="pe-row is-day"><span class="pe-daylbl">Thu 22</span><span class="pe-items"><span class="pe-it"><span class="pe-t">09:00</span><span>Math Methods</span><span class="pe-l">&middot; Classes</span></span></span></div>
-                  <div class="pe-row is-day"><span class="pe-daylbl">Fri 23</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
-                  <div class="pe-row is-day"><span class="pe-daylbl">Sat 24</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
-                  <div class="pe-row is-day"><span class="pe-daylbl">Sun 25</span><span class="pe-items"><span class="pe-it"><span class="pe-t">all day</span><span>Baguio trip</span><span class="pe-l">&middot; Personal</span></span></span></div>
-                  <div class="pe-row is-day"><span class="pe-daylbl">Mon 26</span><span class="pe-items"><span class="pe-it"><span class="pe-t">07:00</span><span>Project Management</span><span class="pe-l">&middot; Classes</span></span></span></div>
-                </div></div>
-              </section></div>
-              <div class="pe-cell pe-r4 pe-s12 pe-x6"><section class="pe-tile">
-                <div class="pe-head is-inline"><span class="eyebrow">Done this week</span><span class="fl-count">3</span></div>
-                <div class="pe-body"><div class="pe-rows">
-                  <div class="pe-row is-item"><button type="button" class="tick" role="checkbox" aria-checked="true" aria-label="Undo &quot;Submit clearance form&quot;"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.3l2 2L8 2.7"/></svg></button><span class="pe-nm">Submit clearance form</span><span class="tag">Academics</span><span class="pe-due">Sun 18</span></div>
-                  <div class="pe-row is-item"><button type="button" class="tick" role="checkbox" aria-checked="true" aria-label="Undo &quot;Reply to sir Pura&quot;"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.3l2 2L8 2.7"/></svg></button><span class="pe-nm">Reply to sir Pura</span><span class="tag">Personal</span><span class="pe-due">Sat 17</span></div>
-                </div></div>
-              </section></div>
-            </div></div>
-          </div></main>
-        </div>
-      </div></div>
     </div></div>
 
     <div class="spec-q">
-      <span class="qlbl">For Riku &middot; the phone</span>
-      <p>The menu on the left is a fixed strip 170 pixels wide on every screen, phone included. On a phone that leaves about a third of the screen for the page.</p>
-      <p><strong>Option A &mdash; fix the menu now:</strong> on a narrow screen the menu becomes a thin bar across the top and the page gets the whole width; the morning works &mdash; push buzzes, open the page, read the day, tick with one thumb; the cost is that the coloured worker badges have nowhere to sit on a phone and are hidden there until the proper phone design.</p>
-      <p><strong>Option B &mdash; leave it:</strong> Personal is a laptop page for now; on a phone you read the notification itself; the phone layout gets its own design round later; the cost is that the reason this page exists &mdash; <em>phone buzzes at 07:00, this is where you go next</em> &mdash; does not work yet.</p>
-      <p>Both are drawn above. The lead&rsquo;s recommendation is A, as a stopgap the phone pass replaces; four of five of the team preferred B, on the grounds that a page phase should not change the shell.</p>
-      <p>With the menu strip beside the page, the page is too narrow to open the add-event or add-to-do form at all &mdash; both buttons are switched off there; with the thin top bar, both forms open.</p>
+      <span class="qlbl">For Riku &middot; the phone &mdash; answered: A (R50)</span>
+      <p>On a narrow screen the menu becomes the thin bar drawn on the left above, and the page gets the whole width. The morning works &mdash; push buzzes, open the page, read the day, tick with one thumb. The cost, accepted with the answer: the coloured worker badges have nowhere to sit in a 44px strip and are hidden at phone width until the proper phone design round; it is explicitly provisional, and that later pass owes this shape nothing.</p>
+      <p>This is a <strong>shell</strong> change, so it lands on every page, not just Personal &mdash; the Freelance page inherits it. Four of five of the design team preferred leaving the rail alone, on the grounds that a page phase should not change the shell; Riku chose the thin bar with that disagreement in front of him, in writing.</p>
+      <p>With the menu strip beside the page (right, kept only as what it replaces), the page is too narrow to open the add-event or add-to-do form at all &mdash; both buttons are switched off there; with the thin top bar (left, the ruled shell), both forms open.</p>
     </div>
   </section>
 
   <hr class="doc-rule">
   <section class="spec">
     <span class="spec-eyebrow">Closing</span>
-    <h2 class="spec-title">What is still open</h2>
-    <p class="spec-cap">Five things on this page are yours to settle: the phone (specimen 08), the week tile&rsquo;s one or two columns (specimen 01), the hero&rsquo;s look (specimen 01), whether a row holding only a small tile should shrink to fit instead of keeping its full height (specimen 04), and the two edits to your content document (specimen 03). Every sentence marked <b class="prop">proposed</b> is a wording nobody has agreed with you yet; yours wins. They are gathered below in one place.</p>
+    <h2 class="spec-title">What round 5 closed, and what is still open</h2>
+    <p class="spec-cap"><strong>Closed.</strong> SHELL (R50, the thin top strip, app-wide), ROW (R53, shrink-to-fit), WORDS (R54/R55, all eleven sentences ship as written, every failure dot stays), and TILE&rsquo;s column count and disclosure mechanism (R51/R51b, R56&ndash;R69, R77). MARK (R52, R70&ndash;R76): a tinted hero, green when nothing is pending, orange at four or more, the old untinted mark for everything between.</p>
+    <p class="spec-cap"><strong>Left open by this pass, both flagged where they are drawn:</strong> whether an overdue to-do should force the busy tint outright even with nothing else pending &mdash; R73&rsquo;s call was no, don&rsquo;t give lateness a second escalation channel, but it is a one-line yes/no if you want it changed; and whether the hero&rsquo;s tint should survive its own add-event form being open &mdash; no ruling covers it, so specimen 06 draws those two panes untinted rather than guess. Everything else below is settled and shipped, not proposed.</p>
     <div class="spec-q">
-      <span class="qlbl">For Riku &middot; the eleven new sentences, all in one place</span>
-      <p>Each is drawn on this page where it would appear, except the two marked as not drawn. Proposed wording; yours wins.</p>
+      <span class="qlbl">The eleven new sentences, all in one place &mdash; shipped as written (R54)</span>
+      <p>Each is drawn on this page where it would appear, except the two marked as not drawn.</p>
       <ul>
         <li>Every calendar layer switched off &mdash; on the page: All layers are switched off. In the push: Today: no layers switched on. (not drawn; or the push&rsquo;s existing Off: shape, e.g. Off: calendar layers.)</li>
         <li>The morning push went out but its text was not stored: A push went out this morning. Its text wasn&rsquo;t stored.</li>
