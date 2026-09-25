@@ -42,12 +42,14 @@ The third reason is the one that forecloses it. Under R83 below, the untinted he
 
 Green at 0, orange at 3, red at 8, clamped at 8 — a day with fourteen things looks like a day with eight. 1 and 2 interpolate green→orange; 4 through 7 interpolate orange→red. Nine states, no tenth.
 
-**The two segments are not the same length and that is deliberate on his part**, not an oversight to smooth out: the first three items move the colour as far as the next five do. A day going from nothing to three things has changed more, to him, than a day going from four to eight. The ramp is built to the anchors he gave, not to an even spacing between them.
+**The two segments are not the same length and that is deliberate on his part**, not an oversight to smooth out: the first three items move the colour **1.8× as far** as the next five do — measured, not estimated, as an end-to-end OKLab ΔE of .1110 split .0774 across the first leg and .0422 across the second. A day going from nothing to three things has changed more, to him, than a day going from four to eight. The ramp is built to the anchors he gave, not to an even spacing between them.
+
+*(An earlier draft of this ruling said the first three items move the colour "as far as" the next five. The measured figure is 1.8×, forced by his anchors rather than chosen; the claim is corrected here rather than the ramp being retuned to make it true.)*
 
 **The cost, recorded here so nobody rediscovers it as a bug — and it is larger than R52's.** R52 already cost `--spend` a second, page-local meaning, and that was written down. This ruling spends three more:
 
 - **`--missing` (red) acquires a page-local second meaning** — a very full day — on top of "overdue". The page can now show a red-tinted hero whose rows are all on time.
-- **`--stale`'s hue is crossed by the ramp** somewhere between orange and red without meaning "a feed did not answer".
+- **`--stale`'s hue is crossed by the ramp** without meaning "a feed did not answer" — **on the green→orange leg, at step 2**, not between orange and red as this ruling first said. Amber sits at hue ~42°, between green's ~158° and orange's ~22°; nothing semantic sits between orange and red at all. Step 2's border gamut-maps to `rgba(217,169,0,.2)`, which is effectively `--stale`. The collision was drawn and checked rather than argued: a 5px saturated disc with a glow is not confusable with a 20%-alpha border, and the mockup renders a step-1 hero carrying its amber `Couldn't read Classes.` dot to prove it. The cost is real; it is simply in the other segment.
 - **`--save` (green) becomes a claim about volume**, not only "healthy".
 
 What keeps the system honest is **register, and it is the only thing that does: the ramp is a background wash and is never ink.** `--missing` as ink on a row still means exactly one thing — this is late. `--stale` on a 5px dot still means exactly one thing — this did not answer. A hue washed behind a whole tile and a hue printed in a word are not the same signal and are not confusable at a glance. That distinction is now load-bearing for the page's whole colour system, so it is written into the spec as a rule (R84), not left as an observation.
@@ -86,6 +88,11 @@ Anchor 8 has no source to port from — `DESIGN-INSPO.md`'s card-tint block give
 **Reason.** Every tint in the system was tuned by eye against its hue and then frozen; the four that exist agree with each other closely enough that a fifth has a clear target to hit. Writing a value into a ruling that nobody has looked at on a screen would be exactly the kind of computed-not-measured number round 4 struck three times (R38's 200, R40's 96 and 146). The formula is ruled; the pixels are measured.
 
 **The one substantive constraint on the tuning.** The near-neutral stop must sit close to the other four (`#141013`, `#0F1417`, `#111117`, `#141209` — all within a hair of `--raised`'s luminance), because R70's whole contrast result rests on the 62%-and-beyond region of every tint being effectively `--raised`. A red tint that brightens that stop would move contrast for every ink on the tile at once.
+
+**As built, and carried into the spec.** Anchor 8 is `#3A0B0B` → `#191016` at 62%, border `rgba(248,113,113,.2)`, and it ships as a third token, **`--tint-missing`**. Two things about its construction are worth recording, because the nine values are frozen and someone will eventually want to know how they were derived:
+
+- **The calibration used WCAG relative luminance, not HSL lightness**, which disagrees wildly across the four existing tints and is not a usable family test. Anchor 8's near-neutral lands at .006352 against the existing band of .005663–.006637; its deep stop at .011630, mid-band between `--tint-stale`'s and `--tint-save`'s. Three brighter and darker candidates were drawn side by side and rejected — `#440D0D` read well and matched the green anchor's presence exactly, but was the brightest deep stop in the system and began to read as an alarm rather than a tint.
+- **The six intermediate steps were interpolated in OkLCh on the short hue arc for the deep stop and the border, and in straight OKLab for the near-neutral.** A straight OKLab line on the deep stop collapses chroma through grey on the green→orange leg and produced a muddy grey-green that made steps 1 and 2 look like mistakes; hue in LCh is meaningless at the near-neutral's chroma, so that one stays OKLab. Out-of-gamut results were gamut-mapped by reducing chroma, never by clipping a channel. **This is a build-time method only — the shipped CSS is frozen hex** (R80), and nothing recomputes it at runtime.
 
 ---
 

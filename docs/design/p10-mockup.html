@@ -817,14 +817,32 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
   background:var(--raised);border:1px solid var(--line);border-radius:var(--r-card);
   padding:15px 16px;min-width:0;overflow:hidden;
 }
-/* R70: the two tint recipes, ported verbatim from DESIGN-INSPO's Card
-   tint recipe — the busy/clear pair --tint-roi and --tint-stale already
-   established the shape for. Declared as page-local custom properties,
-   not in the tokens block above, because tokens.css does not carry them
-   yet (see the note beside .pe-tile.is-hero.is-clear/.is-busy below). */
+/* R81: the ramp's THREE ANCHORS. Two are ported verbatim from
+   DESIGN-INSPO's Card tint recipe — the shape --tint-roi and
+   --tint-stale already established. The third has no source to port
+   from (no --tint-missing exists anywhere in the system) and is built
+   to the same formula: 155deg, a deep desaturated --missing #F87171,
+   into a near-neutral at 62%. Its two stops were tuned against the
+   four existing tints and measured, not computed:
+     deep  #3A0B0B — WCAG L .01163, between --tint-stale's deep stop
+                     (#241A03, .01121) and --tint-save's (#052620,
+                     .01523); mid-band, so the red end is no more
+                     present than the green end, which is what keeps
+                     it a tint and not an alarm.
+     62%   #191016 — WCAG L .00635, inside the band the other four
+                     near-neutral stops sit in (#141013 .00566,
+                     #111117 .00582, #141209 .00601, #0F1417 .00664)
+                     and 25% darker than --raised, the same direction
+                     all four already go. R81's one hard constraint.
+   Declared as page-local custom properties, not in the tokens block
+   above, because tokens.css does not carry them yet: R84 ships that
+   port — plus the amended hue comments — in the same commit as this
+   page's build. Page-local until then; no other surface may consume
+   them without its own ruling. */
 :root{
-  --tint-spend:linear-gradient(155deg,#2A1408,#141013 62%);
-  --tint-save:linear-gradient(155deg,#052620,#0F1417 62%);
+  --tint-save:   linear-gradient(155deg,#052620,#0F1417 62%);  /* anchor 0 */
+  --tint-spend:  linear-gradient(155deg,#2A1408,#141013 62%);  /* anchor 3 */
+  --tint-missing:linear-gradient(155deg,#3A0B0B,#191016 62%);  /* anchor 8 */
 }
 /* the hero (R8): three structural facts, no hue — the #171B21 ground,
    the border lifted to --ink-4 (.btn:hover's shipped value), and the
@@ -832,24 +850,53 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
    shrunk. No inset hairline: it would be drawn in the colour of the
    border it sits inside. */
 .pe-tile.is-hero{background:#171B21;border-color:var(--ink-4);border-radius:var(--r-feature)}
-/* ---- the hero's tint (R52, R70–R76): a page-local reading of --spend
-   and --save, keyed to the Due group's own count — nothing else. Ported,
-   not invented, from DESIGN-INSPO's own Card tint recipe (lines 83–91),
-   the same 155deg / deep-stop / near-neutral-at-62% shape --tint-roi and
-   --tint-stale already use in the tokens block above. Declared here,
-   not there, because tokens.css does not carry them yet: R76 ships that
-   port — plus the amended --spend comment — in the same commit as this
-   page's build. Page-local until then; no other surface may consume
-   these two without its own ruling.
-   nothing pending -> --tint-save (green); 4+ pending -> --tint-spend
-   (orange); 1–3 pending, OR the to-do read failed, take neither and
-   fall back to the plain .pe-tile.is-hero render above (R72) — an
-   untinted hero asserts nothing, which is true whether the honest count
-   is "a few" or "unknown". The radius never moves (R71); the border
-   lifts to the tint's own hue at the tint's own alpha, the same rule
-   every other tinted card on this page already follows. */
-.pe-tile.is-hero.is-clear{background:var(--tint-save);border-color:rgba(53,211,153,.2)}
-.pe-tile.is-hero.is-busy{background:var(--tint-spend);border-color:rgba(255,138,61,.2)}
+/* ---- the hero's tint (R79–R84): a RAMP, not two states. One position
+   on it per day, driven by `pending` = to-dos due today plus anything
+   overdue (R73, confirmed by Riku; scheduled events never count, and an
+   overdue item counts as one like any other, it does not force the top
+   of the ramp). Green at 0, orange at 3, red at 8, clamped at 8 — a day
+   with fourteen things looks like a day with eight. The two segments are
+   deliberately unequal: the first three items move the colour as far as
+   the next five do.
+
+   NINE FROZEN CLASSES, chosen by one pure lookup (R80), for R3's reason
+   restated: an out-of-range stored value matches no rule and is
+   therefore VISIBLE as the untinted hero — the safe render — where an
+   interpolation function would hand back an arbitrary colour,
+   confidently. No inline style, no per-render custom property, no
+   runtime colour maths, no Sass-style function. The six intermediate
+   pairs were interpolated once (OkLCh on the deep stop and the border so
+   the green→orange leg keeps its chroma and passes through amber rather
+   than through grey; OKLab on the near-neutral stop, which is neutral by
+   construction), checked by eye as a strip, measured, and then written
+   here as literal hex. They are page-local: they have exactly one
+   consumer and tokens.css does not carry values one page uses.
+
+   The border moves with the fill and the radius never does (R82). Nine
+   fills under one frozen border colour would be the tinted-fill /
+   hueless-border mistake nine times; --r-feature is invariant across all
+   nine and across the untinted render.
+
+   THE UNTINTED RENDER (.pe-tile.is-hero with no .pe-tN) now means
+   exactly one thing: the to-do store did not answer, so the page has no
+   count and claims nothing (R83). R72's "1–3 pending" middle band is
+   gone — 1, 2 and 3 have tints of their own. A calendar failure never
+   untints the hero, because events never counted (R74).
+
+   REGISTER IS WHAT KEEPS THIS HONEST (R84). The ramp is a background
+   wash and is never ink. --missing as ink on a row still means exactly
+   one thing — this is late — and it is drawn on the red wash in
+   specimen 01 so that composition can be judged rather than described.
+   No surface but this one may carry a semantic hue as a wash. */
+.pe-tile.is-hero.pe-t0{background:var(--tint-save);border-color:rgba(53,211,153,.2)}
+.pe-tile.is-hero.pe-t1{background:linear-gradient(155deg,#16220E,#111316 62%);border-color:rgba(155,196,72,.2)}
+.pe-tile.is-hero.pe-t2{background:linear-gradient(155deg,#231B03,#131114 62%);border-color:rgba(217,169,0,.2)}
+.pe-tile.is-hero.pe-t3{background:var(--tint-spend);border-color:rgba(255,138,61,.2)}
+.pe-tile.is-hero.pe-t4{background:linear-gradient(155deg,#2D1307,#151014 62%);border-color:rgba(255,132,72,.2)}
+.pe-tile.is-hero.pe-t5{background:linear-gradient(155deg,#311107,#161014 62%);border-color:rgba(254,127,83,.2)}
+.pe-tile.is-hero.pe-t6{background:linear-gradient(155deg,#341007,#171015 62%);border-color:rgba(253,122,93,.2)}
+.pe-tile.is-hero.pe-t7{background:linear-gradient(155deg,#370D09,#181015 62%);border-color:rgba(251,117,103,.2)}
+.pe-tile.is-hero.pe-t8{background:var(--tint-missing);border-color:rgba(248,113,113,.2)}
 
 /* ---- head (R11) ------------------------------------------------- */
 .pe-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}
@@ -1334,12 +1381,32 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
 /* the hero comparison and the push tile's states are drawn at the
    height their row gives them, not at natural height */
 .h340 .pe-tile{min-height:340px}
+.h404 .pe-tile{min-height:404px}
+
+/* The nine-state ramp drawn as ONE strip exactly 609 pixels wide, so the
+   whole ramp is judgeable as a ramp at a glance — nine full-width tiles
+   are 5.6 metres of sideways drag and read as nine unrelated tiles,
+   which is the thing R79's fix pass is meant to prevent. Each chip
+   carries the SAME .pe-tN rule the full-width renders below use; the
+   only mockup-only deviation is the chip's size and padding, and the
+   155deg gradient therefore lands differently on a chip than on a tile.
+   The strip answers "is this a ramp"; the nine tiles under it answer
+   "does ink read on it". */
+.ramp{display:flex;gap:6px;width:608.67px;margin-top:24px}
+.ramp>div{flex:1 1 0;min-width:0}
+.ramp .pe-tile{min-height:78px;padding:8px}
+.ramp .rl{
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-3);text-align:center;
+  margin:6px 0 0;font-variant-numeric:tabular-nums;
+}
 
 /* R52 closed specimen 01's four hero alternatives (a)-(d) — the mark
    is a state-driven tint now, not a fixed choice between them. The
    .hero-b/.hero-c/.hero-d rules that drew (b)-(d) are retired with the
-   markup that used them; .pe-tile.is-hero(.is-clear/.is-busy) above is
-   the shipping rule for every hero on this page now. */
+   markup that used them. R79 then closed the two-state reading of that
+   tint: .is-clear and .is-busy are retired in their turn, and
+   .pe-tile.is-hero(.pe-t0 … .pe-t8) above is the shipping rule for
+   every hero on this page now. */
 
 /* the provisional phone shell (specimen 08, option A) */
 .phonebar{
@@ -1403,7 +1470,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
   <section class="spec">
     <span class="spec-eyebrow">Specimen 01 &middot; State</span>
     <h2 class="spec-title">The blank week</h2>
-    <p class="spec-cap">Your page exactly as it is today &mdash; nothing scheduled, nothing due, no to-dos yet, and one real push quoted back at you &mdash; in the default arrangement, with <code>Personal</code> first in the menu. Every finding here is a measured emptiness. The one hue on the page is the hero&rsquo;s own: it tints green because nothing is pending (R52, R70&ndash;R76) &mdash; a state, not an ornament, and the only other colour this page ever spends is on lateness and on a feed that did not answer.</p>
+    <p class="spec-cap">Your page exactly as it is today &mdash; nothing scheduled, nothing due, no to-dos yet, and one real push quoted back at you &mdash; in the default arrangement, with <code>Personal</code> first in the menu. Every finding here is a measured emptiness. The one hue on the page is the hero&rsquo;s own: it sits at the green end of its ramp because nothing is pending (R79&ndash;R84) &mdash; a state, not an ornament, and the only other colour this page ever spends is on lateness and on a feed that did not answer.</p>
     <p class="spec-cap"><strong>Measured, not claimed.</strong> The four rows render at <strong>340 &middot; 200 &middot; 240 &middot; 120</strong> pixels, so the grid is <strong>942px</strong> tall. The second row is 200, not the 180 first planned: each of the three layer switches needs 44 pixels to be tappable, so 180 was a number the tile could not meet and 200 is its weight. Left to their own heights the tiles would measure Today 213.35, To-do 270.85, Layers 191.85, push 112.35, Next 7 days 234.25 and Done this week 51.1 &mdash; every one under its row&rsquo;s weight, which is what makes the weights real: no row here is being held open by its contents.</p>
 
     <div class="scroll">
@@ -1444,7 +1511,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
             <main class="app-content"><div class="fl">
               <div class="pe-wrap"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
 
-                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero is-clear">
+                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero pe-t0">
                   <div class="pe-head">
                     <div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div>
                     <button type="button" class="btn" aria-expanded="false">+ Event</button>
@@ -1515,119 +1582,259 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
       </div>
     </div>
 
-    <p class="spec-cap" style="margin-top:28px"><strong>The hero, tinted by state &mdash; answered.</strong> Not one of the four alternatives specimen 01 used to carry: <strong>green when nothing is pending, orange when four or more things are</strong>, and the old untinted mark from R8 for everything between &mdash; one, two or three things pending, or a to-do read that answered nothing at all. &ldquo;Pending&rdquo; is to-dos due today plus anything overdue; a scheduled event is never a task and never counts. Three renders below, at eight columns and again at four: the busy one carries a genuine overdue row so the red <code>3 days late</code> ink sits on the orange tint at the same time, which is the actual worst case for the two hues together, not just a description of it.</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>The hero, tinted by the day &mdash; answered, and then answered again.</strong> Not one of the four alternatives specimen 01 used to carry, and no longer the two states with a line between them either: <strong>a ramp</strong>. <strong>Green at nothing pending, orange at three, red at eight</strong>, clamped there &mdash; a day with fourteen things looks like a day with eight. One and two interpolate green to orange; four through seven interpolate orange to red. <strong>The two halves are deliberately different lengths</strong>: the first three items move the colour as far as the next five do, because a day going from nothing to three things has changed more than a day going from four to eight. &ldquo;Pending&rdquo; is to-dos due today plus anything overdue; a scheduled event is never a task and never counts, and an overdue item counts as one like any other &mdash; it does not force the red end on its own (R79, R73).</p>
 
-    <div class="scroll"><div class="pair">
-      <div class="hold w609"><p class="lbl"><b>1&ndash;3 pending</b> &middot; untinted, R8&rsquo;s render &middot; span 8</p>
-        <section class="pe-tile is-hero">
+    <p class="spec-cap"><strong>Nine rules, frozen.</strong> The ramp ships as nine CSS classes, <code>.pe-t0</code> to <code>.pe-t8</code>, each carrying a literal gradient pair and a literal border colour, chosen by one lookup in a frozen table. Nothing is interpolated at run time: an out-of-range count matches no rule and renders the untinted hero, which is the safe render, where an interpolation function would return an arbitrary colour and look certain about it (R80, R3&rsquo;s reasoning). The three anchors are system values; the six steps between them were interpolated once, checked as the strip below, measured, and written in as hex.</p>
+
+    <div class="ramp">
+      <div><section class="pe-tile is-hero pe-t0"></section><p class="rl">0</p></div>
+      <div><section class="pe-tile is-hero pe-t1"></section><p class="rl">1</p></div>
+      <div><section class="pe-tile is-hero pe-t2"></section><p class="rl">2</p></div>
+      <div><section class="pe-tile is-hero pe-t3"></section><p class="rl">3</p></div>
+      <div><section class="pe-tile is-hero pe-t4"></section><p class="rl">4</p></div>
+      <div><section class="pe-tile is-hero pe-t5"></section><p class="rl">5</p></div>
+      <div><section class="pe-tile is-hero pe-t6"></section><p class="rl">6</p></div>
+      <div><section class="pe-tile is-hero pe-t7"></section><p class="rl">7</p></div>
+      <div><section class="pe-tile is-hero pe-t8"></section><p class="rl">8</p></div>
+    </div>
+    <p class="spec-cap" style="margin-top:9px">The nine rules at a chip&rsquo;s size, adjacent, across one span-8 width &mdash; the whole ramp in one look, which nine full tiles cannot give you because nine of them are five and a half metres of sideways drag. The chips are the shipping rules; only their size and padding are the mockup&rsquo;s. The nine full renders follow, in the same order, each at eight columns.</p>
+
+    <p class="spec-cap" style="margin-top:28px"><strong>All nine at eight columns, drag sideways.</strong> Every state carries the same <code>Nothing scheduled.</code> above it, so the only thing that changes down the strip is the <code>Due</code> group and the tint it drives. From two pending upward at least one row is genuinely overdue, so the red <code>--missing</code> ink sits on the wash in seven of the nine &mdash; and at the red end it sits on red, which is the real worst case for the two spends of that hue together and is drawn here rather than described.</p>
+
+    <div class="scroll"><div class="pair h404">
+      <div class="hold w609"><p class="lbl"><b>0 pending</b> &middot; <code>.pe-t0</code> &middot; green, the anchor</p>
+        <section class="pe-tile is-hero pe-t0">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body is-pair">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div>
+          </div>
+        </section></div>
+
+      <div class="hold w609"><p class="lbl"><b>1 pending</b> &middot; <code>.pe-t1</code></p>
+        <section class="pe-tile is-hero pe-t1">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
           <div class="pe-body">
             <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
             <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
               <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
-              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span><span class="pe-due">tomorrow</span></button></div>
             </div></div>
           </div>
         </section></div>
-      <div class="hold w609"><p class="lbl"><b>to-do read failed</b> &middot; same untinted render &middot; span 8</p>
-        <section class="pe-tile is-hero">
-          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body">
-            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
-            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div></div>
-          </div>
-        </section></div>
-      <div class="hold w609"><p class="lbl"><b>nothing pending</b> &middot; <code>.is-clear</code> &middot; span 8</p>
-        <section class="pe-tile is-hero is-clear">
-          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
-        </section></div>
-      <div class="hold w609"><p class="lbl"><b>4 or more pending</b> &middot; <code>.is-busy</code> &middot; span 8</p>
-        <section class="pe-tile is-hero is-busy">
+
+      <div class="hold w609"><p class="lbl"><b>2 pending</b> &middot; <code>.pe-t2</code></p>
+        <section class="pe-tile is-hero pe-t2">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
           <div class="pe-body">
             <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
             <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
               <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
               <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
-              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span><span class="pe-due">tomorrow</span></button></div>
-              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span><span class="tag">Academics</span><span class="pe-due">26 Oct</span></button></div>
             </div></div>
           </div>
         </section></div>
-    </div></div>
 
-    <div class="scroll"><div class="sheet c4">
-      <div class="hold w297"><p class="lbl"><b>1&ndash;3 pending</b> &middot; span 4</p>
-        <section class="pe-tile is-hero">
-          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body">
-            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
-            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
-              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
-              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span><span class="pe-due">tomorrow</span></button></div>
-            </div></div>
-          </div>
-        </section></div>
-      <div class="hold w297"><p class="lbl"><b>to-do read failed</b> &middot; span 4</p>
-        <section class="pe-tile is-hero">
-          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body">
-            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
-            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div></div>
-          </div>
-        </section></div>
-      <div class="hold w297"><p class="lbl"><b>nothing pending</b> &middot; span 4</p>
-        <section class="pe-tile is-hero is-clear">
-          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
-          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
-        </section></div>
-      <div class="hold w297"><p class="lbl"><b>4 or more pending</b> &middot; span 4</p>
-        <section class="pe-tile is-hero is-busy">
+      <div class="hold w609"><p class="lbl"><b>3 pending</b> &middot; <code>.pe-t3</code> &middot; orange, the anchor</p>
+        <section class="pe-tile is-hero pe-t3">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
           <div class="pe-body">
             <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
             <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
               <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
               <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
-              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span><span class="pe-due">tomorrow</span></button></div>
-              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span><span class="tag">Academics</span><span class="pe-due">26 Oct</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span></button></div>
+            </div></div>
+          </div>
+        </section></div>
+
+      <div class="hold w609"><p class="lbl"><b>4 pending</b> &middot; <code>.pe-t4</code></p>
+        <section class="pe-tile is-hero pe-t4">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span><span class="tag">Academics</span></button></div>
+            </div></div>
+          </div>
+        </section></div>
+
+      <div class="hold w609"><p class="lbl"><b>5 pending</b> &middot; <code>.pe-t5</code></p>
+        <section class="pe-tile is-hero pe-t5">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Renew ID&quot;"><span class="pe-nm">Renew ID</span><span class="tag">Personal</span></button></div>
+            </div></div>
+          </div>
+        </section></div>
+
+      <div class="hold w609"><p class="lbl"><b>6 pending</b> &middot; <code>.pe-t6</code></p>
+        <section class="pe-tile is-hero pe-t6">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Renew ID&quot;"><span class="pe-nm">Renew ID</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Book dentist&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Book dentist&quot;"><span class="pe-nm">Book dentist</span><span class="tag">Personal</span></button></div>
+            </div></div>
+          </div>
+        </section></div>
+
+      <div class="hold w609"><p class="lbl"><b>7 pending</b> &middot; <code>.pe-t7</code></p>
+        <section class="pe-tile is-hero pe-t7">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Renew ID&quot;"><span class="pe-nm">Renew ID</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Book dentist&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Book dentist&quot;"><span class="pe-nm">Book dentist</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Revise proposal&quot;"><span class="pe-nm">Revise proposal</span><span class="tag">Freelance</span><span class="pe-due is-late">5 days late</span></button></div>
+            </div></div>
+          </div>
+        </section></div>
+
+      <div class="hold w609"><p class="lbl"><b>8 or more pending</b> &middot; <code>.pe-t8</code> &middot; red, the anchor, clamped</p>
+        <section class="pe-tile is-hero pe-t8">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Renew ID&quot;"><span class="pe-nm">Renew ID</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Book dentist&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Book dentist&quot;"><span class="pe-nm">Book dentist</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Revise proposal&quot;"><span class="pe-nm">Revise proposal</span><span class="tag">Freelance</span><span class="pe-due is-late">5 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Submit clearance form&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Submit clearance form&quot;"><span class="pe-nm">Submit clearance form</span><span class="tag">Academics</span></button></div>
             </div></div>
           </div>
         </section></div>
     </div></div>
 
-    <p class="spec-cap" style="margin-top:9px"><strong>The same three, at the narrowest width the hero can reach through the editor</strong> &mdash; 1 of 6 on a 706px grid, 106 pixels. Specimen 05 already draws the hero here (below); these two are the busy and the middle-band renders it does not.</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>The three anchors at four columns</strong> &mdash; 297 pixels, closer to square than the eight-column hero, which is where a 155&deg; gradient is most likely to stop reading as a tint and start reading as a flat wash.</p>
+    <div class="sheet c4">
+      <div class="hold w297"><p class="tab">0 pending &middot; <b>.pe-t0</b></p>
+        <section class="pe-tile is-hero pe-t0">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+      <div class="hold w297"><p class="tab">3 pending &middot; <b>.pe-t3</b></p>
+        <section class="pe-tile is-hero pe-t3">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span></button></div>
+            </div></div>
+          </div>
+        </section></div>
+      <div class="hold w297"><p class="tab">8 pending &middot; <b>.pe-t8</b></p>
+        <section class="pe-tile is-hero pe-t8">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span><span class="tag">Academics</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Renew ID&quot;"><span class="pe-nm">Renew ID</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Book dentist&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Book dentist&quot;"><span class="pe-nm">Book dentist</span><span class="tag">Personal</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Revise proposal&quot;"><span class="pe-nm">Revise proposal</span><span class="tag">Freelance</span><span class="pe-due is-late">5 days late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Submit clearance form&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Submit clearance form&quot;"><span class="pe-nm">Submit clearance form</span><span class="tag">Academics</span></button></div>
+            </div></div>
+          </div>
+        </section></div>
+    </div>
+
+    <p class="spec-cap" style="margin-top:28px"><strong>The three anchors at the narrowest width the hero can reach through the editor</strong> &mdash; 1 of 6 on a 706px grid, 106 pixels, 80 pixels of inner width. Specimen 05 already draws the green one here; these are the other two.</p>
     <div class="scroll"><div class="pair">
-      <div class="hold w106"><p class="tab">1&ndash;3 pending</p>
-        <section class="pe-tile is-hero">
+      <div class="hold w106"><p class="tab">0 pending</p>
+        <section class="pe-tile is-hero pe-t0">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
+          <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
+        </section></div>
+      <div class="hold w106"><p class="tab">3 pending</p>
+        <section class="pe-tile is-hero pe-t3">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
           <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
             <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
               <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="pe-due is-late">3d late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span></button></div>
             </div></div>
           </div>
         </section></div>
-      <div class="hold w106"><p class="tab">nothing pending</p>
-        <section class="pe-tile is-hero is-clear">
-          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
-          <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
-        </section></div>
-      <div class="hold w106"><p class="tab">4 or more pending</p>
-        <section class="pe-tile is-hero is-busy">
+      <div class="hold w106"><p class="tab">8 pending</p>
+        <section class="pe-tile is-hero pe-t8">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
           <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
             <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-rows">
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span></button></div>
               <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="pe-due is-late">3d late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Reviewer ch.3&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Reviewer ch.3&quot;"><span class="pe-nm">Reviewer ch.3</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Lab report 2&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Lab report 2&quot;"><span class="pe-nm">Lab report 2</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Renew ID&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Renew ID&quot;"><span class="pe-nm">Renew ID</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Book dentist&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Book dentist&quot;"><span class="pe-nm">Book dentist</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Revise proposal&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Revise proposal&quot;"><span class="pe-nm">Revise proposal</span><span class="pe-due is-late">5d late</span></button></div>
+              <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Submit clearance form&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Submit clearance form&quot;"><span class="pe-nm">Submit clearance form</span></button></div>
             </div></div>
+          </div>
+        </section></div>
+    </div></div>
+
+    <p class="spec-cap" style="margin-top:28px"><strong>And the untinted hero, which now means exactly one thing</strong> &mdash; the to-do store did not answer, so the page has no count and claims nothing (R83). It used to mean two things at once, &ldquo;a few&rdquo; or &ldquo;unknown&rdquo;, and that ambiguity was defended at some length; the ramp removes it for nothing, because one, two and three have tints of their own now. Note what this costs elsewhere: a calendar failure must never reach the tint, or the hero would say &ldquo;I don&rsquo;t know what&rsquo;s pending&rdquo; because <em>Google</em> did not answer, which is a plain falsehood (R74, and it is why specimens 03 and 05 tint green under a Google failure).</p>
+    <div class="scroll"><div class="pair">
+      <div class="hold w609"><p class="lbl"><b>the to-do read did not answer</b> &middot; no <code>.pe-tN</code> &middot; span 8</p>
+        <section class="pe-tile is-hero">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div></div>
+          </div>
+        </section></div>
+      <div class="hold w297"><p class="lbl"><b>the same, at span 4</b></p>
+        <section class="pe-tile is-hero">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div></div>
+          </div>
+        </section></div>
+      <div class="hold w106"><p class="lbl"><b>1 of 6</b></p>
+        <section class="pe-tile is-hero">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
+            <div class="fl-group"><span class="pe-grp">Due</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t load to-dos.</span></div></div>
           </div>
         </section></div>
     </div></div>
 
     <div class="spec-q">
-      <span class="qlbl">For Riku &middot; the hero&rsquo;s look &mdash; answered</span>
-      <p>Not one of the four you were shown: a tinted hero, driven by the day&rsquo;s own state. Green when nothing is pending, orange when four or more things are &mdash; the threshold is one constant and you can move it any time before the spec is written.</p>
-      <p>The old untinted mark stays for everything between, and for a to-do read that did not answer &mdash; both render identically, on purpose, because an untinted hero claims nothing about the count, which is honest whether the true number is &ldquo;a couple&rdquo; or unknown.</p>
+      <span class="qlbl">For Riku &middot; the hero&rsquo;s look &mdash; your ramp, built</span>
+      <p>Green at nothing, orange at three, red at eight, clamped there, with the two halves at the lengths you set them: three items to get from green to orange, five more to get from orange to red. Above is every step it can take, at the three widths the tile can reach.</p>
+      <p>Two things worth your eye. The ramp crosses amber between one and three &mdash; that is the same hue the page uses on a dot beside <em>a feed did not answer</em>, and at eight it lands on the same red the page uses on an overdue row. Nothing is confusable while the ramp stays a background wash and those two stay ink and a dot, which is now a written rule; but it is your page, so look at the strip and say if the crossing bothers you.</p>
+      <p>The untinted hero is no longer a &ldquo;a few things&rdquo; state. It means one thing only: the to-do list did not load. If that reads as too quiet a failure to you, say so &mdash; the sentence and its amber dot are still inside the tile either way.</p>
     </div>
 
     <p class="spec-cap" style="margin-top:28px"><strong>B-panel &mdash; the week in one column.</strong> The same blank page with the seven days kept in one chronological list at every width. The week tile then measures <strong>361.15px</strong> instead of 234.25px, so row 3 has to be re-weighted to <strong>365px</strong> and the grid becomes <strong>1067px</strong> tall. The rows read <strong>340 &middot; 200 &middot; 365 &middot; 120</strong>: the third row is now the tallest thing on the page.</p>
@@ -1654,7 +1861,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
             <main class="app-content"><div class="fl">
               <div class="pe-wrap"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(365px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
 
-                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero is-clear">
+                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero pe-t0">
                   <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
                   <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
                 </section></div>
@@ -1720,7 +1927,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
   <section class="spec">
     <span class="spec-eyebrow">Specimen 02 &middot; State</span>
     <h2 class="spec-title">The full week</h2>
-    <p class="spec-cap">The same arrangement carrying &sect;13&rsquo;s invented mid-term week, so the design can be judged full as well as empty. In the page, two things carry colour and nothing else does: <code>3 days late</code> on the two overdue rows, in the due column. (The menu&rsquo;s red worker badge is the shell&rsquo;s, not the page&rsquo;s.) The push quotes a morning with a problem in it and stays in plain ink &mdash; this tile quotes, it never evaluates. Content grows a row but never shrinks it: row 1 renders at <strong>463.75px</strong> here, because the To-do tile&rsquo;s six rows in three sections come to 463.75 against a 340px weight. Row 3 is a different story now: five of the seven days collapse to a one-line summary (R51b), so the week no longer needs the room it used to &mdash; it measures <strong>240px</strong>, exactly the floor R51 set on the blank week, a genuinely unplanned finding rather than a designed one (R65). In the hero the due dates sit in a column 64 pixels wide, so the tags of dated rows line up; an undated row&rsquo;s tag runs to the row&rsquo;s edge because there is no date to leave room for.</p>
+    <p class="spec-cap">The same arrangement carrying &sect;13&rsquo;s invented mid-term week, so the design can be judged full as well as empty. In the page, two things carry colour and nothing else does: <code>3 days late</code> on the two overdue rows, in the due column, and the hero&rsquo;s own wash &mdash; <strong>two pending</strong>, so <code>.pe-t2</code>, two steps along the ramp from green and not yet at orange (R79). Count the <code>Due</code> group to check it: the three <code>Scheduled</code> rows above are events and never count. (The menu&rsquo;s red worker badge is the shell&rsquo;s, not the page&rsquo;s.) The push quotes a morning with a problem in it and stays in plain ink &mdash; this tile quotes, it never evaluates. Content grows a row but never shrinks it: row 1 renders at <strong>463.75px</strong> here, because the To-do tile&rsquo;s six rows in three sections come to 463.75 against a 340px weight. Row 3 is a different story now: five of the seven days collapse to a one-line summary (R51b), so the week no longer needs the room it used to &mdash; it measures <strong>240px</strong>, exactly the floor R51 set on the blank week, a genuinely unplanned finding rather than a designed one (R65). In the hero the due dates sit in a column 64 pixels wide, so the tags of dated rows line up; an undated row&rsquo;s tag runs to the row&rsquo;s edge because there is no date to leave room for.</p>
 
     <div class="scroll">
       <div class="frame f1240">
@@ -1745,7 +1952,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
             <main class="app-content"><div class="fl">
               <div class="pe-wrap"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
 
-                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero pe-t2">
                   <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
                   <div class="pe-body">
                     <div class="fl-group"><span class="pe-grp">Scheduled</span>
@@ -1996,7 +2203,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
     <p class="spec-cap"><strong>Google access expired.</strong> Every calendar spot carries the same sentence; the Layers tile shows it too and drops its switches, because the page tile must match the Settings card; <code>+ Event</code> is disabled and points at the sentence as its reason. The week shows the reason once at the top and then seven days with <em>blank</em> value columns &mdash; not seven dashes, because a dash here means &ldquo;we looked and the day was free&rdquo;. The hero still reads <strong>green</strong>: the tint answers to the to-do read alone (R74), and the to-do store answered &ldquo;nothing due&rdquo; here whether or not the calendar did.</p>
     <div class="scroll"><div class="pair">
       <div class="hold w609"><p class="tab">Today &middot; <b>span 8</b></p>
-        <section class="pe-tile is-hero is-clear">
+        <section class="pe-tile is-hero pe-t0">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" disabled aria-describedby="x-exp">+ Event</button></div>
           <div class="pe-body">
             <div class="fl-group"><span class="pe-grp">Scheduled</span>
@@ -2028,10 +2235,10 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
         </section></div>
     </div></div>
 
-    <p class="spec-cap" style="margin-top:28px"><strong>One layer down.</strong> The rows that arrived are shown, then the layer&rsquo;s own name in the failure sentence. <code>Nothing scheduled.</code> is suppressed &mdash; the tile cannot claim the day is empty while one calendar is unread. In the week, the days that had something from a layer that answered still show it; the days that would have been empty show blank rather than a dash.</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>One layer down.</strong> The rows that arrived are shown, then the layer&rsquo;s own name in the failure sentence. <code>Nothing scheduled.</code> is suppressed &mdash; the tile cannot claim the day is empty while one calendar is unread. In the week, the days that had something from a layer that answered still show it; the days that would have been empty show blank rather than a dash. The hero sits at <code>.pe-t1</code>, one step off green: the <code>Due</code> group holds one item and a half-read calendar has no bearing on that count (R74).</p>
     <div class="scroll"><div class="pair">
       <div class="hold w609"><p class="tab">Today &middot; <b>span 8</b></p>
-        <section class="pe-tile is-hero">
+        <section class="pe-tile is-hero pe-t1">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
           <div class="pe-body">
             <div class="fl-group"><span class="pe-grp">Scheduled</span>
@@ -2121,7 +2328,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
     <p class="spec-cap" style="margin-top:28px"><strong>Every layer switched off.</strong> Nothing was read because a switch says so, so the <code>Scheduled</code> group carries no dot: this is a state you made, and an alarm about it would be a false alarm every day. The sentence names the tile that holds the lever, and <code>+ Event</code> is disabled for the same reason &mdash; refused before the fact, never after it. The hero still tints <strong>green</strong>: <code>none-enabled</code> counts as answered (R45), and it is the to-do read, not the calendar, that decides the tint (R74).</p>
     <div class="scroll"><div class="pair">
       <div class="hold w609"><p class="tab">Today &middot; <b>span 8</b></p>
-        <section class="pe-tile is-hero is-clear">
+        <section class="pe-tile is-hero pe-t0">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" disabled aria-describedby="x-off">+ Event</button></div>
           <div class="pe-body">
             <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty" id="x-off">All layers are switched off.</p></div>
@@ -2239,7 +2446,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
             <main class="app-content"><div class="fl">
               <div class="pe-edit"><div class="pe-wrap"><div class="pe-grid is-editing" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
 
-                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero is-clear">
+                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero pe-t0">
                   <div class="pe-head" inert><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" aria-expanded="false">+ Event</button></div>
                   <div class="pe-body is-pair" inert>
                     <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
@@ -2398,7 +2605,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
             </div></div>
           </section></div>
 
-          <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile is-hero is-clear">
+          <div class="pe-cell pe-r1 pe-s4 pe-x2"><section class="pe-tile is-hero pe-t0">
             <div class="pe-head" inert><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" aria-expanded="false">+ Event</button></div>
             <div class="pe-body is-pair" inert>
               <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
@@ -2523,7 +2730,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
             <main class="app-content"><div class="fl">
               <div class="pe-edit"><div class="pe-wrap"><div class="pe-grid is-editing" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
 
-                <div class="pe-cell pe-r1 pe-s3 pe-x2"><section class="pe-tile is-hero is-clear">
+                <div class="pe-cell pe-r1 pe-s3 pe-x2"><section class="pe-tile is-hero pe-t0">
                   <div class="pe-head" inert><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" aria-expanded="false">+ Event</button></div>
                   <div class="pe-body is-pair" inert>
                     <div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div>
@@ -2646,7 +2853,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
             <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
             <div class="pe-body"><p class="pe-ptitle">All clear &middot; 0 to review</p><p class="fl-snip">All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</p></div>
           </section></div>
-          <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile is-hero is-clear">
+          <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile is-hero pe-t0">
             <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
             <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
           </section></div>
@@ -2690,7 +2897,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
             <div class="pe-head"><div><span class="eyebrow">This morning&rsquo;s push</span></div><span class="pe-stamp">sent 07:00</span></div>
             <div class="pe-body"><p class="pe-ptitle">All clear &middot; 0 to review</p><p class="fl-snip">All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</p></div>
           </section></div>
-          <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile is-hero is-clear">
+          <div class="pe-cell pe-r2 pe-s8 pe-x4"><section class="pe-tile is-hero pe-t0">
             <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
             <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
           </section></div>
@@ -2764,7 +2971,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
             <main class="app-content"><div class="fl">
               <div class="pe-wrap"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto) minmax(calc(200px + var(--tb)),auto) minmax(calc(240px + var(--tb)),auto) minmax(calc(120px + var(--tb)),auto)">
 
-                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+                <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero pe-t2">
                   <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
                   <div class="pe-body">
                     <div class="fl-group"><span class="pe-grp">Scheduled</span><div class="pe-rows">
@@ -2844,7 +3051,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
     <div class="scroll">
       <div class="pane p706">
         <div class="pe-wrap"><div class="pe-grid" style="--tracks:minmax(calc(340px + var(--tb)),auto)">
-          <div class="pe-cell pe-r1 pe-s3 pe-x2"><section class="pe-tile is-hero is-clear">
+          <div class="pe-cell pe-r1 pe-s3 pe-x2"><section class="pe-tile is-hero pe-t0">
             <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
             <div class="pe-body is-pair"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
           </section></div>
@@ -2875,12 +3082,12 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
     <p class="spec-cap" style="margin-top:28px"><strong>One of six &mdash; 106 pixels, 80 pixels of inner width.</strong> The narrowest cell the collapse can produce. Every tile still renders its eyebrow, so a tile reduced to one sentence still says which tile it is. The failure sentence wraps and the tile grows &mdash; it never truncates, because a failure sentence that truncates is a failure to report. And the distinction the page rests on survives at this width, because it is carried by a 5px dot that is the same size here as it is at 609 pixels, not by a coloured word. Both heroes below tint <strong>green</strong>, on purpose: the tint reads the to-do store alone, so a calendar that did not answer (right) tints exactly like one that answered and had nothing (left) &mdash; the amber dot is still the thing that tells them apart (R74).</p>
     <div class="scroll"><div class="pair">
       <div class="hold w106"><p class="tab">Read, empty</p>
-        <section class="pe-tile is-hero is-clear">
+        <section class="pe-tile is-hero pe-t0">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
           <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><p class="fl-empty">Nothing scheduled.</p></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
         </section></div>
       <div class="hold w106"><p class="tab">Did not answer</p>
-        <section class="pe-tile is-hero is-clear">
+        <section class="pe-tile is-hero pe-t0">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div></div>
           <div class="pe-body"><div class="fl-group"><span class="pe-grp">Scheduled</span><div class="pe-fail"><i></i><span class="said">Couldn&rsquo;t read the calendar.</span></div></div><div class="fl-group"><span class="pe-grp">Due</span><p class="fl-empty">Nothing due.</p></div></div>
         </section></div>
@@ -2922,11 +3129,11 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
     <h2 class="spec-title">Adding, editing, deleting &mdash; in place</h2>
     <p class="spec-cap">A form replaces the tile&rsquo;s body; it never scrolls and it never opens a dialog. The well is sunk into the tile, so nothing nests a second card. The fields are the browser&rsquo;s own date, time and select controls &mdash; the only genuinely one-handed date entry there is on a phone &mdash; at 16 pixels, which is the size below which iOS zooms into a focused field and does not zoom back out.</p>
     <p class="spec-cap"><strong>Measured.</strong> The event form&rsquo;s well is <strong>322px</strong> tall and the whole tile <strong>421.35px</strong>, so the form grows row 1 from 340 to 421 &mdash; visible, and stated, which is the point; it does not scroll and the columns do not move. At eight columns <code>Calendar</code> and <code>Date</code> sit side by side, and so do <code>Start</code> and <code>End</code>. The to-do form at four columns is one column top to bottom, its well <strong>340.5px</strong> tall and the tile 426.35 &mdash; pairs need 406 pixels of tile, and four columns is 297.</p>
-    <p class="spec-cap"><strong>Not tinted, and left that way on purpose.</strong> The two hero panes below have their <code>Due</code> group replaced by an open form, so nothing here shows what is actually pending. R70&ndash;R76 rule the tint against the <code>Due</code> group's own render and rule edit mode's case explicitly (R75); they do not say whether the tint should survive an add-event form covering that group. Rather than guess, both render in the plain untinted state &mdash; the honest choice when the fact a tint would assert is not on screen &mdash; and this is flagged for a ruling rather than decided here.</p>
+    <p class="spec-cap"><strong>Tinted, and that is the ruling (R78).</strong> The two hero panes below have their <code>Due</code> group replaced by an open form, and they keep their tint &mdash; background, border and radius unchanged, no fourth &ldquo;a form is open&rdquo; appearance. The count <em>was</em> read; the form covers the group that displays it, not the read that produced it, and a fact does not stop being known because the pixels that spell it out are behind something else. This is R75's own reasoning for edit mode, applied to the same event under a different name. It is also the only answer left: under R83 an untinted hero says <em>the to-do store did not answer</em>, so untinting here would have the page claim ignorance of the day at the exact moment you are adding to it. Both panes are drawn at three pending &mdash; <code>.pe-t3</code> &mdash; and the tint is decided at render and refresh time, never live: adding a to-do due today does not warm the tile as the form closes, the next server render does (R67).</p>
 
     <div class="scroll"><div class="pair">
       <div class="hold w609"><p class="tab">Add an event &middot; <b>span 8, two columns</b></p>
-        <section class="pe-tile is-hero">
+        <section class="pe-tile is-hero pe-t3">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" aria-expanded="true" aria-controls="ev-form">+ Event</button></div>
           <div class="pe-body"><form class="formwell" id="ev-form">
             <div class="pe-fields">
@@ -2949,7 +3156,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
         </section></div>
 
       <div class="hold w609"><p class="tab"><b>No answer from Google in time</b></p>
-        <section class="pe-tile is-hero">
+        <section class="pe-tile is-hero pe-t3">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn" aria-expanded="true">+ Event</button></div>
           <div class="pe-body"><form class="formwell">
             <div class="pe-fields">
@@ -3210,7 +3417,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
       </div>
 
       <div class="hold w609"><p class="tab">An event added outside the coming week</p>
-        <section class="pe-tile is-hero is-clear">
+        <section class="pe-tile is-hero pe-t0">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Thu 10 Sep</span></div><button type="button" class="btn">+ Event</button></div>
           <p class="pe-said">Added. It&rsquo;s on Fri 24 Oct, outside this week.</p>
           <div class="pe-body">
@@ -3325,7 +3532,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
         <p class="spec-cap" style="margin-top:9px"><b class="prop">proposed</b> &mdash; Classes is no longer on your Google account. Untick it in Settings. A calendar that has gone from Google is something you did, not something that will come back if the page waits, so the sentence carries no dot and no colour &mdash; the same quiet grey as <code>All layers are switched off.</code> The row stays in the list, still ticked and still live, because the sentence tells you to untick it and there has to be something to untick. The list is built from the calendars you chose, not from Google&rsquo;s answer, for exactly this case.</p>
       </div>
       <div class="hold w609"><p class="tab">The same, on the page &middot; <b>span 8</b></p>
-        <section class="pe-tile is-hero is-clear">
+        <section class="pe-tile is-hero pe-t0">
           <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
           <div class="pe-body">
             <div class="fl-group"><span class="pe-grp">Scheduled</span>
@@ -3366,7 +3573,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
           <div class="fl-head"><div class="fl"><div class="fl-headrow"><h3 class="fl-title">Personal</h3><button type="button" class="btn">Edit layout</button></div></div></div>
           <main class="app-content"><div class="fl">
             <div class="pe-wrap"><div class="pe-grid">
-              <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+              <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero pe-t2">
                 <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
                 <div class="pe-body">
                   <div class="fl-group"><span class="pe-grp">Scheduled</span><div class="pe-rows">
@@ -3451,7 +3658,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
           <div class="fl-head"><div class="fl"><div class="fl-headrow"><h3 class="fl-title">Personal</h3><button type="button" class="btn">Edit layout</button></div></div></div>
           <main class="app-content"><div class="fl">
             <div class="pe-wrap"><div class="pe-grid">
-              <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero">
+              <div class="pe-cell pe-r1 pe-s8 pe-x4"><section class="pe-tile is-hero pe-t2">
                 <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn" disabled aria-describedby="ph-ev">+ Event</button></div>
                 <p class="pe-said" id="ph-ev">Too narrow for the form.</p>
                 <div class="pe-body">
@@ -3531,8 +3738,8 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
   <section class="spec">
     <span class="spec-eyebrow">Closing</span>
     <h2 class="spec-title">What round 5 closed, and what is still open</h2>
-    <p class="spec-cap"><strong>Closed.</strong> SHELL (R50, the thin top strip, app-wide), ROW (R53, shrink-to-fit), WORDS (R54/R55, all eleven sentences ship as written, every failure dot stays), and TILE&rsquo;s column count and disclosure mechanism (R51/R51b, R56&ndash;R69, R77). MARK (R52, R70&ndash;R76): a tinted hero, green when nothing is pending, orange at four or more, the old untinted mark for everything between.</p>
-    <p class="spec-cap"><strong>Left open by this pass, both flagged where they are drawn:</strong> whether an overdue to-do should force the busy tint outright even with nothing else pending &mdash; R73&rsquo;s call was no, don&rsquo;t give lateness a second escalation channel, but it is a one-line yes/no if you want it changed; and whether the hero&rsquo;s tint should survive its own add-event form being open &mdash; no ruling covers it, so specimen 06 draws those two panes untinted rather than guess. Everything else below is settled and shipped, not proposed.</p>
+    <p class="spec-cap"><strong>Closed.</strong> SHELL (R50, the thin top strip, app-wide), ROW (R53, shrink-to-fit), WORDS (R54/R55, all eleven sentences ship as written, every failure dot stays), and TILE&rsquo;s column count and disclosure mechanism (R51/R51b, R56&ndash;R69, R77). MARK (R52, then R79&ndash;R85): a tinted hero, and the tint is a <strong>ramp</strong> &mdash; green at nothing pending, orange at three, red at eight and clamped there, nine frozen classes and no runtime colour maths. The untinted hero survives with one meaning only: the to-do store did not answer.</p>
+    <p class="spec-cap"><strong>Nothing is left open.</strong> The two items this page carried as open are both closed. Whether an overdue to-do should force the busy end outright even with nothing else pending: <strong>no</strong> &mdash; you answered it yourself, &ldquo;it just counts as one&rdquo;, so lateness keeps its one escalation, the red ink on its own row, and R73&rsquo;s flag is withdrawn rather than carried forward. Whether the hero&rsquo;s tint should survive its own form being open: <strong>yes</strong> &mdash; R78 rules it, and specimen 06&rsquo;s two panes are redrawn tinted, because the count was read and only the group that displays it is covered. Everything on this page is settled and shipped, not proposed.</p>
     <div class="spec-q">
       <span class="qlbl">The eleven new sentences, all in one place &mdash; shipped as written (R54)</span>
       <p>Each is drawn on this page where it would appear, except the two marked as not drawn.</p>
