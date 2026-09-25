@@ -6,10 +6,11 @@
 
    One namespace and no other: `pe-`. Every rule here is a `pe-`
    class, or a shared class (.fl-*, .btn, .tag, .tick, .fld,
-   .sumrow, …) qualified by a `pe-` class or reached only through a
-   container this file declares. No bare element-shaped class names
-   (R32): a bare `.tile` rule would border and pad the rail's brand
-   tile on every page in the app.
+   .sumrow, …) qualified by a `pe-` class in the same selector. No
+   bare element-shaped class names (R32): a bare `.tile` rule would
+   border and pad the rail's brand tile on every page in the app. One
+   build difference serves this rule: the narrow band's `.formwell`
+   is qualified by `.pe-cell`, marked where it sits.
 
    Four deliberate differences from the mockup, each marked below:
      1. `.pe-more` is not ported (R89). The mockup already carries
@@ -473,7 +474,12 @@
    keeps R13's own two-line form from 480. */
 @container tile (max-width:239.98px){
   .pe-tile{padding:12px}
-  .formwell{padding:var(--sp-3)}
+  /* BUILD DIFFERENCE (R32): the mockup writes this bare .formwell. It is
+     qualified by .pe-cell, the element that declares the tile container,
+     so the selector itself carries the namespace. (0,2,0) still beats
+     components.css's .formwell, which is the override the comment above
+     describes. */
+  .pe-cell .formwell{padding:var(--sp-3)}
   .pe-head>.btn{padding:8px 10px}
   /* the toolbar's stepper loses its 10px indent, so arrows + stepper
      (190px) stay on one line at span 3 (193.5px inner) and 2 of 6
