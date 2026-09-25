@@ -73,6 +73,8 @@ The orange wash behind spend is a topographic reading of that spend. The green s
 | `--missing` | `#F87171` | Conflicts, gaps, over-limit. |
 | `--skill` | `#F472B6` | Skill nodes in the graph (graph-only). |
 
+*One recorded exception: the Personal page's hero tile carries a background tint that ramps from `--save` through `--spend` to `--missing` with the day's pending-task count. This is a page-local reading of those hues **as a wash**; their fixed meanings in ink, on dots and on row borders are untouched, and no other surface may take a semantic hue as a wash without its own ruling. See P10 round 5, R79–R84.*
+
 ### Alpha ladder
 
 - `100%` — figures, glyphs, graph node cores

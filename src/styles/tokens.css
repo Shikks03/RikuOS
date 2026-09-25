@@ -43,13 +43,14 @@
   --ink-3:#5B6470;
   --ink-4:#3A424C;
 
-  /* semantic hues — meaning is fixed */
-  --spend:#FF8A3D;
-  --save:#35D399;
+  /* semantic hues — meaning is fixed in ink; one recorded exception
+     for background washes on the Personal page's hero tile (P10 R79–R84) */
+  --spend:#FF8A3D;   /* money out, limits consumed, the brand mark — also P10 R84 */
+  --save:#35D399;    /* value recovered, healthy, connected — also P10 R84 */
   --roi:#A78BFA;
   --session:#5FA5FA;
   --stale:#FBBF24;
-  --missing:#F87171;
+  --missing:#F87171; /* overdue, absent, late — also P10 R84 */
 
   /* the one non-hue graphic token */
   --track:#1A1E25;
@@ -57,6 +58,25 @@
   /* card tints — 155deg, deep desaturated hue into near-neutral at 62% */
   --tint-roi:linear-gradient(155deg,#171233,#111117 62%);
   --tint-stale:linear-gradient(155deg,#241A03,#141209 62%);
+  /* the hero ramp's three anchors (P10 R79–R84). --tint-save and
+     --tint-spend are DESIGN-INSPO's card-tint recipe, verbatim.
+     --tint-missing had no source; it is BUILT to the same formula,
+     calibrated by WCAG relative luminance, NOT HSL lightness — HSL
+     disagrees wildly across the existing tints.
+     Deep stop #3A0B0B: .01163, between --tint-stale's #241A03 (.01120)
+     and --tint-save's #052620 (.01523). Mid-band, so the red end is no
+     more present than the green end: a tint, not an alarm. #440D0D
+     (.01546) matched the green anchor's presence and was rejected — the
+     brightest deep stop in the system, it began to read as an alarm.
+     62% stop #191016: .00635, inside the band the other near-neutral
+     stops sit in (#141013 .00566, #111117 .00582, #141209 .00601,
+     #0F1417 .00664). R81's one hard constraint: contrast rests on the
+     62%-and-beyond region of every tint being effectively --raised, so
+     a red tint that brightened that stop would move contrast for every
+     ink on the tile at once. */
+  --tint-save:   linear-gradient(155deg,#052620,#0F1417 62%);  /* anchor 0 */
+  --tint-spend:  linear-gradient(155deg,#2A1408,#141013 62%);  /* anchor 3 */
+  --tint-missing:linear-gradient(155deg,#3A0B0B,#191016 62%);  /* anchor 8 */
 
   /* spacing 4 / 6 / 10 / 14 / 20 / 28 / 44 / 72 */
   --sp-1:4px; --sp-2:6px; --sp-3:10px; --sp-4:14px;
