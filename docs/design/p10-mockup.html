@@ -856,8 +856,10 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
    overdue item counts as one like any other, it does not force the top
    of the ramp). Green at 0, orange at 3, red at 8, clamped at 8 — a day
    with fourteen things looks like a day with eight. The two segments are
-   deliberately unequal: the first three items move the colour as far as
-   the next five do.
+   deliberately unequal: the first three items move the colour 1.8× as far
+   as the next five do — measured, not estimated, as an end-to-end OKLab
+   ΔE of .1110 split .0774 across the first leg and .0422 across the
+   second (R95.1 corrects the earlier "as far as").
 
    NINE FROZEN CLASSES, chosen by one pure lookup (R80), for R3's reason
    restated: an out-of-range stored value matches no rule and is
@@ -1019,12 +1021,13 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
    guard that keeps it honest is R18: a day whose sources did not all
    answer prints nothing at all. */
 .pe-dash{color:var(--ink-3)}
-/* `+3 more` in .fl-bound's register, inline at the end of the day —
-   superseded for the OPEN state of a disclosure day (R51b's second
-   correction): the open list is always every item, never truncated,
-   so this class has no consumer inside .fl-open. It stays live for
-   nothing on this page today; kept because the deck still names it. */
-.pe-more{font-size:11.5px;color:var(--ink-4)}
+/* `.pe-more` (`+3 more`) is DELETED (R89). R51b removed its only
+   consumer by making an open day untruncated and R58 declined the
+   `+1 more` summary shape, so it has none left; §5.8's rule — declared
+   vocabulary with no consumer does not ship — outranks "the deck still
+   names the string", because a live class for a superseded string is
+   how the string comes back. The 20-row bound is untouched: it renders
+   `Showing 20 of 34.` through .fl-bound, which keeps its consumer. */
 
 /* ---- the day row's disclosure (R51b, R56–R69, R77) --------------
    Reuses the shipped .disclose / .sumrow / .fl-count / chevron
@@ -1150,8 +1153,10 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
    two-line form, the 44px switch rows, the due column), 240 (padding,
    the well's padding, the other rows' two-line form, the compact pill)
    and 200 (the head stacks, the heading steps down). The legal cells
-   they catch: 480 catches everything up to span 7 at twelve (452.5)
-   and 4 of 6 (466); 240 catches the two narrowest spans at each column
+   they catch: 480 catches everything up to span 6 at twelve (452.5)
+   and 4 of 6 (466) — span 6, not span 7, which measures 530.83 and sits
+   above the threshold (R93 corrects R38's label here too; 480 itself
+   does not move); 240 catches the two narrowest spans at each column
    count — 106 · 141.67 at the bottom, 219.5 · 226 above them — and
    nothing wider; 200 catches 106 and 141.67 only. */
 
@@ -1369,14 +1374,17 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
 /* holders that give a lone tile the exact width it would have on the
    real grid, so every specimen below is measured, not approximated.
    The holder is the `tile` container, exactly as .pe-cell is on the
-   page. 920px column, 14px gutter: span 8 = 608.67, 4 = 297.33,
-   3 = 219.5, 2 = 141.67. 706px column: 6 = 706, 4 = 466, 2 = 226,
-   1 = 106. */
+   page. 920px column, 14px gutter: span 8 = 608.67, 7 = 530.83,
+   4 = 297.33, 3 = 219.5, 2 = 141.67. 706px column: 6 = 706, 4 = 466,
+   3 = 346, 2 = 226, 1 = 106. The 531 and 346 holders exist for the two
+   legal cells no arrangement in this document happens to produce
+   (R95.4) — drawn once so their widths are measured rather than
+   derived. */
 .hold{flex:none;min-width:0;container:tile / inline-size}
 .w920{width:920px}
-.w609{width:608.67px} .w466{width:466px} .w406{width:406px}
-.w297{width:297.33px} .w226{width:226px} .w219{width:219.5px} .w213{width:213px}
-.w142{width:141.67px} .w106{width:106px}
+.w609{width:608.67px} .w531{width:530.83px} .w466{width:466px} .w406{width:406px}
+.w346{width:346px} .w297{width:297.33px} .w226{width:226px} .w219{width:219.5px}
+.w213{width:213px} .w142{width:141.67px} .w106{width:106px}
 .w334{width:334px} .w164{width:164px}
 /* the hero comparison and the push tile's states are drawn at the
    height their row gives them, not at natural height */
@@ -1582,7 +1590,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
       </div>
     </div>
 
-    <p class="spec-cap" style="margin-top:28px"><strong>The hero, tinted by the day &mdash; answered, and then answered again.</strong> Not one of the four alternatives specimen 01 used to carry, and no longer the two states with a line between them either: <strong>a ramp</strong>. <strong>Green at nothing pending, orange at three, red at eight</strong>, clamped there &mdash; a day with fourteen things looks like a day with eight. One and two interpolate green to orange; four through seven interpolate orange to red. <strong>The two halves are deliberately different lengths</strong>: the first three items move the colour as far as the next five do, because a day going from nothing to three things has changed more than a day going from four to eight. &ldquo;Pending&rdquo; is to-dos due today plus anything overdue; a scheduled event is never a task and never counts, and an overdue item counts as one like any other &mdash; it does not force the red end on its own (R79, R73).</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>The hero, tinted by the day &mdash; answered, and then answered again.</strong> Not one of the four alternatives specimen 01 used to carry, and no longer the two states with a line between them either: <strong>a ramp</strong>. <strong>Green at nothing pending, orange at three, red at eight</strong>, clamped there &mdash; a day with fourteen things looks like a day with eight. One and two interpolate green to orange; four through seven interpolate orange to red. <strong>The two halves are deliberately different lengths</strong>: the first three items move the colour <strong>1.8&times;</strong> as far as the next five do &mdash; measured, not estimated, as an end-to-end OKLab &Delta;E of .1110 split .0774 across the first leg and .0422 across the second &mdash; because a day going from nothing to three things has changed more than a day going from four to eight. &ldquo;Pending&rdquo; is to-dos due today plus anything overdue; a scheduled event is never a task and never counts, and an overdue item counts as one like any other &mdash; it does not force the red end on its own (R79, R73).</p>
 
     <p class="spec-cap"><strong>Nine rules, frozen.</strong> The ramp ships as nine CSS classes, <code>.pe-t0</code> to <code>.pe-t8</code>, each carrying a literal gradient pair and a literal border colour, chosen by one lookup in a frozen table. Nothing is interpolated at run time: an out-of-range count matches no rule and renders the untinted hero, which is the safe render, where an interpolation function would return an arbitrary colour and look certain about it (R80, R3&rsquo;s reasoning). The three anchors are system values; the six steps between them were interpolated once, checked as the strip below, measured, and written in as hex.</p>
 
@@ -1767,6 +1775,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
     </div>
 
     <p class="spec-cap" style="margin-top:28px"><strong>The three anchors at the narrowest width the hero can reach through the editor</strong> &mdash; 1 of 6 on a 706px grid, 106 pixels, 80 pixels of inner width. Specimen 05 already draws the green one here; these are the other two.</p>
+    <p class="spec-cap"><b class="prop">not ratified</b> &mdash; <code>3d late</code> &middot; <code>5d late</code>. <strong>R88 ruled that the deck&rsquo;s <code>3 days late</code> is the only form and that these three strings &mdash; one in the 3-pending pane and two in the 8-pending one &mdash; were a drafting slip. The measurement says otherwise, and the measurement wins.</strong> R88&rsquo;s reasoning was that the narrow band moves the due meta to its own line, where 80 pixels of inner width holds eleven characters of 9.5px mono. The 80 pixels are not what the string gets: a to-do row is a 14-pixel tick, a 14-pixel gap and then the edit button, so the meta&rsquo;s line is <strong>52 pixels</strong> wide, and <code>3 days late</code> measures <strong>62.7</strong>. It overruns its own line by 10.7 pixels and ends 1.3 pixels from the tile&rsquo;s border &mdash; inside the padding rather than clipped, but not a render this document would ship. The full string fits every other width drawn here, 164 pixels and up (a 110-pixel line at 164); <strong>1 of 6 is the single legal cell it does not fit</strong>, and that cell exists only because the editor can produce it. So the abbreviation stays drawn, marked as what it is: an unratified narrow variant. An abbreviated string is Riku&rsquo;s to approve, exactly as the eleven were, and neither this page nor the spec may settle it.</p>
     <div class="scroll"><div class="pair">
       <div class="hold w106"><p class="tab">0 pending</p>
         <section class="pe-tile is-hero pe-t0">
@@ -2060,7 +2069,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
       </div>
     </div>
 
-    <p class="spec-cap" style="margin-top:28px"><strong>The day row, collapsed and open (R51b, R56&ndash;R69).</strong> Two or more items on a day now disclose: a bare leading title and a count before the click, every item after it &mdash; reusing <code>.disclose</code>/<code>.sumrow</code>/<code>.fl-count</code> wholesale (R56), the exact grammar the Freelance page already ships, no second disclosure invented. A day with one item is untouched, byte-identical to today (R57, R77); a day with none still prints <code>&mdash;</code> (R69). Every day loads closed (R60); opening one never closes another (R61); opening pushes the row&rsquo;s height, it never overlays (R63) &mdash; the same treatment the event and to-do forms already get. <b class="prop">proposed</b> &mdash; the count&rsquo;s format, <code>N items</code> (R59); the leading title itself is not new wording, only a rule for which of your own words gets picked (R58).</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>The day row, collapsed and open (R51b, R56&ndash;R69).</strong> Two or more items on a day now disclose: a bare leading title and a count before the click, every item after it &mdash; reusing <code>.disclose</code>/<code>.sumrow</code>/<code>.fl-count</code> wholesale (R56), the exact grammar the Freelance page already ships, no second disclosure invented. A day with one item is untouched, byte-identical to today (R57, R77); a day with none still prints <code>&mdash;</code> (R69). Every day loads closed (R60); opening one never closes another (R61); opening pushes the row&rsquo;s height, it never overlays (R63) &mdash; the same treatment the event and to-do forms already get. <b class="prop">ratified 2026-09-25</b> &mdash; the count&rsquo;s format, <code>2 items</code> / <code>3 items</code> (R59, put to Riku and approved as R90, after the other eleven). No singular form is needed: the disclosure exists only at two or more. The leading title is not new wording either, only a rule for which of your own words gets picked (R58).</p>
     <div class="scroll"><div class="pair">
       <div class="hold w297"><p class="lbl"><b>Collapsed</b> &middot; two items</p>
         <section class="pe-tile">
@@ -2137,7 +2146,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
         </section></div>
     </div></div>
 
-    <p class="spec-cap" style="margin-top:28px"><strong>The full busy week, entirely open</strong> &mdash; the worst case, every disclosure expanded at once, at both column counts. This is never the default (R60 loads every day closed); it is what Riku sees if he opens all five.</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>The full busy week, entirely open</strong> &mdash; the worst case, every disclosure expanded at once, at both column counts. This is never the default (R60 loads every day closed); it is what Riku sees if he opens all five. <strong>Measured, and these are the last two of R65&rsquo;s four figures:</strong> the tile is <strong>447.25px</strong> at two columns and <strong>510.25px</strong> at one, against the collapsed pair&rsquo;s 240 and 362.75. So opening everything costs <strong>207.25px</strong> at two columns and <strong>147.5px</strong> at one &mdash; the two-column week pays more because it starts from the tighter figure, and it is still the shorter of the two when fully open. Row 3&rsquo;s 240 is a minimum and never a fixed height (R3, R4), so the row simply grows; nothing overlays and nothing is clipped (R63). Opening all five is also the only way to reach these numbers: every day loads closed, and each day&rsquo;s state is independent.</p>
     <div class="stack">
       <div class="pane p920">
         <p class="lbl"><b>Two columns</b> &middot; 920px tile</p>
@@ -2171,7 +2180,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
       </div>
     </div>
 
-    <p class="spec-cap" style="margin-top:28px"><strong>A mixed week (R64).</strong> Only <code>Mon 26</code> is open, in column 2. It shares row 3&rsquo;s track with <code>Thu 22</code> in column 1, which is closed and shorter. <code>grid-auto-flow:column</code> pairs day 3 with day 7 into one row-track (days 1&ndash;4 fill column 1, days 5&ndash;7 fill column 2), and grid&rsquo;s default <code>stretch</code> &mdash; the same posture the page&rsquo;s outer grid already uses &mdash; means <code>Thu 22</code>&rsquo;s own box grows to match, leaving real slack under its two lines. This is rendered, not fixed, per R64: report what it does, not paper over it.</p>
+    <p class="spec-cap" style="margin-top:28px"><strong>A mixed week (R64).</strong> Only <code>Mon 26</code> is open, in column 2. It shares row 3&rsquo;s track with <code>Thu 22</code> in column 1, which is closed and shorter. <code>grid-auto-flow:column</code> pairs day 3 with day 7 into one row-track (days 1&ndash;4 fill column 1, days 5&ndash;7 fill column 2), and grid&rsquo;s default <code>stretch</code> &mdash; the same posture the page&rsquo;s outer grid already uses &mdash; means <code>Thu 22</code>&rsquo;s own box grows to match, leaving real slack under its one summary line. <strong>Measured:</strong> the tile is <strong>289.25px</strong> &mdash; the state Riku will actually see most often, between the collapsed 240 and the fully open 447.25 &mdash; and the paired track is <strong>95.5px</strong> tall for <code>Thu 22</code>&rsquo;s 19.5px of content, so <strong>54px</strong> of visible slack sits under it. <strong>Ruled, not merely reported (R94): the slack stays, and <code>align-items:start</code> is not applied to the paired cells.</strong> Three rules point the same way and none points the other &mdash; R6 makes every tile fill its cell exactly and keeps <code>stretch</code> at the page&rsquo;s outer grid, and R17&rsquo;s honesty rulings and the settled &ldquo;nothing fills the empty cell&rdquo; line both say real slack is shown rather than hidden. The gap reflects a true height difference between two unrelated days: it is a fact about the week, not a layout defect, and applying <code>start</code> would buy a cosmetic gain with a new exception to R6. <strong>Cost, accepted:</strong> a day with one line can sit above visible empty room when its partner four days later is open &mdash; the same class of accepted cost as R63&rsquo;s pushing.</p>
     <div class="scroll">
       <div class="pane p920">
         <section class="pe-tile">
@@ -3119,6 +3128,46 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
           <div class="pe-head is-inline"><span class="eyebrow">Done this week</span><p class="fl-empty">Nothing ticked off yet this week.</p></div>
         </section></div>
     </div></div>
+
+    <p class="spec-cap" style="margin-top:28px"><strong>The two legal cells nothing else in this document draws (R95.4).</strong> Every other width above comes out of an arrangement a specimen already holds. These two do not: <strong>span 7 at twelve</strong> needs a row like 7 + 5, and <strong>3 of 6</strong> needs a twelve-column span of 5 or 6 to collapse into it &mdash; both legal, neither in the default or in any arrangement drawn here. Their widths were arithmetic until now, so they are drawn once, with the same tile in both, and measured: <strong>530.83px</strong> and <strong>346px</strong> at the same 14-pixel gutters as everything else. The same content renders <strong>369.75px</strong> tall at span 7 and <strong>416.75px</strong> at 3 of 6; the 47 pixels are the two scheduled rows going two-line. Nothing new is ruled by the pair; what it shows is that both land in bands that already exist. Span 7 sits <em>above</em> 480, so its scheduled rows stay on one line and the due column keeps its 64-pixel floor &mdash; it reads as a slightly narrow span 8. <code>3 of 6</code> sits <em>below</em> 480 and above 240, so the scheduled rows take R13&rsquo;s two-line form and the due column loses its floor, while the tile keeps its full 15/16 padding &mdash; it reads as a slightly wide 2 of 6. Neither width needs a threshold of its own, which is the finding.</p>
+    <div class="scroll"><div class="pair">
+      <div class="hold w531"><p class="lbl"><b>Span 7 at twelve</b> &middot; <code>530.83px</code> &middot; above 480</p>
+        <section class="pe-tile is-hero pe-t2">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span>
+              <div class="pe-rows">
+                <div class="pe-row is-sched"><span class="pe-time">07:00&ndash;08:50</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Project Management</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Classes</span></div>
+                <div class="pe-row is-sched"><span class="pe-time">13:00&ndash;13:30</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Call with Nova Dental</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Personal</span></div>
+              </div>
+            </div>
+            <div class="fl-group"><span class="pe-grp">Due</span>
+              <div class="pe-rows">
+                <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+                <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              </div>
+            </div>
+          </div>
+        </section></div>
+      <div class="hold w346"><p class="lbl"><b>3 of 6</b> &middot; <code>346px</code> &middot; below 480, above 240</p>
+        <section class="pe-tile is-hero pe-t2">
+          <div class="pe-head"><div><span class="eyebrow">Today</span><span class="fl-h">Mon 19 Oct</span></div><button type="button" class="btn">+ Event</button></div>
+          <div class="pe-body">
+            <div class="fl-group"><span class="pe-grp">Scheduled</span>
+              <div class="pe-rows">
+                <div class="pe-row is-sched"><span class="pe-time">07:00&ndash;08:50</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Project Management</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Classes</span></div>
+                <div class="pe-row is-sched"><span class="pe-time">13:00&ndash;13:30</span><a class="fl-biz" href="#" target="_blank" rel="noopener noreferrer"><span class="pe-nm">Call with Nova Dental</span><span class="arr">&#8599;</span></a><span class="tag is-layer">Personal</span></div>
+              </div>
+            </div>
+            <div class="fl-group"><span class="pe-grp">Due</span>
+              <div class="pe-rows">
+                <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Pay tuition&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Pay tuition&quot;"><span class="pe-nm">Pay tuition</span><span class="tag">Personal</span></button></div>
+                <div class="pe-row is-todo"><button type="button" class="tick" role="checkbox" aria-checked="false" aria-label="Done &quot;Send invoice&quot;"></button><button type="button" class="pe-edit-row" aria-label="Edit &quot;Send invoice&quot;"><span class="pe-nm">Send invoice</span><span class="tag">Freelance</span><span class="pe-due is-late">3 days late</span></button></div>
+              </div>
+            </div>
+          </div>
+        </section></div>
+    </div></div>
   </section>
 
   <!-- ==========================================================
@@ -3739,7 +3788,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
     <span class="spec-eyebrow">Closing</span>
     <h2 class="spec-title">What round 5 closed, and what is still open</h2>
     <p class="spec-cap"><strong>Closed.</strong> SHELL (R50, the thin top strip, app-wide), ROW (R53, shrink-to-fit), WORDS (R54/R55, all eleven sentences ship as written, every failure dot stays), and TILE&rsquo;s column count and disclosure mechanism (R51/R51b, R56&ndash;R69, R77). MARK (R52, then R79&ndash;R85): a tinted hero, and the tint is a <strong>ramp</strong> &mdash; green at nothing pending, orange at three, red at eight and clamped there, nine frozen classes and no runtime colour maths. The untinted hero survives with one meaning only: the to-do store did not answer.</p>
-    <p class="spec-cap"><strong>Nothing is left open.</strong> The two items this page carried as open are both closed. Whether an overdue to-do should force the busy end outright even with nothing else pending: <strong>no</strong> &mdash; you answered it yourself, &ldquo;it just counts as one&rdquo;, so lateness keeps its one escalation, the red ink on its own row, and R73&rsquo;s flag is withdrawn rather than carried forward. Whether the hero&rsquo;s tint should survive its own form being open: <strong>yes</strong> &mdash; R78 rules it, and specimen 06&rsquo;s two panes are redrawn tinted, because the count was read and only the group that displays it is covered. Everything on this page is settled and shipped, not proposed.</p>
+    <p class="spec-cap"><strong>One thing is left open, and it is a word.</strong> The two items this page carried as open are both closed. Whether an overdue to-do should force the busy end outright even with nothing else pending: <strong>no</strong> &mdash; you answered it yourself, &ldquo;it just counts as one&rdquo;, so lateness keeps its one escalation, the red ink on its own row, and R73&rsquo;s flag is withdrawn rather than carried forward. Whether the hero&rsquo;s tint should survive its own form being open: <strong>yes</strong> &mdash; R78 rules it, and specimen 06&rsquo;s two panes are redrawn tinted, because the count was read and only the group that displays it is covered. <strong>What is open is one string at one width.</strong> <code>3 days late</code> is the ruled form and it fits every cell the page can reach except the narrowest, 1 of 6, where it overruns its row by 10.7 pixels (the measurement is under specimen 01&rsquo;s three 106px panes). The abbreviation drawn there is not ratified and is not a decision this page may take: either it gets a nod, or that one cell shows something else. Everything else on this page is settled and shipped.</p>
     <div class="spec-q">
       <span class="qlbl">The eleven new sentences, all in one place &mdash; shipped as written (R54)</span>
       <p>Each is drawn on this page where it would appear, except the two marked as not drawn.</p>
@@ -3756,6 +3805,7 @@ All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue.</
         <li>Your saved arrangement could not be read: Couldn&rsquo;t load your arrangement, so this is the default.</li>
         <li>The tile is too narrow to open a form in: Too narrow for the form.</li>
       </ul>
+      <p>And a twelfth, ratified a day later on 2026-09-25 because the day row&rsquo;s disclosure did not exist when you read the eleven: the count beside a collapsed day&rsquo;s leading item, <strong>2 items</strong> / <strong>3 items</strong>. It needs no singular form &mdash; a day discloses only at two or more.</p>
       <p>One sentence from your own document that is not drawn: Up to 10 calendars. It appears under a calendar&rsquo;s row in Settings when you tick an eleventh, and only then; you have six.</p>
     </div>
     <div class="spec-q">

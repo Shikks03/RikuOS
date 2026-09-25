@@ -67,11 +67,11 @@ Also measured: the Org Stuff calendar is full of to-do-shaped entries placed as 
 | Row | Weight | Minimum | Measured against |
 |---|---|---|---|
 | 1 | tall | 340px | the hero with both groups empty |
-| 2 | short | **200px** | the Layers tile's three switch rows at span 3 — 197.85px |
+| 2 | short | **200px** | the Layers tile's three switch rows at span 3 — 191.85px |
 | 3 | medium | 240px | Next 7 days' seven day rows in two inner columns — ~235px |
 | 4 | short | 120px | Done this week, empty |
 
-Row 2 rises from the 140px first written here to **200px**. The blank Layers tile measures 197.85px once its switches carry the 44px touch target they need, and a minimum the content already exceeds is not a weight; shrinking the touch target to make a smaller number true is the one move forbidden here. **A build never tightens row padding, shrinks type or clips to hit a weight** — if a render reaches 240 in row 3, it got there by layout and not by a cheat. The measured blank render is recorded beside each weight for exactly that reason.
+Row 2 rises from the 140px first written here to **200px**. The blank Layers tile measures 191.85px once its switches carry the 44px touch target they need — 197.85px when this was first written, 6px less since the tile's container moved to the cell and its 12px padding came alive at span 3 (R92; the weight is unchanged, because 200 was never the tile's height) — and a minimum the content already exceeds is not a weight; shrinking the touch target to make a smaller number true is the one move forbidden here. **A build never tightens row padding, shrinks type or clips to hit a weight** — if a render reaches 240 in row 3, it got there by layout and not by a cheat. The measured blank render is recorded beside each weight for exactly that reason.
 
 **Row 3 keeps its medium weight because Next 7 days takes two inner columns** — days 1–4 left, 5–7 right, a 14px inner gutter — above 720px of tile width. Seven day rows in one column measure ~363px, taller than the tall row, and the cadence Riku specified would read tall, short, tall, short. Riku chose two columns on 2026-09-24, shown both. Items within a day are a wrapping flex row, so a long day wraps inside its column rather than overflowing it.
 

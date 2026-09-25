@@ -620,7 +620,7 @@ DONE THIS WEEK   3
 
 ---
 
-## 15. Strings ratified 2026-09-24
+## 15. Strings ratified 2026-09-24, and one on 2026-09-25
 
 Eleven states had no words when this deck was written. Most of them are failures that only surfaced once the page was drawn — a calendar that vanished from Google, a tick that got no answer, a tile too narrow to hold a form. Riku read all eleven on 2026-09-24 and approved them as written. They live here with the rest, because this deck is where the words live.
 
@@ -652,3 +652,5 @@ Eleven states had no words when this deck was written. Most of them are failures
 - `No push this morning.` (§6, Tile 4) turns red only once 07:00 has passed. Before then the sentence stands on its own: it is simply true at 00:30, and only the alarm would be lying.
 
 **One older string, kept where it already was.** `Up to 10 calendars.` (§9) is Riku's own and is not one of the eleven. It stays a press outcome — it appears under the picker row whose tick was refused, at the moment it is refused, and never as a standing note on the card.
+
+**And one more, ratified a day later — 2026-09-25.** The day row's collapsible did not exist when the eleven were read, so the count it needs had no words yet. `2 items` / `3 items`, in Tile 5 (§6) on a **collapsed** day row, beside the leading item's own title, where the day holds more than one thing. It is deliberately generic, because a day mixes events and to-dos, and **no singular form is needed**: a day only collapses at two or more, so there is no `1 item`. Dated separately from the eleven because it was approved separately, after them.
