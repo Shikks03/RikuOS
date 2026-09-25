@@ -1041,6 +1041,13 @@ The verification lead ran these checks against the repo, not against earlier rep
   - The lead ruled both out of scope. They are owed to the phone design round (S20) and noted in the CSS comment.
 - **Pre-existing, not P10a.** Three spans on `/freelance` overflow to right=502 at 440 and 439. They are clipped and the page does not scroll. Worth a later look.
 - **Slips in the plan text.** "The four `tile` thresholds are … six" gives the wrong count, and there is a slip in the `.fl-headrow` snippet.
+- **Lead ruling after this record: `.tick::after` shipped at `inset:-14px`, which realises R41 rather than changing it.**
+  - The insets are measured from `.tick`'s 12px padding box, inside its 1px border, so the shipped box is 12 + 2×14 = 40, reaching 13px past the 14px border box. The components.css comment now gives that arithmetic.
+  - Measured in headless Chrome, in a file:// harness linking tokens.css, base.css and components.css, and again with personal.css and legacy.css added. Both gave the same result.
+    - The computed `::after` is 40px × 40px.
+    - The tick's border box is at x 100–114, and the hit box spans 87–127 by 92–132. The sibling button at the row's 14px gap starts at 128, which leaves **1px clear**. Hit-tests agree.
+  - **N8 holds.** Two stacked `.pickrow`s each measure 40px tall (`min-height:40px`). Their tick hit boxes span 184–224 and 224.5–264.5, so they are 0.5px apart and do not overlap. The 0.5px comes from the second row's 1px `border-top`. Hit-testing switches from the first tick to the second between y 223.5 and 224.5.
+  - **For the design team:** the mockup still says `inset:-13px`, which measures 38×38, and so does R41's own arithmetic line.
 
 **Found by this verification.**
 

@@ -622,10 +622,14 @@
   display:grid;place-items:center;cursor:pointer;color:var(--ink-3);
 }
 /* the hit target, not the drawn size: 40 x 40 with the ::after box
-   (R41). The row's 14px gap puts the edit button 14px away, so 13px on
-   every side stops 1px clear of it. Never negative margins, which would
-   move the drawn box too. */
-.tick::after{content:"";position:absolute;inset:-13px}
+   (R41). An absolute box's insets are measured from its containing
+   block's PADDING box, which sits inside .tick's 1px border and is 12px,
+   so -14px on every side gives 12 + 28 = 40, reaching 13px past the 14px
+   border box. The row's 14px gap puts the edit button 14px away, so the
+   target stops 1px clear of it. The mockup's -13px measures 38 x 38
+   (12 + 26) and stops 2px short; correcting it is the design team's.
+   Never negative margins, which would move the drawn box too. */
+.tick::after{content:"";position:absolute;inset:-14px}
 /* the ticked mark is an 8px check, never a fill: solid fills are rationed
    to one per screen and Done this week alone would put twenty on the page.
    The check is drawn in a 10-unit viewBox rather than the icon set's 24 so
