@@ -99,9 +99,14 @@ const LayoutEntrySchema = new Schema<LayoutEntry>(
  * The schema pins shape and per-entry bounds only; the layout's cross-entry
  * rules (each tile once, rows ≤ 12 columns) are validateLayout()'s, called by
  * parseSettingsPatch on write, and resolvePersonalLayout() is total on read.
- * Measured: `doc.validate()` reaches the layout's entries, the deprecated
- * `validateSync()` does not (an array of document arrays), so
- * parseSettingsPatch is the enforcer that must never be bypassed.
+ * Per-entry bounds (tile enum, span 2–12, required fields, four rows, layer
+ * lengths, ≤ 10 layers) are ALSO enforced by the update validators that
+ * updateOsSettings() runs — measured by review via the query's own cast and
+ * validate. The cross-entry rules (each tile exactly once, a row ≤ 12
+ * columns) exist only in parseSettingsPatch / validateLayout, which is why
+ * that path must never be bypassed. Measured too: `doc.validate()` reaches
+ * the layout's entries, the deprecated `validateSync()` does not (an array of
+ * document arrays).
  */
 const OsSettingsSchema = new Schema<IOsSettings>(
   {

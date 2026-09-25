@@ -392,6 +392,19 @@ describe("resolvePersonalLayout — total on read", () => {
     expect(resolvePersonalLayout(wide).fellBack).toBe(true);
   });
 
+  it("the default itself is frozen at all three depths", () => {
+    expect(Object.isFrozen(PERSONAL_LAYOUT_DEFAULT)).toBe(true);
+    for (const row of PERSONAL_LAYOUT_DEFAULT) {
+      expect(Object.isFrozen(row)).toBe(true);
+      for (const entry of row) expect(Object.isFrozen(entry)).toBe(true);
+    }
+    // And a write through a cast throws under strict mode rather than landing.
+    expect(() => {
+      (PERSONAL_LAYOUT_DEFAULT[0][0] as { span: number }).span = 2;
+    }).toThrow(TypeError);
+    expect(PERSONAL_LAYOUT_DEFAULT[0][0].span).toBe(8);
+  });
+
   it("hands back a copy the caller cannot use to mutate the default", () => {
     const { layout } = resolvePersonalLayout(undefined);
     layout[0][0].span = 2;

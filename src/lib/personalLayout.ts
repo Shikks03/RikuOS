@@ -23,6 +23,8 @@ export type PersonalTile = (typeof PERSONAL_TILES)[number];
 export interface LayoutEntry { tile: PersonalTile; span: number }
 /** Exactly 4 rows. */
 export type PersonalLayout = LayoutEntry[][];
+/** The same shape, read-only at every depth: what the default is, and what the render half accepts. */
+export type ReadonlyPersonalLayout = ReadonlyArray<ReadonlyArray<Readonly<LayoutEntry>>>;
 
 export interface CellView {
   tile: PersonalTile | null;   // null = the row's leftover (the dashed cell)
@@ -44,12 +46,22 @@ export interface CellView {
  */
 export const PERSONAL_ROWS: readonly [340, 200, 240, 120] = [340, 200, 240, 120];
 
-export const PERSONAL_LAYOUT_DEFAULT: PersonalLayout = [
+/**
+ * Frozen at all three depths (the array, each row, each entry): it lives for
+ * the life of the process, so a caller that mutated it would rewrite every
+ * later caller's default. Everything that hands a layout OUT returns a
+ * mutable copy instead (`resolvePersonalLayout`, `validateLayout`).
+ */
+export const PERSONAL_LAYOUT_DEFAULT: ReadonlyPersonalLayout = freezeLayout([
   [{ tile: "today", span: 8 }, { tile: "todos", span: 4 }],
   [{ tile: "layers", span: 3 }, { tile: "push",  span: 8 }],
   [{ tile: "week",  span: 12 }],
   [{ tile: "done",  span: 12 }],
-];
+]);
+
+function freezeLayout(layout: PersonalLayout): ReadonlyPersonalLayout {
+  return Object.freeze(layout.map((row) => Object.freeze(row.map((e) => Object.freeze(e)))));
+}
 
 const ROW_COUNT = 4;
 const COLS = 12;
@@ -108,8 +120,10 @@ export function compactRows(layout: PersonalLayout): PersonalLayout {
 }
 
 /** The non-empty rows (at most four) with the index each had before compaction. */
-function liveRows(layout: PersonalLayout): Array<{ weightIndex: number; row: LayoutEntry[] }> {
-  const out: Array<{ weightIndex: number; row: LayoutEntry[] }> = [];
+type ReadonlyRow = ReadonlyArray<Readonly<LayoutEntry>>;
+
+function liveRows(layout: ReadonlyPersonalLayout): Array<{ weightIndex: number; row: ReadonlyRow }> {
+  const out: Array<{ weightIndex: number; row: ReadonlyRow }> = [];
   layout.slice(0, ROW_COUNT).forEach((row, i) => {
     if (row.length > 0) out.push({ weightIndex: i, row });
   });
@@ -123,7 +137,7 @@ function liveRows(layout: PersonalLayout): Array<{ weightIndex: number; row: Lay
  * leftover is bare ground and renders nothing (§4.7) — and only when it exists
  * at one of the two counts; `pe-s0` / `pe-x0` say "none at this count".
  */
-export function buildCells(layout: PersonalLayout, editing: boolean): CellView[] {
+export function buildCells(layout: ReadonlyPersonalLayout, editing: boolean): CellView[] {
   const cells: CellView[] = [];
   liveRows(layout).forEach(({ row }, r) => {
     const rowClass = ROW_CLASS[r];
@@ -153,7 +167,7 @@ export function buildCells(layout: PersonalLayout, editing: boolean): CellView[]
  * the weight), and never while editing (R5's surviving suspension). `--tb` is
  * folded in by `.pe-grid.is-editing`, not here.
  */
-export function buildTracks(layout: PersonalLayout, editing: boolean): string {
+export function buildTracks(layout: ReadonlyPersonalLayout, editing: boolean): string {
   return liveRows(layout)
     .map(({ weightIndex, row }) => {
       const shrinks = !editing && row.length === 1 && clampSpan(row[0].span) < COLS;
