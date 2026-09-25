@@ -28,9 +28,11 @@ export type HeroTint = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
  * numbers Riku can change. Changing one is a table edit plus nine regenerated
  * literals in personal.css, not a code change (R80). The two segments are
  * deliberately unequal: the first three items move the colour 1.8x as far as
- * the next five do, measured as an end-to-end OKLab dE of .1110 split .0774 /
- * .0422 (R79, corrected by R95.1). A day going from nothing to three things
- * has changed more, to Riku, than a day going from four to eight.
+ * the next five do, measured in OKLab between the deep stops: .0774 from 0 to
+ * 3, then .0422 from 3 to 8 (the straight line from 0 to 8 is .1110; the ramp
+ * bends through orange) (R79, corrected by R95.1). A day going from nothing
+ * to three things has changed more, to Riku, than a day going from four to
+ * eight.
  */
 export const PERSONAL_HERO_ANCHORS: Readonly<{ save: 0; spend: 3; missing: 8 }> = Object.freeze({
   save: 0,
