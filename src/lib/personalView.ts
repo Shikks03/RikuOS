@@ -245,6 +245,11 @@ export interface OpenTodoInput {
  * The counts come from the store and never from `rows`, so a capped read can
  * shorten a section's list but never undercount it.
  * "unavailable" is a read that did not answer — never an empty list.
+ *
+ * ORDER IS PART OF THE CONTRACT: `rows` are ordered by dueOn ascending, with
+ * UNDATED ROWS LAST. (Mongo's ascending sort puts missing dueOn FIRST, so the
+ * loader must order them itself — dated rows by dueOn, then the undated.)
+ * That order is what lets a capped read be judged: see readTodosForWindow.
  */
 export type OpenTodosFeed =
   | { rows: readonly OpenTodoInput[]; total: number; sectionTotals: Readonly<Record<TodoSection, number>> }
@@ -306,8 +311,29 @@ export interface PushInput {
   now: Date;
   /** getLastDigest(): null = never stored (R55); "unavailable" = the read threw. */
   digest: StoredDigest | null | "unavailable";
-  /** The dispatcher's latest AgentRun (fetchLatestRuns); null if it never ran. */
-  dispatcher: { ok: boolean; startedAt: Date } | null | "unavailable";
+  /**
+   * The dispatcher's latest AgentRun; null if it never ran.
+   *
+   * `skipped` marks a run that recorded itself WITHOUT sending: with
+   * monitoring off, the morning route still writes a `dispatcher` row with
+   * `ok: true` so the watchdog can tell "switched off" from "cron never fired"
+   * (src/app/api/cron/morning/route.ts). A skipped run is treated as NO run —
+   * never as a push that went out, and never as a failure.
+   *
+   * HOW THE LOADER DERIVES IT — and it is implicit, so read this. AgentRun has
+   * no structured skip field, and fetchLatestRuns (watchdog.ts) does not
+   * select `error`, so Plan C's loader reads the dispatcher row itself with
+   * `error` projected, and sets `skipped = run.ok === true && typeof run.error
+   * === "string"`. That holds because runJob (src/lib/jobs/runJob.ts) writes
+   * `error` on an ok row ONLY when a caller passes a `note`, and the one note
+   * any dispatcher row carries is the monitoring-off route's
+   * "monitoring is disabled in OsSettings". A real send never leaves `error`
+   * on an ok row (its digest-store failure is counted in itemsFailed, not
+   * noted). Do not match the note's text. If a second note-carrying dispatcher
+   * path is ever added, this marker stops being reliable; a structured field
+   * on AgentRun is then the fix.
+   */
+  dispatcher: { ok: boolean; startedAt: Date; skipped: boolean } | null | "unavailable";
   /** OsSettings.monitoringEnabled, or "unavailable" when settings did not load. */
   monitoringEnabled: boolean | "unavailable";
 }
@@ -463,6 +489,25 @@ function formCapableFor(layout: ReadonlyPersonalLayout, tile: PersonalTile): boo
   return false;
 }
 
+/**
+ * The open feed as the page's WINDOW (overdue … today+7) may use it. A capped
+ * read (`rows.length < total`) is safe inside the window only if the cap fell
+ * beyond it: rows are ordered by dueOn ascending with undated last (the
+ * OpenTodosFeed contract), so when the LAST row read is undated or due after
+ * today+7, every row due on or before today+7 is in hand. Otherwise the cap
+ * may have cut a due, overdue or this-week item, and the honest answer is
+ * the existing unreadable path — `Couldn't load to-dos.`, an untinted hero,
+ * and the week's to-do side unread — never `Nothing due.`, green and `—`.
+ * The To-do tile does not use this: its bounds count from `sectionTotals`.
+ */
+function readTodosForWindow(feed: OpenTodosFeed, today: DayKey): OpenTodosFeed {
+  if (feed === "unavailable" || feed.rows.length >= feed.total) return feed;
+  const last = feed.rows[feed.rows.length - 1];
+  if (last === undefined) return "unavailable";
+  if (last.dueOn !== null && last.dueOn <= addDays(today, 7)) return "unavailable";
+  return feed;
+}
+
 // ---- 1. Today ---------------------------------------------------------------
 
 /** deck §6 Tile 1: `09:00–10:50`, `all day`; the start alone when there is no end. */
@@ -481,6 +526,7 @@ function eventRange(e: CalendarEvent): string {
 export function buildTodayView(input: TodayInput): TodayView {
   const today = todayKey(input.now);
   const cal = readCalendar(input.calendar);
+  const todosFeed = readTodosForWindow(input.todos, today);
 
   let scheduled: TodayView["scheduled"];
   if (cal.kind === "none-enabled") {
@@ -505,15 +551,15 @@ export function buildTodayView(input: TodayInput): TodayView {
 
   let due: TodayView["due"];
   let tint: HeroTint | null;
-  if (input.todos === "unavailable") {
+  if (todosFeed === "unavailable") {
     due = { kind: "fail", line: todosFail() };
     tint = heroTint(null);
   } else {
     // deck §6 Tile 1: "to-dos due today, then overdue to-dos" — the deck's
     // order, not sortTodos's overdue-first. Each half is sortTodos'd: today's
     // oldest-created first, the overdue most-overdue first.
-    const dueToday = sortTodos(input.todos.rows.filter((t) => t.dueOn === today));
-    const overdue = sortTodos(input.todos.rows.filter((t) => t.dueOn !== null && t.dueOn < today));
+    const dueToday = sortTodos(todosFeed.rows.filter((t) => t.dueOn === today));
+    const overdue = sortTodos(todosFeed.rows.filter((t) => t.dueOn !== null && t.dueOn < today));
     const rows = [...dueToday, ...overdue].map((t) => todoRow(t, today));
     due = rows.length > 0 ? { kind: "rows", rows } : { kind: "empty" };
     tint = heroTint(rows.length);
@@ -543,7 +589,8 @@ export function buildTodayView(input: TodayInput): TodayView {
 export function buildWeekView(input: WeekInput): WeekView {
   const today = todayKey(input.now);
   const cal = readCalendar(input.calendar);
-  const todosDown = input.todos === "unavailable";
+  const todosFeed = readTodosForWindow(input.todos, today);
+  const todosDown = todosFeed === "unavailable";
 
   const fails: SayLine[] = [];
   if (cal.kind === "none-enabled") fails.push(cal.line);
@@ -554,7 +601,7 @@ export function buildWeekView(input: WeekInput): WeekView {
 
   const everySourceAnswered = (cal.kind === "answered" || cal.kind === "none-enabled") && !todosDown;
   const events = cal.kind === "answered" || cal.kind === "partial" ? cal.events : [];
-  const todos = input.todos === "unavailable" ? [] : sortTodos(input.todos.rows);
+  const todos = todosFeed === "unavailable" ? [] : sortTodos(todosFeed.rows);
 
   const days: DayRowView[] = [];
   for (let n = 1; n <= 7; n++) {
@@ -678,6 +725,7 @@ export function buildDoneView(input: DoneInput): DoneTileView {
  *
  *   digest unreadable                   → fail
  *   a digest sent today (APP_TZ)        → quote; `sent HH:MM` from sentAt
+ *   (a `skipped` dispatcher run counts as no run at all — see PushInput)
  *   dispatcher ok, started today        → went-out-unstored (no dot, R22)
  *   monitoring off                      → monitoring-off
  *   dispatcher unreadable               → fail: "no push" and "a push whose
@@ -694,7 +742,12 @@ export function buildDoneView(input: DoneInput): DoneTileView {
  */
 export function buildPushTileView(input: PushInput): PushTileView {
   const blank = { stamp: null, title: null, body: null, last: null } as const;
-  const { digest, dispatcher, now } = input;
+  const { digest, now } = input;
+  // A skipped run (monitoring off) is NO run: not a push, not a failure.
+  const dispatcher =
+    input.dispatcher !== "unavailable" && input.dispatcher !== null && input.dispatcher.skipped
+      ? null
+      : input.dispatcher;
   const today = todayKey(now);
   const unreadable = stale("Couldn't load this morning's push."); // deck §6 Tile 4, §11
 

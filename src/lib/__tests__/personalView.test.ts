@@ -610,14 +610,14 @@ describe("buildPushTileView", () => {
   });
 
   it("went out, text not stored: no dot", () => {
-    const v = push({ digest: OLD_PUSH, dispatcher: { ok: true, startedAt: new Date("2026-09-09T23:00:00Z") } });
+    const v = push({ digest: OLD_PUSH, dispatcher: { ok: true, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: false } });
     expect(v.kind).toBe("went-out-unstored");
     expect(v.line).toEqual({ text: "A push went out this morning. Its text wasn't stored.", dot: null });
     expect(v.stamp).toBeNull();
   });
 
   it("no push this morning, past 07:00: the missing dot, and Last: beneath", () => {
-    const v = push({ digest: OLD_PUSH, dispatcher: { ok: true, startedAt: new Date("2026-08-08T23:00:00Z") } });
+    const v = push({ digest: OLD_PUSH, dispatcher: { ok: true, startedAt: new Date("2026-08-08T23:00:00Z"), skipped: false } });
     expect(v.kind).toBe("no-push-today");
     expect(v.line).toEqual({ text: "No push this morning.", dot: "missing" });
     expect(v.last).toEqual({ stamp: "Last: Sun 9 Aug 07:00", title: "Old", body: "Old body" });
@@ -631,7 +631,7 @@ describe("buildPushTileView", () => {
   });
 
   it("a failed dispatcher run today is not a push that went out", () => {
-    const v = push({ digest: OLD_PUSH, dispatcher: { ok: false, startedAt: new Date("2026-09-09T23:00:00Z") } });
+    const v = push({ digest: OLD_PUSH, dispatcher: { ok: false, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: false } });
     expect(v.kind).toBe("no-push-today");
   });
 
@@ -659,6 +659,86 @@ describe("buildPushTileView", () => {
   it("an unreadable run cannot tell no-push from unstored, so it fails rather than guess", () => {
     expect(push({ digest: OLD_PUSH, dispatcher: "unavailable" }).kind).toBe("fail");
     expect(push({ digest: TODAY_PUSH, dispatcher: "unavailable" }).kind).toBe("quote");
+  });
+
+  describe("a skipped run is not a push (monitoring off still writes an ok dispatcher row)", () => {
+    const skippedToday = { ok: true, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: true };
+
+    it("old digest + monitoring off + a skipped run today → monitoring-off, not went-out", () => {
+      const v = push({ digest: OLD_PUSH, monitoringEnabled: false, dispatcher: skippedToday });
+      expect(v.kind).toBe("monitoring-off");
+      expect(v.line).toEqual({ text: "Monitoring is off, so no push goes out.", dot: null });
+    });
+
+    it("monitoring back on, today's run was skipped, no digest today → no-push-today, not went-out", () => {
+      const v = push({ digest: OLD_PUSH, monitoringEnabled: true, dispatcher: skippedToday });
+      expect(v.kind).toBe("no-push-today");
+      expect(v.line).toEqual({ text: "No push this morning.", dot: "missing" });
+    });
+
+    it("a skipped run with no digest ever reads as never, not as a failure", () => {
+      expect(push({ digest: null, monitoringEnabled: true, dispatcher: skippedToday }).kind).toBe("never");
+    });
+  });
+
+  describe("the 07:00 boundary in Manila (deck §15)", () => {
+    it("06:59 stands undotted", () => {
+      const v = push({ now: new Date("2026-09-09T22:59:00Z"), digest: OLD_PUSH });
+      expect(v.line).toEqual({ text: "No push this morning.", dot: null });
+    });
+    it("07:00 takes the missing dot", () => {
+      const v = push({ now: new Date("2026-09-09T23:00:00Z"), digest: OLD_PUSH });
+      expect(v.line).toEqual({ text: "No push this morning.", dot: "missing" });
+    });
+  });
+});
+
+// ------------------------------------------------ A capped open read ----
+
+describe("a capped open read never says nothing due", () => {
+  // Rows ordered by dueOn ascending, undated last (the OpenTodosFeed contract).
+  const capped = (rows: OpenTodoInput[], total: number): OpenTodosFeed => ({
+    rows,
+    total,
+    sectionTotals: { personal: total, freelance: 0, academics: 0 },
+  });
+
+  it("the cap fell inside the window (last row due by today+7): DUE, the tint and the week read as unreadable", () => {
+    const feed = capped([todo({ dueOn: "2026-09-12" }), todo({ dueOn: "2026-09-15" })], 9);
+    const t = today(okWindow([]), feed);
+    expect(t.due).toEqual({ kind: "fail", line: { text: "Couldn't load to-dos.", dot: "stale" } });
+    expect(t.heroTint).toBeNull();
+    expect(t.spread).toBe(false);
+    const w = week(okWindow([]), feed);
+    expect(w.fails).toEqual([{ text: "Couldn't load to-dos.", dot: "stale" }]);
+    expect(w.days!.some((d) => dayShape(d).kind === "dash")).toBe(false);
+  });
+
+  it("the cap fell at exactly today+7: still unreadable", () => {
+    const feed = capped([todo({ dueOn: "2026-09-17" })], 3);
+    expect(today(okWindow([]), feed).heroTint).toBeNull();
+  });
+
+  it("the cap fell beyond today+7: nothing in the window was dropped, render normally", () => {
+    const feed = capped([todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-18" })], 9);
+    const t = today(okWindow([]), feed);
+    expect(t.heroTint).toBe(1);
+    expect(t.due.kind).toBe("rows");
+    const w = week(okWindow([]), feed);
+    expect(w.fails).toEqual([]);
+    expect(w.days!.every((d) => dayShape(d).kind === "dash")).toBe(true);
+  });
+
+  it("the cap fell among undated rows: every dated row is in hand, render normally", () => {
+    const feed = capped([todo({ dueOn: "2026-09-11" }), todo({ dueOn: null })], 9);
+    expect(today(okWindow([]), feed)).toMatchObject({ due: { kind: "empty" }, heroTint: 0, spread: true });
+  });
+
+  it("the To-do tile is not affected: its bounds count from the store", () => {
+    const feed = capped([todo({ dueOn: "2026-09-12" })], 9);
+    const v = buildTodoTileView({ now: NOW, todos: feed });
+    expect(v.count).toBe(9);
+    expect(v.sections![0].bound).toBe("Showing 1 of 9.");
   });
 });
 
