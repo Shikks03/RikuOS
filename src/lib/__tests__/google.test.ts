@@ -361,6 +361,67 @@ describe("listEvents", () => {
   });
 });
 
+describe("multi-day all-day events", () => {
+  const trip = (start: string, end: string) =>
+    json({
+      items: [
+        {
+          id: "trip",
+          status: "confirmed",
+          summary: "Baguio trip",
+          htmlLink: "https://www.google.com/calendar/event?eid=t",
+          start: { date: start },
+          end: { date: end },
+        },
+      ],
+    });
+
+  it("a 4-day event across the window's start yields only the in-window days", async () => {
+    stubConfig();
+    // Covers 09-08 … 09-11 (end.date 09-12 is exclusive); the window opens 09-10.
+    stubFetch(() => trip("2026-09-08", "2026-09-12"));
+    const events = await listEvents("cal", "2026-09-10", "2026-09-17");
+    expect(events.map((e) => e.dayKey)).toEqual(["2026-09-10", "2026-09-11"]);
+    for (const e of events) {
+      expect(e).toMatchObject({
+        id: "trip",
+        title: "Baguio trip",
+        allDay: true,
+        htmlLink: "https://www.google.com/calendar/event?eid=t",
+      });
+    }
+  });
+
+  it("a 4-day event across the window's end yields only the in-window days", async () => {
+    stubConfig();
+    stubFetch(() => trip("2026-09-16", "2026-09-20"));
+    const events = await listEvents("cal", "2026-09-10", "2026-09-17");
+    expect(events.map((e) => e.dayKey)).toEqual(["2026-09-16", "2026-09-17"]);
+  });
+
+  it("a single-day all-day event yields one entry", async () => {
+    stubConfig();
+    stubFetch(() => trip("2026-09-12", "2026-09-13"));
+    const events = await listEvents("cal", "2026-09-10", "2026-09-17");
+    expect(events.map((e) => e.dayKey)).toEqual(["2026-09-12"]);
+  });
+
+  it("readCalendarWindow carries the expansion through, in day order", async () => {
+    stubConfig();
+    stubFetch(() => trip("2026-09-10", "2026-09-13"));
+    const w = await readCalendarWindow(
+      [{ calendarId: "cal", name: "Personal", enabled: true }],
+      "2026-09-10",
+      "2026-09-17",
+    );
+    expect(w.ok && w.events.map((e) => `${e.dayKey}:${e.id}`)).toEqual([
+      "2026-09-10:trip",
+      "2026-09-11:trip",
+      "2026-09-12:trip",
+    ]);
+  });
+});
+
 describe("windowBounds", () => {
   it("is Manila midnight of fromKey to Manila midnight after toKey (both days inclusive)", () => {
     const { timeMin, timeMax } = windowBounds("2026-12-31", "2027-01-01");

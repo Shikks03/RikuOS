@@ -42,6 +42,10 @@ import type { Layer } from "@/lib/osSettings";
 
 // --- Contract types (the plan's "Types Plan C will render") -----------------
 
+/**
+ * One event on one day. A multi-day all-day event yields one of these per day it
+ * covers, sharing `id` — key rows by `${dayKey}:${id}`, never by `id` alone.
+ */
 export interface CalendarEvent {
   id: string;
   title: string; // bounded to 200 for display
@@ -404,9 +408,11 @@ function zoneMidnight(key: DayKey, tz: string): Date {
  * midnight that begins the day AFTER `toKey` (Google's timeMax is exclusive).
  * For Manila, `2026-09-10` begins at 2026-09-09T16:00:00Z.
  *
- * Google returns every event that OVERLAPS the window, so an event that began
- * before `fromKey` and runs into it is included and keyed to its own start day
- * (which the page, splitting by dayKey, will not find in the window).
+ * Google returns every event that OVERLAPS the window. An ALL-DAY event is
+ * expanded onto every day it covers, clipped to the window (see listEvents).
+ * A TIMED event is keyed to its start day only — one that began before
+ * `fromKey`, or crosses midnight, does not appear on the later day(s). Known
+ * limit, accepted: the page reads it on the day it starts.
  */
 export function windowBounds(fromKey: DayKey, toKey: DayKey, tz: string = APP_TZ): { timeMin: Date; timeMax: Date } {
   if (!isDayKey(fromKey) || !isDayKey(toKey)) {
@@ -491,6 +497,15 @@ export async function listCalendars(): Promise<CalendarListEntry[]> {
 /**
  * One calendar's events over a window of APP_TZ days (both ends inclusive; see
  * windowBounds). Recurring entries arrive already expanded (singleEvents).
+ *
+ * A multi-day ALL-DAY event (a trip: start.date 09-10, end.date 09-13, the end
+ * exclusive) becomes one entry PER DAY it covers — 09-10, 09-11, 09-12 — clipped
+ * to [fromKey, toKey], each with its own dayKey and the SAME id, title and
+ * htmlLink. Keyed to its start day alone, the page would say `Nothing
+ * scheduled.` on 09-11 while Riku is away. So an id CAN REPEAT across days:
+ * consumers key rows by `${dayKey}:${id}`, never by id alone.
+ *
+ * A TIMED event crossing midnight stays keyed to its start day (known limit).
  */
 export async function listEvents(calendarId: string, fromKey: DayKey, toKey: DayKey): Promise<LayerEvent[]> {
   const { timeMin, timeMax } = windowBounds(fromKey, toKey);
@@ -510,7 +525,17 @@ export async function listEvents(calendarId: string, fromKey: DayKey, toKey: Day
   const events: LayerEvent[] = [];
   for (const raw of items) {
     const e = toLayerEvent(raw);
-    if (e) events.push(e);
+    if (!e) continue;
+    if (!e.allDay) {
+      events.push(e);
+      continue;
+    }
+    const endRaw = str((raw as { end?: { date?: unknown } }).end?.date);
+    // end.date is exclusive; a missing or nonsensical end means one day.
+    const end = endRaw && isDayKey(endRaw) && endRaw > e.dayKey ? endRaw : addDays(e.dayKey, 1);
+    for (let day = e.dayKey < fromKey ? fromKey : e.dayKey; day < end && day <= toKey; day = addDays(day, 1)) {
+      events.push({ ...e, dayKey: day });
+    }
   }
   return events;
 }
