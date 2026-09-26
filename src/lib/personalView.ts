@@ -320,18 +320,19 @@ export interface PushInput {
    * (src/app/api/cron/morning/route.ts). A skipped run is treated as NO run —
    * never as a push that went out, and never as a failure.
    *
-   * HOW THE LOADER DERIVES IT — and it is implicit, so read this. AgentRun has
-   * no structured skip field, and fetchLatestRuns (watchdog.ts) does not
-   * select `error`, so Plan C's loader reads the dispatcher row itself with
-   * `error` projected, and sets `skipped = run.ok === true && typeof run.error
-   * === "string"`. That holds because runJob (src/lib/jobs/runJob.ts) writes
-   * `error` on an ok row ONLY when a caller passes a `note`, and the one note
-   * any dispatcher row carries is the monitoring-off route's
-   * "monitoring is disabled in OsSettings". A real send never leaves `error`
-   * on an ok row (its digest-store failure is counted in itemsFailed, not
-   * noted). Do not match the note's text. If a second note-carrying dispatcher
-   * path is ever added, this marker stops being reliable; a structured field
-   * on AgentRun is then the fix.
+   * HOW THE LOADER DERIVES IT. AgentRun carries a structured `skipped`
+   * field: runJob (src/lib/jobs/runJob.ts) writes `skipped: true` on every
+   * ok run it was handed a skip note for. fetchLatestRuns (watchdog.ts) does
+   * not select it, so Plan C's loader reads the dispatcher row itself with
+   * `skipped` and `error` projected, and sets `skipped = run.skipped === true`.
+   *
+   * FALLBACK, for rows written before the field existed (they have no
+   * `skipped` key, and AgentRun's 90-day TTL retires them): `skipped =
+   * run.ok === true && typeof run.error === "string"`. That held because
+   * runJob wrote `error` on an ok row ONLY for a `note`, and the one note any
+   * dispatcher row carried was the monitoring-off route's. Apply it only when
+   * `run.skipped` is absent — never when it is `false`. Do not match the
+   * note's text.
    */
   dispatcher: { ok: boolean; startedAt: Date; skipped: boolean } | null | "unavailable";
   /** OsSettings.monitoringEnabled, or "unavailable" when settings did not load. */

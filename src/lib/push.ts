@@ -11,8 +11,9 @@ import webpush from "web-push";
 import { connectDB } from "@/lib/db";
 import PushSubscription from "@/models/PushSubscription";
 
-export const PUSH_TITLE_MAX = 80;
-export const PUSH_BODY_MAX = 320;
+import { PUSH_BODY_MAX, PUSH_TITLE_MAX } from "@/lib/constants";
+
+export { PUSH_BODY_MAX, PUSH_TITLE_MAX };
 
 export interface PushPayload {
   title: string;

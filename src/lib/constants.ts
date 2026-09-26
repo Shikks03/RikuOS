@@ -26,3 +26,12 @@ export const APP_TZ = "Asia/Manila";
  * happen at the time it says.
  */
 export const PUSH_EXPECTED_HOUR = 7;
+
+/**
+ * The push payload's bounds (buildPushPayload in push.ts). Here rather than
+ * in push.ts because digest.ts budgets the Today sentence against the body
+ * bound and must stay pure — push.ts imports web-push and the database. 320
+ * for every push (§7.8, D12); LastDigest's maxlengths match both.
+ */
+export const PUSH_TITLE_MAX = 80;
+export const PUSH_BODY_MAX = 320;

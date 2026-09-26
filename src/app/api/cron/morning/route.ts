@@ -136,20 +136,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // A dependency being down must not cost the whole digest. The reason is
       // logged rather than discarded: the digest can only say "unavailable",
       // which cannot distinguish a rotated secret from an outage from DNS.
-      const attention = await fetchAttention(settings.chaserNDays, ATTENTION_LIMIT).catch(
-        (attentionErr: unknown) => {
+      //
+      // The Today sentence's two reads run beside it: the Manila day's events
+      // on the switched-on layers, and the open to-dos due within 3 days or
+      // overdue. Both are caught inside readDigestToday into "unavailable" —
+      // the digest never fails for Google. Neither promise rejects, so
+      // Promise.all cannot throw here. The layers are the ones this route
+      // already read above; no second settings read, and no write (never
+      // getOsSettings for this).
+      const [attention, today] = await Promise.all([
+        fetchAttention(settings.chaserNDays, ATTENTION_LIMIT).catch((attentionErr: unknown) => {
           console.error("[cron/morning] attention check failed:", attentionErr);
           return null;
-        }
-      );
-
-      // The Today sentence's two reads: the Manila day's events on the
-      // switched-on layers, and the open to-dos due within 3 days or overdue.
-      // Both are caught inside readDigestToday into "unavailable" — the digest
-      // never fails for Google. The layers are the ones this route already
-      // read above; no second settings read, and no write (never
-      // getOsSettings for this).
-      const today = await readDigestToday(settings.layers, todayKey(new Date()));
+        }),
+        readDigestToday(settings.layers, todayKey(new Date())),
+      ]);
 
       const problems = buildProblems({
         expiry: { ok: expiry.ok, error: expiry.error, unstuck: expiry.data?.unstuck ?? 0 },

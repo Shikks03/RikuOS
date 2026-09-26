@@ -36,7 +36,9 @@ export interface JobResult<T> {
  * @param note recorded on the run when the job did no work for a legitimate
  *   reason (e.g. switched off). It lands in `error` on an `ok: true` row, the
  *   same shape the chaser uses — deliberately, so "disabled" and "never fired"
- *   stay distinguishable. Nothing reads it back programmatically.
+ *   stay distinguishable. A noted run that completed is written with
+ *   `skipped: true`, the structured marker readers use; a noted run whose
+ *   work threw is a failure, not a skip, and is written `skipped: false`.
  */
 export async function runJob<T>(
   agent: Agent,
@@ -65,6 +67,7 @@ export async function runJob<T>(
       durationMs: Date.now() - startedAt.getTime(),
       ok,
       counts,
+      skipped: ok && note !== undefined,
       ...(error !== undefined ? { error: error.slice(0, 2000) } : {}),
     });
   } catch (runErr) {

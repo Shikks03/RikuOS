@@ -488,3 +488,99 @@ describe("composeTodayLine's totals", () => {
     ).toBe("Due: A (today), B (today), C (today), +9 more.");
   });
 });
+
+describe("the Today sentence's budget (D12)", () => {
+  const long = (prefix: string, n: number) => `${prefix} ${"x".repeat(n - prefix.length - 1)}`;
+  const HEAVY: DigestTodayInput = {
+    events: [
+      { title: long("Event one", 200), time: "09:00" },
+      { title: long("Event two", 180), time: "13:00" },
+      { title: long("Event three", 160), time: null },
+    ],
+    missedLayers: [],
+    due: [
+      { title: long("Due one", 140), dayLabel: "today" },
+      { title: long("Due two", 140), dayLabel: "tomorrow" },
+      { title: long("Due three", 140), dayLabel: "Sun" },
+    ],
+    overdue: [
+      { title: long("Late one", 140), daysLate: 3 },
+      { title: long("Late two", 150), daysLate: 2 },
+      { title: long("Late three", 140), daysLate: 1 },
+    ],
+  };
+
+  it("keeps the problems line and the freelance line whole with 140-200 char titles", () => {
+    const body = composeDigest({
+      ...base,
+      attention: { repliedUnanswered: 4, overdue: 2 },
+      problems: ["Meowchi unreachable"],
+      today: HEAVY,
+    }).body;
+    expect(body.length).toBeLessThanOrEqual(320);
+    expect(body.startsWith("Meowchi unreachable. Today: ")).toBe(true);
+    expect(body.endsWith(" 4 waiting on you, 2 overdue.")).toBe(true);
+    expect(body).toContain("Due: ");
+    expect(body).toContain("Overdue: ");
+    // Suffixes survive the cut.
+    expect(body).toContain("09:00");
+  });
+
+  it("keeps Off: whole too, behind the freelance line", () => {
+    const body = composeDigest({
+      ...base,
+      problems: ["Meowchi unreachable", "dispatcher failed"],
+      offAgents: ["chaser"],
+      today: HEAVY,
+    }).body;
+    expect(body.length).toBeLessThanOrEqual(320);
+    expect(body.endsWith(" 0 waiting on you, 0 overdue. Off: chaser.")).toBe(true);
+  });
+
+  it("changes nothing when the sentence already fits", () => {
+    expect(composeTodayLine(FULL, 320)).toBe(composeTodayLine(FULL));
+  });
+
+  it("cuts titles first, marking the cut, before dropping any name", () => {
+    const line = composeTodayLine(
+      { ...QUIET, events: [{ title: "A".repeat(100), time: "09:00" }] },
+      80
+    );
+    expect(line).toBe(`Today: ${"A".repeat(59)}… 09:00.`);
+  });
+
+  it("then moves names into +N more, keeping the labels and the partial clause", () => {
+    const line = composeTodayLine({ ...HEAVY, missedLayers: ["Classes"] }, 120);
+    expect(line.length).toBeLessThanOrEqual(120);
+    expect(line).toContain("Today: ");
+    expect(line).toContain("Classes wasn't read.");
+    expect(line).toContain("Due: ");
+    expect(line).toContain("Overdue: ");
+    expect(line).toMatch(/\+\d more/);
+  });
+
+  it("never cuts a failure sentence", () => {
+    const line = composeTodayLine({ ...QUIET, events: "unavailable", due: "unavailable" }, 10);
+    expect(line).toBe("Today: calendar unavailable. Due: to-dos unavailable.");
+  });
+});
+
+describe("capitalising the problems line", () => {
+  it("capitalises the app's own fragments", () => {
+    expect(
+      composeDigest({ ...base, problems: ["expiry sweep failed: mongo down"] }).body.startsWith(
+        "Expiry sweep failed: mongo down."
+      )
+    ).toBe(true);
+  });
+
+  it("never alters a configured site name that leads the line", () => {
+    const body = composeDigest({ ...base, problems: ["meowchi.dev returned HTTP 503"] }).body;
+    expect(body.startsWith("meowchi.dev returned HTTP 503.")).toBe(true);
+  });
+
+  it("leaves an agent id that leads the line as written", () => {
+    const body = composeDigest({ ...base, problems: ["dispatcher failed"] }).body;
+    expect(body.startsWith("dispatcher failed.")).toBe(true);
+  });
+});

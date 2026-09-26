@@ -102,6 +102,16 @@ describe("AgentRun", () => {
     });
     expect(doc.validateSync()?.errors["agent"]).toBeDefined();
   });
+
+  it("defaults skipped to false, not required, and adds no index", () => {
+    const doc = new AgentRun({ agent: "dispatcher", startedAt: new Date(), durationMs: 1, ok: true });
+    expect(doc.validateSync()).toBeUndefined();
+    expect(doc.skipped).toBe(false);
+    expect(AgentRun.schema.path("skipped").isRequired).toBeFalsy();
+    const indexed = AgentRun.schema.indexes().some(([fields]) => "skipped" in fields);
+    expect(indexed).toBe(false);
+    expect(AgentRun.schema.indexes()).toHaveLength(2);
+  });
 });
 
 describe("PushSubscription", () => {

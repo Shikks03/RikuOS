@@ -44,6 +44,12 @@ export interface IAgentRun extends Document {
   ok: boolean;
   counts: IAgentRunCounts;
   error?: string;
+  /**
+   * True when the run deliberately did no work (e.g. switched off) and says
+   * why in `error`. Structured so a reader never infers a skip from the
+   * `ok && error` shape. Rows written before the field existed have no key.
+   */
+  skipped?: boolean;
 }
 
 // No timestamps option: startedAt is the meaningful time and is set
@@ -60,6 +66,8 @@ const AgentRunSchema = new Schema<IAgentRun>(
       default: () => ({ itemsCreated: 0, itemsProcessed: 0, itemsSkipped: 0, itemsFailed: 0 }),
     },
     error: { type: String, maxlength: 2000 },
+    // Not required and not indexed: a pre-existing row simply lacks it.
+    skipped: { type: Boolean, default: false },
   },
   { strict: true }
 );

@@ -62,7 +62,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!settings.chaserEnabled) {
       // A disabled agent still records a run, so the watchdog (P5) can tell
       // "switched off" apart from "cron never fired".
-      await writeRun(startedAt, true, 0, 0, 0, 0, "chaser is disabled in OsSettings");
+      await writeRun(startedAt, true, 0, 0, 0, 0, "chaser is disabled in OsSettings", true);
       return NextResponse.json({ ok: true, disabled: true });
     }
 
@@ -159,7 +159,9 @@ async function writeRun(
   itemsProcessed: number,
   itemsSkipped: number,
   itemsFailed: number,
-  error?: string
+  error?: string,
+  /** True only for the switched-off path: `error` is then a skip note, not a failure. */
+  skipped = false
 ): Promise<void> {
   try {
     await AgentRun.create({
@@ -168,6 +170,7 @@ async function writeRun(
       durationMs: Date.now() - startedAt.getTime(),
       ok,
       counts: { itemsCreated, itemsProcessed, itemsSkipped, itemsFailed },
+      skipped,
       ...(error !== undefined ? { error: error.slice(0, 2000) } : {}),
     });
   } catch (runErr) {

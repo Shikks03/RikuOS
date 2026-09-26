@@ -18,7 +18,7 @@ import type { Anomaly } from "@/lib/watchdog";
 import type { SiteResult } from "@/lib/siteHealth";
 import type { OutreachFinding } from "@/lib/outreachHealth";
 import type { CalendarWindow } from "@/lib/google";
-import { APP_TZ } from "@/lib/constants";
+import { APP_TZ, PUSH_BODY_MAX } from "@/lib/constants";
 import { addDays, formatDay, type DayKey } from "@/lib/days";
 import { daysLate, sortTodos, todoDueKey } from "@/lib/todos";
 
@@ -64,13 +64,34 @@ function short(problem: string): string {
 }
 
 /**
- * The first letter up. Fragments are written lowercase so they read right
- * anywhere in the joined line; the rendered line is a sentence, so deck §10's
- * `Calendar check unavailable.` is what the fragment `calendar check
- * unavailable` renders as when it leads (R23).
+ * How the app's OWN problem fragments begin — the lowercase ones this file
+ * writes (here and in buildProblems). Only these are capitalised when they
+ * lead the line. Everything else leads as written: a site's detail begins
+ * with its configured name (`meowchi.dev returned HTTP 503`) and a watchdog
+ * anomaly with an agent id (`dispatcher failed`), and upper-casing either
+ * would misspell a name. A new fragment in this file belongs in this list.
+ */
+const OWN_FRAGMENTS = [
+  "pipeline check ",
+  "calendar check ",
+  "to-do check ",
+  "expiry sweep failed",
+  "watchdog failed",
+  "site health failed",
+  "site reading could not",
+  "outreach check failed",
+] as const;
+
+/**
+ * The first letter up, for an own fragment only. Fragments are written
+ * lowercase so they read right anywhere in the joined line; the rendered line
+ * is a sentence, so deck §10's `Calendar check unavailable.` is what the
+ * fragment `calendar check unavailable` renders as when it leads (R23).
  */
 function capitalise(line: string): string {
-  return line.charAt(0).toUpperCase() + line.slice(1);
+  return OWN_FRAGMENTS.some((f) => line.startsWith(f))
+    ? line.charAt(0).toUpperCase() + line.slice(1)
+    : line;
 }
 
 export function composeDigest(input: DigestInput): Digest {
@@ -104,19 +125,21 @@ export function composeDigest(input: DigestInput): Digest {
       ? `${problemCount} problem${problemCount === 1 ? "" : "s"} · ${reviewPart}`
       : `All clear · ${reviewPart}`;
 
-  const lines: string[] = [];
-  lines.push(problemCount > 0 ? capitalise(end(problems.map(short).join("; "))) : "All clear.");
-  lines.push(composeTodayLine(today));
-
+  const problemsLine = problemCount > 0 ? capitalise(end(problems.map(short).join("; "))) : "All clear.";
+  const after: string[] = [];
   if (input.attention !== null) {
-    lines.push(
-      `${input.attention.repliedUnanswered} waiting on you, ${input.attention.overdue} overdue.`
-    );
+    after.push(`${input.attention.repliedUnanswered} waiting on you, ${input.attention.overdue} overdue.`);
+  }
+  if (input.offAgents.length > 0) {
+    after.push(`Off: ${input.offAgents.join(", ")}.`);
   }
 
-  if (input.offAgents.length > 0) {
-    lines.push(`Off: ${input.offAgents.join(", ")}.`);
-  }
+  // The Today sentence gets what the other parts leave of the body bound, so
+  // it shortens itself rather than letting the payload slice cut the
+  // freelance line (D12). One space separates each part.
+  const others = [problemsLine, ...after];
+  const budget = PUSH_BODY_MAX - (others.join(" ").length + others.length);
+  const lines = [problemsLine, composeTodayLine(today, budget), ...after];
 
   return { title, body: lines.join(" ") };
 }
@@ -152,11 +175,24 @@ export interface DigestTodayInput {
 const TODAY_NAMES = 3;
 
 /**
+ * The title caps tried, longest first, when the sentence is over its budget.
+ * A name's suffix — its time, its day, its lateness — is never cut; only the
+ * title before it.
+ */
+const TITLE_CAPS = [60, 40, 24, 12] as const;
+
+/** A title cut to `cap` characters, the cut marked with `…`. */
+function capTitle(title: string, cap: number): string {
+  return title.length > cap ? `${title.slice(0, cap - 1).trimEnd()}…` : title;
+}
+
+/**
  * `A, B, C, +2 more` — singular `+1 more`. `total` is the true count when the
  * names are a bounded read of something larger; never below `names.length`.
+ * `limit` is how many names are shown before `+N more` takes the rest.
  */
-function listPart(names: string[], total: number = names.length): string {
-  const shown = names.slice(0, TODAY_NAMES);
+function listPart(names: string[], total: number = names.length, limit: number = TODAY_NAMES): string {
+  const shown = names.slice(0, limit);
   const rest = Math.max(total, names.length) - shown.length;
   // PROVISIONAL (P10b): not in the deck - Riku to approve (the comma before `+N more`)
   return rest > 0 ? [...shown, `+${rest} more`].join(", ") : shown.join(", ");
@@ -188,8 +224,33 @@ function missedSentence(layers: string[]): string {
  *
  * Absent parts are omitted; the quiet line is the one exception, so silence
  * and "couldn't read the calendar" never look the same (D6).
+ *
+ * `budget` is the most characters the sentence may take. Over it, the titles
+ * are cut to each of TITLE_CAPS in turn, then names are moved into `+N more`
+ * three, two, one, none per part — until it fits. A part's label, a name's
+ * time/day/lateness, the partial-read clause and every failure sentence are
+ * never cut. If even no names at all does not fit, that most compact form is
+ * returned: only a problems line that is itself over the bound gets there,
+ * and the payload's slice is then the last resort.
  */
-export function composeTodayLine(today: DigestTodayInput): string {
+export function composeTodayLine(today: DigestTodayInput, budget: number = Infinity): string {
+  const full = renderToday(today, Infinity, TODAY_NAMES);
+  if (full.length <= budget) return full;
+  let line = full;
+  for (const cap of TITLE_CAPS) {
+    line = renderToday(today, cap, TODAY_NAMES);
+    if (line.length <= budget) return line;
+  }
+  const smallest = TITLE_CAPS[TITLE_CAPS.length - 1];
+  for (let limit = TODAY_NAMES - 1; limit >= 0; limit--) {
+    line = renderToday(today, smallest, limit);
+    if (line.length <= budget) return line;
+  }
+  return line;
+}
+
+function renderToday(today: DigestTodayInput, cap: number, limit: number): string {
+  const t = (title: string) => capTitle(title, cap);
   const parts: string[] = [];
 
   if (today.events === "none-enabled") {
@@ -197,10 +258,10 @@ export function composeTodayLine(today: DigestTodayInput): string {
   } else if (today.events === "unavailable") {
     parts.push("Today: calendar unavailable.");
   } else {
-    const names = today.events.map((e) => `${e.title} ${e.time ?? "(all day)"}`);
+    const names = today.events.map((e) => `${t(e.title)} ${e.time ?? "(all day)"}`);
     const missed = today.missedLayers.length > 0 ? missedSentence(today.missedLayers) : null;
     if (names.length > 0) {
-      parts.push(`Today: ${listPart(names)}.`);
+      parts.push(`Today: ${listPart(names, names.length, limit)}.`);
       if (missed) parts.push(missed);
     } else if (missed) {
       // Nothing arrived from the layers that answered. Naming only the miss
@@ -215,11 +276,11 @@ export function composeTodayLine(today: DigestTodayInput): string {
     parts.push("Due: to-dos unavailable.");
   } else {
     if (today.due.length > 0) {
-      parts.push(`Due: ${listPart(today.due.map((d) => `${d.title} (${d.dayLabel})`), today.dueTotal)}.`);
+      parts.push(`Due: ${listPart(today.due.map((d) => `${t(d.title)} (${d.dayLabel})`), today.dueTotal, limit)}.`);
     }
     if (today.overdue.length > 0) {
       parts.push(
-        `Overdue: ${listPart(today.overdue.map((o) => `${o.title} (${o.daysLate}d)`), today.overdueTotal)}.`
+        `Overdue: ${listPart(today.overdue.map((o) => `${t(o.title)} (${o.daysLate}d)`), today.overdueTotal, limit)}.`
       );
     }
   }
@@ -242,9 +303,11 @@ function clockTime(at: Date, tz: string): string {
 
 /**
  * Pure. readCalendarWindow's answer for `today … today` as the sentence's
- * calendar half. Only events keyed to `today` count: the window also returns
- * an event that began earlier and runs into it, keyed to its own start day,
- * and the page drops those the same way.
+ * calendar half. Only events keyed to `today` count. A multi-day all-day
+ * event is expanded by google.ts into one entry per day it covers (bd9459a),
+ * so one that began earlier still has a `today` entry and is named; only a
+ * TIMED event stays keyed to its start day, so a timed event that began
+ * yesterday and runs into today is dropped — as the page drops it.
  *
  * A window that is `ok` but in which EVERY enabled layer failed (a token
  * failure of kind `http` is reported that way) is `"unavailable"`, not a

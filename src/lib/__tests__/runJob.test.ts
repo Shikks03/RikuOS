@@ -51,6 +51,26 @@ describe("runJob", () => {
 
     expect(result.ok).toBe(true);
     expect(create.mock.calls[0][0].error).toBe("monitoring is disabled");
+    expect(create.mock.calls[0][0].skipped).toBe(true);
+  });
+
+  it("writes skipped: false on an ordinary run", async () => {
+    await runJob("watchdog", async () => ({ data: 1 }));
+    expect(create.mock.calls[0][0].skipped).toBe(false);
+  });
+
+  it("does not call a noted run that threw a skip - it is a failure", async () => {
+    await runJob(
+      "dispatcher",
+      async () => {
+        throw new Error("boom");
+      },
+      "monitoring is disabled"
+    );
+    const record = create.mock.calls[0][0];
+    expect(record.ok).toBe(false);
+    expect(record.skipped).toBe(false);
+    expect(record.error).toBe("boom");
   });
 
   it("survives the AgentRun write itself failing", async () => {
