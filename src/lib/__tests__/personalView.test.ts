@@ -67,7 +67,16 @@ function todo(over: Partial<OpenTodoInput> = {}): OpenTodoInput {
   };
 }
 
-const open = (rows: OpenTodoInput[]): OpenTodosFeed => ({ rows, total: rows.length });
+/** A complete read: every count agrees with the rows. */
+const open = (rows: OpenTodoInput[]): OpenTodosFeed => ({
+  rows,
+  total: rows.length,
+  sectionTotals: {
+    personal: rows.filter((r) => r.section === "personal").length,
+    freelance: rows.filter((r) => r.section === "freelance").length,
+    academics: rows.filter((r) => r.section === "academics").length,
+  },
+});
 const okWindow = (events: CalendarEvent[], failed: string[] = []): CalendarFeed => ({
   layers: LAYERS,
   window: { ok: true, events, failed },
@@ -417,6 +426,18 @@ describe("buildWeekView", () => {
     expect(v.days!.every((d) => "unread" in d)).toBe(true);
   });
 
+  it("a 3-day all-day event appears on three day rows under the same id (keys are dayKey:id)", () => {
+    const trip = (d: string) => ev({ id: "trip", title: "Baguio trip", allDay: true, startsAt: null, endsAt: null, dayKey: d });
+    const v = week(okWindow([trip("2026-09-12"), trip("2026-09-13"), trip("2026-09-14")]));
+    const withTrip = v.days!.filter((d) => "items" in d && d.items.some((i) => i.id === "trip"));
+    expect(withTrip.map((d) => d.key)).toEqual(["2026-09-12", "2026-09-13", "2026-09-14"]);
+    const keys = withTrip.map((d) => ("items" in d ? `${d.key}:${d.items[0].id}` : ""));
+    expect(new Set(keys).size).toBe(3);
+    // And today's copy of a spanning event is Today's own row, not deduped away.
+    const t = today(okWindow([trip(TODAY), trip("2026-09-11")]));
+    expect(t.scheduled.kind === "rows" && t.scheduled.rows.map((r) => r.id)).toEqual(["trip"]);
+  });
+
   it("an overdue or today to-do is not in the week", () => {
     const v = week(okWindow([]), open([todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-01" }), todo({ dueOn: "2026-09-18" })]));
     expect(v.days!.every((d) => dayShape(d).kind === "dash")).toBe(true);
@@ -481,8 +502,29 @@ describe("buildTodoTileView", () => {
   });
 
   it("the header count is the store's total", () => {
-    const v = buildTodoTileView({ now: NOW, todos: { rows: [todo()], total: 1 } });
+    const v = buildTodoTileView({
+      now: NOW,
+      todos: { rows: [todo()], total: 1, sectionTotals: { personal: 1, freelance: 0, academics: 0 } },
+    });
     expect(v.count).toBe(1);
+  });
+
+  it("a capped read never undercounts: bounds and header come from the store's counts", () => {
+    // The read stopped at 25 rows; the store holds 34 freelance and 12 personal.
+    const rows = [
+      ...Array.from({ length: 22 }, () => todo({ section: "freelance" })),
+      ...Array.from({ length: 3 }, () => todo({ section: "personal" })),
+    ];
+    const v = buildTodoTileView({
+      now: NOW,
+      todos: { rows, total: 46, sectionTotals: { personal: 12, freelance: 34, academics: 0 } },
+    });
+    expect(v.count).toBe(46);
+    expect(v.sections![0].rows).toHaveLength(3);
+    expect(v.sections![0].bound).toBe("Showing 3 of 12.");
+    expect(v.sections![1].rows).toHaveLength(20);
+    expect(v.sections![1].bound).toBe("Showing 20 of 34.");
+    expect(v.sections![2].bound).toBeNull();
   });
 });
 

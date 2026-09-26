@@ -120,6 +120,13 @@ export interface TodoRowView {
   note: string | null; // "entry on the old day"
 }
 
+/**
+ * IDS REPEAT ACROSS DAYS. google.ts expands a multi-day all-day event into one
+ * CalendarEvent per covered day, all with the SAME Google `id`. An EventRowView
+ * or a DayItemView is therefore one day's appearance of an event, not the
+ * event: a React key or any lookup must be `${dayKey}:${id}`, never `id` alone.
+ * Nothing in this file dedupes or indexes events by id.
+ */
 export interface EventRowView {
   id: string;
   title: string;
@@ -150,6 +157,7 @@ export type DayRowView =
   | { key: DayKey; label: string; items: DayItemView[] }
   | { key: DayKey; label: string; unread: true };
 
+/** `id` repeats across day rows for a multi-day event: key by `${row.key}:${id}` (see EventRowView). */
 export interface DayItemView {
   kind: "event" | "todo";
   id: string;
@@ -230,11 +238,17 @@ export interface OpenTodoInput {
 
 /**
  * The open to-do read, shared by Today, Next 7 days and the To-do tile (the
- * Todo model's "two indexes, two queries, whole page"). `rows` is the whole
- * open list; `total` is the store's count, which the To-do header shows.
+ * Todo model's "two indexes, two queries, whole page"). `rows` is the open
+ * list as read (bounded by the page's safety cap); `total` is the store's
+ * count, which the To-do header shows; `sectionTotals` is the store's count
+ * per section (one aggregate), which each section's `Showing 20 of N.` uses.
+ * The counts come from the store and never from `rows`, so a capped read can
+ * shorten a section's list but never undercount it.
  * "unavailable" is a read that did not answer — never an empty list.
  */
-export type OpenTodosFeed = { rows: readonly OpenTodoInput[]; total: number } | "unavailable";
+export type OpenTodosFeed =
+  | { rows: readonly OpenTodoInput[]; total: number; sectionTotals: Readonly<Record<TodoSection, number>> }
+  | "unavailable";
 
 /**
  * The calendar side, shared by Today, Next 7 days and Layers.
@@ -616,13 +630,16 @@ export function dayShape(row: DayRowView): DayShape {
 export function buildTodoTileView(input: TodoTileInput): TodoTileView {
   if (input.todos === "unavailable") return { count: null, sections: null, fail: todosFail() };
   const today = todayKey(input.now);
-  const rows = input.todos.rows;
+  const { rows, sectionTotals } = input.todos;
   const sections = SECTION_ORDER.map((key): TodoSectionView => {
     const all = sortTodos(rows.filter((t) => t.section === key));
     const shown = all.slice(0, DISPLAY_BOUND).map((t) => todoRow(t, today));
-    return { key, label: SECTION_LABEL[key], rows: shown, bound: boundLine(shown.length, all.length) };
+    // The store's count, never the read's length; the max only guards a
+    // count that arrived lower than the rows actually in hand.
+    const sectionTotal = Math.max(sectionTotals[key], all.length);
+    return { key, label: SECTION_LABEL[key], rows: shown, bound: boundLine(shown.length, sectionTotal) };
   });
-  return { count: input.todos.total, sections, fail: null };
+  return { count: Math.max(input.todos.total, rows.length), sections, fail: null };
 }
 
 // ---- 4. Done this week ------------------------------------------------------
