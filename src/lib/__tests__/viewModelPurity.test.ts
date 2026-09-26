@@ -22,6 +22,9 @@ import "@/lib/freelanceGaps";
 import "@/lib/freelanceHealth";
 // P10b: the pure half of the to-do store, which personalView.ts will import.
 import "@/lib/todos";
+// P10b Task 9: the six Personal view models (type-only imports of google.ts,
+// lastDigest.ts, osSettings.ts and the Todo model must stay type-only).
+import "@/lib/personalView";
 
 describe("view-model purity", () => {
   it("registers no Mongoose model when the view models load", () => {
