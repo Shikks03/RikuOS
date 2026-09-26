@@ -10,10 +10,10 @@ describe("buildPushPayload", () => {
     });
   });
 
-  it("truncates title to 80 and body to 200 chars", () => {
-    const p = buildPushPayload("t".repeat(100), "b".repeat(300));
+  it("truncates title to 80 and body to 320 chars, for every push", () => {
+    const p = buildPushPayload("t".repeat(100), "b".repeat(400));
     expect(p.title).toHaveLength(80);
-    expect(p.body).toHaveLength(200);
+    expect(p.body).toHaveLength(320);
   });
 
   it("accepts an explicit url", () => {

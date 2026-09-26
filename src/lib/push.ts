@@ -11,15 +11,22 @@ import webpush from "web-push";
 import { connectDB } from "@/lib/db";
 import PushSubscription from "@/models/PushSubscription";
 
+export const PUSH_TITLE_MAX = 80;
+export const PUSH_BODY_MAX = 320;
+
 export interface PushPayload {
   title: string;
   body: string;
   url: string;
 }
 
-/** Pure: bounded title/body so a runaway agent can't push a novel. */
+/**
+ * Pure: bounded title/body so a runaway agent can't push a novel. The body
+ * bound is 320 for every push (§7.8) so the morning Today sentence cannot push
+ * the freelance line off the end (D12); LastDigest's body maxlength matches it.
+ */
 export function buildPushPayload(title: string, body: string, url = "/freelance/queue"): PushPayload {
-  return { title: title.slice(0, 80), body: body.slice(0, 200), url };
+  return { title: title.slice(0, PUSH_TITLE_MAX), body: body.slice(0, PUSH_BODY_MAX), url };
 }
 
 export interface ParsedSubscription {

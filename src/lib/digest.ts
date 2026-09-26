@@ -8,13 +8,19 @@
  * net, and an absence only means something if the presence is unconditional.
  * Hence "All clear" rather than a silent morning.
  *
- * Problems come first in the body because buildPushPayload truncates it at 200
- * characters and a lock-screen preview is shorter still.
+ * Problems come first in the body because buildPushPayload truncates it at 320
+ * characters and a lock-screen preview is shorter still. The Today sentence
+ * comes second (deck §10, D12): after the problems, so a bad night is never
+ * cut off, and before the freelance line.
  */
 
 import type { Anomaly } from "@/lib/watchdog";
 import type { SiteResult } from "@/lib/siteHealth";
 import type { OutreachFinding } from "@/lib/outreachHealth";
+import type { CalendarWindow } from "@/lib/google";
+import { APP_TZ } from "@/lib/constants";
+import { addDays, formatDay, type DayKey } from "@/lib/days";
+import { daysLate, sortTodos, todoDueKey } from "@/lib/todos";
 
 export interface DigestInput {
   /** ApprovalItems waiting on a decision. */
@@ -28,6 +34,8 @@ export interface DigestInput {
   problems: string[];
   /** Agents switched off in OsSettings, so a pause cannot be forgotten. */
   offAgents: string[];
+  /** The Today sentence's parts. Required, so the route cannot forget it. */
+  today: DigestTodayInput;
 }
 
 export interface Digest {
@@ -55,6 +63,16 @@ function short(problem: string): string {
     : problem;
 }
 
+/**
+ * The first letter up. Fragments are written lowercase so they read right
+ * anywhere in the joined line; the rendered line is a sentence, so deck §10's
+ * `Calendar check unavailable.` is what the fragment `calendar check
+ * unavailable` renders as when it leads (R23).
+ */
+function capitalise(line: string): string {
+  return line.charAt(0).toUpperCase() + line.slice(1);
+}
+
 export function composeDigest(input: DigestInput): Digest {
   // A pipeline check that could not run is itself a problem. Reporting it as
   // "All clear" would make a total ShikksTracker outage — the one dependency
@@ -62,10 +80,20 @@ export function composeDigest(input: DigestInput): Digest {
   // as long as it lasted. The route cannot count it either: it downgrades the
   // failed call to null rather than letting it fail the run, so this is the
   // only place the outage can still be named.
-  const problems =
-    input.attention === null
-      ? [...input.problems, "pipeline check unavailable"]
-      : input.problems;
+  //
+  // The calendar and the to-do store are counted the same way (deck §10), and
+  // a PARTIAL calendar read is counted too (R23), so the title never says all
+  // clear over a blind spot. Every layer switched off is not counted: it is a
+  // choice, not a fault (deck §15).
+  const problems = [...input.problems];
+  if (input.attention === null) problems.push("pipeline check unavailable");
+  const { today } = input;
+  if (today.events === "unavailable") {
+    problems.push("calendar check unavailable");
+  } else if (today.events !== "none-enabled" && today.missedLayers.length > 0) {
+    problems.push("calendar check incomplete");
+  }
+  if (today.due === "unavailable") problems.push("to-do check unavailable");
 
   const problemCount = problems.length;
   const reviewPart = `${input.pending} to review`;
@@ -76,7 +104,8 @@ export function composeDigest(input: DigestInput): Digest {
       : `All clear · ${reviewPart}`;
 
   const lines: string[] = [];
-  lines.push(problemCount > 0 ? end(problems.map(short).join("; ")) : "All clear.");
+  lines.push(problemCount > 0 ? capitalise(end(problems.map(short).join("; "))) : "All clear.");
+  lines.push(composeTodayLine(today));
 
   if (input.attention !== null) {
     lines.push(
@@ -89,6 +118,189 @@ export function composeDigest(input: DigestInput): Digest {
   }
 
   return { title, body: lines.join(" ") };
+}
+
+// --- The Today sentence (deck §10, §15) --------------------------------------
+
+/**
+ * What the Today sentence is built from. Named apart from personalView.ts's
+ * `TodayInput`, which is the page's and a different shape.
+ *
+ * `events` is `"none-enabled"` when every layer is switched off — a choice,
+ * not a fault, so it is never counted as a problem (deck §15) — and
+ * `"unavailable"` when no layer could be read. `missedLayers` names the layers
+ * that did not answer when SOME did (R23's partial form), and is empty
+ * otherwise. `overdue` is ignored when `due` is `"unavailable"`: both come
+ * from one to-do read, and an omitted `Overdue:` must not read as "nothing
+ * overdue" — `Due: to-dos unavailable.` covers it.
+ */
+export interface DigestTodayInput {
+  events: Array<{ title: string; time: string | null }> | "unavailable" | "none-enabled";
+  missedLayers: string[];
+  due: Array<{ title: string; dayLabel: string }> | "unavailable";
+  overdue: Array<{ title: string; daysLate: number }>;
+}
+
+/** Up to 3 names per part (deck §10). */
+const TODAY_NAMES = 3;
+
+/** `A, B, C, +2 more` — singular `+1 more`. */
+function listPart(names: string[]): string {
+  const shown = names.slice(0, TODAY_NAMES);
+  const rest = names.length - shown.length;
+  return rest > 0 ? [...shown, `+${rest} more`].join(", ") : shown.join(", ");
+}
+
+/** `Classes wasn't read.` · `Classes and Events weren't read.` */
+function missedSentence(layers: string[]): string {
+  if (layers.length === 1) return `${layers[0]} wasn't read.`;
+  const shown = layers.slice(0, TODAY_NAMES);
+  const rest = layers.length - shown.length;
+  const named =
+    rest > 0
+      ? `${shown.join(", ")} and ${rest} more`
+      : `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`;
+  return `${named} weren't read.`;
+}
+
+/**
+ * Pure. The push's Today sentence, in deck §10's and §15's forms:
+ *
+ *   Today: Math Methods 09:00, Meeting 13:00. Due: Pay tuition (today). Overdue: Send invoice (3d).
+ *   Today: nothing scheduled, nothing due.           every part empty (D6)
+ *   Today: calendar unavailable. Due: …              no layer answered
+ *   Today: Math Methods 09:00. Classes wasn't read.  some answered (R23)
+ *   Due: to-dos unavailable.                         the to-do read failed
+ *   Today: no layers switched on.                    every layer off (deck §15)
+ *
+ * Absent parts are omitted; the quiet line is the one exception, so silence
+ * and "couldn't read the calendar" never look the same (D6).
+ */
+export function composeTodayLine(today: DigestTodayInput): string {
+  const parts: string[] = [];
+
+  if (today.events === "none-enabled") {
+    parts.push("Today: no layers switched on.");
+  } else if (today.events === "unavailable") {
+    parts.push("Today: calendar unavailable.");
+  } else {
+    const names = today.events.map((e) => `${e.title} ${e.time ?? "(all day)"}`);
+    const missed = today.missedLayers.length > 0 ? missedSentence(today.missedLayers) : null;
+    if (names.length > 0) {
+      parts.push(`Today: ${listPart(names)}.`);
+      if (missed) parts.push(missed);
+    } else if (missed) {
+      // Nothing arrived from the layers that answered. Naming only the miss
+      // makes no claim about the day: `nothing scheduled` here would be said
+      // over a calendar that was not read.
+      parts.push(`Today: ${missed}`);
+    }
+  }
+
+  if (today.due === "unavailable") {
+    parts.push("Due: to-dos unavailable.");
+  } else {
+    if (today.due.length > 0) {
+      parts.push(`Due: ${listPart(today.due.map((d) => `${d.title} (${d.dayLabel})`))}.`);
+    }
+    if (today.overdue.length > 0) {
+      parts.push(`Overdue: ${listPart(today.overdue.map((o) => `${o.title} (${o.daysLate}d)`))}.`);
+    }
+  }
+
+  return parts.length > 0 ? parts.join(" ") : "Today: nothing scheduled, nothing due.";
+}
+
+/** `HH:MM` on a 24-hour clock, in `tz`. */
+function clockTime(at: Date, tz: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(at);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("hour")}:${part("minute")}`;
+}
+
+/**
+ * Pure. readCalendarWindow's answer for `today … today` as the sentence's
+ * calendar half. Only events keyed to `today` count: the window also returns
+ * an event that began earlier and runs into it, keyed to its own start day,
+ * and the page drops those the same way.
+ *
+ * A window that is `ok` but in which EVERY enabled layer failed (a token
+ * failure of kind `http` is reported that way) is `"unavailable"`, not a
+ * partial read: nothing arrived to be named.
+ */
+export function calendarForDigest(
+  window: CalendarWindow,
+  enabledLayers: number,
+  today: DayKey,
+  tz: string = APP_TZ
+): Pick<DigestTodayInput, "events" | "missedLayers"> {
+  if (!window.ok) {
+    return {
+      events: window.reason === "none-enabled" ? "none-enabled" : "unavailable",
+      missedLayers: [],
+    };
+  }
+  if (window.failed.length > 0 && window.failed.length >= enabledLayers) {
+    return { events: "unavailable", missedLayers: [] };
+  }
+  const events = window.events
+    .filter((e) => e.dayKey === today)
+    .map((e) => ({
+      title: e.title,
+      time: e.allDay || e.startsAt === null ? null : clockTime(e.startsAt, tz),
+    }));
+  return { events, missedLayers: [...window.failed] };
+}
+
+/** A to-do as the digest's read returns it; `dueOn` is the stored UTC-midnight day. */
+export interface DigestTodoRow {
+  title: string;
+  dueOn: Date | null | undefined;
+  createdAt: Date;
+}
+
+/**
+ * Pure. Open to-dos as the sentence's `Due:` and `Overdue:` halves. Due is
+ * today … today+3 inclusive (digestWindow's span), labelled `today` ·
+ * `tomorrow` · `Fri`; overdue is anything before today, most overdue first,
+ * labelled with whole days late. Undated rows and rows past the window are not
+ * the digest's business and are dropped.
+ */
+export function todosForDigest(
+  rows: readonly DigestTodoRow[],
+  today: DayKey
+): { due: Array<{ title: string; dayLabel: string }>; overdue: Array<{ title: string; daysLate: number }> } {
+  const tomorrow = addDays(today, 1);
+  const lastDay = addDays(today, 3);
+  const keyed = sortTodos(
+    rows.flatMap((r) => {
+      const dueOn = todoDueKey(r.dueOn);
+      return dueOn === null ? [] : [{ title: r.title, dueOn, createdAt: r.createdAt }];
+    })
+  );
+
+  const due: Array<{ title: string; dayLabel: string }> = [];
+  const overdue: Array<{ title: string; daysLate: number }> = [];
+  for (const row of keyed) {
+    if (row.dueOn < today) {
+      overdue.push({ title: row.title, daysLate: daysLate(row.dueOn, today) });
+    } else if (row.dueOn <= lastDay) {
+      const dayLabel =
+        row.dueOn === today
+          ? "today"
+          : row.dueOn === tomorrow
+            ? "tomorrow"
+            : formatDay(row.dueOn).split(" ")[0];
+      due.push({ title: row.title, dayLabel });
+    }
+  }
+  return { due, overdue };
 }
 
 /**

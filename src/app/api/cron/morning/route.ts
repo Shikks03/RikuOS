@@ -11,6 +11,9 @@ import { evaluateOutreach } from "@/lib/outreachHealth";
 import { buildProblems, composeDigest } from "@/lib/digest";
 import { ATTENTION_LIMIT, fetchAttention, fetchSummary } from "@/lib/stApi";
 import { buildPushPayload, sendPushToAll } from "@/lib/push";
+import { readDigestToday } from "@/lib/digestToday";
+import { saveLastDigest } from "@/lib/lastDigest";
+import { todayKey } from "@/lib/days";
 import ApprovalItem from "@/models/ApprovalItem";
 
 /**
@@ -140,6 +143,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
       );
 
+      // The Today sentence's two reads: the Manila day's events on the
+      // switched-on layers, and the open to-dos due within 3 days or overdue.
+      // Both are caught inside readDigestToday into "unavailable" — the digest
+      // never fails for Google. The layers are the ones this route already
+      // read above; no second settings read, and no write (never
+      // getOsSettings for this).
+      const today = await readDigestToday(settings.layers, todayKey(new Date()));
+
       const problems = buildProblems({
         expiry: { ok: expiry.ok, error: expiry.error, unstuck: expiry.data?.unstuck ?? 0 },
         watchdog: { ok: watch.ok, error: watch.error, anomalies: watch.data ?? [] },
@@ -166,6 +177,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           : null,
         problems,
         offAgents: settings.chaserEnabled ? [] : ["chaser"],
+        today,
       });
 
       // A digest nobody received is a total failure of this run's purpose, not
@@ -175,14 +187,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // without this an invalidated iPhone subscription would file a healthy
       // run every morning while reaching nobody, and the absent push — the
       // outer safety net this whole phase rests on — would be all that is left.
-      const delivery = await sendPushToAll(buildPushPayload(digest.title, digest.body));
+      const payload = buildPushPayload(digest.title, digest.body);
+      const delivery = await sendPushToAll(payload);
+      const sentAt = new Date();
       if (delivery.sent === 0) {
         throw new Error(
           `the digest reached no device (failed ${delivery.failed}, removed ${delivery.removed}). ` +
             "Re-subscribe from /freelance/queue."
         );
       }
-      return { counts: { itemsProcessed: problems.length }, data: digest };
+
+      // What the Personal page's push tile quotes (R22). After the guard, so
+      // nothing is recorded as sent that was not. The PAYLOAD is stored, not
+      // the digest: it is the sliced text the devices received. Caught, so a
+      // persistence step cannot cost the push that already went out; its
+      // failure is the run's one failed item, which the rail shows as degraded
+      // this morning and tomorrow's watchdog names in the push. It cannot be
+      // named in THIS push — that has already gone.
+      let digestStored = true;
+      try {
+        await saveLastDigest(sentAt, payload, delivery.sent);
+      } catch (err) {
+        digestStored = false;
+        console.error("[cron/morning] last digest write failed:", err);
+      }
+      return {
+        counts: { itemsProcessed: problems.length, itemsFailed: digestStored ? 0 : 1 },
+        data: digest,
+      };
     });
 
     return NextResponse.json({
