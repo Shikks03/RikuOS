@@ -243,12 +243,21 @@ async function pinLeg(id: string, title: string, due: DayKey): Promise<CalendarO
   }
 
   // Compensation: the entry exists and nothing records it.
+  let removed: boolean;
   try {
     await deleteEvent(PIN_CALENDAR_ID, entryId);
-    return { kind: "failed", cause, orphaned: false };
+    removed = true;
   } catch (err) {
-    return { kind: "failed", cause, orphaned: classifyWrite(err).kind !== "gone" };
+    removed = classifyWrite(err).kind === "gone";
   }
+  // On the store path the claim threw and the read-back found nothing — but a
+  // claim can still commit server-side after that read. Once the entry is
+  // known removed, unset any such late-landing claim, guarded on this id, so
+  // no record is left pointing at a deleted entry.
+  if (removed && cause === "store") {
+    await followUp(() => Todo.updateOne({ _id: id, calendarEventId: entryId }, UNPIN));
+  }
+  return { kind: "failed", cause, orphaned: !removed };
 }
 
 /**

@@ -115,7 +115,37 @@ describe("createTodo with the calendar switch on (the pin path)", () => {
 
     expect(m.findOne).toHaveBeenCalledWith({ _id: ID, calendarEventId: EVT });
     expect(del).toHaveBeenCalledWith(PIN_CALENDAR_ID, EVT);
+    // A claim that commits after the read-back is unset once the entry is removed.
+    expect(m.updateOne).toHaveBeenCalledWith(
+      { _id: ID, calendarEventId: EVT },
+      { $unset: { calendarEventId: 1, calendarId: 1 }, $set: { calendarBehind: false } },
+    );
     expect(r).toEqual({ kind: "created", id: ID, calendar: { kind: "failed", cause: "store", orphaned: false } });
+  });
+
+  it("a store-path compensation that finds the entry gone still unsets a late claim; a failed one does not", async () => {
+    insert.mockResolvedValue({ id: EVT, htmlLink: "" });
+    m.findOneAndUpdate.mockReturnValue(q(new Error("mongo down")));
+    m.findOne.mockReturnValue(q(null));
+    del.mockRejectedValueOnce(gone());
+
+    expect(await createTodo(body)).toMatchObject({ calendar: { kind: "failed", cause: "store", orphaned: false } });
+    expect(m.updateOne).toHaveBeenCalledTimes(1);
+
+    m.updateOne.mockClear();
+    del.mockRejectedValueOnce(serverErr());
+    expect(await createTodo(body)).toMatchObject({ calendar: { kind: "failed", cause: "store", orphaned: true } });
+    expect(m.updateOne).not.toHaveBeenCalled();
+  });
+
+  it("a late-claim unset that throws does not change the result", async () => {
+    insert.mockResolvedValue({ id: EVT, htmlLink: "" });
+    m.findOneAndUpdate.mockReturnValue(q(new Error("mongo down")));
+    m.findOne.mockReturnValue(q(null));
+    del.mockResolvedValue(undefined);
+    m.updateOne.mockRejectedValue(new Error("still down"));
+
+    expect(await createTodo(body)).toMatchObject({ calendar: { kind: "failed", cause: "store", orphaned: false } });
   });
 
   it("a claim that throws but landed is ok on the re-read - never compensated", async () => {
