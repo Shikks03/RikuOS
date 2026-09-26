@@ -8,20 +8,24 @@ import type { IOsSettings } from "@/models/OsSettings";
 /**
  * Shared response projection for both GET and PATCH.
  *
- * All three settings are included. The settings PAGE is deliberately deferred
+ * Every setting is included. The settings PAGE is deliberately deferred
  * (S11: page phases are content-first and discussed with Riku before they are
  * built), but that is a decision about building a page, not about what an API
  * response reports — a PATCH that reports nothing back looks identical to a
  * save that changed nothing.
  *
  * This projected six more fields until S15 (2026-09-05) deleted the Messenger
- * triage lane that owned them.
+ * triage lane that owned them. P10b adds the Personal page's two stores,
+ * copied out by field so no subdocument internals reach the response.
+ * `personalLayout` is reported AS STORED; render code resolves it.
  */
 function projectSettings(settings: IOsSettings) {
   return {
     chaserEnabled: settings.chaserEnabled,
     chaserNDays: settings.chaserNDays,
     monitoringEnabled: settings.monitoringEnabled,
+    layers: settings.layers.map((l) => ({ calendarId: l.calendarId, name: l.name, enabled: l.enabled })),
+    personalLayout: settings.personalLayout.map((row) => row.map((e) => ({ tile: e.tile, span: e.span }))),
   };
 }
 

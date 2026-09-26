@@ -125,6 +125,37 @@ export class GoogleError extends Error {
   }
 }
 
+/**
+ * How a failed WRITE is classified — by whether the side effect could have
+ * happened, never by guessing (CLAUDE.md's asymmetric-failure rule). Shared by
+ * the to-do store's calendar legs and `POST /api/calendar/events`, so the
+ * table lives once, beside the error it reads; todoStore.ts's header has it
+ * written out row by row. `gone` is left to the caller: it is success on a
+ * delete and a failure on an insert or a move.
+ */
+export type WriteClass =
+  | { kind: "failed"; cause: "not-configured" | "expired" | "refused" }
+  | { kind: "unknown" }
+  | { kind: "gone" };
+
+export function classifyWrite(err: unknown): WriteClass {
+  if (!(err instanceof GoogleError)) return { kind: "unknown" };
+  switch (err.kind) {
+    case "not-configured":
+      return { kind: "failed", cause: "not-configured" };
+    case "expired":
+      return { kind: "failed", cause: "expired" };
+    case "gone":
+      return { kind: "gone" };
+    case "timeout":
+      return { kind: "unknown" };
+    case "http":
+      return err.status !== undefined && err.status >= 400 && err.status < 500
+        ? { kind: "failed", cause: "refused" }
+        : { kind: "unknown" };
+  }
+}
+
 export interface GoogleConfig {
   clientId: string;
   clientSecret: string;

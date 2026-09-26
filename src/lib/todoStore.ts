@@ -79,7 +79,7 @@
 import mongoose from "mongoose";
 import Todo, { type TodoSection } from "@/models/Todo";
 import { dayStart, type DayKey } from "@/lib/days";
-import { deleteEvent, GoogleError, insertEvent, patchEvent } from "@/lib/google";
+import { classifyWrite, deleteEvent, insertEvent, patchEvent, type WriteClass } from "@/lib/google";
 import { parseCreateTodo, parseUpdateTodo, todoDueKey, type TodoInputError } from "@/lib/todos";
 
 /** Every pin goes to the main calendar in this version (deck §7). Stored anyway. */
@@ -135,33 +135,11 @@ export type DeleteResult =
   | { kind: "deleted"; calendar: CalendarOutcome };
 
 // --- Classification ----------------------------------------------------------
-
-type Classified =
-  | { kind: "failed"; cause: Exclude<CalendarFailCause, "changed" | "store"> }
-  | { kind: "unknown" }
-  | { kind: "gone" };
-
-/** The docblock's table, in code. */
-function classifyWrite(err: unknown): Classified {
-  if (!(err instanceof GoogleError)) return { kind: "unknown" };
-  switch (err.kind) {
-    case "not-configured":
-      return { kind: "failed", cause: "not-configured" };
-    case "expired":
-      return { kind: "failed", cause: "expired" };
-    case "gone":
-      return { kind: "gone" };
-    case "timeout":
-      return { kind: "unknown" };
-    case "http":
-      return err.status !== undefined && err.status >= 400 && err.status < 500
-        ? { kind: "failed", cause: "refused" }
-        : { kind: "unknown" };
-  }
-}
+// The docblock's table, in code, is google.ts's classifyWrite: the event route
+// classifies its insert by the same table, so it lives once, beside GoogleError.
 
 /** A non-gone classification as an outcome. */
-function outcomeOf(c: Exclude<Classified, { kind: "gone" }>, orphaned: boolean): CalendarOutcome {
+function outcomeOf(c: Exclude<WriteClass, { kind: "gone" }>, orphaned: boolean): CalendarOutcome {
   return c.kind === "failed" ? { kind: "failed", cause: c.cause, orphaned } : { kind: "unknown", orphaned };
 }
 
