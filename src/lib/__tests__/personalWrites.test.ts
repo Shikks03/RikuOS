@@ -5,6 +5,7 @@ import type { Layer } from "@/lib/osSettings";
 import {
   BAD_JSON,
   DELETE_FAILED,
+  ERROR_SENTENCES,
   EVENT_TITLE_MAX,
   SAVE_FAILED,
   createReply,
@@ -12,6 +13,7 @@ import {
   doneReply,
   eventCreatedReply,
   eventFailedReply,
+  eventShapeError,
   parseEventInput,
   parseTodoPatch,
   updateReply,
@@ -70,10 +72,38 @@ describe("to-do replies", () => {
     expect(deleteReply({ kind: "not-found" }).status).toBe(404);
   });
 
-  it("a thrown own-write is 500 with the deck's sentence; bad JSON is 400", () => {
-    expect(SAVE_FAILED).toEqual({ status: 500, body: { error: "Couldn't save." } });
-    expect(DELETE_FAILED).toEqual({ status: 500, body: { error: "Couldn't delete." } });
-    expect(BAD_JSON.status).toBe(400);
+  it("a thrown own-write is 500 with a code, never a sentence; bad JSON is 400", () => {
+    expect(SAVE_FAILED).toEqual({ status: 500, body: { error: "save-failed" } });
+    expect(DELETE_FAILED).toEqual({ status: 500, body: { error: "delete-failed" } });
+    expect(BAD_JSON).toEqual({ status: 400, body: { error: "bad-json" } });
+  });
+});
+
+describe("ERROR_SENTENCES", () => {
+  it("maps codes to the deck's sentences, verbatim", () => {
+    expect(ERROR_SENTENCES).toEqual({
+      "save-failed": "Couldn't save.",
+      "delete-failed": "Couldn't delete.",
+      "calendar-unknown": "Couldn't tell if that saved.",
+      "no-title": "Give it a title.",
+      "end-before-start": "End must be after start.",
+      "needs-due": "Needs a due date.",
+    });
+  });
+
+  it("covers the codes the doors actually emit for those cases", () => {
+    expect(ERROR_SENTENCES[SAVE_FAILED.body.error as "save-failed"]).toBe("Couldn't save.");
+    expect(ERROR_SENTENCES[DELETE_FAILED.body.error as "delete-failed"]).toBe("Couldn't delete.");
+    expect(ERROR_SENTENCES[eventFailedReply(new Error("x")).body.error as "calendar-unknown"]).toBe(
+      "Couldn't tell if that saved.",
+    );
+  });
+
+  it("is frozen", () => {
+    expect(Object.isFrozen(ERROR_SENTENCES)).toBe(true);
+    expect(() => {
+      (ERROR_SENTENCES as Record<string, string>)["save-failed"] = "Saved!";
+    }).toThrow();
   });
 });
 
@@ -144,6 +174,24 @@ describe("parseEventInput", () => {
     expect(parseEventInput({ ...good, calendarId: undefined }, LAYERS)).toEqual({ ok: false, error: "bad-calendar" });
     expect(parseEventInput({ ...good, calendarId: ["primary"] }, LAYERS)).toEqual({ ok: false, error: "bad-calendar" });
     expect(parseEventInput(good, [])).toEqual({ ok: false, error: "bad-calendar" });
+  });
+
+  it.each([
+    ["PRIMARY"],
+    [" primary"],
+    ["primary "],
+    ["__proto__"],
+    ["constructor"],
+    ["toString"],
+    ["hasOwnProperty"],
+  ])("near-miss calendarId %j is refused", (calendarId) => {
+    expect(parseEventInput({ ...good, calendarId }, LAYERS)).toEqual({ ok: false, error: "bad-calendar" });
+  });
+
+  it("an object whose toString is a stored id is refused, by the full check and the shape check", () => {
+    const sneaky = { toString: () => "primary" };
+    expect(parseEventInput({ ...good, calendarId: sneaky }, LAYERS)).toEqual({ ok: false, error: "bad-calendar" });
+    expect(eventShapeError({ ...good, calendarId: sneaky })).toBe("bad-calendar");
   });
 
   it("a stored layer that is switched off is refused as layer-off", () => {
@@ -223,5 +271,28 @@ describe("event replies", () => {
     expect(eventFailedReply(new GoogleError("http", "m", 503))).toEqual(unknown);
     expect(eventFailedReply(new GoogleError("http", "m"))).toEqual(unknown);
     expect(eventFailedReply(new Error("boom"))).toEqual(unknown);
+  });
+});
+
+describe("eventShapeError — the check before the layers read", () => {
+  const good = { title: "Dentist", calendarId: "primary", dayKey: "2026-09-28", allDay: true };
+
+  it("passes a well-typed body (content is parseEventInput's job)", () => {
+    expect(eventShapeError(good)).toBeNull();
+    expect(eventShapeError({ ...good, title: "", calendarId: "not-a-layer", dayKey: "nope" })).toBeNull();
+  });
+
+  it("refuses garbage with the same code the full check would give first", () => {
+    expect(eventShapeError(null)).toBe("not-object");
+    expect(eventShapeError([good])).toBe("not-object");
+    expect(eventShapeError({ ...good, title: 3 })).toBe("no-title");
+    expect(eventShapeError({ ...good, calendarId: null })).toBe("bad-calendar");
+    expect(eventShapeError({ ...good, dayKey: 20260928 })).toBe("bad-day");
+    expect(eventShapeError({ ...good, allDay: "true" })).toBe("bad-all-day");
+    for (const b of [null, { ...good, title: 3 }, { ...good, calendarId: null }, { ...good, dayKey: 1 }]) {
+      const full = parseEventInput(b, LAYERS);
+      expect(full.ok).toBe(false);
+      if (!full.ok) expect(eventShapeError(b)).toBe(full.error);
+    }
   });
 });

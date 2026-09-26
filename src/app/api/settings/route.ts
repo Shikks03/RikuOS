@@ -56,7 +56,14 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  await connectDB();
-  const settings = await updateOsSettings(parsed.value);
-  return NextResponse.json({ settings: projectSettings(settings) });
+  try {
+    await connectDB();
+    const settings = await updateOsSettings(parsed.value);
+    return NextResponse.json({ settings: projectSettings(settings) });
+  } catch (err) {
+    console.error("[api/settings] save failed:", err instanceof Error ? err.name : "unknown error");
+    // The shipped Settings page shows `error` verbatim, so it stays a sentence
+    // (its own fallback, `Could not save.`); `code` matches the new doors.
+    return NextResponse.json({ error: "Could not save.", code: "save-failed" }, { status: 500 });
+  }
 }

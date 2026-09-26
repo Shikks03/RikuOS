@@ -8,6 +8,7 @@ import {
   SAVE_FAILED,
   eventCreatedReply,
   eventFailedReply,
+  eventShapeError,
   parseEventInput,
   type Reply,
 } from "@/lib/personalWrites";
@@ -20,7 +21,8 @@ const send = (r: Reply) => NextResponse.json(r.body, { status: r.status });
  *
  * THE calendarId CHECK IS THE SECURITY BOUNDARY: it must name a stored,
  * switched-on layer (parseEventInput), so the app cannot write to a calendar
- * Riku did not choose. The layers are read before validation for that reason.
+ * Riku did not choose. A cheap shape check runs first; then the layers are
+ * read and the full validation runs in §7.6's order.
  *
  * Writes one event straight to Google and nothing locally (concept D5), so
  * there is no half-state and nothing to sweep. 201 `{ id, htmlLink, calendar }`;
@@ -38,6 +40,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch {
     return send(BAD_JSON);
   }
+
+  // Garbage is refused before any database read; the full check follows.
+  const shape = eventShapeError(body);
+  if (shape) return send({ status: 400, body: { error: shape } });
 
   let layers;
   try {
