@@ -91,6 +91,7 @@ export function composeDigest(input: DigestInput): Digest {
   if (today.events === "unavailable") {
     problems.push("calendar check unavailable");
   } else if (today.events !== "none-enabled" && today.missedLayers.length > 0) {
+    // PROVISIONAL (P10b): not in the deck - Riku to approve
     problems.push("calendar check incomplete");
   }
   if (today.due === "unavailable") problems.push("to-do check unavailable");
@@ -133,21 +134,31 @@ export function composeDigest(input: DigestInput): Digest {
  * otherwise. `overdue` is ignored when `due` is `"unavailable"`: both come
  * from one to-do read, and an omitted `Overdue:` must not read as "nothing
  * overdue" — `Due: to-dos unavailable.` covers it.
+ *
+ * `dueTotal` / `overdueTotal` are the STORE's counts, which the arrays may
+ * fall short of (the read is bounded). `+N more` counts them, so it never
+ * undercounts past the read's limit. Absent, the array length is the total.
  */
 export interface DigestTodayInput {
   events: Array<{ title: string; time: string | null }> | "unavailable" | "none-enabled";
   missedLayers: string[];
   due: Array<{ title: string; dayLabel: string }> | "unavailable";
   overdue: Array<{ title: string; daysLate: number }>;
+  dueTotal?: number;
+  overdueTotal?: number;
 }
 
 /** Up to 3 names per part (deck §10). */
 const TODAY_NAMES = 3;
 
-/** `A, B, C, +2 more` — singular `+1 more`. */
-function listPart(names: string[]): string {
+/**
+ * `A, B, C, +2 more` — singular `+1 more`. `total` is the true count when the
+ * names are a bounded read of something larger; never below `names.length`.
+ */
+function listPart(names: string[], total: number = names.length): string {
   const shown = names.slice(0, TODAY_NAMES);
-  const rest = names.length - shown.length;
+  const rest = Math.max(total, names.length) - shown.length;
+  // PROVISIONAL (P10b): not in the deck - Riku to approve (the comma before `+N more`)
   return rest > 0 ? [...shown, `+${rest} more`].join(", ") : shown.join(", ");
 }
 
@@ -156,10 +167,12 @@ function missedSentence(layers: string[]): string {
   if (layers.length === 1) return `${layers[0]} wasn't read.`;
   const shown = layers.slice(0, TODAY_NAMES);
   const rest = layers.length - shown.length;
+  // PROVISIONAL (P10b): not in the deck - Riku to approve (the plural forms)
   const named =
     rest > 0
       ? `${shown.join(", ")} and ${rest} more`
       : `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`;
+  // PROVISIONAL (P10b): not in the deck - Riku to approve
   return `${named} weren't read.`;
 }
 
@@ -193,6 +206,7 @@ export function composeTodayLine(today: DigestTodayInput): string {
       // Nothing arrived from the layers that answered. Naming only the miss
       // makes no claim about the day: `nothing scheduled` here would be said
       // over a calendar that was not read.
+      // PROVISIONAL (P10b): not in the deck - Riku to approve (the miss alone)
       parts.push(`Today: ${missed}`);
     }
   }
@@ -201,10 +215,12 @@ export function composeTodayLine(today: DigestTodayInput): string {
     parts.push("Due: to-dos unavailable.");
   } else {
     if (today.due.length > 0) {
-      parts.push(`Due: ${listPart(today.due.map((d) => `${d.title} (${d.dayLabel})`))}.`);
+      parts.push(`Due: ${listPart(today.due.map((d) => `${d.title} (${d.dayLabel})`), today.dueTotal)}.`);
     }
     if (today.overdue.length > 0) {
-      parts.push(`Overdue: ${listPart(today.overdue.map((o) => `${o.title} (${o.daysLate}d)`))}.`);
+      parts.push(
+        `Overdue: ${listPart(today.overdue.map((o) => `${o.title} (${o.daysLate}d)`), today.overdueTotal)}.`
+      );
     }
   }
 
@@ -271,11 +287,20 @@ export interface DigestTodoRow {
  * `tomorrow` · `Fri`; overdue is anything before today, most overdue first,
  * labelled with whole days late. Undated rows and rows past the window are not
  * the digest's business and are dropped.
+ *
+ * `totals` is required: the rows are a bounded read, and only the store's own
+ * counts (same filters) let `+N more` stay exact past the bound.
  */
 export function todosForDigest(
   rows: readonly DigestTodoRow[],
-  today: DayKey
-): { due: Array<{ title: string; dayLabel: string }>; overdue: Array<{ title: string; daysLate: number }> } {
+  today: DayKey,
+  totals: { due: number; overdue: number }
+): {
+  due: Array<{ title: string; dayLabel: string }>;
+  overdue: Array<{ title: string; daysLate: number }>;
+  dueTotal: number;
+  overdueTotal: number;
+} {
   const tomorrow = addDays(today, 1);
   const lastDay = addDays(today, 3);
   const keyed = sortTodos(
@@ -300,7 +325,12 @@ export function todosForDigest(
       due.push({ title: row.title, dayLabel });
     }
   }
-  return { due, overdue };
+  return {
+    due,
+    overdue,
+    dueTotal: Math.max(totals.due, due.length),
+    overdueTotal: Math.max(totals.overdue, overdue.length),
+  };
 }
 
 /**

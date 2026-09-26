@@ -415,7 +415,8 @@ describe("todosForDigest", () => {
         { title: "Yesterday", dueOn: at("2026-09-09"), createdAt: created },
         { title: "Send invoice", dueOn: at("2026-09-07"), createdAt: created },
       ],
-      TODAY
+      TODAY,
+      { due: 3, overdue: 2 }
     );
     expect(result.overdue).toEqual([
       { title: "Send invoice", daysLate: 3 },
@@ -434,8 +435,56 @@ describe("todosForDigest", () => {
         { title: "Newer", dueOn: at(TODAY), createdAt: new Date("2026-09-05T00:00:00Z") },
         { title: "Older", dueOn: at(TODAY), createdAt: new Date("2026-09-02T00:00:00Z") },
       ],
-      TODAY
+      TODAY,
+      { due: 2, overdue: 0 }
     );
     expect(result.due.map((d) => d.title)).toEqual(["Older", "Newer"]);
+  });
+
+  it("counts +N more from the store, not the bounded read: 60 overdue, 50 read, +57 more", () => {
+    // The read stops at 50 (DIGEST_TODO_LIMIT); the store holds 60.
+    const rows = Array.from({ length: 50 }, (_, i) => ({
+      title: `Late ${i + 1}`,
+      dueOn: new Date(Date.UTC(2026, 6, 1 + i)), // Jul 1 onwards, all before TODAY
+      createdAt: created,
+    }));
+    const todos = todosForDigest(rows, TODAY, { due: 0, overdue: 60 });
+    expect(todos.overdue).toHaveLength(50);
+    expect(todos.overdueTotal).toBe(60);
+    const line = composeTodayLine({ ...QUIET, ...todos });
+    expect(line).toMatch(/^Overdue: Late 1 \(\d+d\), Late 2 \(\d+d\), Late 3 \(\d+d\), \+57 more\.$/);
+  });
+
+  it("never lets a stale count fall below what was actually read", () => {
+    const todos = todosForDigest(
+      [
+        { title: "A", dueOn: at(TODAY), createdAt: created },
+        { title: "B", dueOn: at(TODAY), createdAt: created },
+        { title: "C", dueOn: at(TODAY), createdAt: created },
+        { title: "D", dueOn: at(TODAY), createdAt: created },
+      ],
+      TODAY,
+      { due: 1, overdue: 0 }
+    );
+    expect(todos.dueTotal).toBe(4);
+    expect(composeTodayLine({ ...QUIET, ...todos })).toBe(
+      "Due: A (today), B (today), C (today), +1 more."
+    );
+  });
+});
+
+describe("composeTodayLine's totals", () => {
+  it("counts +N more from dueTotal when the store holds more than the array", () => {
+    expect(
+      composeTodayLine({
+        ...QUIET,
+        due: [
+          { title: "A", dayLabel: "today" },
+          { title: "B", dayLabel: "today" },
+          { title: "C", dayLabel: "today" },
+        ],
+        dueTotal: 12,
+      })
+    ).toBe("Due: A (today), B (today), C (today), +9 more.");
   });
 });

@@ -19,8 +19,9 @@ import { calendarForDigest, todosForDigest, type DigestTodayInput, type DigestTo
 
 /**
  * Per query. Two queries, not one, so a long overdue list can never evict the
- * to-dos due in the next three days. Only three names per part are shown; the
- * bound only limits how high `+N more` can count (it undercounts past it).
+ * to-dos due in the next three days. Only three names per part are shown, and
+ * `+N more` counts each group with countDocuments on the same filter, so the
+ * bound never makes it undercount.
  */
 export const DIGEST_TODO_LIMIT = 50;
 
@@ -48,23 +49,23 @@ async function readCalendarPart(
   }
 }
 
-async function readTodoPart(today: DayKey): Promise<Pick<DigestTodayInput, "due" | "overdue">> {
+async function readTodoPart(
+  today: DayKey
+): Promise<Pick<DigestTodayInput, "due" | "overdue" | "dueTotal" | "overdueTotal">> {
   try {
     const start = dayStart(today);
     const fields = { title: 1, dueOn: 1, createdAt: 1, _id: 0 };
     // Both served by the { done: 1, dueOn: 1 } index. `dueOn` is a UTC
     // midnight, so day bounds are dayStart() values, never APP_TZ instants.
-    const [overdue, due] = await Promise.all([
-      Todo.find({ done: false, dueOn: { $lt: start } }, fields)
-        .sort({ dueOn: 1 })
-        .limit(DIGEST_TODO_LIMIT)
-        .lean<DigestTodoRow[]>(),
-      Todo.find({ done: false, dueOn: { $gte: start, $lte: dayStart(addDays(today, 3)) } }, fields)
-        .sort({ dueOn: 1 })
-        .limit(DIGEST_TODO_LIMIT)
-        .lean<DigestTodoRow[]>(),
+    const overdueFilter = { done: false, dueOn: { $lt: start } };
+    const dueFilter = { done: false, dueOn: { $gte: start, $lte: dayStart(addDays(today, 3)) } };
+    const [overdue, due, overdueCount, dueCount] = await Promise.all([
+      Todo.find(overdueFilter, fields).sort({ dueOn: 1 }).limit(DIGEST_TODO_LIMIT).lean<DigestTodoRow[]>(),
+      Todo.find(dueFilter, fields).sort({ dueOn: 1 }).limit(DIGEST_TODO_LIMIT).lean<DigestTodoRow[]>(),
+      Todo.countDocuments(overdueFilter),
+      Todo.countDocuments(dueFilter),
     ]);
-    return todosForDigest([...overdue, ...due], today);
+    return todosForDigest([...overdue, ...due], today, { due: dueCount, overdue: overdueCount });
   } catch (err) {
     console.error("[cron/morning] to-do check failed:", err);
     return { due: "unavailable", overdue: [] };
