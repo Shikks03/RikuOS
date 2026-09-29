@@ -338,6 +338,7 @@ function event(over: Partial<CalendarEvent>): CalendarEvent {
   return {
     id: "e",
     title: "Event",
+    calendarId: "primary",
     layerName: "Personal",
     allDay: false,
     startsAt: null,

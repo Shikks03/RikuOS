@@ -414,10 +414,33 @@ describe("multi-day all-day events", () => {
       "2026-09-10",
       "2026-09-17",
     );
-    expect(w.ok && w.events.map((e) => `${e.dayKey}:${e.id}`)).toEqual([
-      "2026-09-10:trip",
-      "2026-09-11:trip",
-      "2026-09-12:trip",
+    expect(w.ok && w.events.map((e) => `${e.dayKey}:${e.calendarId}:${e.id}`)).toEqual([
+      "2026-09-10:cal:trip",
+      "2026-09-11:cal:trip",
+      "2026-09-12:cal:trip",
+    ]);
+  });
+
+  it("one invited event on two layers, same day, same id: two events with two distinct keys", async () => {
+    stubConfig();
+    stubFetch(() =>
+      json({ items: [{ id: "invite", summary: "Team sync", start: { dateTime: "2026-09-10T09:00:00+08:00" }, end: { dateTime: "2026-09-10T10:00:00+08:00" } }] }),
+    );
+    const w = await readCalendarWindow(
+      [
+        { calendarId: "primary", name: "Personal", enabled: true },
+        { calendarId: "team@g", name: "Team", enabled: true },
+      ],
+      "2026-09-10",
+      "2026-09-17",
+    );
+    expect(w.ok).toBe(true);
+    if (!w.ok) return;
+    const keys = w.events.map((e) => `${e.dayKey}:${e.calendarId}:${e.id}`);
+    expect(keys.sort()).toEqual(["2026-09-10:primary:invite", "2026-09-10:team@g:invite"]);
+    expect(w.events.map((e) => [e.calendarId, e.layerName]).sort()).toEqual([
+      ["primary", "Personal"],
+      ["team@g", "Team"],
     ]);
   });
 });

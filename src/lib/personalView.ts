@@ -121,14 +121,19 @@ export interface TodoRowView {
 }
 
 /**
- * IDS REPEAT ACROSS DAYS. google.ts expands a multi-day all-day event into one
- * CalendarEvent per covered day, all with the SAME Google `id`. An EventRowView
- * or a DayItemView is therefore one day's appearance of an event, not the
- * event: a React key or any lookup must be `${dayKey}:${id}`, never `id` alone.
- * Nothing in this file dedupes or indexes events by id.
+ * IDS REPEAT — ACROSS DAYS AND ACROSS CALENDARS. google.ts expands a multi-day
+ * all-day event into one CalendarEvent per covered day, all with the SAME
+ * Google `id`; and Google gives an invited event the same `id` on every
+ * calendar holding it, so two enabled layers can each yield it on the same
+ * day. An EventRowView or a DayItemView is therefore one calendar's one day's
+ * appearance of an event, not the event: a React key or any lookup must be
+ * `${dayKey}:${calendarId}:${id}`, never `id` alone. Nothing in this file
+ * dedupes or indexes events by id.
  */
 export interface EventRowView {
   id: string;
+  /** The layer's Google calendar id — the key's middle part. */
+  calendarId: string;
   title: string;
   layerName: string;
   time: string;
@@ -157,10 +162,20 @@ export type DayRowView =
   | { key: DayKey; label: string; items: DayItemView[] }
   | { key: DayKey; label: string; unread: true };
 
-/** `id` repeats across day rows for a multi-day event: key by `${row.key}:${id}` (see EventRowView). */
+/**
+ * Key by `${row.key}:${calendarId}:${id}` (see EventRowView): an event's `id`
+ * repeats across day rows and across calendars.
+ */
 export interface DayItemView {
   kind: "event" | "todo";
   id: string;
+  /**
+   * An event's layer calendar id. A to-do's is always `""` (TODO_ITEM_CALENDAR_ID):
+   * a stored layer's calendarId is 1–256 characters (settings.ts), so `""` can
+   * never be an event's, and a to-do's Mongo id can never meet an event id that
+   * happens to spell the same hex under one key.
+   */
+  calendarId: string;
   title: string;
   time: string | null;
   layerOrSection: string;
@@ -386,6 +401,9 @@ function shortDay(key: DayKey): string {
   return `${weekday} ${day}`;
 }
 
+/** DayItemView.calendarId for a to-do: never a real calendar id. */
+export const TODO_ITEM_CALENDAR_ID = "";
+
 const ALL_DAY = "all day"; // deck §6 Tile 1 and Tile 5 renders
 
 function isPinned(eventId: string | null): boolean {
@@ -562,7 +580,14 @@ export function buildTodayView(input: TodayInput): TodayView {
     const fails = cal.kind === "partial" ? cal.lines : [];
     if (todays.length > 0) {
       const rows = todays.slice(0, DISPLAY_BOUND).map(
-        (e): EventRowView => ({ id: e.id, title: e.title, layerName: e.layerName, time: eventRange(e), href: e.htmlLink }),
+        (e): EventRowView => ({
+          id: e.id,
+          calendarId: e.calendarId,
+          title: e.title,
+          layerName: e.layerName,
+          time: eventRange(e),
+          href: e.htmlLink,
+        }),
       );
       scheduled = { kind: "rows", rows, bound: boundLine(rows.length, todays.length), fails };
     } else if (fails.length > 0) {
@@ -639,6 +664,7 @@ export function buildWeekView(input: WeekInput): WeekView {
           (e): DayItemView => ({
             kind: "event",
             id: e.id,
+            calendarId: e.calendarId,
             title: e.title,
             time: e.allDay || e.startsAt === null ? ALL_DAY : clock(e.startsAt),
             layerOrSection: e.layerName,
@@ -651,6 +677,7 @@ export function buildWeekView(input: WeekInput): WeekView {
           (t): DayItemView => ({
             kind: "todo",
             id: t.id,
+            calendarId: TODO_ITEM_CALENDAR_ID,
             title: t.title,
             time: null,
             layerOrSection: SECTION_LABEL[t.section],

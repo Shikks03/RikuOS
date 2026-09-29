@@ -43,11 +43,19 @@ import type { Layer } from "@/lib/osSettings";
 // --- Contract types (the plan's "Types Plan C will render") -----------------
 
 /**
- * One event on one day. A multi-day all-day event yields one of these per day it
- * covers, sharing `id` — key rows by `${dayKey}:${id}`, never by `id` alone.
+ * One event on one day, as one calendar holds it. The KEY is
+ * `${dayKey}:${calendarId}:${id}` — never `id` alone, and never without the
+ * calendar:
+ *   - a multi-day all-day event yields one of these per day it covers, all
+ *     sharing `id` (so the day is in the key);
+ *   - Google gives an invited event the SAME `id` on every calendar that
+ *     holds it, so two enabled layers can yield the same `id` on the same day
+ *     (so the calendar is in the key).
  */
 export interface CalendarEvent {
   id: string;
+  /** The layer's Google calendar id — the key's middle part. */
+  calendarId: string;
   title: string; // bounded to 200 for display
   layerName: string;
   allDay: boolean;
@@ -70,8 +78,8 @@ export interface CalendarListEntry {
   primary: boolean;
 }
 
-/** An event as listEvents returns it; readCalendarWindow adds the layer's name. */
-export type LayerEvent = Omit<CalendarEvent, "layerName">;
+/** An event as listEvents returns it; readCalendarWindow adds the layer's calendarId and name. */
+export type LayerEvent = Omit<CalendarEvent, "layerName" | "calendarId">;
 
 /** What insertEvent writes. Times are "HH:MM" wall-clock in APP_TZ. */
 export type EventInput =
@@ -533,8 +541,9 @@ export async function listCalendars(): Promise<CalendarListEntry[]> {
  * exclusive) becomes one entry PER DAY it covers — 09-10, 09-11, 09-12 — clipped
  * to [fromKey, toKey], each with its own dayKey and the SAME id, title and
  * htmlLink. Keyed to its start day alone, the page would say `Nothing
- * scheduled.` on 09-11 while Riku is away. So an id CAN REPEAT across days:
- * consumers key rows by `${dayKey}:${id}`, never by id alone.
+ * scheduled.` on 09-11 while Riku is away. So an id CAN REPEAT across days —
+ * and, for an invited event, across calendars: consumers key rows by
+ * `${dayKey}:${calendarId}:${id}` (see CalendarEvent), never by id alone.
  *
  * A TIMED event crossing midnight stays keyed to its start day (known limit).
  */
@@ -684,7 +693,7 @@ export async function readCalendarWindow(
   settled.forEach((result, i) => {
     const layer = enabled[i];
     if (result.status === "fulfilled") {
-      for (const e of result.value) events.push({ ...e, layerName: layer.name });
+      for (const e of result.value) events.push({ ...e, calendarId: layer.calendarId, layerName: layer.name });
     } else {
       failed.push(layer.name);
       kinds.push(result.reason instanceof GoogleError ? result.reason.kind : "http");

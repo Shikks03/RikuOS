@@ -16,6 +16,7 @@ import {
   buildPushTileView,
   buildLayersView,
   dayShape,
+  TODO_ITEM_CALENDAR_ID,
   type CalendarFeed,
   type OpenTodoInput,
   type OpenTodosFeed,
@@ -43,6 +44,7 @@ function ev(over: Partial<CalendarEvent> = {}): CalendarEvent {
   return {
     id: `e${seq}`,
     title: `Event ${seq}`,
+    calendarId: "primary",
     layerName: "Personal",
     allDay: false,
     startsAt: new Date("2026-09-10T01:00:00Z"), // 09:00 Manila
@@ -443,16 +445,43 @@ describe("buildWeekView", () => {
     expect(v.days!.every((d) => "unread" in d)).toBe(true);
   });
 
-  it("a 3-day all-day event appears on three day rows under the same id (keys are dayKey:id)", () => {
+  it("a 3-day all-day event appears on three day rows under the same id (keys are dayKey:calendarId:id)", () => {
     const trip = (d: string) => ev({ id: "trip", title: "Baguio trip", allDay: true, startsAt: null, endsAt: null, dayKey: d });
     const v = week(okWindow([trip("2026-09-12"), trip("2026-09-13"), trip("2026-09-14")]));
     const withTrip = v.days!.filter((d) => "items" in d && d.items.some((i) => i.id === "trip"));
     expect(withTrip.map((d) => d.key)).toEqual(["2026-09-12", "2026-09-13", "2026-09-14"]);
-    const keys = withTrip.map((d) => ("items" in d ? `${d.key}:${d.items[0].id}` : ""));
+    const keys = withTrip.map((d) => ("items" in d ? `${d.key}:${d.items[0].calendarId}:${d.items[0].id}` : ""));
     expect(new Set(keys).size).toBe(3);
     // And today's copy of a spanning event is Today's own row, not deduped away.
     const t = today(okWindow([trip(TODAY), trip("2026-09-11")]));
     expect(t.scheduled.kind === "rows" && t.scheduled.rows.map((r) => r.id)).toEqual(["trip"]);
+  });
+
+  it("one invited event on two layers, same day, same id: two items with two distinct keys", () => {
+    const invite = (calendarId: string, layerName: string) =>
+      ev({ id: "invite", title: "Team sync", calendarId, layerName, dayKey: "2026-09-12" });
+    const v = week(okWindow([invite("primary", "Personal"), invite("classes@g", "Classes")]));
+    const row = v.days!.find((d) => d.key === "2026-09-12");
+    expect(row && "items" in row && row.items.map((i) => i.calendarId)).toEqual(["primary", "classes@g"]);
+    const keys = row && "items" in row ? row.items.map((i) => `${row.key}:${i.calendarId}:${i.id}`) : [];
+    expect(keys).toEqual(["2026-09-12:primary:invite", "2026-09-12:classes@g:invite"]);
+    expect(new Set(keys).size).toBe(2);
+  });
+
+  it("the same invite twice on Today: two rows, keyed apart by calendarId", () => {
+    const invite = (calendarId: string, layerName: string) => ev({ id: "invite", calendarId, layerName });
+    const t = today(okWindow([invite("primary", "Personal"), invite("classes@g", "Classes")]));
+    expect(t.scheduled.kind).toBe("rows");
+    if (t.scheduled.kind !== "rows") return;
+    const keys = t.scheduled.rows.map((r) => `${TODAY}:${r.calendarId}:${r.id}`);
+    expect(new Set(keys).size).toBe(2);
+  });
+
+  it("a to-do's day item carries the fixed to-do calendarId, never a real one", () => {
+    const v = week(okWindow([]), open([todo({ id: "t-x", dueOn: "2026-09-12" })]));
+    const row = v.days!.find((d) => d.key === "2026-09-12");
+    expect(row && "items" in row && row.items.map((i) => [i.kind, i.calendarId])).toEqual([["todo", TODO_ITEM_CALENDAR_ID]]);
+    expect(TODO_ITEM_CALENDAR_ID).toBe("");
   });
 
   it("an overdue or today to-do is not in the week", () => {
