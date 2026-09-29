@@ -281,8 +281,8 @@ export type OpenTodosFeed =
  *   calendars             listCalendars()'s answer, or null when the page did
  *                         not ask or the list failed. It is the only way to
  *                         tell a vanished calendar (R42) from one that merely
- *                         did not answer — the window's `failed` names a layer
- *                         and nothing more. null means "never claim vanished".
+ *                         did not answer — the window's `failed` lists layer
+ *                         calendarIds and nothing more. null means "never claim vanished".
  */
 export type CalendarFeed =
   | "layers-unavailable"
@@ -469,37 +469,44 @@ function readCalendar(feed: CalendarFeed): CalendarRead {
   const events = [...window.events].sort(compareEvents);
   if (window.failed.length === 0) return { kind: "answered", events };
 
-  const failed = [...new Set(window.failed)];
-  const vanished = vanishedNames(layers, calendars);
-  const enabledNames = [...new Set(layers.filter((l) => l.enabled).map((l) => l.name))];
-  const allFailed = enabledNames.every((n) => failed.includes(n));
-  const anyVanished = failed.some((n) => vanished.has(n));
+  // `failed` is calendarIds (google.ts): every decision compares ids, and a
+  // name is joined in only to write a sentence — two layers may share one.
+  const failedIds = new Set(window.failed);
+  const enabled = layers.filter((l) => l.enabled);
+  const failedLayers = enabled.filter((l) => failedIds.has(l.calendarId));
+  // An id that joins to no enabled layer is outside the window's contract; it
+  // is still a failure, so it is said, never dropped into a `Nothing scheduled.`
+  const unjoined = failedLayers.length < failedIds.size;
+  const allFailed = enabled.length > 0 && enabled.every((l) => failedIds.has(l.calendarId));
+  const present = calendars === null ? null : new Set(calendars.map((c) => c.calendarId));
+  // With `calendars` null nothing is ever called vanished: a calendar that
+  // merely did not answer must not be told to be unticked.
+  const vanished = (l: Readonly<Layer>) => present !== null && !present.has(l.calendarId);
+  const anyVanished = failedLayers.some(vanished);
 
   const lines: SayLine[] =
     allFailed && !anyVanished
       ? [stale("Couldn't read the calendar.")] // deck §6 Tile 1: every layer failed
-      : failed.map((name) =>
-          vanished.has(name)
-            ? bare(`${name} is no longer on your Google account. Untick it in Settings.`) // deck §15, R42
-            : stale(`Couldn't read ${name}.`), // deck §6 Tile 1: the layer's own name
-        );
+      : uniqueLines([
+          ...failedLayers.map((l) =>
+            vanished(l)
+              ? bare(`${l.name} is no longer on your Google account. Untick it in Settings.`) // deck §15, R42
+              : stale(`Couldn't read ${l.name}.`), // deck §6 Tile 1: the layer's own name
+          ),
+          ...(unjoined ? [stale("Couldn't read the calendar.")] : []), // deck §6 Tile 1, §11
+        ]);
   return allFailed ? { kind: "unread", lines } : { kind: "partial", events, lines };
 }
 
-/**
- * Layer NAMES every one of whose calendars is absent from Google's list. With
- * `calendars` null nothing is ever called vanished: a calendar that merely did
- * not answer must not be told to be unticked.
- */
-function vanishedNames(
-  layers: readonly Readonly<Layer>[],
-  calendars: readonly CalendarListEntry[] | null,
-): Set<string> {
-  if (calendars === null) return new Set();
-  const present = new Set(calendars.map((c) => c.calendarId));
-  const goneByName = new Map<string, boolean>();
-  for (const l of layers) goneByName.set(l.name, (goneByName.get(l.name) ?? true) && !present.has(l.calendarId));
-  return new Set([...goneByName].filter(([, gone]) => gone).map(([name]) => name));
+/** Two layers sharing a name that both fail say their sentence once. */
+function uniqueLines(lines: SayLine[]): SayLine[] {
+  const seen = new Set<string>();
+  return lines.filter((l) => {
+    const k = `${l.dot}|${l.text}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 function formCapableFor(layout: ReadonlyPersonalLayout, tile: PersonalTile): boolean {

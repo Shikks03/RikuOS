@@ -68,7 +68,13 @@ export interface CalendarEvent {
 export type GoogleErrorKind = "not-configured" | "expired" | "timeout" | "gone" | "http";
 
 export type CalendarWindow =
-  | { ok: true; events: CalendarEvent[]; failed: string[] } // failed = layer NAMES
+  /**
+   * `failed` = the failed layers' CALENDAR IDS, never their names: two layers
+   * may share a name, and an id is what the "all failed" / "partial" decisions
+   * compare against the enabled layers. Consumers join an id to its name via
+   * the stored layers only when they render a sentence.
+   */
+  | { ok: true; events: CalendarEvent[]; failed: string[] }
   | { ok: false; reason: "none-enabled" | "not-configured" | "expired" | "timeout" };
 
 /** One row of the calendar list — what the Settings picker joins `layers` against. */
@@ -649,7 +655,8 @@ function compareEvents(a: CalendarEvent, b: CalendarEvent): number {
  *   expired         the token was refused, or any layer hit the second 401:
  *                   a credential problem is the whole window's, not N layers'.
  *   timeout         the token request timed out, or EVERY layer timed out.
- *   ok              `failed` names each layer that did not answer — including a
+ *   ok              `failed` lists the calendarId of each layer that did not
+ *                   answer (ids, not names: two layers may share a name) — including a
  *                   vanished calendar (`gone`) and a layer truncated at the page
  *                   ceiling. The kinds are not carried: the Settings page tells
  *                   a vanished calendar apart by joining `layers` to listCalendars.
@@ -682,7 +689,7 @@ export async function readCalendarWindow(
   } catch (err) {
     const kind = err instanceof GoogleError ? err.kind : "http";
     if (kind === "expired" || kind === "timeout") return { ok: false, reason: kind };
-    return { ok: true, events: [], failed: enabled.map((l) => l.name) };
+    return { ok: true, events: [], failed: enabled.map((l) => l.calendarId) };
   }
 
   const settled = await Promise.allSettled(enabled.map((l) => listEvents(l.calendarId, fromKey, toKey)));
@@ -695,7 +702,7 @@ export async function readCalendarWindow(
     if (result.status === "fulfilled") {
       for (const e of result.value) events.push({ ...e, calendarId: layer.calendarId, layerName: layer.name });
     } else {
-      failed.push(layer.name);
+      failed.push(layer.calendarId);
       kinds.push(result.reason instanceof GoogleError ? result.reason.kind : "http");
     }
   });

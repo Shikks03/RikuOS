@@ -500,7 +500,7 @@ describe("readCalendarWindow", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("returns failed: ['Classes'] when one of three layers rejects", async () => {
+  it("returns failed: ['classes'] (the calendarId, not the name) when one of three layers rejects", async () => {
     stubConfig();
     const calls = stubFetch((url) =>
       url.pathname.includes("/calendars/classes/")
@@ -519,7 +519,7 @@ describe("readCalendarWindow", () => {
     const w = await readCalendarWindow([classes, personal, gym], "2026-09-10", "2026-09-17");
     expect(w.ok).toBe(true);
     if (!w.ok) return;
-    expect(w.failed).toEqual(["Classes"]);
+    expect(w.failed).toEqual(["classes"]);
     expect(w.events.map((e) => e.layerName).sort()).toEqual(["Gym", "Personal"]);
     expect(tokenCalls(calls)).toHaveLength(1);
   });
@@ -537,7 +537,7 @@ describe("readCalendarWindow", () => {
       "2026-09-10",
       "2026-09-17",
     );
-    expect(w).toEqual({ ok: true, events: [], failed: ["Classes"] });
+    expect(w).toEqual({ ok: true, events: [], failed: ["classes"] });
     expect(apiCalls(calls).some((c) => c.url.includes("/calendars/gym/"))).toBe(false);
   });
 

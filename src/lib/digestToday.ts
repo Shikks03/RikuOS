@@ -42,7 +42,7 @@ async function readCalendarPart(
     } else if (window.ok && window.failed.length > 0) {
       console.error(`[cron/morning] calendar layers not read: ${window.failed.length}`);
     }
-    return calendarForDigest(window, layers.filter((l) => l.enabled).length, today);
+    return calendarForDigest(window, layers, today);
   } catch (err) {
     console.error("[cron/morning] calendar check failed:", err);
     return { events: "unavailable", missedLayers: [] };

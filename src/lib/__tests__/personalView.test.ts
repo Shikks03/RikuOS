@@ -149,18 +149,50 @@ describe("buildTodayView", () => {
   });
 
   it("one layer failed: rows that arrived, then the layer's own sentence; Nothing scheduled. suppressed", () => {
-    const v = today(okWindow([ev()], ["Classes"]));
+    const v = today(okWindow([ev()], ["classes@g"]));
     expect(v.scheduled).toMatchObject({
       kind: "rows",
       fails: [{ text: "Couldn't read Classes.", dot: "stale" }],
     });
-    const none = today(okWindow([], ["Classes"]));
+    const none = today(okWindow([], ["classes@g"]));
     expect(none.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn't read Classes.", dot: "stale" }] });
     expect(none.spread).toBe(false);
   });
 
   it("every layer failed: Couldn't read the calendar.", () => {
-    const v = today(okWindow([], ["Personal", "Classes"]));
+    const v = today(okWindow([], ["primary", "classes@g"]));
+    expect(v.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn't read the calendar.", dot: "stale" }] });
+  });
+
+  it("two enabled layers named alike, one answers and one times out: its events, one `Couldn't read Calendar.`", () => {
+    const layers: Layer[] = [
+      { calendarId: "a@g", name: "Calendar", enabled: true },
+      { calendarId: "b@g", name: "Calendar", enabled: true },
+    ];
+    const v = today({
+      layers,
+      window: { ok: true, events: [ev({ calendarId: "a@g", layerName: "Calendar", title: "Gym" })], failed: ["b@g"] },
+      calendars: null,
+    });
+    expect(v.scheduled).toMatchObject({
+      kind: "rows",
+      fails: [{ text: "Couldn't read Calendar.", dot: "stale" }],
+    });
+    expect(v.scheduled.kind === "rows" && v.scheduled.rows.map((r) => r.title)).toEqual(["Gym"]);
+  });
+
+  it("two alike-named layers both failing beside one that answered: the sentence once", () => {
+    const layers: Layer[] = [
+      { calendarId: "a@g", name: "Calendar", enabled: true },
+      { calendarId: "b@g", name: "Calendar", enabled: true },
+      { calendarId: "primary", name: "Personal", enabled: true },
+    ];
+    const v = today({ layers, window: { ok: true, events: [ev()], failed: ["a@g", "b@g"] }, calendars: null });
+    expect(v.scheduled).toMatchObject({ kind: "rows", fails: [{ text: "Couldn't read Calendar.", dot: "stale" }] });
+  });
+
+  it("a failed id that joins to no enabled layer is still said, never `Nothing scheduled.`", () => {
+    const v = today(okWindow([], ["stranger@g"]));
     expect(v.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn't read the calendar.", dot: "stale" }] });
   });
 
@@ -210,7 +242,7 @@ describe("buildTodayView", () => {
 
   it("a vanished layer says so where its couldn't-read would sit, without a dot (R42)", () => {
     const calendars: CalendarListEntry[] = [{ calendarId: "primary", name: "Personal", primary: true }];
-    const v = today({ layers: LAYERS, window: { ok: true, events: [ev()], failed: ["Classes"] }, calendars });
+    const v = today({ layers: LAYERS, window: { ok: true, events: [ev()], failed: ["classes@g"] }, calendars });
     expect(v.scheduled).toMatchObject({
       kind: "rows",
       fails: [{ text: "Classes is no longer on your Google account. Untick it in Settings.", dot: null }],
@@ -294,7 +326,7 @@ describe("buildTodayView", () => {
       expect(today({ layers: off, window: { ok: false, reason: "none-enabled" }, calendars: null }).heroTint).toBe(0);
     });
     it("is green on the one-layer-failed hero", () => {
-      expect(today(okWindow([], ["Classes"])).heroTint).toBe(0);
+      expect(today(okWindow([], ["classes@g"])).heroTint).toBe(0);
     });
     it("clamps at 8", () => {
       const rows = Array.from({ length: 14 }, () => todo({ dueOn: TODAY }));
@@ -410,7 +442,7 @@ describe("buildWeekView", () => {
   });
 
   it("one layer failed: its sentence on top; days with nothing are unread", () => {
-    const v = week(okWindow([ev({ dayKey: "2026-09-13" })], ["Classes"]));
+    const v = week(okWindow([ev({ dayKey: "2026-09-13" })], ["classes@g"]));
     expect(v.fails).toEqual([{ text: "Couldn't read Classes.", dot: "stale" }]);
     expect(dayShape(v.days![2]).kind).toBe("one");
     expect(v.days![0]).toMatchObject({ unread: true });
@@ -844,7 +876,7 @@ describe("buildLayersView", () => {
   });
 
   it("switches stay live on a read failure", () => {
-    expect(buildLayersView({ calendar: okWindow([], ["Classes"]) }).kind).toBe("switches");
+    expect(buildLayersView({ calendar: okWindow([], ["classes@g"]) }).kind).toBe("switches");
     expect(
       buildLayersView({ calendar: { layers: LAYERS, window: { ok: false, reason: "timeout" }, calendars: null } }).kind,
     ).toBe("switches");
@@ -855,7 +887,7 @@ describe("buildLayersView", () => {
       { calendarId: "primary", name: "Personal", primary: true },
       { calendarId: "events@g", name: "Events", primary: false },
     ];
-    const v = buildLayersView({ calendar: { layers: LAYERS, window: { ok: true, events: [], failed: ["Classes"] }, calendars } });
+    const v = buildLayersView({ calendar: { layers: LAYERS, window: { ok: true, events: [], failed: ["classes@g"] }, calendars } });
     expect(v.rows[1].note).toBe("Classes is no longer on your Google account. Untick it in Settings.");
     expect(v.rows[0].note).toBeNull();
   });

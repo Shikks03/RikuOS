@@ -18,6 +18,7 @@ import type { Anomaly } from "@/lib/watchdog";
 import type { SiteResult } from "@/lib/siteHealth";
 import type { OutreachFinding } from "@/lib/outreachHealth";
 import type { CalendarWindow } from "@/lib/google";
+import type { Layer } from "@/lib/osSettings";
 import { APP_TZ, PUSH_BODY_MAX } from "@/lib/constants";
 import { addDays, formatDay, type DayKey } from "@/lib/days";
 import { daysLate, sortTodos, todoDueKey } from "@/lib/todos";
@@ -342,10 +343,17 @@ function clockTime(at: Date, tz: string): string {
  * A window that is `ok` but in which EVERY enabled layer failed (a token
  * failure of kind `http` is reported that way) is `"unavailable"`, not a
  * partial read: nothing arrived to be named.
+ *
+ * `window.failed` is calendarIds (google.ts). "Every enabled layer failed" is
+ * decided by id against `layers`' enabled ids — never by name, since two
+ * layers may share one — and the ids are joined to names only to fill
+ * `missedLayers`, one name once. A failed id that joins to no enabled layer is
+ * outside the window's contract and reads as `"unavailable"`: the push must
+ * not call a morning clear over a read it cannot name.
  */
 export function calendarForDigest(
   window: CalendarWindow,
-  enabledLayers: number,
+  layers: readonly Layer[],
   today: DayKey,
   tz: string = APP_TZ
 ): Pick<DigestTodayInput, "events" | "missedLayers"> {
@@ -355,7 +363,13 @@ export function calendarForDigest(
       missedLayers: [],
     };
   }
-  if (window.failed.length > 0 && window.failed.length >= enabledLayers) {
+  const failedIds = new Set(window.failed);
+  const enabled = layers.filter((l) => l.enabled);
+  const failedLayers = enabled.filter((l) => failedIds.has(l.calendarId));
+  if (
+    failedIds.size > 0 &&
+    (failedLayers.length < failedIds.size || enabled.every((l) => failedIds.has(l.calendarId)))
+  ) {
     return { events: "unavailable", missedLayers: [] };
   }
   const events = window.events
@@ -364,7 +378,7 @@ export function calendarForDigest(
       title: e.title,
       time: e.allDay || e.startsAt === null ? null : clockTime(e.startsAt, tz),
     }));
-  return { events, missedLayers: [...window.failed] };
+  return { events, missedLayers: [...new Set(failedLayers.map((l) => l.name))] };
 }
 
 /** A to-do as the digest's read returns it; `dueOn` is the stored UTC-midnight day. */

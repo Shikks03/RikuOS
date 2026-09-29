@@ -8,6 +8,7 @@ import {
 } from "@/lib/digest";
 import { buildPushPayload } from "@/lib/push";
 import type { CalendarEvent } from "@/lib/google";
+import type { Layer } from "@/lib/osSettings";
 
 const QUIET: DigestTodayInput = { events: [], missedLayers: [], due: [], overdue: [] };
 
@@ -349,9 +350,13 @@ function event(over: Partial<CalendarEvent>): CalendarEvent {
   };
 }
 
+const PERSONAL_L: Layer = { calendarId: "primary", name: "Personal", enabled: true };
+const CLASSES_L: Layer = { calendarId: "classes@g", name: "Classes", enabled: true };
+const TWO = [PERSONAL_L, CLASSES_L];
+
 describe("calendarForDigest", () => {
   it("maps none-enabled to the no-layers form, not to unavailable", () => {
-    expect(calendarForDigest({ ok: false, reason: "none-enabled" }, 0, TODAY)).toEqual({
+    expect(calendarForDigest({ ok: false, reason: "none-enabled" }, [], TODAY)).toEqual({
       events: "none-enabled",
       missedLayers: [],
     });
@@ -359,21 +364,51 @@ describe("calendarForDigest", () => {
 
   it("maps every other failed window to unavailable", () => {
     for (const reason of ["not-configured", "expired", "timeout"] as const) {
-      expect(calendarForDigest({ ok: false, reason }, 2, TODAY).events).toBe("unavailable");
+      expect(calendarForDigest({ ok: false, reason }, TWO, TODAY).events).toBe("unavailable");
     }
   });
 
   it("treats a window where every enabled layer failed as unavailable, not partial", () => {
-    expect(calendarForDigest({ ok: true, events: [], failed: ["Personal", "Classes"] }, 2, TODAY)).toEqual({
+    expect(calendarForDigest({ ok: true, events: [], failed: ["primary", "classes@g"] }, TWO, TODAY)).toEqual({
       events: "unavailable",
       missedLayers: [],
     });
   });
 
   it("carries the missed layer names when some answered", () => {
-    expect(calendarForDigest({ ok: true, events: [], failed: ["Classes"] }, 2, TODAY)).toEqual({
+    expect(calendarForDigest({ ok: true, events: [], failed: ["classes@g"] }, TWO, TODAY)).toEqual({
       events: [],
       missedLayers: ["Classes"],
+    });
+  });
+
+  it("decides by id: two enabled layers named alike, one answered, is partial with the name once", () => {
+    const layers: Layer[] = [
+      { calendarId: "a@g", name: "Calendar", enabled: true },
+      { calendarId: "b@g", name: "Calendar", enabled: true },
+    ];
+    const window = {
+      ok: true as const,
+      events: [event({ calendarId: "a@g", layerName: "Calendar", title: "Gym", allDay: true })],
+      failed: ["b@g"],
+    };
+    const part = calendarForDigest(window, layers, TODAY);
+    expect(part).toEqual({ events: [{ title: "Gym", time: null }], missedLayers: ["Calendar"] });
+    const digest = composeDigest({ ...base, today: { ...QUIET, ...part } });
+    expect(digest.body).toContain("Calendar wasn't read.");
+    expect(digest.body).not.toContain("calendar unavailable");
+    expect(digest.body).toContain("Calendar check incomplete");
+  });
+
+  it("a disabled layer does not stand between a failure and `unavailable`", () => {
+    const layers = [PERSONAL_L, { ...CLASSES_L, enabled: false }];
+    expect(calendarForDigest({ ok: true, events: [], failed: ["primary"] }, layers, TODAY).events).toBe("unavailable");
+  });
+
+  it("a failed id that joins to no enabled layer is unavailable, never all clear", () => {
+    expect(calendarForDigest({ ok: true, events: [], failed: ["stranger@g"] }, TWO, TODAY)).toEqual({
+      events: "unavailable",
+      missedLayers: [],
     });
   });
 
@@ -392,7 +427,7 @@ describe("calendarForDigest", () => {
         event({ title: "Midnight", startsAt: new Date("2026-09-09T16:05:00Z") }),
       ],
     };
-    expect(calendarForDigest(window, 1, TODAY).events).toEqual([
+    expect(calendarForDigest(window, [PERSONAL_L], TODAY).events).toEqual([
       { title: "Baguio trip", time: null },
       { title: "Math Methods", time: "09:00" },
       { title: "Meeting", time: "13:30" },
