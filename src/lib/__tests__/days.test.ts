@@ -7,7 +7,7 @@
  * ships.
  */
 import { describe, it, expect } from "vitest";
-import { dayKey, dayStart, isDayKey, addDays, daysBetween, formatDay, todayKey } from "@/lib/days";
+import { dayKey, dayStart, isDayKey, addDays, daysBetween, formatDay, todayKey, clockHHMM } from "@/lib/days";
 import { APP_TZ, PUSH_EXPECTED_HOUR } from "@/lib/constants";
 
 describe("the constants", () => {
@@ -134,6 +134,20 @@ describe("formatDay", () => {
     // The label is formatted in UTC because dayStart is the key's 00:00Z; a
     // label formatted in a zone west of UTC would read the day before.
     expect(formatDay("2027-01-01")).toBe("Fri 1 Jan");
+  });
+});
+
+describe("clockHHMM", () => {
+  it("is the wall clock in the zone asked, 24-hour and zero-padded", () => {
+    expect(clockHHMM(new Date("2026-09-10T01:00:00Z"), APP_TZ)).toBe("09:00");
+    expect(clockHHMM(new Date("2026-09-10T05:30:00Z"), APP_TZ)).toBe("13:30");
+    expect(clockHHMM(new Date("2026-09-10T01:00:00Z"), "UTC")).toBe("01:00");
+  });
+
+  it("reads midnight as 00, never 24, across the zone's day line", () => {
+    // 16:05Z on the 9th is 00:05 on the 10th in Manila.
+    expect(clockHHMM(new Date("2026-09-09T16:05:00Z"), APP_TZ)).toBe("00:05");
+    expect(clockHHMM(new Date("2026-09-09T15:59:00Z"), APP_TZ)).toBe("23:59");
   });
 });
 

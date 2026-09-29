@@ -38,6 +38,7 @@
 
 import { APP_TZ } from "@/lib/constants";
 import { addDays, dayKey, dayStart, isDayKey, type DayKey } from "@/lib/days";
+import { compareEvents } from "@/lib/eventOrder";
 import type { Layer } from "@/lib/osSettings";
 
 // --- Contract types (the plan's "Types Plan C will render") -----------------
@@ -636,15 +637,6 @@ export async function deleteEvent(calendarId: string, eventId: string): Promise<
 }
 
 // --- The window --------------------------------------------------------------
-
-function compareEvents(a: CalendarEvent, b: CalendarEvent): number {
-  if (a.dayKey !== b.dayKey) return a.dayKey < b.dayKey ? -1 : 1;
-  if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
-  const at = a.startsAt?.getTime() ?? 0;
-  const bt = b.startsAt?.getTime() ?? 0;
-  if (at !== bt) return at - bt;
-  return a.title.localeCompare(b.title);
-}
 
 /**
  * Every enabled layer's events over `fromKey … toKey` (both inclusive), in one

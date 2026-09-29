@@ -19,6 +19,7 @@
 // Type-only: erased at build, so no schema is registered by importing this file.
 import type { TodoSection } from "@/models/Todo";
 import { addDays, dayKey, daysBetween, formatDay, isDayKey, type DayKey } from "@/lib/days";
+import { TODO_TITLE_MAX } from "@/lib/constants";
 
 // --- Ordering ----------------------------------------------------------------
 
@@ -100,7 +101,8 @@ export function digestWindow(today: DayKey): { fromKey: DayKey; toKey: DayKey } 
 
 // --- Input -------------------------------------------------------------------
 
-export const TODO_TITLE_MAX = 140;
+/** constants.ts holds it (the Todo model imports it from there); re-exported for the lib and the routes. */
+export { TODO_TITLE_MAX };
 
 export interface CreateTodoInput {
   title: string;

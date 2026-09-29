@@ -35,3 +35,13 @@ export const PUSH_EXPECTED_HOUR = 7;
  */
 export const PUSH_TITLE_MAX = 80;
 export const PUSH_BODY_MAX = 320;
+
+/**
+ * A to-do title's bound. Here, not in todos.ts, because the Todo model's
+ * schema reads it too and models/Todo.ts is loaded by sync-indexes.mts under
+ * `node --experimental-strip-types`, which resolves no "@/" alias: the model
+ * can only import a file with no imports of its own, and todos.ts imports
+ * days.ts through "@/". This file imports nothing. todos.ts re-exports it, so
+ * the lib and the routes keep reading it from there.
+ */
+export const TODO_TITLE_MAX = 140;

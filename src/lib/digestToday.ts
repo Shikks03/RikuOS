@@ -14,7 +14,8 @@
 import Todo from "@/models/Todo";
 import { readCalendarWindow } from "@/lib/google";
 import type { Layer } from "@/lib/osSettings";
-import { addDays, dayStart, type DayKey } from "@/lib/days";
+import { dayStart, type DayKey } from "@/lib/days";
+import { digestWindow } from "@/lib/todos";
 import { calendarForDigest, todosForDigest, type DigestTodayInput, type DigestTodoRow } from "@/lib/digest";
 
 /**
@@ -53,12 +54,13 @@ async function readTodoPart(
   today: DayKey
 ): Promise<Pick<DigestTodayInput, "due" | "overdue" | "dueTotal" | "overdueTotal">> {
   try {
-    const start = dayStart(today);
+    const { fromKey, toKey } = digestWindow(today);
+    const start = dayStart(fromKey);
     const fields = { title: 1, dueOn: 1, createdAt: 1, _id: 0 };
     // Both served by the { done: 1, dueOn: 1 } index. `dueOn` is a UTC
     // midnight, so day bounds are dayStart() values, never APP_TZ instants.
     const overdueFilter = { done: false, dueOn: { $lt: start } };
-    const dueFilter = { done: false, dueOn: { $gte: start, $lte: dayStart(addDays(today, 3)) } };
+    const dueFilter = { done: false, dueOn: { $gte: start, $lte: dayStart(toKey) } };
     const [overdue, due, overdueCount, dueCount] = await Promise.all([
       Todo.find(overdueFilter, fields).sort({ dueOn: 1 }).limit(DIGEST_TODO_LIMIT).lean<DigestTodoRow[]>(),
       Todo.find(dueFilter, fields).sort({ dueOn: 1 }).limit(DIGEST_TODO_LIMIT).lean<DigestTodoRow[]>(),

@@ -94,6 +94,23 @@ export function formatDay(key: DayKey): string {
   return `${part("weekday")} ${part("day")} ${part("month")}`;
 }
 
+/**
+ * "07:00" — `at`'s wall clock in `tz`, 24-hour, zero-padded. The one HH:MM in
+ * the app: the page's event times and push stamps and the push's Today
+ * sentence all read it. `at` is a parameter; nothing here reads the clock.
+ */
+export function clockHHMM(at: Date, tz: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz,
+    hourCycle: "h23",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(at);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("hour")}:${part("minute")}`;
+}
+
 export function todayKey(now: Date, tz: string = APP_TZ): DayKey {
   return dayKey(now, tz);
 }

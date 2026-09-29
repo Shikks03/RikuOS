@@ -27,7 +27,8 @@
  */
 
 import { APP_TZ, PUSH_EXPECTED_HOUR } from "@/lib/constants";
-import { addDays, dayKey, formatDay, todayKey, type DayKey } from "@/lib/days";
+import { addDays, clockHHMM, dayKey, formatDay, todayKey, type DayKey } from "@/lib/days";
+import { compareEvents } from "@/lib/eventOrder";
 import { dueChip, sortTodos, type CreateTodoInput } from "@/lib/todos";
 import { formCapable, type PersonalTile, type ReadonlyPersonalLayout } from "@/lib/personalLayout";
 import type { CalendarEvent, CalendarListEntry, CalendarWindow } from "@/lib/google";
@@ -383,17 +384,8 @@ function boundLine(shown: number, total: number): string | null {
 /** deck §6 Tiles 1, 2, 5, 6 and §11. */
 const todosFail = (): SayLine => stale("Couldn't load to-dos.");
 
-/** "07:00" — the wall clock in APP_TZ, 24-hour. */
-function clock(at: Date): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: APP_TZ,
-    hourCycle: "h23",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).formatToParts(at);
-  const part = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value ?? "";
-  return `${part("hour")}:${part("minute")}`;
-}
+/** "07:00" — the wall clock in APP_TZ, 24-hour (days.ts's clockHHMM). */
+const clock = (at: Date): string => clockHHMM(at, APP_TZ);
 
 /** "Fri 11" — formatDay's weekday and day (deck §6 Tiles 5 and 6). */
 function shortDay(key: DayKey): string {
@@ -423,16 +415,6 @@ function todoRow(t: OpenTodoInput, today: DayKey): TodoRowView {
     // after a date change.
     note: pinned && t.calendarBehind ? "entry on the old day" : null,
   };
-}
-
-/** All-day first, then timed by start, then title — google.ts's own order. */
-function compareEvents(a: CalendarEvent, b: CalendarEvent): number {
-  if (a.dayKey !== b.dayKey) return a.dayKey < b.dayKey ? -1 : 1;
-  if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
-  const at = a.startsAt?.getTime() ?? 0;
-  const bt = b.startsAt?.getTime() ?? 0;
-  if (at !== bt) return at - bt;
-  return a.title.localeCompare(b.title);
 }
 
 // ---- The calendar, read once into one of four states ------------------------
@@ -466,6 +448,9 @@ function readCalendar(feed: CalendarFeed): CalendarRead {
         return { kind: "unread", lines: [stale("Couldn't read the calendar.")] }; // deck §6 Tile 1, §11
     }
   }
+  // google.ts already returns this order; sorting again with the SAME
+  // comparator keeps the view total over any window it is handed (the loader
+  // is Plan C's, and the CalendarWindow type does not carry the order).
   const events = [...window.events].sort(compareEvents);
   if (window.failed.length === 0) return { kind: "answered", events };
 

@@ -20,8 +20,8 @@ import type { OutreachFinding } from "@/lib/outreachHealth";
 import type { CalendarWindow } from "@/lib/google";
 import type { Layer } from "@/lib/osSettings";
 import { APP_TZ, PUSH_BODY_MAX } from "@/lib/constants";
-import { addDays, formatDay, type DayKey } from "@/lib/days";
-import { daysLate, sortTodos, todoDueKey } from "@/lib/todos";
+import { addDays, clockHHMM, formatDay, type DayKey } from "@/lib/days";
+import { daysLate, digestWindow, sortTodos, todoDueKey } from "@/lib/todos";
 
 export interface DigestInput {
   /** ApprovalItems waiting on a decision. */
@@ -319,19 +319,6 @@ function renderToday(today: DigestTodayInput, cap: number, limit: number): strin
   return parts.length > 0 ? parts.join(" ") : "Today: nothing scheduled, nothing due.";
 }
 
-/** `HH:MM` on a 24-hour clock, in `tz`. */
-function clockTime(at: Date, tz: string): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: tz,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(at);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((p) => p.type === type)?.value ?? "";
-  return `${part("hour")}:${part("minute")}`;
-}
-
 /**
  * Pure. readCalendarWindow's answer for `today … today` as the sentence's
  * calendar half. Only events keyed to `today` count. A multi-day all-day
@@ -376,7 +363,7 @@ export function calendarForDigest(
     .filter((e) => e.dayKey === today)
     .map((e) => ({
       title: e.title,
-      time: e.allDay || e.startsAt === null ? null : clockTime(e.startsAt, tz),
+      time: e.allDay || e.startsAt === null ? null : clockHHMM(e.startsAt, tz),
     }));
   return { events, missedLayers: [...new Set(failedLayers.map((l) => l.name))] };
 }
@@ -409,7 +396,7 @@ export function todosForDigest(
   overdueTotal: number;
 } {
   const tomorrow = addDays(today, 1);
-  const lastDay = addDays(today, 3);
+  const { toKey: lastDay } = digestWindow(today);
   const keyed = sortTodos(
     rows.flatMap((r) => {
       const dueOn = todoDueKey(r.dueOn);

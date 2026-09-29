@@ -1,4 +1,9 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
+// Relative and with the extension, not "@/": sync-indexes.mts loads this model
+// under `node --experimental-strip-types`, which resolves no tsconfig alias.
+// constants.ts imports nothing, so it is safe on that import graph (todos.ts,
+// the bound's natural home, is not: it imports days.ts through "@/").
+import { TODO_TITLE_MAX } from "../lib/constants.ts";
 
 /**
  * The three to-do sections. Work is not one of them: the Work page stays
@@ -77,7 +82,7 @@ export interface ITodo extends Document {
  */
 const TodoSchema = new Schema<ITodo>(
   {
-    title: { type: String, required: true, maxlength: 140, trim: true },
+    title: { type: String, required: true, maxlength: TODO_TITLE_MAX, trim: true },
     section: { type: String, required: true, enum: TODO_SECTIONS },
     dueOn: { type: Date },
     done: { type: Boolean, required: true, default: false },
