@@ -12,6 +12,8 @@ import { describe, it, expect } from "vitest";
 import {
   daysLate,
   digestWindow,
+  doneWindowStart,
+  DONE_WINDOW_DAYS,
   dueChip,
   parseCreateTodo,
   parseUpdateTodo,
@@ -131,6 +133,28 @@ describe("daysLate", () => {
 
   it("counts across a year boundary", () => {
     expect(daysLate("2026-12-31", "2027-01-02")).toBe(2);
+  });
+});
+
+describe("doneWindowStart", () => {
+  it("is today and the six days before it: the deck's `last seven days`", () => {
+    expect(DONE_WINDOW_DAYS).toBe(7);
+    expect(doneWindowStart(TODAY)).toBe("2026-09-04");
+  });
+
+  it("is rolling, not a calendar week: Monday reaches back to the Tuesday before", () => {
+    expect(doneWindowStart("2026-09-14")).toBe("2026-09-08"); // Mon 14 → Tue 8
+    expect(doneWindowStart("2026-09-13")).toBe("2026-09-07"); // Sun 13 → Mon 7
+  });
+
+  it("crosses month and year ends", () => {
+    expect(doneWindowStart("2026-10-02")).toBe("2026-09-26");
+    expect(doneWindowStart("2027-01-03")).toBe("2026-12-28");
+    expect(doneWindowStart("2028-03-01")).toBe("2028-02-24");
+  });
+
+  it("refuses a day that is not one", () => {
+    expect(() => doneWindowStart("2026-02-30")).toThrow(RangeError);
   });
 });
 

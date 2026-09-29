@@ -94,6 +94,22 @@ export function daysLate(dueOn: DayKey, today: DayKey): number {
   return Math.max(0, daysBetween(dueOn, today));
 }
 
+/**
+ * The number of days Done this week covers, today included. The content deck
+ * defines the tile's job as "what was ticked off in the last seven days"
+ * (§6 Tile 6): a rolling window, not a calendar week.
+ */
+export const DONE_WINDOW_DAYS = 7;
+
+/**
+ * The first day of Done this week: today and the six days before it, both
+ * ends inclusive, as APP_TZ days. The loader turns it into an instant
+ * with the APP_TZ midnight that begins it (see personalView.ts's DoneInput).
+ */
+export function doneWindowStart(today: DayKey): DayKey {
+  return addDays(today, -(DONE_WINDOW_DAYS - 1));
+}
+
 /** The morning push's `Due:` window: today … today+3, both ends inclusive. */
 export function digestWindow(today: DayKey): { fromKey: DayKey; toKey: DayKey } {
   return { fromKey: today, toKey: addDays(today, 3) };

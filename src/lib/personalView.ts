@@ -320,6 +320,15 @@ export interface DoneTodoInput {
   calendarEventId: string | null;
 }
 
+/**
+ * "This week" is the deck's own definition: "what was ticked off in the last
+ * seven days" (content deck §6 Tile 6, Job) — a ROLLING seven days, today and
+ * the six before it, in APP_TZ, not a calendar week. todos.ts's
+ * doneWindowStart(today) is the first of those days; the loader reads
+ * `done: true, doneAt >=` the APP_TZ midnight that begins it (google.ts's
+ * windowBounds(doneWindowStart(today), today).timeMin), for both the rows and
+ * the count.
+ */
 export interface DoneInput {
   /** The newest completions (the page reads DISPLAY_BOUND of them) and the week's count. */
   done: { rows: readonly DoneTodoInput[]; total: number } | "unavailable";
@@ -365,6 +374,23 @@ export interface LayersInput {
 
 /** deck §6 Tiles 1, 2, 6: 20 rows, then `Showing 20 of N.` */
 export const DISPLAY_BOUND = 20;
+
+/**
+ * The open-to-do read's safety cap: Plan C's loader reads at most this many
+ * rows (`.limit(OPEN_TODOS_CAP)`) in the OpenTodosFeed order. 200 because the
+ * page's widest honest need is every row due on or before today+7 (Today and
+ * Next 7 days) plus 20 per section on the To-do tile — a one-person list sits
+ * far below it, so the cap exists to bound one read's payload on a runaway
+ * list, not to shape a normal day. Past it, readTodosForWindow still answers
+ * honestly: a cap that fell inside the window reads `Couldn't load to-dos.`.
+ *
+ * A read is CAPPED iff it came back FULL (`rows.length === OPEN_TODOS_CAP`)
+ * AND the store holds more (`rows.length < total`). The first half is what
+ * makes it a rule rather than a guess: the list and the count are two reads,
+ * so a to-do created between them makes `rows.length < total` on a read that
+ * was never cut, and only a full page can have been cut.
+ */
+export const OPEN_TODOS_CAP = 200;
 
 const SECTION_ORDER: readonly TodoSection[] = ["personal", "freelance", "academics"]; // deck §6 Tile 2
 const SECTION_LABEL: Record<TodoSection, "Personal" | "Freelance" | "Academics"> = {
@@ -504,7 +530,8 @@ function formCapableFor(layout: ReadonlyPersonalLayout, tile: PersonalTile): boo
 
 /**
  * The open feed as the page's WINDOW (overdue … today+7) may use it. A capped
- * read (`rows.length < total`) is safe inside the window only if the cap fell
+ * read (full at OPEN_TODOS_CAP and short of `total` — see OPEN_TODOS_CAP) is
+ * safe inside the window only if the cap fell
  * beyond it: rows are ordered by dueOn ascending with undated last (the
  * OpenTodosFeed contract), so when the LAST row read is undated or due after
  * today+7, every row due on or before today+7 is in hand. Otherwise the cap
@@ -519,7 +546,8 @@ function readTodosForWindow(feed: OpenTodosFeed, today: DayKey): OpenTodosFeed {
   // default puts the undated FIRST) cannot have its cap judged, and even
   // uncapped it signals a loader that is not the one this contract describes.
   if (!inWindowOrder(feed.rows)) return "unavailable";
-  if (feed.rows.length >= feed.total) return feed;
+  const capped = feed.rows.length === OPEN_TODOS_CAP && feed.rows.length < feed.total;
+  if (!capped) return feed;
   const last = feed.rows[feed.rows.length - 1];
   if (last === undefined) return "unavailable";
   if (last.dueOn !== null && last.dueOn <= addDays(today, 7)) return "unavailable";

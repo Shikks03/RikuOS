@@ -17,6 +17,7 @@ import {
   buildLayersView,
   dayShape,
   TODO_ITEM_CALENDAR_ID,
+  OPEN_TODOS_CAP,
   type CalendarFeed,
   type OpenTodoInput,
   type OpenTodosFeed,
@@ -774,15 +775,22 @@ describe("buildPushTileView", () => {
 // ------------------------------------------------ A capped open read ----
 
 describe("a capped open read never says nothing due", () => {
-  // Rows ordered by dueOn ascending, undated last (the OpenTodosFeed contract).
-  const capped = (rows: OpenTodoInput[], total: number): OpenTodosFeed => ({
-    rows,
-    total,
-    sectionTotals: { personal: total, freelance: 0, academics: 0 },
+  /**
+   * A read cut at the cap: `head` then `fill` repeated up to OPEN_TODOS_CAP
+   * rows, in the OpenTodosFeed order (dueOn ascending, undated last), with the
+   * store holding `total` > the cap.
+   */
+  const capped = (head: OpenTodoInput[], fill: () => OpenTodoInput, total = OPEN_TODOS_CAP + 9): OpenTodosFeed => {
+    const rows = contractOrder([...head, ...Array.from({ length: OPEN_TODOS_CAP - head.length }, fill)]);
+    return { rows, total, sectionTotals: { personal: total, freelance: 0, academics: 0 } };
+  };
+
+  it("the cap is 200", () => {
+    expect(OPEN_TODOS_CAP).toBe(200);
   });
 
   it("the cap fell inside the window (last row due by today+7): DUE, the tint and the week read as unreadable", () => {
-    const feed = capped([todo({ dueOn: "2026-09-12" }), todo({ dueOn: "2026-09-15" })], 9);
+    const feed = capped([todo({ dueOn: "2026-09-12" })], () => todo({ dueOn: "2026-09-15" }));
     const t = today(okWindow([]), feed);
     expect(t.due).toEqual({ kind: "fail", line: { text: "Couldn't load to-dos.", dot: "stale" } });
     expect(t.heroTint).toBeNull();
@@ -793,12 +801,12 @@ describe("a capped open read never says nothing due", () => {
   });
 
   it("the cap fell at exactly today+7: still unreadable", () => {
-    const feed = capped([todo({ dueOn: "2026-09-17" })], 3);
+    const feed = capped([], () => todo({ dueOn: "2026-09-17" }));
     expect(today(okWindow([]), feed).heroTint).toBeNull();
   });
 
   it("the cap fell beyond today+7: nothing in the window was dropped, render normally", () => {
-    const feed = capped([todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-18" })], 9);
+    const feed = capped([todo({ dueOn: TODAY })], () => todo({ dueOn: "2026-09-18" }));
     const t = today(okWindow([]), feed);
     expect(t.heroTint).toBe(1);
     expect(t.due.kind).toBe("rows");
@@ -808,24 +816,39 @@ describe("a capped open read never says nothing due", () => {
   });
 
   it("the cap fell among undated rows: every dated row is in hand, render normally", () => {
-    const feed = capped([todo({ dueOn: "2026-09-11" }), todo({ dueOn: null })], 9);
+    const feed = capped([todo({ dueOn: "2026-09-11" })], () => todo({ dueOn: null }));
     expect(today(okWindow([]), feed)).toMatchObject({ due: { kind: "empty" }, heroTint: 0, spread: true });
   });
 
   it("the To-do tile is not affected: its bounds count from the store", () => {
-    const feed = capped([todo({ dueOn: "2026-09-12" })], 9);
+    const feed = capped([], () => todo({ dueOn: "2026-09-12" }));
     const v = buildTodoTileView({ now: NOW, todos: feed });
-    expect(v.count).toBe(9);
-    expect(v.sections![0].bound).toBe("Showing 1 of 9.");
+    expect(v.count).toBe(OPEN_TODOS_CAP + 9);
+    expect(v.sections![0].bound).toBe(`Showing 20 of ${OPEN_TODOS_CAP + 9}.`);
   });
 
-  it("zero rows with a store total above zero reads as Couldn't load to-dos.", () => {
-    const feed = capped([], 4);
+  it("fewer rows than the store's count but under the cap is a race, not a cap: render normally", () => {
+    // A to-do created between the list read and the count: total runs ahead
+    // of a read that was never cut. It is not `Couldn't load to-dos.`.
+    const rows = [todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-12" })];
+    const feed: OpenTodosFeed = { rows, total: 3, sectionTotals: { personal: 3, freelance: 0, academics: 0 } };
     const t = today(okWindow([]), feed);
-    expect(t.due).toEqual({ kind: "fail", line: { text: "Couldn't load to-dos.", dot: "stale" } });
-    expect(t.heroTint).toBeNull();
-    const w = week(okWindow([]), feed);
-    expect(w.fails).toEqual([{ text: "Couldn't load to-dos.", dot: "stale" }]);
+    expect(t.heroTint).toBe(1);
+    expect(t.due.kind).toBe("rows");
+    expect(week(okWindow([]), feed).fails).toEqual([]);
+  });
+
+  it("zero rows with a store total above zero is the same race: `Nothing due.`, not a failure", () => {
+    const feed: OpenTodosFeed = { rows: [], total: 4, sectionTotals: { personal: 4, freelance: 0, academics: 0 } };
+    const t = today(okWindow([]), feed);
+    expect(t.due).toEqual({ kind: "empty" });
+    expect(t.heroTint).toBe(0);
+  });
+
+  it("a full page that IS the whole store is not capped", () => {
+    const feed = capped([], () => todo({ dueOn: "2026-09-12" }), OPEN_TODOS_CAP);
+    expect(today(okWindow([]), feed).heroTint).toBe(0);
+    expect(week(okWindow([]), feed).fails).toEqual([]);
   });
 });
 
