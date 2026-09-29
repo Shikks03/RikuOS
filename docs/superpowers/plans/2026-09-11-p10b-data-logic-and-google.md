@@ -964,3 +964,299 @@ Before handing this plan to Plan C, confirm each of the following is true of the
 - [ ] `PERSONAL_HERO_BUSY_AT` still does not exist; `heroTint` is still one field; Plan A's three exports in `personalView.ts` are unmoved.
 - [ ] `npm test` · `npx tsc --noEmit` · `npm run build` green; `npm run lint` at four errors and three warnings.
 - [ ] `git -C ../ShikksTracker status --porcelain` is empty.
+
+---
+
+## Post-build record (executed 2026-09-29)
+
+The verification lead ran these checks against the repo, not against earlier reports. Every figure below was produced in this session.
+
+**HEADs.** Plan start `8e17845` (`8e17845739aa0d598355587106cd268210209f93`). Build end `1e4bfb0` (`1e4bfb0a8a39ea99d218dc4d7954e5dcf6298ae6`), after the principal review's fix round. The checks below were first run at `0880d1d`, the build end before that round. Every figure here comes from the second run, at `1e4bfb0`. This record is the one commit after the build end. Plan C diffs against the build end.
+
+**Commits** (`git log --oneline 8e17845..HEAD`, oldest first, 32 commits):
+
+- `2116249` feat(p10b): APP_TZ, the expected push hour, and days.ts
+- `b101dca` feat(p10b): the Todo model - two indexes, two queries, no TTL
+- `617a948` feat(p10b): LastDigest - the fixed-id singleton the push tile quotes
+- `7f8111d` fix(p10b): dayStart rejects impossible dates; dueOn read in UTC
+- `da6dee1` feat(p10b): personalLayout.ts - the pure layout store, client-importable
+- `f7e3454` fix(p10b): formCapable decides from the row - span 4 at twelve, 2 at six
+- `bdb16ce` feat(p10b): OsSettings gains layers and personalLayout, typed and bounded
+- `af481f6` fix(p10b): the default layout is frozen; update validators named
+- `528c9c6` feat(p10b): the Google Calendar client - raw fetch, five calls, one taxonomy
+- `e0e9cf0` feat(p10b): the loopback OAuth bootstrap, and dev moves to 3001
+- `c0dcfad` fix(p10b): google client hardening - aborts stay timeouts, window checked once
+- `25bc2d4` feat(p10b): todos.ts - ordering and due chips, then the write-through
+- `1f56581` fix(p10b): the pin remembers only its id - calendarBehind replaces the stored day
+- `6134ce6` fix(p10b): todoStore - follow-up writes never lie, ambiguous claims re-read
+- `78b82ec` fix(p10b): a compensated pin unsets any late-landing claim
+- `35a2a5f` feat(p10b): personalView.ts - six view models, every state in the type
+- `edb902d` fix(p10b): section totals come from the store; ids repeat across days
+- `bd9459a` fix(p10b): a multi-day all-day event appears on every day it covers
+- `c7abe76` feat(p10b): the push's Today sentence, and the LastDigest the tile quotes
+- `5d64938` fix(p10b): +N more counts the store, not the page read; provisional strings marked
+- `2df40e2` fix(p10b): a skipped run is not a push; a capped read never says nothing due
+- `42da849` feat(p10b): three mutation doors - to-dos, one event, the settings patch
+- `61c329c` fix(p10b): Today fits its budget, reads run in parallel, a skip is a field
+- `eefadbf` fix(p10b): every new door answers in codes; boundary near-misses pinned
+- `3e1ce81` fix(p10b): the open feed's order is checked, not trusted
+- `54aaef7` fix(p10b): the pre-read shape check only answers what the parse answers first
+- `0880d1d` fix(p10b): the problems line has a budget too
+- `1448ba1` fix(p10b): an event row is keyed by day, calendar and id
+- `e01af55` fix(p10b): a failed layer is named by its id, joined to its name at render
+- `4647581` fix(p10b): the error sentences live where a client can import them
+- `3380fc1` refactor(p10b): one HH:MM, one event order, one due window, one title bound
+- `1e4bfb0` feat(p10b): the open-feed cap and the done week are rules, not guesses
+
+**Files changed** `8e17845..1e4bfb0`: 48 files, +8829 / −51.
+
+- **Config and scripts:** `.env.example`, `package.json`, `scripts/google-auth.mts` (new), `scripts/sync-indexes.mts` (adds `Todo` and `LastDigest` to `MODELS`).
+- **Routes:**
+  - New: `api/calendar/events`, `api/todos`, `api/todos/[id]`.
+  - Changed: `api/cron/morning`, `api/cron/chaser` (writes `skipped`), `api/settings`.
+- **Library:**
+  - New: `days`, `digestToday`, `eventOrder`, `google`, `lastDigest`, `personalErrors`, `personalLayout`, `personalWrites`, `todoStore`, `todos`.
+  - Changed: `constants`, `digest`, `jobs/runJob`, `osSettings`, `personalView`, `push`, `settings`.
+- **Models:**
+  - New: `Todo`, `LastDigest`.
+  - Changed: `AgentRun` (`skipped`), `OsSettings` (`layers`, `personalLayout`).
+- **Tests:**
+  - New: `days`, `eventOrder`, `google`, `lastDigest`, `layout`, `personalView`, `personalWrites`, `todoModel`, `todoStore`, `todos`.
+  - Extended: `digest`, `models`, `osSettings`, `push`, `runJob`, `settings`, `viewModelPurity`.
+- **Untouched:** no component, stylesheet or `(app)/` page changed.
+
+**Tests.** `npm test` passes 40 files, **977 tests**. Plan A's baseline was 539. At `0880d1d`, before the fix round, the count was 38 files and 953 tests.
+
+**Types and build.**
+
+- `npx tsc --noEmit` exits 0 with no output.
+- `npm run build` prints `✓ Compiled successfully in 1806ms`. The route table has `ƒ /api/todos`, `ƒ /api/todos/[id]` and `ƒ /api/calendar/events`, and has no `/api/google/*`.
+
+**Lint.** `npm run lint` exits 1 at the baseline: 4 errors and 3 warnings.
+
+- **The four errors** are `react-hooks/set-state-in-effect` at `login/page.tsx:23:9`, `settings/page.tsx:35:10`, `freelance/queue/page.tsx:69:10` and `freelance/queue/PushControls.tsx:24:7`. None moved, and none of those files changed.
+- **The three warnings** are at `models.test.ts:43:22`, `queue.test.ts:258:27` and `db.ts:20:3`.
+  - The first moved from line 42 to 43. The reason is one added import line (`PERSONAL_LAYOUT_DEFAULT`) above it, and the warning is the same.
+
+**Invariant greps (step 2).** Each is listed with its result. Where the plan's form is wrong, the corrected form ran as well.
+
+- `git -C ../ShikksTracker status --porcelain` printed nothing.
+- `git grep -n 'ST_API'` over `todos.ts todoStore.ts google.ts personalView.ts days.ts personalLayout.ts personalErrors.ts eventOrder.ts` exits 1.
+- `git diff --stat 8e17845..HEAD -- package-lock.json next.config.ts src/proxy.ts` printed nothing.
+  - `package.json` changed as expected, and nowhere else:
+    - `dev` is now `next dev -p 3001`.
+    - `google:auth` was added.
+- `git diff --name-only 8e17845..HEAD -- src/styles/ "src/app/(app)/"` printed nothing.
+- `git grep -n '"use client"' -- src/lib/ src/app/api/` exits 1.
+- **Purity greps.**
+  - The `personalLayout.ts` grep (`@/models|server-only|next/headers|process.env|fetch(`) exits 1.
+  - The `personalView.ts days.ts` grep (`@/models|fetch(|process.env|Date.now(`) exits 1.
+  - The same grep over `todos.ts`, `eventOrder.ts`, `personalErrors.ts` and `constants.ts` has one hit, `todos.ts:20: import type { TodoSection } from "@/models/Todo"`. It is a type-only import, erased at compile, so there is no runtime model import.
+  - **No runtime imports in the three client-safe modules.** `git grep -nE '^\s*import|require\(|from "' -- src/lib/personalErrors.ts src/lib/eventOrder.ts src/lib/constants.ts` has one hit, `personalErrors.ts:17: export type { CalendarOutcome } from "@/lib/todoStore"`. It is a type-only re-export, erased at compile. `eventOrder.ts` and `constants.ts` import nothing.
+- **`Schema.Types.Mixed`.**
+  - The plan's form exits 0 on two comments that forbid it: `ApprovalItem.ts:79` ("never Schema.Types.Mixed") and `HealthSnapshot.ts:60` ("No Schema.Types.Mixed").
+  - The corrected form, `git grep -nE ':\s*Schema\.Types\.Mixed' -- src/models/`, exits 1.
+- **`type: String`.** The plan's `git grep … -A 1 -- …` fails with `fatal: unable to resolve revision: -A`, because the option has to come before the pattern. The corrected form is `git grep -n -A 1 -E 'type: String' -- src/models/Todo.ts src/models/LastDigest.ts`. Each hit has a bound:
+  - `Todo.title` `maxlength: TODO_TITLE_MAX` (140, in `constants.ts`)
+  - `Todo.section` `enum: TODO_SECTIONS`
+  - `Todo.calendarId` `maxlength: 256`
+  - `Todo.calendarEventId` `maxlength: 1024`
+  - `LastDigest._id` `enum: [LAST_DIGEST_ID], maxlength: 16`
+  - `LastDigest.title` `maxlength: 80`
+  - `LastDigest.body` `maxlength: 320`
+- **Secrets.**
+  - The plan's grep hits seven fixture lines in `src/lib/__tests__/google.test.ts`. With that file excluded too, it exits 1.
+  - A wider grep across `src/ scripts/ .env.example` finds the three variable names in:
+    - `google.ts` (the one reader)
+    - `scripts/google-auth.mts` (the bootstrap, which reads ID and secret)
+    - `.env.example` (names and comments only)
+    - the test fixtures
+  - `google-auth.mts:151` prints the refresh token once, by design, as its output to Riku.
+  - `git grep -n 'console\.\(log\|error\|warn\)' -- src/lib/google.ts` exits 1, so google.ts has no log line at all.
+- **The cut things.**
+  - The plan's `ALLOW_OAUTH_BOOTSTRAP|api/google/status|api/google/calendars` over the whole repo hits the specs, the design rounds and the plans themselves.
+  - Restricted to `src/ scripts/ .env.example package.json`, it has one hit: `scripts/google-auth.mts:4`, a comment saying the script *replaces* those routes (R36). There is no code hit.
+- **`section: 1` in `Todo.ts`.** The plan's grep has one hit, `Todo.ts:68`, a comment saying the third index "was CUT (R35 / R86 §I item 3)". The schema declares exactly two indexes, `{ done: 1, dueOn: 1 }` (line 98) and `{ done: 1, doneAt: -1 }` (line 99), and no `expires`.
+- **`d late`.**
+  - The plan's form hits `agentStatus.test.ts:136` ("one millisecond later").
+  - The corrected form, `git grep -nE '[0-9]d late' -- src/`, exits 1.
+  - `dueChip` emits only the long forms `N days late` and `1 day late`.
+- **`PERSONAL_HERO_BUSY_AT`** survives only in two "is deleted" comments: `personalView.ts:19` and `heroTint.test.ts:7`. There is no code identifier.
+
+**The three doors, live (step 3).**
+
+- **Setup.**
+  - A production build of `1e4bfb0` served by `npx next start -p 3011`. **Not 3001:** that port was held by PID 70136, another project's Next server (`templates/A3_Lite_Template_1`), which was left alone. 3002 was also taken, by PID 12372.
+  - The same requests gave the same results at `0880d1d`.
+  - Port 3000 was not touched.
+  - The session cookie was minted in-process with `createSessionToken`, using SESSION_SECRET from `.env.local`. Neither the secret nor the token was printed.
+  - The server was stopped by its own PID (74504; 34052 in the first run), and the scratch scripts were deleted.
+
+| request | observed |
+|---|---|
+| POST /api/todos, no cookie | **401** `{"error":"Unauthorized"}` |
+| POST /api/todos, cookie + `Origin: https://evil.example` | **403** `{"error":"Cross-origin request rejected"}` |
+| PATCH /api/todos/:id, no cookie / foreign Origin | **401** / **403** (same bodies) |
+| DELETE /api/todos/:id, no cookie / foreign Origin | **401** / **403** |
+| POST /api/calendar/events, no cookie / foreign Origin | **401** / **403** |
+| PATCH /api/settings, no cookie / foreign Origin | **401** / **403** |
+| POST /api/todos, 141-char title | **400** `{"error":"title-too-long"}` |
+| PATCH /api/todos/:id, `{done:true,title:"x"}` | **400** `{"error":"mixed-patch"}` |
+| POST /api/todos, bad JSON | **400** `{"error":"bad-json"}` |
+| PATCH /api/todos/:id, bad JSON | **400** `{"error":"bad-json"}` |
+| POST /api/calendar/events, bad JSON | **400** `{"error":"bad-json"}` |
+| POST /api/calendar/events, `title:""` | **400** `{"error":"no-title"}` (before the layers read) |
+| POST /api/calendar/events, `calendarId: 5` | **400** `{"error":"bad-calendar"}` |
+| POST /api/calendar/events, 201-char title | **400** `{"error":"title-too-long"}` |
+| PATCH /api/settings, bad JSON | **400** `{"error":"Invalid JSON body."}`. This is the settings door's existing sentence, with no `code`, per ruling 16. |
+| PATCH /api/settings, a span of 13 | **400** `{"error":"Tile \"today\" must span a whole number of columns from 2 to 12."}`, which is validateLayout's own typed message |
+| PATCH /api/settings, a valid `personalLayout` | **500** `{"error":"Could not save.","code":"save-failed"}`. The write could not reach Mongo. |
+
+**Mongo is still unreachable from this machine.** `dns.resolveSrv` on the Atlas host answers `EREFUSED`. **Still unobserved for lack of a DB:**
+
+- `POST /api/todos` 200/201.
+- A `calendarId` outside `layers` → 400, and a switched-off layer → `layer-off`.
+- `PATCH /api/todos/:id` toggling `done` twice, where the second is not an error.
+- `DELETE` → 200, and 404 on an unknown id.
+- `PATCH /api/settings` with a valid layout → 200.
+- The event door's Google outcomes (201 / 503 / 502 / 504).
+
+**Steps 4–6 were not run.** They need Riku's Google setup and the database: no `migrate:indexes`, no `google:auth`, no real Google read, no cron route and no push.
+
+**Step 5 item 3 is wrong in the plan text.** `readCalendarWindow` cannot return `gone`, because its `CalendarWindow` union's reasons are only `none-enabled | not-configured | expired | timeout`. A vanished layer appears by its **calendarId** in `failed[]` on an `ok: true` window (google.ts:650–653, 697, 707). `listEvents` on that calendar throws `GoogleError("gone")` on a 404 or 410 (google.ts:373). Step 5 should check that shape instead.
+
+**Step 7: what this plan deliberately did not ship.** This was confirmed against the repo.
+
+- There is no component, island, tile, edit mode, form or Settings card: nothing under `src/app/(app)/` or `src/styles/` changed.
+- There is no `ARCHITECTURE.md` edit.
+- There is no `GET /api/google/calendars` (cut, Task 6), no `/api/google/status`, no OAuth route and no `ALLOW_OAUTH_BOOTSTRAP` (R24, R36).
+- There is no third `Todo` index (R35).
+- No index was created. That step is Riku's.
+
+**Self-review, checked against the repo.**
+
+- [x] `days.ts`, `todos.ts` (the pure half), `personalLayout.ts`, `personalView.ts`, `eventOrder.ts`, `personalErrors.ts` and `constants.ts` are pure. `todos.ts`'s one model reference is `import type`, and `personalErrors.ts`'s one reference to another module is `export type`.
+- [x] `personalLayout.ts` imports no model, no `server-only` and no `next/headers`.
+- [x] `Todo` has two indexes and no TTL, and every `String` is bounded. `section` is an enum, and there is no `Mixed`. The two sub-schemas (`OsSettings`'s `LayerSchema` and `LayoutEntrySchema`) take `_id: false`.
+- [x] `LastDigest` has a fixed `_id`. It is written by `findOneAndUpdate` with `upsert` and one E11000 retry (lastDigest.ts:83–92), and its read accessor returns `null` when absent.
+- [x] `readOsSettings` never upserts and copies the two array defaults on every read. Stored arrays are fresh per `.lean()` query, and the stored layout is returned unresolved.
+- [x] The three Google secrets are read only in `google.ts` (bootstrap aside), and google.ts has no log line.
+- [x] Every new mutation route calls `requireSession` first, which also checks `Origin` on mutations. `calendarId` must be a stored, enabled layer (`layer-off` otherwise).
+- [x] The pin is Google-first with a guarded claim and a compensating delete. The other paths are local-first. `unknown` maps to `calendar-unknown`, `Couldn't tell if that saved.`, and is never asserted as failure.
+- [x] The LastDigest write comes after the `sent === 0` guard, is wrapped, and stores the **payload** (the sliced body).
+- [x] `PERSONAL_HERO_BUSY_AT` has no code identifier, and `heroTint` is one field. Plan A's three exports (`HeroTint`, `PERSONAL_HERO_ANCHORS`, `heroTint`) are unchanged: the only removed lines in personalView.ts are two lines of the module docblock.
+- [x] The trio is green, and lint is at 4 errors and 3 warnings.
+- [x] `git -C ../ShikksTracker status --porcelain` is empty.
+
+**Deviations and lead rulings during execution.** Items 1–14 were checked against the code at `0880d1d`, then re-read at `1e4bfb0` where the fix round touched them. Items 15 and 16 were checked at `1e4bfb0`.
+
+1. **`lastDigest.test.ts` was added.** The plan had no test step for Task 3. The file is present, with 128 lines.
+2. **`formatDay` uses en-US parts,** because en-GB's ICU prints "Sept". This is confirmed at days.ts:85: the parts are reassembled as `weekday day month`.
+3. **`dayStart` rejects impossible dates** with a read-back check (`2026-02-31` throws). `isDayKey` was added as the non-throwing route check (days.ts:46–66).
+4. **Lead ruling: `formCapable(rowSpans, index)`,** correcting the plan's `span >= 3`.
+   - A tile is capable if its span is at least 4 at twelve columns **and** its collapsed span is at least 2 at six (personalLayout.ts:194).
+   - Span 3 is 194.5px at an 820px grid, and a trimmed tile can be one column (106px): `[3,3,4,2]` collapses to `[2,2,1,1]`.
+   - **Plan C must call it with the whole row.**
+5. **The layout store.**
+   - `PERSONAL_LAYOUT_DEFAULT` is frozen at all three depths.
+   - `resolveLayoutAgainst<T>` was exported for the P11 clause.
+   - Leftover cells clamp to `pe-s0…pe-s10` and `pe-x0…pe-x5`.
+   - `[3,3,5]` is 11 of 12 and ceils to 7, the pre-trim sum, so it is trimmed once to `[2,2,2]`. `[3,3,3,3]` is the case trimmed twice, to `[2,2,1,1]` (layout.test.ts:145–153).
+6. **`Layer` lives in the `OsSettings` model** and is re-exported from `lib/osSettings`.
+   - `readOsSettings` returns the stored layout unresolved. Plan C calls `resolvePersonalLayout` for `fellBack`.
+   - The update validators enforce per-entry bounds: the tile enum, span 2–12, four rows, and ≤ 10 layers. The cross-entry rules are enforced only by `validateLayout`, through `parseSettingsPatch`.
+7. **`GET /api/google/calendars` is cut,** by the plan's own ruling.
+   - google.ts shares one `AbortSignal.timeout` across a layer's pages (`readPages`).
+   - 404 and 410 map to `gone`.
+   - A token failure of kind `http` gives `ok: true` with every enabled layer in `failed`.
+   - A multi-day all-day event is expanded onto each covered day, clipped to the window, so the same event id repeats across days. The key is now `${dayKey}:${calendarId}:${id}` (item 15).
+   - A timed event crossing midnight stays on its start day. This is a known limit and is documented at `windowBounds`.
+8. **The to-dos split into a pure `todos.ts` and an impure `todoStore.ts`** (R52 purity).
+   - **`Todo.calendarBehind`** (a Boolean holding sync state) replaces a proposed stored day. Per S19 the to-do keeps only the entry's id.
+   - todoStore.ts's header carries the write classification table (failed vs unknown).
+   - An unknown pin insert is not compensated and writes no id.
+   - Delete is local-first, and anything short of removal reports `orphaned`.
+   - A claim is re-read on an ambiguous throw.
+   - A done to-do cannot be pinned (`done-cannot-pin`).
+   - `dueChip` gives the weekday form for +2…+7 and `24 Sep` from +8. It returns only the long lateness forms. **`3d late` is Plan C's component-only rendering** (R96, ratified by Riku).
+9. **personalView.**
+   - `TodoTileView` was narrowed to two variants (ratified). `dayShape()` was added.
+   - The due order is due today, then overdue.
+   - The open feed carries `sectionTotals`. It is ordered by `dueOn` ascending, with undated to-dos last by `createdAt` ascending, and the order is checked.
+   - A cap that could cut inside today+7 gives `Couldn't load to-dos.`
+   - A skipped run counts as no run.
+   - The red dot shows from 07:00 Manila inclusive (`>= PUSH_EXPECTED_HOUR`).
+   - The vanished-layer sentence needs `listCalendars()` passed in (`calendars`, where `null` means nothing is called vanished).
+10. **Routes.**
+    - A PATCH body of exactly `{done}` is the tick, any other body is an edit, and mixing them gives `mixed-patch`.
+    - A switched-off layer gives `layer-off`.
+    - The new doors answer in codes. `ERROR_SENTENCES` is frozen and now lives in `personalErrors.ts` (item 15). `personalWrites.ts` re-exports it.
+    - The event door's Google outcomes are 503 (not configured or expired), 502 (refused or gone) and 504 (`calendar-unknown`).
+    - The settings PATCH keeps `Could not save.` and adds `code: "save-failed"` **on its 500 only**. Its 400s carry the sentence with no `code`, as observed above. This is ruling 16.
+11. **Push.**
+    - The problems line and the Today sentence are both budgeted, so the freelance line survives 320.
+    - The morning route runs `fetchAttention` and `readDigestToday` in parallel.
+    - `+N more` counts the store.
+    - **`AgentRun.skipped`** was added (not required, not indexed). `runJob` writes `ok && note !== undefined`, and the chaser's disabled path writes `true`.
+    - The layers come from the route's existing `getOsSettings()` read. The route's comment "(never getOsSettings for this)" means *no second* read, and reads oddly beside it.
+12. **Provisional strings awaiting Riku** (`git grep -n "PROVISIONAL (P10b)"`, all in `src/lib/digest.ts`):
+    - `:76`: the problems line's overflow, `+${dropped} more`
+    - `:140`: `calendar check incomplete`
+    - `:226`: the comma before `+N more` in a names list, `A, B, +N more`
+    - `:235`: the plural forms, `A, B and N more` / `A, B and C`
+    - `:240`: `${named} weren't read.`
+    - `:301`: the miss alone, `Today: ${missed}` (for example `Today: Classes wasn't read.`)
+13. **Carry-forwards for Plan C.**
+    - Call `formCapable` with the row.
+    - Use `sectionTotals` and the ordered open feed.
+    - Pass `listCalendars()` into the Personal page's view for R42.
+    - Take `skipped` from `run.skipped`, falling back to `ok && error` for old rows. The loader must project `skipped` and `error` itself, because watchdog's `fetchLatestRuns` selects neither.
+    - Event rows carry `calendarId`. Key them `${dayKey}:${calendarId}:${id}`. To-do rows use `TODO_ITEM_CALENDAR_ID` (`""`).
+    - `CalendarWindow.failed` holds calendarIds. Join them to layer names at render. An id that matches no layer reads as unreadable, never as all clear.
+    - Use `OPEN_TODOS_CAP` (200) for the open-feed read, and treat the feed as capped only when `rows.length === OPEN_TODOS_CAP && rows.length < total`.
+    - Use `doneWindowStart(today)` for Done this week, with the instant from `windowBounds(doneWindowStart(today), today).timeMin`.
+    - An empty `href` means no anchor.
+    - Map codes through `ERROR_SENTENCES`, imported from `personalErrors.ts` (no runtime imports, so a client component can use it).
+    - Set `--tracks` inline on `.pe-grid`, where `--tb` is declared (personal.css:56–60, read at :72, overridden at :93).
+14. **Slips in the plan text.**
+    - The greps corrected above: `Mixed`, `-A` order, `d late`, the secrets fixtures, the cut-routes scope, `section: 1`, and `PERSONAL_HERO_BUSY_AT`.
+    - `<plan-A-final-HEAD>` is `8e17845`.
+    - Step 5 item 3 is wrong (see above).
+    - Task 4's line 428 says `parseSettingsPatch` is "(Task 8)", but Task 8 is `todos.ts`.
+    - `.env.example` lines 18–20 are an orphan comment block after `CRON_SECRET`, left from the Messenger removal ("Deliberately NOT the same value as CRON_SECRET…"), with no variable under it.
+15. **The principal review's cross-module fixes** (`1448ba1`…`1e4bfb0`), checked against the code:
+    - **Event keys.** Event rows are keyed `${dayKey}:${calendarId}:${id}` (google.ts:48, personalView.ts:131 and :167). To-dos carry `TODO_ITEM_CALENDAR_ID = ""` (personalView.ts:423).
+    - **Failed layers.** `CalendarWindow.failed` is calendarIds (google.ts:697), joined to names at render.
+      - On the page, an id that matches no layer reads as unreadable, never as all clear. The page shows the events that did arrive, plus `Couldn't read the calendar.` (personalView.ts:500–507).
+      - In the push, `calendarForDigest` returns `events: "unavailable"` when a failed id matches no enabled layer, or when every enabled layer failed (digest.ts:353–361).
+    - **`ERROR_SENTENCES`** lives in `personalErrors.ts`, which imports nothing at runtime.
+    - **Shared helpers.**
+      - There is one `clockHHMM` (days.ts:102).
+      - There is one `compareEvents` (eventOrder.ts:21). google.ts sorts through it, and personalView re-sorts through it (personalView.ts:480).
+      - `digestWindow` is used by `digestToday.ts:57` and `digest.ts:399`.
+    - **`TODO_TITLE_MAX`** moved to `constants.ts:47` and is used by the `Todo` model. The reason: `todos.ts` imports `days` at runtime, and that import broke the alias-free model load in `sync-indexes`.
+    - **`OPEN_TODOS_CAP = 200`** (personalView.ts:393). The feed is capped iff `rows.length === OPEN_TODOS_CAP && rows.length < total` (:549).
+    - **Done window.** `doneWindowStart(today) = today − 6` (todos.ts:109, `DONE_WINDOW_DAYS − 1`), per deck §6 Tile 6, "last seven days". The loader uses `windowBounds(start, today).timeMin`.
+16. **Lead ruling: the settings PATCH 400s keep their existing sentence bodies,** because the Settings page displays them. Only the door's new 500 carries `code`.
+
+**What remains: Riku's hands, in order.**
+
+1. **Google Cloud** (ShikksTracker's project):
+   - Enable the Calendar API.
+   - Create a second OAuth client (Web application) with the one redirect `http://localhost:8787/callback`.
+   - Add the scopes `calendar.events` and `calendar.readonly`.
+   - Set Publishing status to **In production**.
+2. **`.env.local`:** add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then run `npm run google:auth` and copy the refresh token it prints once.
+3. **Vercel:** add the three `GOOGLE_*` variables, then redeploy.
+4. **Indexes:** run `npm run migrate:indexes` and read the dry run, then run `npm run migrate:indexes:apply`.
+   - It should create Todo's two indexes only.
+   - AgentRun, OsSettings and LastDigest should show no index change. **Confirm this from the dry run.**
+5. **Step 3's DB-dependent statuses,** as listed above.
+6. **Step 5:** one real Google read. Check the calendar count, `none-enabled` with no HTTP, a vanished layer in `failed[]`, the week `ok`, and no secret in the output.
+7. **Step 6:** one real push.
+   - The Today sentence is second.
+   - The body is ≤ 320 characters with the freelance line last.
+   - LastDigest is stored with the sliced body and the real `sentAt`.
+   - The `dispatcher` run is `ok` with no `itemsFailed`.
+
+**Master is 64 commits ahead of `origin/master`, unpushed** (at `1e4bfb0`, before this record; 65 with it).
