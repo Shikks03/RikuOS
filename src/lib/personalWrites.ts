@@ -20,7 +20,8 @@
  *   - A to-do write that threw (Mongo, on the to-do's own write) is 500
  *     `save-failed` / `delete-failed` — nothing was written. Codes too (lead
  *     ruling, 2026-09-26): EVERY error body on these doors is a code, and the
- *     two that have a deck sentence map through ERROR_SENTENCES below.
+ *     two that have a deck sentence map through ERROR_SENTENCES
+ *     (personalErrors.ts, client-safe; re-exported below).
  *   - The event door has no local write, so its Google failure IS the
  *     request's failure: 503 when Google is not connected or its access has
  *     expired (the app's own configuration), 502 when Google refused, and 504
@@ -55,25 +56,11 @@ export const SAVE_FAILED: Reply = reply(500, { error: "save-failed" });
 export const DELETE_FAILED: Reply = reply(500, { error: "delete-failed" });
 
 /**
- * The error codes these doors answer that have a sentence of their own,
- * verbatim, so Plan C's client maps rather than re-types them. Sources:
- *   save-failed, delete-failed, calendar-unknown — visual design §4.9 (R21's
- *     press outcomes; deck §15 for `Couldn't tell if that saved.`, a Google
- *     write that may have landed);
- *   no-title, end-before-start — content doc §7 (deck §7), both forms'
- *     validation lines;
- *   needs-due — content doc §7, the note under `Put on calendar`.
- * Every other code is one the forms cannot produce and reads as a plain
- * failure. Frozen: a shared table must not become one caller's scratch.
+ * The error codes with a sentence of their own. The table lives in
+ * personalErrors.ts, which has no runtime import, so Plan C's client imports
+ * it from there; it is re-exported here so the server side has one name.
  */
-export const ERROR_SENTENCES = Object.freeze({
-  "save-failed": "Couldn't save.",
-  "delete-failed": "Couldn't delete.",
-  "calendar-unknown": "Couldn't tell if that saved.",
-  "no-title": "Give it a title.",
-  "end-before-start": "End must be after start.",
-  "needs-due": "Needs a due date.",
-} as const);
+export { ERROR_SENTENCES, type ErrorSentenceCode } from "@/lib/personalErrors";
 
 const NOT_FOUND: Reply = reply(404, { error: "not-found" });
 

@@ -18,6 +18,7 @@ import {
   parseTodoPatch,
   updateReply,
 } from "@/lib/personalWrites";
+import { ERROR_SENTENCES as CLIENT_ERROR_SENTENCES } from "@/lib/personalErrors";
 
 const LAYERS: Layer[] = [
   { calendarId: "primary", name: "Riku", enabled: true },
@@ -97,6 +98,10 @@ describe("ERROR_SENTENCES", () => {
     expect(ERROR_SENTENCES[eventFailedReply(new Error("x")).body.error as "calendar-unknown"]).toBe(
       "Couldn't tell if that saved.",
     );
+  });
+
+  it("is the one client-safe table personalErrors.ts holds, re-exported", () => {
+    expect(ERROR_SENTENCES).toBe(CLIENT_ERROR_SENTENCES);
   });
 
   it("is frozen", () => {

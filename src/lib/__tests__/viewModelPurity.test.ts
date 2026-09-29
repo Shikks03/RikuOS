@@ -13,6 +13,8 @@
  */
 import { describe, it, expect } from "vitest";
 import mongoose from "mongoose";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // Imported for their side effects — the module graph IS the subject here.
 import "@/lib/format";
@@ -25,9 +27,23 @@ import "@/lib/todos";
 // P10b Task 9: the six Personal view models (type-only imports of google.ts,
 // lastDigest.ts, osSettings.ts and the Todo model must stay type-only).
 import "@/lib/personalView";
+// P10b integration: the layout's pure half (OsSettings imports it relatively)
+// and the client-safe error sentences.
+import "@/lib/personalLayout";
+import "@/lib/personalErrors";
 
 describe("view-model purity", () => {
   it("registers no Mongoose model when the view models load", () => {
     expect(mongoose.modelNames()).toEqual([]);
+  });
+
+  it("personalErrors.ts has no runtime import, so a client component can load it", () => {
+    const source = readFileSync(join(process.cwd(), "src/lib/personalErrors.ts"), "utf8");
+    const imports = source.split(/\r?\n/).filter((line) => /^\s*(import|export)\b.*\bfrom\b/.test(line));
+    expect(imports.length).toBeGreaterThan(0);
+    for (const line of imports) expect(line).toMatch(/^\s*(import|export) type\b/);
+    // A bare side-effect import (`import "x";`) has no `from`; refuse it too.
+    expect(source).not.toMatch(/^\s*import\s+["']/m);
+    expect(source).not.toMatch(/\brequire\(|\bimport\(/);
   });
 });
