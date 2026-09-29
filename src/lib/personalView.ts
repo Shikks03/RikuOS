@@ -247,9 +247,11 @@ export interface OpenTodoInput {
  * "unavailable" is a read that did not answer — never an empty list.
  *
  * ORDER IS PART OF THE CONTRACT: `rows` are ordered by dueOn ascending, with
- * UNDATED ROWS LAST. (Mongo's ascending sort puts missing dueOn FIRST, so the
- * loader must order them itself — dated rows by dueOn, then the undated.)
- * That order is what lets a capped read be judged: see readTodosForWindow.
+ * UNDATED ROWS LAST, and the undated rows by createdAt ascending (oldest
+ * first) — sortTodos's order for the undated. (Mongo's ascending sort puts
+ * missing dueOn FIRST, so the loader must order them itself.) That order is
+ * what lets a capped read be judged, and it is CHECKED, not trusted: a feed
+ * whose dueOn order is broken reads as unavailable (readTodosForWindow).
  */
 export type OpenTodosFeed =
   | { rows: readonly OpenTodoInput[]; total: number; sectionTotals: Readonly<Record<TodoSection, number>> }
@@ -502,11 +504,32 @@ function formCapableFor(layout: ReadonlyPersonalLayout, tile: PersonalTile): boo
  * The To-do tile does not use this: its bounds count from `sectionTotals`.
  */
 function readTodosForWindow(feed: OpenTodosFeed, today: DayKey): OpenTodosFeed {
-  if (feed === "unavailable" || feed.rows.length >= feed.total) return feed;
+  if (feed === "unavailable") return feed;
+  // The order is checked, not trusted: a feed out of contract order (Mongo's
+  // default puts the undated FIRST) cannot have its cap judged, and even
+  // uncapped it signals a loader that is not the one this contract describes.
+  if (!inWindowOrder(feed.rows)) return "unavailable";
+  if (feed.rows.length >= feed.total) return feed;
   const last = feed.rows[feed.rows.length - 1];
   if (last === undefined) return "unavailable";
   if (last.dueOn !== null && last.dueOn <= addDays(today, 7)) return "unavailable";
   return feed;
+}
+
+/**
+ * The part of the contracted order the window judgement relies on: dated rows
+ * by dueOn ascending, every undated row after every dated one. The undated
+ * rows' createdAt order is not checked — it cannot move the cut across
+ * today+7, and sortTodos re-sorts each group anyway.
+ */
+function inWindowOrder(rows: readonly OpenTodoInput[]): boolean {
+  for (let i = 1; i < rows.length; i++) {
+    const prev = rows[i - 1].dueOn;
+    const cur = rows[i].dueOn;
+    if (prev === null && cur !== null) return false;
+    if (prev !== null && cur !== null && cur < prev) return false;
+  }
+  return true;
 }
 
 // ---- 1. Today ---------------------------------------------------------------

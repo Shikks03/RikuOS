@@ -67,8 +67,24 @@ function todo(over: Partial<OpenTodoInput> = {}): OpenTodoInput {
   };
 }
 
+/**
+ * The loader's order (the OpenTodosFeed contract): dated by dueOn ascending,
+ * then undated by createdAt ascending. Fixtures are written in any order and
+ * passed through this, as the real loader's rows would be.
+ */
+function contractOrder(rows: OpenTodoInput[]): OpenTodoInput[] {
+  return [...rows].sort((a, b) => {
+    if (a.dueOn !== null && b.dueOn !== null && a.dueOn !== b.dueOn) return a.dueOn < b.dueOn ? -1 : 1;
+    if (a.dueOn === null && b.dueOn !== null) return 1;
+    if (a.dueOn !== null && b.dueOn === null) return -1;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
+}
+
 /** A complete read: every count agrees with the rows. */
-const open = (rows: OpenTodoInput[]): OpenTodosFeed => ({
+const open = (unordered: OpenTodoInput[]): OpenTodosFeed => {
+  const rows = contractOrder(unordered);
+  return {
   rows,
   total: rows.length,
   sectionTotals: {
@@ -76,7 +92,8 @@ const open = (rows: OpenTodoInput[]): OpenTodosFeed => ({
     freelance: rows.filter((r) => r.section === "freelance").length,
     academics: rows.filter((r) => r.section === "academics").length,
   },
-});
+  };
+};
 const okWindow = (events: CalendarEvent[], failed: string[] = []): CalendarFeed => ({
   layers: LAYERS,
   window: { ok: true, events, failed },
@@ -739,6 +756,45 @@ describe("a capped open read never says nothing due", () => {
     const v = buildTodoTileView({ now: NOW, todos: feed });
     expect(v.count).toBe(9);
     expect(v.sections![0].bound).toBe("Showing 1 of 9.");
+  });
+
+  it("zero rows with a store total above zero reads as Couldn't load to-dos.", () => {
+    const feed = capped([], 4);
+    const t = today(okWindow([]), feed);
+    expect(t.due).toEqual({ kind: "fail", line: { text: "Couldn't load to-dos.", dot: "stale" } });
+    expect(t.heroTint).toBeNull();
+    const w = week(okWindow([]), feed);
+    expect(w.fails).toEqual([{ text: "Couldn't load to-dos.", dot: "stale" }]);
+  });
+});
+
+describe("the open feed's order is checked, not trusted", () => {
+  const feedOf = (rows: OpenTodoInput[]): OpenTodosFeed => ({
+    rows,
+    total: rows.length,
+    sectionTotals: { personal: rows.length, freelance: 0, academics: 0 },
+  });
+
+  it("Mongo's default order (undated first) reads as unreadable, even uncapped", () => {
+    const feed = feedOf([todo({ dueOn: null }), todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-12" })]);
+    const t = today(okWindow([]), feed);
+    expect(t.due).toEqual({ kind: "fail", line: { text: "Couldn't load to-dos.", dot: "stale" } });
+    expect(t.heroTint).toBeNull();
+    const w = week(okWindow([]), feed);
+    expect(w.fails).toEqual([{ text: "Couldn't load to-dos.", dot: "stale" }]);
+    expect(w.days!.some((d) => dayShape(d).kind === "dash")).toBe(false);
+  });
+
+  it("dated rows out of dueOn order read as unreadable", () => {
+    const feed = feedOf([todo({ dueOn: "2026-09-12" }), todo({ dueOn: TODAY })]);
+    expect(today(okWindow([]), feed).heroTint).toBeNull();
+  });
+
+  it("the contracted order renders normally", () => {
+    const feed = feedOf([todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-12" }), todo({ dueOn: null })]);
+    const t = today(okWindow([]), feed);
+    expect(t.heroTint).toBe(1);
+    expect(t.due.kind).toBe("rows");
   });
 });
 
