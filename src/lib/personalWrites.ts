@@ -139,19 +139,22 @@ export type EventInputError =
   | "end-before-start";
 
 /**
- * The cheap shape check the event route runs BEFORE reading the layers, so a
- * garbage body is a 400 without a Mongo read. It only asks the four required
- * fields' types; parseEventInput then does the full validation in §7.6's order
- * (and re-derives every code, so this check can never change which one wins
- * for a body that passes it).
+ * The cheap check the event route runs BEFORE reading the layers, so a
+ * garbage body is a 400 without a Mongo read. It answers ONLY what
+ * parseEventInput would answer before its layer lookup — `not-object`, the
+ * title's two codes, and `bad-calendar` for a calendarId that is not even a
+ * string — and otherwise returns null and lets the full parse (after the
+ * layers read) decide the day, allDay and the times. Answering anything that
+ * comes later in §7.6's order could pre-empt an earlier code for a body with
+ * several faults; the sweep test in personalWrites.test.ts pins that it never
+ * does.
  */
 export function eventShapeError(body: unknown): EventInputError | null {
   if (typeof body !== "object" || body === null || Array.isArray(body)) return "not-object";
   const b = body as Record<string, unknown>;
-  if (typeof b.title !== "string") return "no-title";
+  if (typeof b.title !== "string" || b.title.trim() === "") return "no-title";
+  if (b.title.trim().length > EVENT_TITLE_MAX) return "title-too-long";
   if (typeof b.calendarId !== "string") return "bad-calendar";
-  if (typeof b.dayKey !== "string") return "bad-day";
-  if (typeof b.allDay !== "boolean") return "bad-all-day";
   return null;
 }
 

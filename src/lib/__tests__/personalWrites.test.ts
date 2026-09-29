@@ -277,22 +277,49 @@ describe("event replies", () => {
 describe("eventShapeError — the check before the layers read", () => {
   const good = { title: "Dentist", calendarId: "primary", dayKey: "2026-09-28", allDay: true };
 
-  it("passes a well-typed body (content is parseEventInput's job)", () => {
+  it("passes a body whose remaining faults only the full parse can place", () => {
     expect(eventShapeError(good)).toBeNull();
-    expect(eventShapeError({ ...good, title: "", calendarId: "not-a-layer", dayKey: "nope" })).toBeNull();
+    expect(eventShapeError({ ...good, calendarId: "not-a-layer" })).toBeNull();
+    expect(eventShapeError({ ...good, dayKey: 5, allDay: "x" })).toBeNull();
   });
 
-  it("refuses garbage with the same code the full check would give first", () => {
+  it("answers the codes that come before the layer lookup", () => {
     expect(eventShapeError(null)).toBe("not-object");
     expect(eventShapeError([good])).toBe("not-object");
     expect(eventShapeError({ ...good, title: 3 })).toBe("no-title");
+    expect(eventShapeError({ ...good, title: "  " })).toBe("no-title");
+    expect(eventShapeError({ ...good, title: "x".repeat(EVENT_TITLE_MAX + 1) })).toBe("title-too-long");
     expect(eventShapeError({ ...good, calendarId: null })).toBe("bad-calendar");
-    expect(eventShapeError({ ...good, dayKey: 20260928 })).toBe("bad-day");
-    expect(eventShapeError({ ...good, allDay: "true" })).toBe("bad-all-day");
-    for (const b of [null, { ...good, title: 3 }, { ...good, calendarId: null }, { ...good, dayKey: 1 }]) {
-      const full = parseEventInput(b, LAYERS);
-      expect(full.ok).toBe(false);
-      if (!full.ok) expect(eventShapeError(b)).toBe(full.error);
-    }
+  });
+
+  it("a multi-fault body keeps the full parse's first code: empty title beats a bad calendarId", () => {
+    expect(eventShapeError({ title: "", calendarId: 5 })).toBe("no-title");
+  });
+
+  it("SWEEP: whenever it answers, it answers exactly what parseEventInput answers", () => {
+    const MISSING = Symbol("missing");
+    const titles = ["Dentist", "", "x".repeat(EVENT_TITLE_MAX + 1), 5];
+    const calendarIds = ["primary", "not-a-layer", 5];
+    const dayKeys = ["2026-09-28", "2026-13-99", 5];
+    const allDays: unknown[] = [true, "x", MISSING];
+    let answered = 0;
+    let combos = 0;
+    for (const title of titles)
+      for (const calendarId of calendarIds)
+        for (const dayKey of dayKeys)
+          for (const allDay of allDays) {
+            const body: Record<string, unknown> = { title, calendarId, dayKey };
+            if (allDay !== MISSING) body.allDay = allDay;
+            combos++;
+            const shape = eventShapeError(body);
+            const full = parseEventInput(body, LAYERS);
+            if (shape !== null) {
+              answered++;
+              expect(full, JSON.stringify(body)).toEqual({ ok: false, error: shape });
+            }
+          }
+    expect(combos).toBe(108);
+    // Every title fault, and every non-string calendarId under a good title.
+    expect(answered).toBe(3 * 27 + 9);
   });
 });
