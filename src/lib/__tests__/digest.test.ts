@@ -584,3 +584,65 @@ describe("capitalising the problems line", () => {
     expect(body.startsWith("dispatcher failed.")).toBe(true);
   });
 });
+
+describe("the problems line's budget (D12)", () => {
+  const mongo = (job: string) =>
+    `${job} failed: MongoServerSelectionError: connection timed out after 30000ms to cluster0-shard-00-02`;
+  const BOTH_DOWN: DigestTodayInput = { ...QUIET, events: "unavailable", due: "unavailable" };
+
+  for (const count of [3, 4]) {
+    it(`keeps the freelance line and Off: whole with ${count} capped failures and both reads down`, () => {
+      const problems = ["expiry sweep", "watchdog", "site health", "outreach check"].slice(0, count).map(mongo);
+      const digest = composeDigest({
+        ...base,
+        attention: { repliedUnanswered: 4, overdue: 2 },
+        offAgents: ["chaser"],
+        problems,
+        today: BOTH_DOWN,
+      });
+      // count failures + calendar + to-do, all still counted in the title.
+      expect(digest.title).toBe(`${count + 2} problems · 0 to review`);
+      expect(digest.body.length).toBeLessThanOrEqual(320);
+      expect(digest.body.endsWith(" 4 waiting on you, 2 overdue. Off: chaser.")).toBe(true);
+      expect(digest.body).toContain("Today: calendar unavailable. Due: to-dos unavailable.");
+      expect(digest.body).toMatch(/^Expiry sweep failed: /);
+      expect(digest.body).toMatch(/; \+\d more\. Today: /);
+    });
+  }
+
+  it("names exactly how many fragments it dropped", () => {
+    const problems = ["expiry sweep", "watchdog", "site health", "outreach check"].map(mongo);
+    const body = composeDigest({
+      ...base,
+      attention: { repliedUnanswered: 4, overdue: 2 },
+      offAgents: ["chaser"],
+      problems,
+      today: BOTH_DOWN,
+    }).body;
+    const problemsLine = body.slice(0, body.indexOf(" Today: "));
+    const kept = problemsLine.split("; ").filter((f) => !f.startsWith("+")).length;
+    const dropped = Number(/\+(\d+) more\.$/.exec(problemsLine)?.[1]);
+    expect(kept + dropped).toBe(6);
+  });
+
+  it("leaves a problems line that fits untouched", () => {
+    expect(composeDigest({ ...base, problems: ["Meowchi unreachable", "dispatcher failed"] }).body).toBe(
+      "Meowchi unreachable; dispatcher failed. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue."
+    );
+  });
+
+  it("cuts a lone fragment when even it and its +N more cannot fit", () => {
+    const body = composeDigest({
+      ...base,
+      attention: { repliedUnanswered: 4, overdue: 2 },
+      offAgents: ["chaser", "x".repeat(150)],
+      problems: [mongo("expiry sweep"), mongo("watchdog")],
+      today: BOTH_DOWN,
+    }).body;
+    expect(body.length).toBeLessThanOrEqual(320);
+    expect(body.endsWith(`Off: chaser, ${"x".repeat(150)}.`)).toBe(true);
+    expect(body).toMatch(/^Expiry sweep failed: .*…; \+3 more\. Today: /);
+    // Cut below the 80-char cap: the fragment gave way, not the freelance line.
+    expect(body.indexOf("…;")).toBeLessThan(80);
+  });
+});

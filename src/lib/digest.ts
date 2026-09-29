@@ -64,6 +64,30 @@ function short(problem: string): string {
 }
 
 /**
+ * The problems line within `budget` characters. Problems lead, so the leading
+ * fragments are kept whole and the tail collapses into `+N more`, N being the
+ * fragments dropped (the title still carries the true count). If even one
+ * fragment plus its `+N more` is over, that one fragment is cut to fit, so the
+ * line never exceeds its budget and the payload's slice never has to cut.
+ */
+function problemsWithin(problems: string[], budget: number): string {
+  const frags = problems.map(short);
+  // PROVISIONAL (P10b): not in the deck - Riku to approve (the problems line's `+N more`)
+  const more = (dropped: number) => `+${dropped} more`;
+  for (let keep = frags.length; keep >= 1; keep--) {
+    const dropped = frags.length - keep;
+    const kept = frags.slice(0, keep);
+    const line = capitalise(end((dropped > 0 ? [...kept, more(dropped)] : kept).join("; ")));
+    if (line.length <= budget) return line;
+  }
+  const dropped = frags.length - 1;
+  const suffix = dropped > 0 ? `; ${more(dropped)}.` : ".";
+  const room = Math.max(2, budget - suffix.length);
+  const first = frags[0].length > room ? `${frags[0].slice(0, room - 1)}…` : frags[0];
+  return capitalise(end(dropped > 0 ? `${first}; ${more(dropped)}` : first));
+}
+
+/**
  * How the app's OWN problem fragments begin — the lowercase ones this file
  * writes (here and in buildProblems). Only these are capitalised when they
  * lead the line. Everything else leads as written: a site's detail begins
@@ -125,7 +149,6 @@ export function composeDigest(input: DigestInput): Digest {
       ? `${problemCount} problem${problemCount === 1 ? "" : "s"} · ${reviewPart}`
       : `All clear · ${reviewPart}`;
 
-  const problemsLine = problemCount > 0 ? capitalise(end(problems.map(short).join("; "))) : "All clear.";
   const after: string[] = [];
   if (input.attention !== null) {
     after.push(`${input.attention.repliedUnanswered} waiting on you, ${input.attention.overdue} overdue.`);
@@ -134,9 +157,14 @@ export function composeDigest(input: DigestInput): Digest {
     after.push(`Off: ${input.offAgents.join(", ")}.`);
   }
 
-  // The Today sentence gets what the other parts leave of the body bound, so
-  // it shortens itself rather than letting the payload slice cut the
-  // freelance line (D12). One space separates each part.
+  // Both lines ahead of the freelance line are budgeted, so the payload's
+  // slice never cuts it (D12). One space separates each part. The problems
+  // line may take everything except the parts after it and the Today
+  // sentence's most compact form (budget 0 returns that form); the Today
+  // sentence then gets whatever the problems line actually left.
+  const afterLength = after.reduce((n, part) => n + 1 + part.length, 0);
+  const problemsBudget = PUSH_BODY_MAX - afterLength - 1 - composeTodayLine(today, 0).length;
+  const problemsLine = problemCount > 0 ? problemsWithin(problems, problemsBudget) : "All clear.";
   const others = [problemsLine, ...after];
   const budget = PUSH_BODY_MAX - (others.join(" ").length + others.length);
   const lines = [problemsLine, composeTodayLine(today, budget), ...after];
@@ -229,9 +257,11 @@ function missedSentence(layers: string[]): string {
  * are cut to each of TITLE_CAPS in turn, then names are moved into `+N more`
  * three, two, one, none per part — until it fits. A part's label, a name's
  * time/day/lateness, the partial-read clause and every failure sentence are
- * never cut. If even no names at all does not fit, that most compact form is
- * returned: only a problems line that is itself over the bound gets there,
- * and the payload's slice is then the last resort.
+ * never cut (under pressure a missed layer's NAME is cut like a title, the
+ * clause itself never). If even no names at all does not fit, that most
+ * compact form is returned — `budget` 0 asks for it. composeDigest reserves
+ * room for this form before it sizes the problems line, so inside a digest it
+ * always fits and the payload's slice never cuts the freelance line.
  */
 export function composeTodayLine(today: DigestTodayInput, budget: number = Infinity): string {
   const full = renderToday(today, Infinity, TODAY_NAMES);
@@ -259,7 +289,7 @@ function renderToday(today: DigestTodayInput, cap: number, limit: number): strin
     parts.push("Today: calendar unavailable.");
   } else {
     const names = today.events.map((e) => `${t(e.title)} ${e.time ?? "(all day)"}`);
-    const missed = today.missedLayers.length > 0 ? missedSentence(today.missedLayers) : null;
+    const missed = today.missedLayers.length > 0 ? missedSentence(today.missedLayers.map(t)) : null;
     if (names.length > 0) {
       parts.push(`Today: ${listPart(names, names.length, limit)}.`);
       if (missed) parts.push(missed);
