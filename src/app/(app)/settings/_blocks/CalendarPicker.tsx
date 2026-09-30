@@ -19,6 +19,9 @@ import type { Layer } from "@/lib/osSettings";
  * same stored array would each drop the other's change. `busy` covers the
  * refresh too, through useTransition (router.refresh() returns before the
  * server render lands), so a box never re-enables showing the old state.
+ * Busy is `aria-disabled` plus a guard in the handler, never `disabled` (L9):
+ * `disabled` on the focused box would send focus to <body>. The dim is the
+ * same (`.tick[aria-disabled="true"]`, L1c).
  *
  * Nothing flips locally (R21): the tick shows what the server read, and the
  * refresh decides what comes back — on success and on failure alike. The next
@@ -53,6 +56,7 @@ export default function CalendarPicker({
   const busy = saving || isPending;
 
   async function press(row: PickerRow): Promise<void> {
+    if (busy) return; // aria-disabled does not stop a click (L9)
     const next = pickerToggle(stored, row, limits);
     if (!next.ok) {
       setSaid({ calendarId: row.calendarId, text: next.note });
@@ -85,7 +89,7 @@ export default function CalendarPicker({
             role="checkbox"
             aria-checked={row.ticked}
             aria-label={row.name}
-            disabled={busy}
+            aria-disabled={busy}
             onClick={() => void press(row)}
           >
             {row.ticked && (

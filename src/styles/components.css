@@ -573,8 +573,8 @@
   line-height:1.4;
 }
 .btn:hover{border-color:var(--ink-4);color:var(--ink)}
-.btn:disabled{opacity:.45;cursor:not-allowed;color:var(--ink-4)}
-.btn:disabled:hover{border-color:var(--line);color:var(--ink-4)}
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed;color:var(--ink-4)}
+.btn:disabled:hover,.btn[aria-disabled="true"]:hover{border-color:var(--line);color:var(--ink-4)}
 /* the affirmative pill — declared vocabulary; P8 uses none */
 .btn.go{border-color:rgba(53,211,153,.4);color:#8AE9C6}
 .btn.go:hover{background:rgba(53,211,153,.09);border-color:var(--save)}
@@ -637,7 +637,7 @@
    instead of 0.6px. The attribute value is the system's; the box is sized
    so the value means what it says at 8px. */
 .tick svg{width:8px;height:8px;display:block}
-.tick:disabled{opacity:.45;cursor:not-allowed}
+.tick:disabled,.tick[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 
 /* ---- the switch (R15, R25) — components.html:475-478 ported verbatim,
    with one substitution: the reference writes `currentColor` so the ROW
@@ -747,7 +747,7 @@ select.fld{appearance:none;-webkit-appearance:none;padding-right:28px}
    later rule wins, and a disabled Save must still read as disabled. */
 .btn.hi{border-color:var(--ink-4);color:var(--ink)}
 .btn.hi:hover{border-color:var(--ink-3)}
-.btn.hi:disabled{border-color:var(--line);color:var(--ink-4)}
+.btn.hi:disabled,.btn.hi[aria-disabled="true"]{border-color:var(--line);color:var(--ink-4)}
 
 /* ---- legacy.css reaches these in the app and not in the mockup; pinned so
    the render outlives legacy.css's deletion. legacy.css loads last and

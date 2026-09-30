@@ -24,6 +24,11 @@ type LayerRow = LayersTileView["rows"][number];
  * the refresh too, through useTransition (router.refresh() returns before the
  * server render lands).
  *
+ * Busy is `aria-disabled` plus a guard in the handler, never `disabled` (L9):
+ * `disabled` on the focused switch would send focus to <body>, so the switch
+ * just pressed would lose focus and its aria-checked change would go
+ * unannounced. The dim is the same (`.pe-sw[aria-disabled="true"]`, L1c).
+ *
  * The knob (deck §6 Tile 3, §15; plan Task 7 Step 2):
  *   - moves on the tap, and holds while busy;
  *   - a DEFINITE failure (the door's own answer, via pressOutcome) returns it
@@ -46,6 +51,7 @@ export default function LayerSwitches({ rows }: { rows: LayerRow[] }) {
   const busy = saving || isPending;
 
   async function press(row: LayerRow): Promise<void> {
+    if (busy) return; // aria-disabled does not stop a click (L9)
     const enabled = !row.enabled;
     const layers = rows.map((r) => ({
       calendarId: r.calendarId,
@@ -82,7 +88,7 @@ export default function LayerSwitches({ rows }: { rows: LayerRow[] }) {
               className="pe-sw"
               role="switch"
               aria-checked={on}
-              disabled={busy}
+              aria-disabled={busy}
               onClick={() => void press(row)}
             >
               <span className="nm">{row.name}</span>

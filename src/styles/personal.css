@@ -376,7 +376,7 @@
    switch would otherwise be pushed into the tile's padding (S11). */
 .pe-sw .nm{flex:1 1 0;font-size:12.5px;color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pe-sw .swx{margin-left:auto}
-.pe-sw:disabled{opacity:.45;cursor:not-allowed}
+.pe-sw:disabled,.pe-sw[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 
 /* ---- the push tile (R14) ---------------------------------------- */
 .pe-ptitle{font-weight:600;font-size:13px;color:var(--ink)}
