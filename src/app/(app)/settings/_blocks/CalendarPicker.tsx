@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ERROR_SENTENCES } from "@/lib/personalErrors";
+import { PRESS_TIMEOUT_MS } from "@/lib/constants";
+import { pressOutcome } from "@/lib/pressOutcome";
 import { pickerToggle, type PickerLimits, type PickerRow } from "@/lib/personalView";
 import type { Layer } from "@/lib/osSettings";
 
@@ -20,17 +21,18 @@ import type { Layer } from "@/lib/osSettings";
  * server render lands), so a box never re-enables showing the old state.
  *
  * Nothing flips locally (R21): the tick shows what the server read, and the
- * refresh decides what comes back — on success and on failure alike.
+ * refresh decides what comes back — on success and on failure alike. The next
+ * tap builds from `stored`, so if a refresh fails to land, that tap is
+ * last-write-wins over stale data (accepted, §7.5).
  *
- * Outcomes render in `.fl-note` under the pressed row's name, never `.pe-said`
- * (R46: `pe-` is the Personal page's namespace). They stand until the next
- * press and do not survive a reload:
+ * Outcomes render in `.fl-note` under the pressed row's name, never in the
+ * Personal page's own classes (R46: its prefix is that page's alone). They
+ * stand until the next press and do not survive a reload:
  *   - `Up to 10 calendars.` — an eleventh tick, refused before any request (R43);
- *   - `Couldn't save.` — the door answered and said no. Its 400s carry a
- *     sentence and no code, its 500 `code: "save-failed"`; deck §9 names one
- *     failure sentence for the card, so every non-2xx reads as it;
- *   - `Couldn't tell if that saved.` — no answer at all (a rejected fetch):
- *     the write may have landed, so the page does not claim it failed (deck
+ *   - `Couldn't save.` / `Couldn't tell if that saved.` — pressOutcome's one
+ *     rule (L7): only the door's own JSON answer is a definite failure; a
+ *     timeout (PRESS_TIMEOUT_MS), a network rejection or a platform error
+ *     page may follow a write that landed, so it never claims failure (deck
  *     §15, CLAUDE.md's asymmetric rule).
  * An expired session is answered by the refresh itself: proxy.ts sends it to
  * /login.
@@ -58,18 +60,15 @@ export default function CalendarPicker({
     }
     setSaving(true);
     setSaid(null);
-    let text: string | null = null;
-    try {
-      const res = await fetch("/api/settings", {
+    const out = await pressOutcome(
+      fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ layers: next.layers }),
-      });
-      if (!res.ok) text = ERROR_SENTENCES["save-failed"]; // deck §9
-    } catch {
-      text = ERROR_SENTENCES["calendar-unknown"]; // deck §15
-    }
-    if (text !== null) setSaid({ calendarId: row.calendarId, text });
+        signal: AbortSignal.timeout(PRESS_TIMEOUT_MS),
+      }),
+    );
+    if (out.kind !== "ok") setSaid({ calendarId: row.calendarId, text: out.sentence }); // deck §9, §15
     setSaving(false);
     startTransition(() => {
       router.refresh();

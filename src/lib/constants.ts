@@ -45,3 +45,24 @@ export const PUSH_BODY_MAX = 320;
  * the lib and the routes keep reading it from there.
  */
 export const TODO_TITLE_MAX = 140;
+
+/**
+ * How long an island waits for one of its own mutation doors (POST / PATCH /
+ * DELETE) before it stops waiting and says `Couldn't tell if that saved.`
+ * (L7, pressOutcome.ts). Without it a hung request leaves the control
+ * disabled forever.
+ *
+ * It must COMFORTABLY EXCEED the slowest door's own server-side budget, or the
+ * island gives up on a write that is still in flight and about to land. The
+ * mutation doors declare no maxDuration, so the budget is the sum of the
+ * bounds inside them. The heaviest is a to-do pin with its compensating delete:
+ *   connectDB server selection           10 s (db.ts)
+ *   Google insert: token + call          5 + 5 s (GOOGLE_TIMEOUT_MS each)
+ *   its one 401 retry: token + call      5 + 5 s
+ *   compensating delete, same shape      up to 20 s
+ * ≈ 50 s before the Mongo writes themselves, which answer in milliseconds
+ * when the cluster is up. 60 s clears that with room and is still a bound a
+ * person can wait out. A settings PATCH (Mongo only) needs a small fraction
+ * of it.
+ */
+export const PRESS_TIMEOUT_MS = 60_000;

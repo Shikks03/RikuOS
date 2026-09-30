@@ -956,6 +956,10 @@ export type PickerToggle =
  * calendars.` — a press outcome, never a standing note (R43). An untick is
  * never refused, so a store somehow over the bound can still be brought back
  * under it.
+ *
+ * Not refused here: a calendarId past the model's 256 would 400 at the door
+ * and read `Couldn't save.`. The deck has no sentence for refusing one before
+ * the fact, so none is invented; real Google ids are ~50 characters.
  */
 export function pickerToggle(
   stored: readonly Layer[],
@@ -979,8 +983,11 @@ export type CalendarListFeed =
 export interface SettingsCardsView {
   /** The `Google Calendar` card's one sentence (deck §9). */
   connection: string;
-  /** The `Calendar layers` card: its picker, or one sentence and no list. */
-  /** `stored` is the array the rows were joined from: pickerToggle builds each PATCH from it. */
+  /**
+   * The `Calendar layers` card: its picker, or one sentence and no list.
+   * `stored` is the array the rows were joined from: pickerToggle builds each
+   * PATCH from it.
+   */
   layers: { kind: "picker"; rows: PickerRow[]; stored: Layer[] } | { kind: "sentence"; text: string };
 }
 
