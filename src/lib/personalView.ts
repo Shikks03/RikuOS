@@ -520,7 +520,8 @@ function uniqueLines(lines: SayLine[]): SayLine[] {
   });
 }
 
-function formCapableFor(layout: ReadonlyPersonalLayout, tile: PersonalTile): boolean {
+/** R40's form floor for one tile, from its stored row: formCapable takes the whole row. */
+export function formCapableFor(layout: ReadonlyPersonalLayout, tile: PersonalTile): boolean {
   for (const row of layout) {
     const index = row.findIndex((e) => e.tile === tile);
     if (index >= 0) return formCapable(row.map((e) => e.span), index);

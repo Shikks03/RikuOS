@@ -35,7 +35,7 @@ type LayerRow = LayersTileView["rows"][number];
  *     what the server read: the local position is shown only while busy.
  * The outcome stands until the next press and does not survive a reload.
  *
- * ZERO useEffect (R33).
+ * ZERO effects (R33).
  */
 export default function LayerSwitches({ rows }: { rows: LayerRow[] }) {
   const router = useRouter();

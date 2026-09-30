@@ -114,3 +114,42 @@ export function clockHHMM(at: Date, tz: string): string {
 export function todayKey(now: Date, tz: string = APP_TZ): DayKey {
   return dayKey(now, tz);
 }
+
+// --- The event form's time defaults (deck §7) ---------------------------------
+
+const CLOCK_SHAPE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+/** The last minute of a day: an End never crosses midnight (the event door compares HH:MM as strings). */
+const DAY_LAST = "23:59";
+
+/**
+ * "HH:MM" one hour after `start`, CAPPED at 23:59 — deck §7's "End: one hour
+ * after start", within the one day the form writes to. `23:30` → `23:59`,
+ * never `00:30`: the door (personalWrites.parseEventInput) compares start and
+ * end as strings on one dayKey, so a wrapped End would read as before Start.
+ * At `23:59` the cap equals the start, and the door says `End must be after
+ * start.` — the one input this cannot help. null for anything not "HH:MM".
+ *
+ * ONE rule for both callers (lead ruling S2): the page's server default and
+ * EventForm's "End tracks Start + 1h until edited". Recorded deviation from
+ * deck §7's plain "+1h", accepted by the lead.
+ */
+export function oneHourAfter(start: string): string | null {
+  const m = CLOCK_SHAPE.exec(start);
+  if (!m) return null;
+  const h = Number(m[1]) + 1;
+  return h >= 24 ? DAY_LAST : `${String(h).padStart(2, "0")}:${m[2]}`;
+}
+
+/**
+ * The event form's defaults (deck §7), in `tz`: today, the next full hour,
+ * and oneHourAfter it. From 23:00 the next full hour is tomorrow's 00:00, so
+ * the default Date is tomorrow (00:00–01:00); at 22:xx it is 23:00–23:59.
+ * `now` is a parameter; nothing here reads the clock.
+ */
+export function eventTimeDefaults(now: Date, tz: string = APP_TZ): { dayKey: DayKey; start: string; end: string } {
+  const today = dayKey(now, tz);
+  const next = Number(clockHHMM(now, tz).slice(0, 2)) + 1;
+  if (next >= 24) return { dayKey: addDays(today, 1), start: "00:00", end: "01:00" };
+  const start = `${String(next).padStart(2, "0")}:00`;
+  return { dayKey: today, start, end: oneHourAfter(start) ?? DAY_LAST };
+}

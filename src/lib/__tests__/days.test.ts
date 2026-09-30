@@ -7,7 +7,7 @@
  * ships.
  */
 import { describe, it, expect } from "vitest";
-import { dayKey, dayStart, isDayKey, addDays, daysBetween, formatDay, todayKey, clockHHMM } from "@/lib/days";
+import { dayKey, dayStart, isDayKey, addDays, daysBetween, formatDay, todayKey, clockHHMM, oneHourAfter, eventTimeDefaults } from "@/lib/days";
 import { APP_TZ, PUSH_EXPECTED_HOUR } from "@/lib/constants";
 
 describe("the constants", () => {
@@ -160,5 +160,37 @@ describe("todayKey", () => {
 
   it("takes a zone when given one", () => {
     expect(todayKey(new Date("2026-09-10T23:00:00Z"), "UTC")).toBe("2026-09-10");
+  });
+});
+
+describe("oneHourAfter — End tracks Start + 1h, inside one day (deck §7, lead S2)", () => {
+  it("adds an hour and keeps the minutes", () => {
+    expect(oneHourAfter("09:00")).toBe("10:00");
+    expect(oneHourAfter("09:45")).toBe("10:45");
+    expect(oneHourAfter("22:00")).toBe("23:00");
+    expect(oneHourAfter("22:59")).toBe("23:59");
+  });
+  it("caps at 23:59 rather than wrapping past midnight", () => {
+    expect(oneHourAfter("23:00")).toBe("23:59");
+    expect(oneHourAfter("23:30")).toBe("23:59");
+    expect(oneHourAfter("23:59")).toBe("23:59");
+  });
+  it("answers null for anything that is not HH:MM", () => {
+    for (const bad of ["", "9:00", "24:00", "12:60", "12:00:00", "noon"]) expect(oneHourAfter(bad)).toBeNull();
+  });
+});
+
+describe("eventTimeDefaults — today, the next full hour, +1h, in Manila", () => {
+  it("10:20 Manila → today 11:00–12:00", () => {
+    expect(eventTimeDefaults(new Date("2026-09-10T02:20:00Z"))).toEqual({ dayKey: "2026-09-10", start: "11:00", end: "12:00" });
+  });
+  it("on the hour still moves to the next one: 10:00 → 11:00", () => {
+    expect(eventTimeDefaults(new Date("2026-09-10T02:00:00Z"))).toEqual({ dayKey: "2026-09-10", start: "11:00", end: "12:00" });
+  });
+  it("22:xx → 23:00–23:59 today (End capped)", () => {
+    expect(eventTimeDefaults(new Date("2026-09-10T14:30:00Z"))).toEqual({ dayKey: "2026-09-10", start: "23:00", end: "23:59" });
+  });
+  it("23:xx → tomorrow 00:00–01:00 — and tomorrow is Manila's, across UTC midnight", () => {
+    expect(eventTimeDefaults(new Date("2026-09-10T15:10:00Z"))).toEqual({ dayKey: "2026-09-11", start: "00:00", end: "01:00" });
   });
 });

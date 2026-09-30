@@ -23,7 +23,7 @@ export interface TodosProps {
  *
  * The count is `0 open` / `1 open` — tabular, never hued, and ABSENT under a
  * failed read (R21): TodoTileView makes `count: null` the only failed form, so
- * nothing here writes `?? 0`.
+ * nothing here zeroes a count that was never read.
  */
 export default function Todos({ view }: TodosProps) {
   return (

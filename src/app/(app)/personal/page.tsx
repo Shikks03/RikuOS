@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { APP_TZ } from "@/lib/constants";
 import { connectDB } from "@/lib/db";
 import { MONGO_READ_TIMEOUT_MS, withDeadline } from "@/lib/deadline";
-import { addDays, clockHHMM, formatDay, todayKey, type DayKey } from "@/lib/days";
+import { addDays, eventTimeDefaults, formatDay, todayKey, type DayKey } from "@/lib/days";
 import {
   listCalendars,
   readCalendarWindow,
@@ -13,7 +12,7 @@ import {
 } from "@/lib/google";
 import { getLastDigest, type StoredDigest } from "@/lib/lastDigest";
 import { readOsSettings, type Layer, type OsSettingsValues } from "@/lib/osSettings";
-import { formCapable, resolvePersonalLayout, type ReadonlyPersonalLayout } from "@/lib/personalLayout";
+import { resolvePersonalLayout } from "@/lib/personalLayout";
 import {
   DISPLAY_BOUND,
   OPEN_TODOS_CAP,
@@ -24,6 +23,7 @@ import {
   buildTodayView,
   buildTodoTileView,
   buildWeekView,
+  formCapableFor,
   type CalendarFeed,
   type DoneInput,
   type OpenTodoInput,
@@ -196,50 +196,39 @@ async function readDispatcher(): Promise<Dispatcher> {
  * not answer. It never rejects: a window read that throws (a programming
  * error; google.ts answers every Google failure in-band) is logged and read as
  * `Couldn't read the calendar.`; a calendar list that fails is null, which
- * calls nothing vanished. With no layer switched on neither call is made, so
- * `none-enabled` stays a state with no HTTP (R20, R45).
+ * calls nothing vanished. With no layer switched on the list is not asked
+ * for, and readCalendarWindow answers `none-enabled` before any HTTP, so an
+ * all-off switchboard costs no Google call (R20, R45).
+ *
+ * Logging: the window's own failure is logged once, by reason or by the
+ * failed layers' names. The list's failure is logged only when the window
+ * answered — under not-configured / expired / timeout it fails for the same
+ * reason, and one outage is one line.
  */
 async function readCalendarFeed(layers: Layer[], today: DayKey): Promise<CalendarFeed> {
-  const [window, calendars] = await Promise.all([
+  const [window, list] = await Promise.all([
     readCalendarWindow(layers, today, addDays(today, 7)).catch((err: unknown): CalendarWindow => {
       console.error("[personal] calendar window failed:", err);
       return { ok: false, reason: "timeout" };
     }),
     layers.some((l) => l.enabled)
-      ? listCalendars().catch((err: unknown): CalendarListEntry[] | null => {
-          console.error("[personal] calendar list failed:", err);
-          return null;
-        })
-      : null,
+      ? listCalendars().then(
+          (calendars): { calendars: CalendarListEntry[] | null; err?: unknown } => ({ calendars }),
+          (err: unknown) => ({ calendars: null, err }),
+        )
+      : { calendars: null },
   ]);
-  if (!window.ok && window.reason !== "none-enabled") {
-    console.error(`[personal] calendar window: ${window.reason}`);
-  } else if (window.ok && window.failed.length > 0) {
-    console.error(`[personal] calendar window: ${window.failed.length} layer(s) did not answer`);
+  if (!window.ok) {
+    if (window.reason !== "none-enabled") console.error(`[personal] calendar window: ${window.reason}`);
+  } else {
+    if (window.failed.length > 0) {
+      // Joined to names for the log; an id no layer holds is logged as the id.
+      const names = window.failed.map((id) => layers.find((l) => l.calendarId === id)?.name ?? id);
+      console.error(`[personal] calendar window: couldn't read ${names.join(", ")}`);
+    }
+    if ("err" in list) console.error("[personal] calendar list failed:", list.err);
   }
-  return { layers, window, calendars };
-}
-
-/**
- * The event form's defaults (deck §7), on the server in APP_TZ — a
- * client-computed default would be the browser's zone. Today, the next full
- * hour, one hour after it. Past 23:00 the next full hour is tomorrow's 00:00;
- * at 22:xx it is 23:00, and +1h would cross midnight, so End stops at 23:59.
- */
-function eventDefaults(now: Date, today: DayKey): EventFormData["defaults"] {
-  const next = Number(clockHHMM(now, APP_TZ).slice(0, 2)) + 1;
-  const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
-  if (next >= 24) return { dayKey: addDays(today, 1), start: "00:00", end: "01:00" };
-  return { dayKey: today, start: hh(next), end: next + 1 >= 24 ? "23:59" : hh(next + 1) };
-}
-
-/** R40's form floor for one tile, from its stored row — formCapable takes the whole row. */
-function formCapableIn(layout: ReadonlyPersonalLayout, tile: string): boolean {
-  for (const row of layout) {
-    const index = row.findIndex((e) => e.tile === tile);
-    if (index >= 0) return formCapable(row.map((e) => e.span), index);
-  }
-  return false;
+  return { layers, window, calendars: list.calendars };
 }
 
 export default async function PersonalPage() {
@@ -257,7 +246,7 @@ export default async function PersonalPage() {
   const connected = connectDB();
   const bounded = <T,>(read: () => Promise<T>, label: string) =>
     withDeadline(
-      connected.then(read),
+      connected.then(() => read()),
       MONGO_READ_TIMEOUT_MS,
       `personal ${label}`,
     );
@@ -311,7 +300,7 @@ export default async function PersonalPage() {
       settings === "unavailable"
         ? []
         : settings.layers.filter((l) => l.enabled).map((l) => ({ calendarId: l.calendarId, name: l.name })),
-    defaults: eventDefaults(now, today),
+    defaults: eventTimeDefaults(now),
   };
 
   return (
@@ -332,7 +321,7 @@ export default async function PersonalPage() {
             <Today view={todayView} eventForm={eventForm} todoDue={todoDue} />
           </Suspense>
         ),
-        todos: <Todos view={todoTile} todoDue={todoDue} formCapable={formCapableIn(layout, "todos")} />,
+        todos: <Todos view={todoTile} todoDue={todoDue} formCapable={formCapableFor(layout, "todos")} />,
         layers: (
           <Suspense fallback={<LayersFallback />}>
             <Layers view={layersView} />
