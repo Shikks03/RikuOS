@@ -64,6 +64,12 @@ export type HiddenKey = `${"open" | "done"}:${string}`;
  */
 interface PageState {
   editing: boolean;
+  /**
+   * Bumped by edit mode on entry (Task 8). A TileBody with `resetOnEdit`
+   * keys itself by it, so every native <details> inside — the week's open
+   * days — remounts closed (R62) without anything reaching into the DOM.
+   */
+  editEpoch: number;
   hidden: ReadonlySet<HiddenKey>;
   presses: Readonly<Record<PersonalTile, number>>;
   notes: Readonly<Partial<Record<PersonalTile, SayLine>>>;
@@ -86,6 +92,7 @@ const NO_PRESSES: Readonly<Record<PersonalTile, number>> = Object.freeze({
 const noop = () => {};
 const PageContext = createContext<PageState>({
   editing: false,
+  editEpoch: 0,
   hidden: new Set(),
   presses: NO_PRESSES,
   notes: {},
@@ -139,10 +146,27 @@ export function TileHead({
  * The tile's body (`.pe-body`, `.is-pair` on the hero only when both groups
  * are empty — R17, decided by TodayView.spread). `inert` while editing (R44).
  */
-export function TileBody({ pair = false, children }: { pair?: boolean; children: ReactNode }) {
-  const { editing } = useContext(PageContext);
+export function TileBody({
+  pair = false,
+  resetOnEdit = false,
+  children,
+}: {
+  pair?: boolean;
+  /**
+   * Remount this body when edit mode opens (keyed by editEpoch), so its
+   * uncontrolled <details> come back closed (R62). Only a body holding no
+   * typed input may ask for it — a form's text must survive the mode (R30).
+   */
+  resetOnEdit?: boolean;
+  children: ReactNode;
+}) {
+  const { editing, editEpoch } = useContext(PageContext);
   return (
-    <div className={pair ? "pe-body is-pair" : "pe-body"} inert={editing || undefined}>
+    <div
+      key={resetOnEdit ? `epoch:${editEpoch}` : undefined}
+      className={pair ? "pe-body is-pair" : "pe-body"}
+      inert={editing || undefined}
+    >
       {children}
     </div>
   );
@@ -181,6 +205,7 @@ export default function LayoutEditor({
   // never overwrite each other.
   const state: PageState = {
     editing: false,
+    editEpoch: 0,
     hidden,
     presses,
     notes,
