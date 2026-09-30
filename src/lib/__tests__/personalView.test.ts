@@ -157,19 +157,19 @@ describe("buildTodayView", () => {
     const v = today(okWindow([ev()], ["classes@g"]));
     expect(v.scheduled).toMatchObject({
       kind: "rows",
-      fails: [{ text: "Couldn't read Classes.", dot: "stale" }],
+      fails: [{ text: "Couldn’t read Classes.", dot: "stale" }],
     });
     const none = today(okWindow([], ["classes@g"]));
-    expect(none.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn't read Classes.", dot: "stale" }] });
+    expect(none.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn’t read Classes.", dot: "stale" }] });
     expect(none.spread).toBe(false);
   });
 
-  it("every layer failed: Couldn't read the calendar.", () => {
+  it("every layer failed: Couldn’t read the calendar.", () => {
     const v = today(okWindow([], ["primary", "classes@g"]));
-    expect(v.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn't read the calendar.", dot: "stale" }] });
+    expect(v.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn’t read the calendar.", dot: "stale" }] });
   });
 
-  it("two enabled layers named alike, one answers and one times out: its events, one `Couldn't read Calendar.`", () => {
+  it("two enabled layers named alike, one answers and one times out: its events, one `Couldn’t read Calendar.`", () => {
     const layers: Layer[] = [
       { calendarId: "a@g", name: "Calendar", enabled: true },
       { calendarId: "b@g", name: "Calendar", enabled: true },
@@ -181,7 +181,7 @@ describe("buildTodayView", () => {
     });
     expect(v.scheduled).toMatchObject({
       kind: "rows",
-      fails: [{ text: "Couldn't read Calendar.", dot: "stale" }],
+      fails: [{ text: "Couldn’t read Calendar.", dot: "stale" }],
     });
     expect(v.scheduled.kind === "rows" && v.scheduled.rows.map((r) => r.title)).toEqual(["Gym"]);
   });
@@ -193,24 +193,24 @@ describe("buildTodayView", () => {
       { calendarId: "primary", name: "Personal", enabled: true },
     ];
     const v = today({ layers, window: { ok: true, events: [ev()], failed: ["a@g", "b@g"] }, calendars: null });
-    expect(v.scheduled).toMatchObject({ kind: "rows", fails: [{ text: "Couldn't read Calendar.", dot: "stale" }] });
+    expect(v.scheduled).toMatchObject({ kind: "rows", fails: [{ text: "Couldn’t read Calendar.", dot: "stale" }] });
   });
 
   it("a failed id that joins to no enabled layer is still said, never `Nothing scheduled.`", () => {
     const v = today(okWindow([], ["stranger@g"]));
-    expect(v.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn't read the calendar.", dot: "stale" }] });
+    expect(v.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn’t read the calendar.", dot: "stale" }] });
   });
 
-  it("timeout: Couldn't read the calendar.", () => {
+  it("timeout: Couldn’t read the calendar.", () => {
     const v = today({ layers: LAYERS, window: { ok: false, reason: "timeout" }, calendars: null });
-    expect(v.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn't read the calendar.", dot: "stale" }] });
+    expect(v.scheduled).toEqual({ kind: "fail", lines: [{ text: "Couldn’t read the calendar.", dot: "stale" }] });
   });
 
   it("not-configured: absence by configuration, no dot", () => {
     const v = today({ layers: LAYERS, window: { ok: false, reason: "not-configured" }, calendars: null });
     expect(v.scheduled).toEqual({
       kind: "fail",
-      lines: [{ text: "Google isn't connected yet. Set it up in Settings.", dot: null }],
+      lines: [{ text: "Google isn’t connected yet. Set it up in Settings.", dot: null }],
     });
   });
 
@@ -241,7 +241,7 @@ describe("buildTodayView", () => {
     const v = today("layers-unavailable");
     expect(v.scheduled).toEqual({
       kind: "fail",
-      lines: [{ text: "Couldn't load layers, so the calendar wasn't read.", dot: "stale" }],
+      lines: [{ text: "Couldn’t load layers, so the calendar wasn’t read.", dot: "stale" }],
     });
   });
 
@@ -257,7 +257,7 @@ describe("buildTodayView", () => {
 
   it("to-dos unavailable: dotted sentence in DUE's place, untinted hero, no spread", () => {
     const v = today(okWindow([]), "unavailable");
-    expect(v.due).toEqual({ kind: "fail", line: { text: "Couldn't load to-dos.", dot: "stale" } });
+    expect(v.due).toEqual({ kind: "fail", line: { text: "Couldn’t load to-dos.", dot: "stale" } });
     expect(v.heroTint).toBeNull();
     expect(v.spread).toBe(false);
   });
@@ -473,14 +473,14 @@ describe("buildWeekView", () => {
 
   it("one layer failed: its sentence on top; days with nothing are unread", () => {
     const v = week(okWindow([ev({ dayKey: "2026-09-13" })], ["classes@g"]));
-    expect(v.fails).toEqual([{ text: "Couldn't read Classes.", dot: "stale" }]);
+    expect(v.fails).toEqual([{ text: "Couldn’t read Classes.", dot: "stale" }]);
     expect(dayShape(v.days![2]).kind).toBe("one");
     expect(v.days![0]).toMatchObject({ unread: true });
   });
 
   it("to-dos unavailable: the sentence on top, days list events only, empty days unread", () => {
     const v = week(okWindow([ev({ dayKey: "2026-09-11" })]), "unavailable");
-    expect(v.fails).toEqual([{ text: "Couldn't load to-dos.", dot: "stale" }]);
+    expect(v.fails).toEqual([{ text: "Couldn’t load to-dos.", dot: "stale" }]);
     expect(dayShape(v.days![0]).kind).toBe("one");
     expect(v.days![1]).toMatchObject({ unread: true });
   });
@@ -489,8 +489,8 @@ describe("buildWeekView", () => {
     const v = week("layers-unavailable", "unavailable");
     expect(v.days).toBeNull();
     expect(v.fails).toEqual([
-      { text: "Couldn't load layers, so the calendar wasn't read.", dot: "stale" },
-      { text: "Couldn't load to-dos.", dot: "stale" },
+      { text: "Couldn’t load layers, so the calendar wasn’t read.", dot: "stale" },
+      { text: "Couldn’t load to-dos.", dot: "stale" },
     ]);
   });
 
@@ -503,7 +503,7 @@ describe("buildWeekView", () => {
 
   it("not-configured: the undotted sentence on top, days unread", () => {
     const v = week({ layers: LAYERS, window: { ok: false, reason: "not-configured" }, calendars: null });
-    expect(v.fails).toEqual([{ text: "Google isn't connected yet. Set it up in Settings.", dot: null }]);
+    expect(v.fails).toEqual([{ text: "Google isn’t connected yet. Set it up in Settings.", dot: null }]);
     expect(v.days!.every((d) => "unread" in d)).toBe(true);
   });
 
@@ -568,12 +568,12 @@ describe("buildTodoTileView", () => {
 
   it("unreadable: no count, no sections, one dotted sentence", () => {
     const v = buildTodoTileView({ now: NOW, todos: "unavailable" });
-    expect(v).toEqual({ count: null, sections: null, fail: { text: "Couldn't load to-dos.", dot: "stale" } });
+    expect(v).toEqual({ count: null, sections: null, fail: { text: "Couldn’t load to-dos.", dot: "stale" } });
   });
 
   it("`0 open` above a failed read is unrepresentable in the type (R21)", () => {
     // @ts-expect-error — a count beside a failed read does not type-check.
-    const bad: TodoTileView = { count: 0, sections: null, fail: { text: "Couldn't load to-dos.", dot: "stale" } };
+    const bad: TodoTileView = { count: 0, sections: null, fail: { text: "Couldn’t load to-dos.", dot: "stale" } };
     expect(bad).toBeDefined();
   });
 
@@ -689,7 +689,7 @@ describe("buildDoneView", () => {
       count: null,
       rows: [],
       bound: null,
-      fail: { text: "Couldn't load to-dos.", dot: "stale" },
+      fail: { text: "Couldn’t load to-dos.", dot: "stale" },
     });
   });
 });
@@ -720,7 +720,7 @@ describe("buildPushTileView", () => {
   it("went out, text not stored: no dot", () => {
     const v = push({ digest: OLD_PUSH, dispatcher: { ok: true, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: false } });
     expect(v.kind).toBe("went-out-unstored");
-    expect(v.line).toEqual({ text: "A push went out this morning. Its text wasn't stored.", dot: null });
+    expect(v.line).toEqual({ text: "A push went out this morning. Its text wasn’t stored.", dot: null });
     expect(v.stamp).toBeNull();
   });
 
@@ -759,9 +759,9 @@ describe("buildPushTileView", () => {
     expect(push({ digest: TODAY_PUSH, monitoringEnabled: false }).kind).toBe("quote");
   });
 
-  it("unreadable digest: Couldn't load this morning's push.", () => {
+  it("unreadable digest: Couldn’t load this morning’s push.", () => {
     const v = push({ digest: "unavailable" });
-    expect(v).toMatchObject({ kind: "fail", line: { text: "Couldn't load this morning's push.", dot: "stale" }, stamp: null });
+    expect(v).toMatchObject({ kind: "fail", line: { text: "Couldn’t load this morning’s push.", dot: "stale" }, stamp: null });
   });
 
   it("an unreadable run cannot tell no-push from unstored, so it fails rather than guess", () => {
@@ -821,11 +821,11 @@ describe("a capped open read never says nothing due", () => {
   it("the cap fell inside the window (last row due by today+7): DUE, the tint and the week read as unreadable", () => {
     const feed = capped([todo({ dueOn: "2026-09-12" })], () => todo({ dueOn: "2026-09-15" }));
     const t = today(okWindow([]), feed);
-    expect(t.due).toEqual({ kind: "fail", line: { text: "Couldn't load to-dos.", dot: "stale" } });
+    expect(t.due).toEqual({ kind: "fail", line: { text: "Couldn’t load to-dos.", dot: "stale" } });
     expect(t.heroTint).toBeNull();
     expect(t.spread).toBe(false);
     const w = week(okWindow([]), feed);
-    expect(w.fails).toEqual([{ text: "Couldn't load to-dos.", dot: "stale" }]);
+    expect(w.fails).toEqual([{ text: "Couldn’t load to-dos.", dot: "stale" }]);
     expect(w.days!.some((d) => dayShape(d).kind === "dash")).toBe(false);
   });
 
@@ -858,7 +858,7 @@ describe("a capped open read never says nothing due", () => {
 
   it("fewer rows than the store's count but under the cap is a race, not a cap: render normally", () => {
     // A to-do created between the list read and the count: total runs ahead
-    // of a read that was never cut. It is not `Couldn't load to-dos.`.
+    // of a read that was never cut. It is not `Couldn’t load to-dos.`.
     const rows = [todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-12" })];
     const feed: OpenTodosFeed = { rows, total: 3, sectionTotals: { personal: 3, freelance: 0, academics: 0 } };
     const t = today(okWindow([]), feed);
@@ -891,10 +891,10 @@ describe("the open feed's order is checked, not trusted", () => {
   it("Mongo's default order (undated first) reads as unreadable, even uncapped", () => {
     const feed = feedOf([todo({ dueOn: null }), todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-12" })]);
     const t = today(okWindow([]), feed);
-    expect(t.due).toEqual({ kind: "fail", line: { text: "Couldn't load to-dos.", dot: "stale" } });
+    expect(t.due).toEqual({ kind: "fail", line: { text: "Couldn’t load to-dos.", dot: "stale" } });
     expect(t.heroTint).toBeNull();
     const w = week(okWindow([]), feed);
-    expect(w.fails).toEqual([{ text: "Couldn't load to-dos.", dot: "stale" }]);
+    expect(w.fails).toEqual([{ text: "Couldn’t load to-dos.", dot: "stale" }]);
     expect(w.days!.some((d) => dayShape(d).kind === "dash")).toBe(false);
   });
 
@@ -949,7 +949,7 @@ describe("buildLayersView", () => {
     expect(nc).toEqual({
       kind: "sentence",
       rows: [],
-      line: { text: "Google isn't connected yet. Set it up in Settings.", dot: null },
+      line: { text: "Google isn’t connected yet. Set it up in Settings.", dot: null },
     });
     const ex = buildLayersView({ calendar: { layers: LAYERS, window: { ok: false, reason: "expired" }, calendars: null } });
     expect(ex.line).toEqual({ text: "Google access has expired. Renew it from Settings.", dot: "stale" });
@@ -972,7 +972,7 @@ describe("buildLayersView", () => {
     expect(buildLayersView({ calendar: "layers-unavailable" })).toEqual({
       kind: "fail",
       rows: [],
-      line: { text: "Couldn't load layers.", dot: "stale" },
+      line: { text: "Couldn’t load layers.", dot: "stale" },
     });
   });
 });
@@ -1080,8 +1080,8 @@ describe("the Settings page's two Google cards (deck §9, R24)", () => {
   it("any other failure: couldn't check, couldn't list", () => {
     for (const kind of ["timeout", "http", "gone", "unknown"] as const) {
       expect(buildSettingsCards({ ok: false, kind }, LAYERS)).toEqual({
-        connection: "Couldn't check right now.",
-        layers: { kind: "sentence", text: "Couldn't list your calendars." },
+        connection: "Couldn’t check right now.",
+        layers: { kind: "sentence", text: "Couldn’t list your calendars." },
       });
     }
   });
@@ -1089,7 +1089,7 @@ describe("the Settings page's two Google cards (deck §9, R24)", () => {
   it("the list came back but the stored layers did not: still Connected., and no picker", () => {
     expect(buildSettingsCards({ ok: true, calendars: GOOGLE }, "unavailable")).toEqual({
       connection: "Connected.",
-      layers: { kind: "sentence", text: "Couldn't load layers." },
+      layers: { kind: "sentence", text: "Couldn’t load layers." },
     });
   });
 });

@@ -30,9 +30,9 @@ export type { CalendarOutcome } from "@/lib/todoStore";
  * failure. Frozen: a shared table must not become one caller's scratch.
  */
 export const ERROR_SENTENCES = Object.freeze({
-  "save-failed": "Couldn't save.",
-  "delete-failed": "Couldn't delete.",
-  "calendar-unknown": "Couldn't tell if that saved.",
+  "save-failed": "Couldn’t save.",
+  "delete-failed": "Couldn’t delete.",
+  "calendar-unknown": "Couldn’t tell if that saved.",
   "no-title": "Give it a title.",
   "end-before-start": "End must be after start.",
   "needs-due": "Needs a due date.",

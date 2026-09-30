@@ -38,7 +38,7 @@ import type { DoneTileView, TodoRowView } from "@/lib/personalView";
 import { usePersonalPage, type HiddenKey } from "./LayoutEditor";
 
 /** deck §15 (R49): a claim about Google's state, not about the press. */
-const ENTRY_LEFT = "Done, but the calendar entry couldn't be removed. Remove it in Google Calendar.";
+const ENTRY_LEFT = "Done, but the calendar entry couldn’t be removed. Remove it in Google Calendar.";
 
 /** The 8px check, in a 10-unit viewBox so strokeWidth 1.8 renders at 1.44px (R25). */
 function Check() {

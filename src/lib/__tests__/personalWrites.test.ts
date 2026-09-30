@@ -83,9 +83,9 @@ describe("to-do replies", () => {
 describe("ERROR_SENTENCES", () => {
   it("maps codes to the deck's sentences, verbatim", () => {
     expect(ERROR_SENTENCES).toEqual({
-      "save-failed": "Couldn't save.",
-      "delete-failed": "Couldn't delete.",
-      "calendar-unknown": "Couldn't tell if that saved.",
+      "save-failed": "Couldn’t save.",
+      "delete-failed": "Couldn’t delete.",
+      "calendar-unknown": "Couldn’t tell if that saved.",
       "no-title": "Give it a title.",
       "end-before-start": "End must be after start.",
       "needs-due": "Needs a due date.",
@@ -93,10 +93,10 @@ describe("ERROR_SENTENCES", () => {
   });
 
   it("covers the codes the doors actually emit for those cases", () => {
-    expect(ERROR_SENTENCES[SAVE_FAILED.body.error as "save-failed"]).toBe("Couldn't save.");
-    expect(ERROR_SENTENCES[DELETE_FAILED.body.error as "delete-failed"]).toBe("Couldn't delete.");
+    expect(ERROR_SENTENCES[SAVE_FAILED.body.error as "save-failed"]).toBe("Couldn’t save.");
+    expect(ERROR_SENTENCES[DELETE_FAILED.body.error as "delete-failed"]).toBe("Couldn’t delete.");
     expect(ERROR_SENTENCES[eventFailedReply(new Error("x")).body.error as "calendar-unknown"]).toBe(
-      "Couldn't tell if that saved.",
+      "Couldn’t tell if that saved.",
     );
   });
 

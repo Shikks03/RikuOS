@@ -1,6 +1,6 @@
 /**
  * pressOutcome.test.ts — L7's one rule: only the door's own JSON is a definite
- * outcome; everything else is `Couldn't tell if that saved.` and never a
+ * outcome; everything else is `Couldn’t tell if that saved.` and never a
  * claimed failure.
  */
 import { describe, it, expect } from "vitest";
@@ -10,7 +10,7 @@ import { pressOutcome } from "@/lib/pressOutcome";
 import { PRESS_TIMEOUT_MS } from "@/lib/constants";
 import { GOOGLE_TIMEOUT_MS } from "@/lib/google";
 
-const UNKNOWN = { kind: "unknown", sentence: "Couldn't tell if that saved." };
+const UNKNOWN = { kind: "unknown", sentence: "Couldn’t tell if that saved." };
 const json = (body: unknown, status: number) =>
   Promise.resolve(new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
 
@@ -26,12 +26,12 @@ describe("pressOutcome — the door answered", () => {
     expect(await pressOutcome(json({ error: "save-failed" }, 500))).toEqual({
       kind: "failed",
       code: "save-failed",
-      sentence: "Couldn't save.",
+      sentence: "Couldn’t save.",
     });
     expect(await pressOutcome(json({ error: "Could not save.", code: "save-failed" }, 500))).toEqual({
       kind: "failed",
       code: "save-failed",
-      sentence: "Couldn't save.",
+      sentence: "Couldn’t save.",
     });
     expect(await pressOutcome(json({ error: "no-title" }, 400))).toEqual({
       kind: "failed",
@@ -44,12 +44,12 @@ describe("pressOutcome — the door answered", () => {
     expect(await pressOutcome(json({ error: "Unauthorized" }, 401))).toEqual({
       kind: "failed",
       code: null,
-      sentence: "Couldn't save.",
+      sentence: "Couldn’t save.",
     });
     expect(await pressOutcome(json({ error: "At most 10 layers can be chosen." }, 400))).toEqual({
       kind: "failed",
       code: null,
-      sentence: "Couldn't save.",
+      sentence: "Couldn’t save.",
     });
   });
 
@@ -57,12 +57,12 @@ describe("pressOutcome — the door answered", () => {
     expect(await pressOutcome(json({ error: "bad-json" }, 400))).toEqual({
       kind: "failed",
       code: "bad-json",
-      sentence: "Couldn't save.",
+      sentence: "Couldn’t save.",
     });
     expect(await pressOutcome(json({ error: "not-found" }, 404), "delete-failed")).toEqual({
       kind: "failed",
       code: "not-found",
-      sentence: "Couldn't delete.",
+      sentence: "Couldn’t delete.",
     });
   });
 

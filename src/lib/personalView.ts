@@ -408,7 +408,7 @@ function boundLine(shown: number, total: number): string | null {
 }
 
 /** deck §6 Tiles 1, 2, 5, 6 and §11. */
-const todosFail = (): SayLine => stale("Couldn't load to-dos.");
+const todosFail = (): SayLine => stale("Couldn’t load to-dos.");
 
 /** "07:00" — the wall clock in APP_TZ, 24-hour (days.ts's clockHHMM). */
 const clock = (at: Date): string => clockHHMM(at, APP_TZ);
@@ -457,7 +457,7 @@ type CalendarRead =
 
 function readCalendar(feed: CalendarFeed): CalendarRead {
   if (feed === "layers-unavailable") {
-    return { kind: "unread", lines: [stale("Couldn't load layers, so the calendar wasn't read.")] }; // deck §6 Tile 1, §11
+    return { kind: "unread", lines: [stale("Couldn’t load layers, so the calendar wasn’t read.")] }; // deck §6 Tile 1, §11
   }
   const { layers, window, calendars } = feed;
   if (!window.ok) {
@@ -467,11 +467,11 @@ function readCalendar(feed: CalendarFeed): CalendarRead {
           ? { kind: "none-enabled", line: bare("No calendars chosen. Pick them in Settings.") } // deck §6 Tile 1
           : { kind: "none-enabled", line: bare("All layers are switched off.") }; // deck §15
       case "not-configured":
-        return { kind: "unread", lines: [bare("Google isn't connected yet. Set it up in Settings.")] }; // deck §6 Tile 1
+        return { kind: "unread", lines: [bare("Google isn’t connected yet. Set it up in Settings.")] }; // deck §6 Tile 1
       case "expired":
         return { kind: "unread", lines: [stale("Google access has expired. Renew it from Settings.")] }; // deck §6 Tile 1
       case "timeout":
-        return { kind: "unread", lines: [stale("Couldn't read the calendar.")] }; // deck §6 Tile 1, §11
+        return { kind: "unread", lines: [stale("Couldn’t read the calendar.")] }; // deck §6 Tile 1, §11
     }
   }
   // google.ts already returns this order; sorting again with the SAME
@@ -497,14 +497,14 @@ function readCalendar(feed: CalendarFeed): CalendarRead {
 
   const lines: SayLine[] =
     allFailed && !anyVanished
-      ? [stale("Couldn't read the calendar.")] // deck §6 Tile 1: every layer failed
+      ? [stale("Couldn’t read the calendar.")] // deck §6 Tile 1: every layer failed
       : uniqueLines([
           ...failedLayers.map((l) =>
             vanished(l)
               ? bare(`${l.name} is no longer on your Google account. Untick it in Settings.`) // deck §15, R42
-              : stale(`Couldn't read ${l.name}.`), // deck §6 Tile 1: the layer's own name
+              : stale(`Couldn’t read ${l.name}.`), // deck §6 Tile 1: the layer's own name
           ),
-          ...(unjoined ? [stale("Couldn't read the calendar.")] : []), // deck §6 Tile 1, §11
+          ...(unjoined ? [stale("Couldn’t read the calendar.")] : []), // deck §6 Tile 1, §11
         ]);
   return allFailed ? { kind: "unread", lines } : { kind: "partial", events, lines };
 }
@@ -829,7 +829,7 @@ export function buildPushTileView(input: PushInput): PushTileView {
       ? null
       : input.dispatcher;
   const today = todayKey(now);
-  const unreadable = stale("Couldn't load this morning's push."); // deck §6 Tile 4, §11
+  const unreadable = stale("Couldn’t load this morning’s push."); // deck §6 Tile 4, §11
 
   if (digest === "unavailable") return { kind: "fail", ...blank, line: unreadable };
   if (digest !== null && dayKey(digest.sentAt, APP_TZ) === today) {
@@ -843,7 +843,7 @@ export function buildPushTileView(input: PushInput): PushTileView {
     };
   }
   if (dispatcher !== "unavailable" && dispatcher !== null && dispatcher.ok && dayKey(dispatcher.startedAt, APP_TZ) === today) {
-    return { kind: "went-out-unstored", ...blank, line: bare("A push went out this morning. Its text wasn't stored.") }; // deck §15
+    return { kind: "went-out-unstored", ...blank, line: bare("A push went out this morning. Its text wasn’t stored.") }; // deck §15
   }
   if (input.monitoringEnabled === false) {
     return { kind: "monitoring-off", ...blank, line: bare("Monitoring is off, so no push goes out.") }; // deck §6 Tile 4
@@ -877,13 +877,13 @@ export function buildPushTileView(input: PushInput): PushTileView {
 export function buildLayersView(input: LayersInput): LayersTileView {
   const feed = input.calendar;
   if (feed === "layers-unavailable") {
-    return { kind: "fail", rows: [], line: stale("Couldn't load layers.") }; // deck §6 Tile 3, §11
+    return { kind: "fail", rows: [], line: stale("Couldn’t load layers.") }; // deck §6 Tile 3, §11
   }
   if (feed.layers.length === 0) {
     return { kind: "sentence", rows: [], line: bare("No calendars chosen. Pick them in Settings.") }; // deck §6 Tile 3
   }
   if (!feed.window.ok && feed.window.reason === "not-configured") {
-    return { kind: "sentence", rows: [], line: bare("Google isn't connected yet. Set it up in Settings.") }; // deck §6 Tile 1
+    return { kind: "sentence", rows: [], line: bare("Google isn’t connected yet. Set it up in Settings.") }; // deck §6 Tile 1
   }
   if (!feed.window.ok && feed.window.reason === "expired") {
     return { kind: "sentence", rows: [], line: stale("Google access has expired. Renew it from Settings.") }; // deck §6 Tile 1
@@ -1027,12 +1027,12 @@ export function buildSettingsCards(
       return { connection: EXPIRED, layers: { kind: "sentence", text: EXPIRED } };
     }
     return {
-      connection: "Couldn't check right now.", // deck §9
-      layers: { kind: "sentence", text: "Couldn't list your calendars." }, // deck §9
+      connection: "Couldn’t check right now.", // deck §9
+      layers: { kind: "sentence", text: "Couldn’t list your calendars." }, // deck §9
     };
   }
   if (stored === "unavailable") {
-    return { connection: "Connected.", layers: { kind: "sentence", text: "Couldn't load layers." } }; // deck §9; deck §6 Tile 3, §11
+    return { connection: "Connected.", layers: { kind: "sentence", text: "Couldn’t load layers." } }; // deck §9; deck §6 Tile 3, §11
   }
   return {
     connection: "Connected.", // deck §9
