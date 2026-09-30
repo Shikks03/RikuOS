@@ -54,10 +54,14 @@ export default async function Today({ view }: TodayProps) {
  * The Suspense fallback (§7.4): the tile at full size with border, ground and
  * eyebrow, and the date, which needs no feed — and no sentence, no count, no
  * stamp, no control. An unanswered read is not a measured emptiness.
+ *
+ * It carries the tint (R83): the to-do read has answered before the calendar
+ * has, and an untinted hero would say it had not. The page hands it
+ * buildTodayDue's tint — the same derivation buildTodayView uses.
  */
-export function TodayFallback({ dateLabel }: { dateLabel: string }) {
+export function TodayFallback({ dateLabel, heroTint }: { dateLabel: string; heroTint: TodayView["heroTint"] }) {
   return (
-    <section className="pe-tile is-hero">
+    <section className={heroClass(heroTint)}>
       <TileHead>
         <div>
           <span className="eyebrow">Today</span>

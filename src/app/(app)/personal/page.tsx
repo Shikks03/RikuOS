@@ -20,6 +20,7 @@ import {
   buildDoneView,
   buildLayersView,
   buildPushTileView,
+  buildTodayDue,
   buildTodayView,
   buildTodoTileView,
   buildWeekView,
@@ -327,7 +328,7 @@ export default async function PersonalPage() {
       }
       tiles={{
         today: (
-          <Suspense fallback={<TodayFallback dateLabel={formatDay(today)} />}>
+          <Suspense fallback={<TodayFallback dateLabel={formatDay(today)} heroTint={buildTodayDue(todos, now).heroTint} />}>
             <Today view={todayView} eventForm={eventForm} todoDue={todoDue} />
           </Suspense>
         ),

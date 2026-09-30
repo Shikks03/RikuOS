@@ -10,6 +10,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildTodayView,
+  buildTodayDue,
   buildWeekView,
   buildTodoTileView,
   buildDoneView,
@@ -353,6 +354,31 @@ describe("buildTodayView", () => {
       ],
     ];
     expect(buildTodayView({ now: NOW, calendar: okWindow([]), todos: open([]), layout: narrow }).formCapable).toBe(false);
+  });
+});
+
+describe("buildTodayDue — the tint the Suspense fallback carries (R83)", () => {
+  const feeds: Array<[string, OpenTodosFeed]> = [
+    ["empty", open([])],
+    ["unavailable", "unavailable"],
+    ["due today + overdue + later", open([todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-07" }), todo({ dueOn: "2026-09-12" }), todo()])],
+    ["nine pending, clamped", open(Array.from({ length: 9 }, () => todo({ dueOn: TODAY })))],
+  ];
+  const calendars: CalendarFeed[] = ["layers-unavailable", okWindow([]), okWindow([ev()], ["classes@g"])];
+
+  it.each(feeds)("%s: agrees with buildTodayView under every calendar state", (_name, feed) => {
+    const alone = buildTodayDue(feed, NOW);
+    for (const calendar of calendars) {
+      const v = today(calendar, feed);
+      expect(alone.heroTint).toBe(v.heroTint);
+      expect(alone.due).toEqual(v.due);
+    }
+  });
+
+  it("answers from the to-dos alone: green for nothing due, null for a failed read", () => {
+    expect(buildTodayDue(open([]), NOW).heroTint).toBe(0);
+    expect(buildTodayDue("unavailable", NOW).heroTint).toBeNull();
+    expect(buildTodayDue(open([todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-07" })]), NOW).heroTint).toBe(2);
   });
 });
 

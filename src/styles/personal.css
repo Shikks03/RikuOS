@@ -109,6 +109,15 @@
    half of the compensation, dropping the grid 14px the moment the mode
    opens. Restated at the same specificity, later in the sheet (M6). */
 .fl>.pe-edit{margin-top:calc(-1 * var(--sp-4))}
+/* NAMED EXCEPTION L1b (P10c lead ruling): the page-level sentence deck
+   §15 gives an arrangement that could not be read (`Couldn't load your
+   arrangement, so this is the default.`) sits above the grid with the
+   same 14px the mockup draws. In edit mode the well's own padding is
+   that 14px, so the well drops its negative top margin there instead —
+   the grid does not move when the mode opens (M6). Same specificity as
+   the rule above, later in the sheet. */
+.pe-fail + .pe-wrap{margin-top:var(--sp-4)}
+.pe-fail + .pe-edit{margin-top:0}
 
 /* ---- the tile (R6) ---------------------------------------------- */
 .pe-tile{

@@ -579,6 +579,29 @@ function eventRange(e: CalendarEvent): string {
 }
 
 /**
+ * Today's DUE group and the hero's tint, from the to-do feed ALONE — the one
+ * derivation of both. buildTodayView calls it, and so does the page for
+ * Today's Suspense fallback: the to-do read has answered before the calendar
+ * has, and an untinted hero would claim it had not (R83). One function, so
+ * the fallback and the tile can never disagree about the tint.
+ */
+export function buildTodayDue(
+  todos: OpenTodosFeed,
+  now: Date,
+): { due: TodayView["due"]; heroTint: HeroTint | null } {
+  const today = todayKey(now);
+  const todosFeed = readTodosForWindow(todos, today);
+  if (todosFeed === "unavailable") return { due: { kind: "fail", line: todosFail() }, heroTint: heroTint(null) };
+  // deck §6 Tile 1: "to-dos due today, then overdue to-dos" — the deck's
+  // order, not sortTodos's overdue-first. Each half is sortTodos'd: today's
+  // oldest-created first, the overdue most-overdue first.
+  const dueToday = sortTodos(todosFeed.rows.filter((t) => t.dueOn === today));
+  const overdue = sortTodos(todosFeed.rows.filter((t) => t.dueOn !== null && t.dueOn < today));
+  const rows = [...dueToday, ...overdue].map((t) => todoRow(t, today));
+  return { due: rows.length > 0 ? { kind: "rows", rows } : { kind: "empty" }, heroTint: heroTint(rows.length) };
+}
+
+/**
  * The hero. `heroTint` is called with the DUE group's row count — to-dos due
  * today plus overdue — or null when that read failed, and NEVER with anything
  * the calendar said (R74, R83, R85): a crowded calendar, a failed layer, an
@@ -588,7 +611,6 @@ function eventRange(e: CalendarEvent): string {
 export function buildTodayView(input: TodayInput): TodayView {
   const today = todayKey(input.now);
   const cal = readCalendar(input.calendar);
-  const todosFeed = readTodosForWindow(input.todos, today);
 
   let scheduled: TodayView["scheduled"];
   if (cal.kind === "none-enabled") {
@@ -618,21 +640,7 @@ export function buildTodayView(input: TodayInput): TodayView {
     }
   }
 
-  let due: TodayView["due"];
-  let tint: HeroTint | null;
-  if (todosFeed === "unavailable") {
-    due = { kind: "fail", line: todosFail() };
-    tint = heroTint(null);
-  } else {
-    // deck §6 Tile 1: "to-dos due today, then overdue to-dos" — the deck's
-    // order, not sortTodos's overdue-first. Each half is sortTodos'd: today's
-    // oldest-created first, the overdue most-overdue first.
-    const dueToday = sortTodos(todosFeed.rows.filter((t) => t.dueOn === today));
-    const overdue = sortTodos(todosFeed.rows.filter((t) => t.dueOn !== null && t.dueOn < today));
-    const rows = [...dueToday, ...overdue].map((t) => todoRow(t, today));
-    due = rows.length > 0 ? { kind: "rows", rows } : { kind: "empty" };
-    tint = heroTint(rows.length);
-  }
+  const { due, heroTint: tint } = buildTodayDue(input.todos, input.now);
 
   return {
     dateLabel: formatDay(today), // deck §6 Tile 1: `Thu 10 Sep`
