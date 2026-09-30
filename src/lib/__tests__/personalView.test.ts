@@ -357,6 +357,22 @@ describe("buildTodayView", () => {
   });
 });
 
+describe("TodayView.eventFormBlocked — `+ Event` refused before the fact", () => {
+  const off = (reason: "none-enabled" | "not-configured" | "expired" | "timeout"): CalendarFeed => ({
+    layers: LAYERS,
+    window: { ok: false, reason },
+    calendars: null,
+  });
+  it("every layer switched off: blocked", () => expect(today(off("none-enabled")).eventFormBlocked).toBe(true));
+  it("layers unreadable: blocked", () => expect(today("layers-unavailable").eventFormBlocked).toBe(true));
+  it("Google not set up: blocked", () => expect(today(off("not-configured")).eventFormBlocked).toBe(true));
+  it("Google access expired: blocked", () => expect(today(off("expired")).eventFormBlocked).toBe(true));
+  it("a timeout: not blocked — the door can still try", () => expect(today(off("timeout")).eventFormBlocked).toBe(false));
+  it("a partial window: not blocked", () =>
+    expect(today(okWindow([ev()], ["classes@g"])).eventFormBlocked).toBe(false));
+  it("a window that answered: not blocked", () => expect(today(okWindow([])).eventFormBlocked).toBe(false));
+});
+
 describe("buildTodayDue — the tint the Suspense fallback carries (R83)", () => {
   const feeds: Array<[string, OpenTodosFeed]> = [
     ["empty", open([])],

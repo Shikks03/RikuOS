@@ -296,6 +296,7 @@ export default async function PersonalPage() {
   const todoDue: TodoDueKeys =
     todos === "unavailable" ? {} : Object.fromEntries(todos.rows.map((t) => [t.id, t.dueOn]));
   const eventForm: EventFormData = {
+    today,
     calendars:
       settings === "unavailable"
         ? []

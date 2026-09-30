@@ -10,6 +10,8 @@ import type { TodoDueKeys } from "./Todos";
  * APP_TZ.
  */
 export interface EventFormData {
+  /** Today in APP_TZ — the week the page shows is today+1 … today+7 (deck §15's "outside this week"). */
+  today: DayKey;
   calendars: ReadonlyArray<{ calendarId: string; name: string }>;
   defaults: { dayKey: DayKey; start: string; end: string };
 }

@@ -156,6 +156,14 @@ export interface TodayView {
   spread: boolean;
   /** R40's 213px form floor, decided from the STORED SPAN. See formCapable. */
   formCapable: boolean;
+  /**
+   * `+ Event` cannot run, and the Scheduled group's sentence is its reason
+   * (the mockup's disabled pill with aria-describedby): every layer switched
+   * off (R20), the layers unreadable, Google not set up, or its access
+   * expired (R42). NOT for a timeout or a partial window — the door can
+   * still try, and its own outcome speaks for it.
+   */
+  eventFormBlocked: boolean;
 }
 
 /** R18's guard, in the TYPE: `—` is unreachable for an unread day. */
@@ -650,7 +658,14 @@ export function buildTodayView(input: TodayInput): TodayView {
     due,
     spread: scheduled.kind === "empty" && due.kind === "empty",
     formCapable: formCapableFor(input.layout, "today"),
+    eventFormBlocked: eventFormBlocked(input.calendar),
   };
+}
+
+function eventFormBlocked(feed: CalendarFeed): boolean {
+  if (feed === "layers-unavailable") return true;
+  if (feed.window.ok) return false;
+  return feed.window.reason !== "timeout";
 }
 
 // ---- 2. Next 7 days ---------------------------------------------------------
