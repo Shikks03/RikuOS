@@ -85,9 +85,11 @@ New Next.js App Router app, TypeScript strict, Mongoose, deployed on Vercel. Mob
 v0 collections (all Mongoose, per the schema rules in `CLAUDE.md` — bounded strings, enums, no `Mixed`):
 
 - **ApprovalItem** — `source` (agent enum), `type` (enum: `reply-draft` | `followup-draft` | `client-issue-email` | `triage-response` | `skill-edit`), `title`, `summary`, typed payload via Mongoose discriminators per type, `status` (`pending` | `approved` | `edited_approved` | `rejected` | `expired`), `staleAt`, decision metadata (`decidedAt`, `editedPayload`, `rejectNote`), action execution state (`actionStatus`: `pending` | `done` | `failed`, `actionError`, `actionAt`). Retained indefinitely (training data; rows are small).
-- **AgentRun** — `agent`, `startedAt`, `durationMs`, `ok`, typed counts summary, `error`. TTL 90 days.
+- **AgentRun** — `agent`, `startedAt`, `durationMs`, `ok`, typed counts summary, `error`, `skipped` (true when the run deliberately did no work — monitoring switched off — and says why in `error`; rows older than the field lack it and read as not skipped). TTL 90 days.
 - **PushSubscription** — endpoint + keys for web push; multiple devices allowed.
-- **OsSettings** — singleton (upsert pattern): per-agent enable toggles, chaser N-days threshold.
+- **OsSettings** — singleton (upsert pattern): per-agent enable toggles, chaser N-days threshold, and P10's two bounded typed arrays: `layers` (≤ 10 of `{calendarId, name, enabled}` — the calendars the Personal page and the morning push read, in display order) and `personalLayout` (exactly four rows of `{tile, span}`; the cross-entry rules — each tile once, a row ≤ 12 columns — live in `parseSettingsPatch`, so every write goes through it).
+- **Todo** — the app's own to-dos: `title`, `section` (`personal` | `freelance` | `academics` — `freelance` is this app's own to-dos about that work, never a ShikksTracker read), `dueOn` (a day, stored as that day's 00:00Z), `done`, `doneAt`, and the calendar pin: `calendarId`, `calendarEventId` (present exactly when the to-do is pinned) and `calendarBehind` (sync state: a title or day change is saved and Google has not confirmed it — the page's `entry on the old day`; never event data). Two indexes, `{done, dueOn}` for the open list and `{done, doneAt: -1}` for Done this week. **No TTL: done items are kept.**
+- **LastDigest** — singleton with a fixed `_id` (R55's pattern, not OsSettings'): the most recent morning push as the devices received it — `sentAt`, `title`, `body`, `devices` — overwritten whole on each send; its reader returns `null` when absent. The Personal page's push tile quotes it; `devices` is stored and not shown. No TTL.
 - **LoginAttempt** — ported rate-limit pattern, TTL 15 min.
 
 Phase-8 collections (Academics manual area, Personal projects) are specified when those pages are built. Calendar events are **never** stored (D5).
@@ -120,7 +122,7 @@ Contract stability rule: ShikksTracker may change its internals freely; these re
 | ~~Meta Messenger Platform~~ | **DROPPED (S15, 2026-09-05)** | — | Dev mode does NOT suffice: it delivers events only for role-holding accounts, so prospect DMs never arrive. The old line here read “Dev mode suffices — Riku admins the page”, which was true of the plumbing and misleading about the point. Publishing needs App Review, which needs business verification Riku will not do. Lane removed in both repos; D2 still binds |
 | Anthropic API | Draft generation (both apps), cron agents | API key per app | Model pinned via env. **Must not be called from Vercel's `hkg1` region** — see below |
 | Gmail API | ShikksTracker (existing send/poll) | OAuth refresh token | Unchanged |
-| Google Calendar API | RikuOS phase 8 | OAuth (same Google Cloud project pattern) | Read live + write-through only (D5) |
+| Google Calendar API | RikuOS P10 (Personal page, morning push) | OAuth refresh token in env (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`) | Two scopes, `calendar.readonly` + `calendar.events`. Read live + write-through + to-do pins (only the event id is stored on the `Todo`) — D5 |
 | Canvas LMS API | RikuOS phase 8 | Personal access token | Read-only |
 | Web Push (VAPID) | RikuOS notifications | VAPID keypair in env | iOS ≥ 16.4 PWA |
 
@@ -143,6 +145,8 @@ repo (S4).
 **Chaser → v0 finish line (RikuOS):** daily cron → `GET /api/os/attention` → for each replied-but-unanswered lead (capped per run): draft response via Anthropic API → `ApprovalItem` created → push notification → Riku taps approve (or edits) → `POST /api/os/drafts` → the draft is in ShikksTracker's lane → Riku sends (email batch-send or Messenger copy-paste). **v0 is done the first time this catches a real missed follow-up and the message goes out** (ratified 2026-08-28).
 
 **Watchdog:** cron → checks `AgentRun` freshness per agent schedule → any anomaly → named in the morning digest. Alerts on failure; never retries forever. It makes **no network call to ShikksTracker**, deliberately: a ShikksTracker outage must not make the watchdog claim RikuOS's own agents are broken.
+
+**Morning push (RikuOS):** daily cron → expiry sweep → (monitoring off: one `skipped` run per monitoring agent, sweep alerts only, no push) → watchdog, site health, outreach monitor → dispatcher: pending count, `GET /api/os/attention` **and the Today read** in parallel — today's events on the switched-on `layers` and the open to-dos due within three days or overdue (`readDigestToday`), each caught into `"unavailable"` so the digest never fails for Google or the to-do store → `composeDigest` → push to every device → the sent payload overwrites `LastDigest` (after the reached-no-device guard, and caught, so a failed write costs the run one item and never the push).
 
 **Outreach pipeline monitor:** the same cron → one `GET /api/os/summary` → judges the send engine (`lastRunAt`, `lastRunErrors`, stranded approved messages) and the Messenger webhook's liveness (`messenger.lastEventAt`, silent 10+ days) → findings join the same digest. Webhook freshness lives here rather than in the watchdog because it depends on that outbound call. **The Meta Graph API token ping named in this document remains unbuilt — see S9.**
 
