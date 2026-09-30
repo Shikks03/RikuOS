@@ -379,13 +379,19 @@
 .pe-sw:disabled,.pe-sw[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 
 /* ---- the push tile (R14) ---------------------------------------- */
-.pe-ptitle{font-weight:600;font-size:13px;color:var(--ink)}
+.pe-ptitle{font-weight:600;font-size:13px;color:var(--ink);overflow-wrap:anywhere}
+/* today's push body (L1d): the tile quotes, so a long unbroken word (an id
+   or path in a watchdog error) wraps rather than being clipped by the
+   tile's overflow, and the text keeps its whitespace exactly as the older
+   push's well does. Scoped by adjacency: .pe-ptitle exists only in the
+   push tile, so .fl-snip elsewhere is untouched. */
+.pe-ptitle + .fl-snip{overflow-wrap:anywhere;white-space:pre-wrap}
 /* the older push's stamp, and the pre.body well it sits above, so the
    quotation reads as subordinate to the stamp and not as content under
    the eyebrow. Values are pre.body's, verbatim. */
 .pe-last{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin-top:var(--sp-4)}
 .pe-quote{
-  white-space:pre-wrap;font-family:var(--body);font-size:12.5px;line-height:1.55;
+  white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--body);font-size:12.5px;line-height:1.55;
   color:var(--ink-2);background:var(--sunk);border:1px solid var(--line-soft);
   border-radius:var(--r-chip);padding:10px 12px;margin:var(--sp-3) 0 0;
 }
