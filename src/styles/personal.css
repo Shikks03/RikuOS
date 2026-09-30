@@ -304,6 +304,13 @@
 /* `on calendar` — a lowercase word, body face, no box: an ambient state
    of the row, not a category */
 .pe-on{font-size:11px;color:var(--ink-3);white-space:nowrap}
+/* NAMED EXCEPTION L1 (P10c lead ruling, R96): lateness renders BOTH forms
+   and the tile's width shows one — `3 days late` from 240px of tile up,
+   `3d late` below (the swap is in the 240 band further down). The same
+   tile is 262px at twelve columns and 226px at six, so the server cannot
+   pick one string, and measuring would need an effect (R33). display:none
+   keeps the hidden form out of the accessibility tree. */
+.pe-ls{display:none}
 .pe-daylbl{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 .pe-items{display:flex;flex-wrap:wrap;gap:4px var(--sp-4);font-size:13px;color:var(--ink-2);min-width:0}
 .pe-items .pe-it{display:inline-flex;align-items:center;gap:6px;min-width:0}
@@ -473,6 +480,8 @@
    keeps R13's own two-line form from 480. */
 @container tile (max-width:239.98px){
   .pe-tile{padding:12px}
+  .pe-lf{display:none}
+  .pe-ls{display:inline}
   /* BUILD DIFFERENCE (R32): the mockup writes this bare .formwell. It is
      qualified by .pe-cell, the element that declares the tile container,
      so the selector itself carries the namespace. (0,2,0) still beats

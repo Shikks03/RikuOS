@@ -14,7 +14,7 @@ export interface PushProps {
 export default function Push({ view }: PushProps) {
   return (
     <section className="pe-tile">
-      <TileHead>
+      <TileHead tile="push">
         <div>
           <span className="eyebrow">This morning’s push</span>
         </div>

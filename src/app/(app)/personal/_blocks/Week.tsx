@@ -11,7 +11,7 @@ export default async function Week({ view }: WeekProps) {
   await view;
   return (
     <section className="pe-tile">
-      <TileHead>
+      <TileHead tile="week">
         <div>
           <span className="eyebrow">Next 7 days</span>
         </div>
@@ -28,7 +28,7 @@ export default async function Week({ view }: WeekProps) {
 export function WeekFallback() {
   return (
     <section className="pe-tile">
-      <TileHead>
+      <TileHead tile="week">
         <div>
           <span className="eyebrow">Next 7 days</span>
         </div>

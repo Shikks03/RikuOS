@@ -19,7 +19,7 @@ export default function Done({ view }: DoneProps) {
   const empty = view.fail === null && view.count === null && view.rows.length === 0;
   return (
     <section className="pe-tile">
-      <TileHead inline>
+      <TileHead tile="done" inline>
         <span className="eyebrow">Done this week</span>
         {view.count !== null && <span className="fl-count">{view.count}</span>}
         {empty && <p className="fl-empty">Nothing ticked off yet this week.</p>}

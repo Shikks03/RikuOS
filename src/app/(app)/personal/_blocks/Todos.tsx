@@ -28,7 +28,7 @@ export interface TodosProps {
 export default function Todos({ view }: TodosProps) {
   return (
     <section className="pe-tile">
-      <TileHead>
+      <TileHead tile="todos">
         <div>
           <span className="eyebrow">To-do</span>
           {view.count !== null && <span className="fl-count">{view.count} open</span>}

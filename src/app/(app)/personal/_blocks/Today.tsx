@@ -39,7 +39,7 @@ export default async function Today({ view }: TodayProps) {
   const v = await view;
   return (
     <section className={heroClass(v.heroTint)}>
-      <TileHead>
+      <TileHead tile="today">
         <div>
           <span className="eyebrow">Today</span>
           <h2 className="fl-h">{v.dateLabel}</h2>
@@ -62,7 +62,7 @@ export default async function Today({ view }: TodayProps) {
 export function TodayFallback({ dateLabel, heroTint }: { dateLabel: string; heroTint: TodayView["heroTint"] }) {
   return (
     <section className={heroClass(heroTint)}>
-      <TileHead>
+      <TileHead tile="today">
         <div>
           <span className="eyebrow">Today</span>
           <h2 className="fl-h">{dateLabel}</h2>
