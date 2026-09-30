@@ -15,6 +15,9 @@ import {
   buildDoneView,
   buildPushTileView,
   buildLayersView,
+  buildSettingsCards,
+  pickerRows,
+  pickerToggle,
   dayShape,
   TODO_ITEM_CALENDAR_ID,
   OPEN_TODOS_CAP,
@@ -953,5 +956,114 @@ describe("lateness leaves the view model in its long form only", () => {
     const v = buildTodoTileView({ now: NOW, todos: open([todo({ dueOn: "2026-09-09" }), todo({ dueOn: "2026-09-01" })]) });
     const texts = v.sections![0].rows.map((r) => r.due?.text);
     expect(texts).toEqual(["9 days late", "1 day late"]);
+  });
+});
+
+describe("the Settings picker (P10c Task 9, R42, R43)", () => {
+  const GOOGLE: CalendarListEntry[] = [
+    { calendarId: "primary", name: "Personal", primary: true },
+    { calendarId: "events@g", name: "Events", primary: false },
+    { calendarId: "org@g", name: "Org Stuff", primary: false },
+    { calendarId: "ph#holiday", name: "Holidays in Philippines", primary: false },
+  ];
+  const LIMITS = { layers: 10, name: 120 };
+
+  it("a stored layer absent from Google keeps its row, stays ticked, and gets the note", () => {
+    const rows = pickerRows(LAYERS, GOOGLE);
+    expect(rows[1]).toEqual({
+      calendarId: "classes@g",
+      name: "Classes",
+      ticked: true,
+      note: "Classes is no longer on your Google account. Untick it in Settings.",
+    });
+  });
+
+  it("a Google calendar not in layers appears unticked with no note, after the stored rows in Google's order", () => {
+    const rows = pickerRows(LAYERS, GOOGLE);
+    expect(rows.slice(3)).toEqual([
+      { calendarId: "org@g", name: "Org Stuff", ticked: false, note: null },
+      { calendarId: "ph#holiday", name: "Holidays in Philippines", ticked: false, note: null },
+    ]);
+  });
+
+  it("stored order is preserved, whatever order Google answers in (D10)", () => {
+    const rows = pickerRows(LAYERS, [...GOOGLE].reverse());
+    expect(rows.map((r) => r.calendarId)).toEqual(["primary", "classes@g", "events@g", "ph#holiday", "org@g"]);
+    expect(rows.slice(0, 3).every((r) => r.ticked)).toBe(true);
+    // A present stored row carries no note and keeps its stored name.
+    expect(rows[0]).toEqual({ calendarId: "primary", name: "Personal", ticked: true, note: null });
+  });
+
+  it("no layers: every calendar unticked, in Google's order", () => {
+    expect(pickerRows([], GOOGLE).map((r) => [r.calendarId, r.ticked])).toEqual(
+      GOOGLE.map((c) => [c.calendarId, false]),
+    );
+  });
+
+  it("an eleventh tick is refused with `Up to 10 calendars.`", () => {
+    const ten: Layer[] = Array.from({ length: 10 }, (_, i) => ({ calendarId: `c${i}@g`, name: `C${i}`, enabled: true }));
+    expect(pickerToggle(ten, { calendarId: "c10@g", name: "C10" }, LIMITS)).toEqual({
+      ok: false,
+      note: "Up to 10 calendars.",
+    });
+    // An untick at the bound is never refused.
+    const untick = pickerToggle(ten, { calendarId: "c3@g", name: "C3" }, LIMITS);
+    expect(untick.ok && untick.layers.map((l) => l.calendarId)).toEqual(
+      ten.filter((l) => l.calendarId !== "c3@g").map((l) => l.calendarId),
+    );
+  });
+
+  it("a tick appends the calendar switched on; an untick removes it; the input is not mutated", () => {
+    const before = LAYERS.map((l) => ({ ...l }));
+    const ticked = pickerToggle(LAYERS, { calendarId: "org@g", name: "Org Stuff" }, LIMITS);
+    expect(ticked).toEqual({ ok: true, layers: [...before, { calendarId: "org@g", name: "Org Stuff", enabled: true }] });
+    const unticked = pickerToggle(LAYERS, { calendarId: "classes@g", name: "Classes" }, LIMITS);
+    expect(unticked).toEqual({ ok: true, layers: [before[0], before[2]] });
+    expect(LAYERS).toEqual(before);
+  });
+
+  it("a Google name past the model's bound is shortened, so a tick cannot become a 400", () => {
+    const long = "x".repeat(200);
+    const r = pickerToggle([], { calendarId: "long@g", name: long }, LIMITS);
+    expect(r.ok && r.layers[0].name.length).toBe(120);
+  });
+});
+
+describe("the Settings page's two Google cards (deck §9, R24)", () => {
+  const GOOGLE: CalendarListEntry[] = [{ calendarId: "primary", name: "Personal", primary: true }];
+  const NOT_SET_UP = "Not set up. Add the three Google values to the environment and redeploy.";
+  const EXPIRED = "Access expired. Run the sign-in again and replace the token.";
+
+  it("`Connected.` only when the list came back, and the picker joins it", () => {
+    const v = buildSettingsCards({ ok: true, calendars: GOOGLE }, LAYERS);
+    expect(v.connection).toBe("Connected.");
+    expect(v.layers).toEqual({ kind: "picker", rows: pickerRows(LAYERS, GOOGLE), stored: LAYERS });
+  });
+
+  it("not set up / expired: both cards say the connection sentence, and no list", () => {
+    expect(buildSettingsCards({ ok: false, kind: "not-configured" }, LAYERS)).toEqual({
+      connection: NOT_SET_UP,
+      layers: { kind: "sentence", text: NOT_SET_UP },
+    });
+    expect(buildSettingsCards({ ok: false, kind: "expired" }, "unavailable")).toEqual({
+      connection: EXPIRED,
+      layers: { kind: "sentence", text: EXPIRED },
+    });
+  });
+
+  it("any other failure: couldn't check, couldn't list", () => {
+    for (const kind of ["timeout", "http", "gone", "unknown"] as const) {
+      expect(buildSettingsCards({ ok: false, kind }, LAYERS)).toEqual({
+        connection: "Couldn't check right now.",
+        layers: { kind: "sentence", text: "Couldn't list your calendars." },
+      });
+    }
+  });
+
+  it("the list came back but the stored layers did not: still Connected., and no picker", () => {
+    expect(buildSettingsCards({ ok: true, calendars: GOOGLE }, "unavailable")).toEqual({
+      connection: "Connected.",
+      layers: { kind: "sentence", text: "Couldn't load layers." },
+    });
   });
 });

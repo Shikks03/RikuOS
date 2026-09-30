@@ -31,7 +31,7 @@ import { addDays, clockHHMM, dayKey, formatDay, todayKey, type DayKey } from "@/
 import { compareEvents } from "@/lib/eventOrder";
 import { dueChip, sortTodos, type CreateTodoInput } from "@/lib/todos";
 import { formCapable, type PersonalTile, type ReadonlyPersonalLayout } from "@/lib/personalLayout";
-import type { CalendarEvent, CalendarListEntry, CalendarWindow } from "@/lib/google";
+import type { CalendarEvent, CalendarListEntry, CalendarWindow, GoogleErrorKind } from "@/lib/google";
 import type { StoredDigest } from "@/lib/lastDigest";
 import type { Layer } from "@/lib/osSettings";
 
@@ -892,5 +892,138 @@ export function buildLayersView(input: LayersInput): LayersTileView {
           : null,
     })),
     line: null,
+  };
+}
+
+// ---- The Settings page's two Google cards (P10c Task 9) ----------------------
+
+/** One row of the Settings picker (`.pickrow`). `ticked` = the calendar is a stored layer. */
+export interface PickerRow {
+  calendarId: string;
+  name: string;
+  ticked: boolean;
+  /** deck §15's vanished-calendar sentence, or null. Rendered in `.fl-note`, no dot. */
+  note: string | null;
+}
+
+/**
+ * The picker's rows: the STORED layers first, in stored order (membership
+ * order is display order, D10), then every Google calendar that is not a
+ * layer, unticked, in Google's order (deck §9). Derived from `layers` joined
+ * against Google's list and NOT from Google's list alone (R42): a stored
+ * layer Google no longer returns keeps its row — ticked and live, so there is
+ * something to untick — and carries deck §15's sentence. A stored row keeps
+ * its stored name, the name the Personal page shows.
+ */
+export function pickerRows(
+  stored: readonly Layer[],
+  fromGoogle: readonly CalendarListEntry[],
+): PickerRow[] {
+  const present = new Set(fromGoogle.map((c) => c.calendarId));
+  const chosen = new Set(stored.map((l) => l.calendarId));
+  return [
+    ...stored.map((l) => ({
+      calendarId: l.calendarId,
+      name: l.name,
+      ticked: true,
+      note: present.has(l.calendarId)
+        ? null
+        : `${l.name} is no longer on your Google account. Untick it in Settings.`, // deck §15, R42
+    })),
+    ...fromGoogle
+      .filter((c) => !chosen.has(c.calendarId))
+      .map((c) => ({ calendarId: c.calendarId, name: c.name, ticked: false, note: null })),
+  ];
+}
+
+/** The two bounds a tick is checked against — OsSettings' LAYERS_MAX and LAYER_NAME_MAX, passed in so this module never imports a model (R52). */
+export interface PickerLimits {
+  layers: number;
+  name: number;
+}
+
+export type PickerToggle =
+  | { ok: true; layers: Layer[] }
+  | { ok: false; note: "Up to 10 calendars." };
+
+/**
+ * One tap on a picker row → the WHOLE `layers` array the PATCH sends (the
+ * door replaces it whole; settings.ts). Unticking removes the layer, and its
+ * switch with it (deck §9). Ticking appends it switched on ("Defaults when
+ * first chosen: on", deck §6 Tile 3), its name bounded to the model's
+ * maxlength so a long Google name cannot turn a tick into a 400. A tick past
+ * the bound is refused before any request with deck §9's `Up to 10
+ * calendars.` — a press outcome, never a standing note (R43). An untick is
+ * never refused, so a store somehow over the bound can still be brought back
+ * under it.
+ */
+export function pickerToggle(
+  stored: readonly Layer[],
+  row: { calendarId: string; name: string },
+  limits: PickerLimits,
+): PickerToggle {
+  const copy = stored.map((l) => ({ calendarId: l.calendarId, name: l.name, enabled: l.enabled }));
+  if (copy.some((l) => l.calendarId === row.calendarId)) {
+    return { ok: true, layers: copy.filter((l) => l.calendarId !== row.calendarId) };
+  }
+  if (copy.length >= limits.layers) return { ok: false, note: "Up to 10 calendars." }; // deck §9, R43
+  const name = row.name.length > limits.name ? `${row.name.slice(0, limits.name - 1)}…` : row.name;
+  return { ok: true, layers: [...copy, { calendarId: row.calendarId, name, enabled: true }] };
+}
+
+/** What `listCalendars()` answered, as the Settings page hands it over: the list, or the failure's kind. */
+export type CalendarListFeed =
+  | { ok: true; calendars: CalendarListEntry[] }
+  | { ok: false; kind: GoogleErrorKind | "unknown" };
+
+export interface SettingsCardsView {
+  /** The `Google Calendar` card's one sentence (deck §9). */
+  connection: string;
+  /** The `Calendar layers` card: its picker, or one sentence and no list. */
+  /** `stored` is the array the rows were joined from: pickerToggle builds each PATCH from it. */
+  layers: { kind: "picker"; rows: PickerRow[]; stored: Layer[] } | { kind: "sentence"; text: string };
+}
+
+const NOT_SET_UP = "Not set up. Add the three Google values to the environment and redeploy."; // deck §9
+const EXPIRED = "Access expired. Run the sign-in again and replace the token."; // deck §9
+
+/**
+ * Both Settings cards from ONE `listCalendars()` answer (R24). `Connected.`
+ * means exactly that the list came back (deck §15) — not that a token exists.
+ * Not set up or expired: the layers card repeats the connection card's own
+ * sentence and shows no list, because an empty picker reads as a page that
+ * failed rather than a connection never made (visual spec §4.10). Any other
+ * failure — timeout, http, gone, or something that is not a GoogleError — is
+ * `Couldn't check right now.` / `Couldn't list your calendars.`. A list that
+ * came back beside a stored `layers` that could not be read cannot be joined
+ * (R42 needs both), so the layers card says Tile 3's `Couldn't load layers.`
+ * and the connection card still says `Connected.`: the two facts are separate.
+ */
+export function buildSettingsCards(
+  google: CalendarListFeed,
+  stored: readonly Layer[] | "unavailable",
+): SettingsCardsView {
+  if (!google.ok) {
+    if (google.kind === "not-configured") {
+      return { connection: NOT_SET_UP, layers: { kind: "sentence", text: NOT_SET_UP } };
+    }
+    if (google.kind === "expired") {
+      return { connection: EXPIRED, layers: { kind: "sentence", text: EXPIRED } };
+    }
+    return {
+      connection: "Couldn't check right now.", // deck §9
+      layers: { kind: "sentence", text: "Couldn't list your calendars." }, // deck §9
+    };
+  }
+  if (stored === "unavailable") {
+    return { connection: "Connected.", layers: { kind: "sentence", text: "Couldn't load layers." } }; // deck §9; deck §6 Tile 3, §11
+  }
+  return {
+    connection: "Connected.", // deck §9
+    layers: {
+      kind: "picker",
+      rows: pickerRows(stored, google.calendars),
+      stored: stored.map((l) => ({ calendarId: l.calendarId, name: l.name, enabled: l.enabled })),
+    },
   };
 }
