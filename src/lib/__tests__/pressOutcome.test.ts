@@ -27,16 +27,19 @@ describe("pressOutcome — the door answered", () => {
       kind: "failed",
       code: "save-failed",
       sentence: "Couldn’t save.",
+      body: { error: "save-failed" },
     });
     expect(await pressOutcome(json({ error: "Could not save.", code: "save-failed" }, 500))).toEqual({
       kind: "failed",
       code: "save-failed",
       sentence: "Couldn’t save.",
+      body: { error: "Could not save.", code: "save-failed" },
     });
     expect(await pressOutcome(json({ error: "no-title" }, 400))).toEqual({
       kind: "failed",
       code: "no-title",
       sentence: "Give it a title.",
+      body: { error: "no-title" },
     });
   });
 
@@ -45,11 +48,13 @@ describe("pressOutcome — the door answered", () => {
       kind: "failed",
       code: null,
       sentence: "Couldn’t save.",
+      body: { error: "Unauthorized" },
     });
     expect(await pressOutcome(json({ error: "At most 10 layers can be chosen." }, 400))).toEqual({
       kind: "failed",
       code: null,
       sentence: "Couldn’t save.",
+      body: { error: "At most 10 layers can be chosen." },
     });
   });
 
@@ -58,12 +63,21 @@ describe("pressOutcome — the door answered", () => {
       kind: "failed",
       code: "bad-json",
       sentence: "Couldn’t save.",
+      body: { error: "bad-json" },
     });
     expect(await pressOutcome(json({ error: "not-found" }, 404), "delete-failed")).toEqual({
       kind: "failed",
       code: "not-found",
       sentence: "Couldn’t delete.",
+      body: { error: "not-found" },
     });
+  });
+
+  it("a refusal keeps the door's body, so the event door's reason survives", async () => {
+    const refused = { error: "calendar-failed", calendar: { kind: "failed", cause: "refused", orphaned: false } };
+    const out = await pressOutcome(json(refused, 502));
+    expect(out).toEqual({ kind: "failed", code: "calendar-failed", sentence: "Couldn’t save.", body: refused });
+    expect(out.kind === "failed" && (out.body as typeof refused).calendar.cause).toBe("refused");
   });
 
   it("the door's own calendar-unknown stays unknown", async () => {

@@ -31,8 +31,15 @@ import { ERROR_SENTENCES, type ErrorSentenceCode } from "@/lib/personalErrors";
 export type PressOutcome =
   /** `body` is the door's parsed JSON — the caller validates it before trusting it. */
   | { kind: "ok"; body: unknown }
-  /** `code` is the door's, or null for a sentence-only body (the settings 400s, the 401). */
-  | { kind: "failed"; code: string | null; sentence: string }
+  /**
+   * `code` is the door's, or null for a sentence-only body (the settings 400s,
+   * the 401). `body` is the door's parsed JSON object, kept because some
+   * refusals carry more than a code — the event door's 502/503
+   * `{ error: "calendar-failed", calendar: { kind: "failed", cause } }` is the
+   * only place `Google didn’t accept it: <its reason>.` can read its reason.
+   * The caller validates it before trusting it.
+   */
+  | { kind: "failed"; code: string | null; sentence: string; body: unknown }
   | { kind: "unknown"; sentence: string };
 
 const UNKNOWN: PressOutcome = { kind: "unknown", sentence: ERROR_SENTENCES["calendar-unknown"] }; // deck §15
@@ -83,7 +90,7 @@ export async function pressOutcome(
   const { code, error } = body as { code?: unknown; error?: unknown };
   const said = typeof code === "string" ? code : typeof error === "string" ? error : null;
   if (said === null || said === "calendar-unknown") return UNKNOWN;
-  if (isErrorCode(said)) return { kind: "failed", code: said, sentence: ERROR_SENTENCES[said] };
+  if (isErrorCode(said)) return { kind: "failed", code: said, sentence: ERROR_SENTENCES[said], body };
   // A code the island cannot produce, or a sentence (which is not a code).
-  return { kind: "failed", code: CODE_SHAPE.test(said) ? said : null, sentence: ERROR_SENTENCES[fallback] };
+  return { kind: "failed", code: CODE_SHAPE.test(said) ? said : null, sentence: ERROR_SENTENCES[fallback], body };
 }
