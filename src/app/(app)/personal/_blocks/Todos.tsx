@@ -86,21 +86,18 @@ export default function Todos({ view, todoDue, formCapable }: TodosProps) {
               ))}
             </div>
           )}
+          {/* deck §6 Tile 2: `Showing 20 of 34.` — the section's own bound, under
+              its own rows. A recorded deviation from R16's foot (lead ruling
+              N3): three sections' identical lines in one foot could not be
+              told apart. */}
+          {section.bound !== null && <p className="fl-bound">{section.bound}</p>}
         </div>
       ))
     );
 
-  // R16: the foot holds display meta — each section's `Showing 20 of 34.` (deck §6 Tile 2).
-  const bounds =
-    view.sections === null
-      ? []
-      : view.sections.flatMap((s) =>
-          s.bound === null ? [] : [<p className="fl-bound" key={s.key}>{s.bound}</p>],
-        );
-
   return (
     <section className="pe-tile">
-      <TodoTile head={head} body={body} foot={bounds.length > 0 ? bounds : null} formCapable={formCapable} />
+      <TodoTile head={head} body={body} formCapable={formCapable} />
     </section>
   );
 }

@@ -10,41 +10,38 @@
  * `.pe-said`'s register, no hue), fields go `readonly` while busy. Escape
  * closes KEEPING what was typed; Cancel closes and forgets it.
  *
- * WHERE THE TYPING LIVES. Never in the form. Every typed value is state of
- * the TILE that holds the form — the add draft in TodoTile, each row's edit
- * draft in the tile's FormDrafts map — and the form is a view of it. So any
- * close keeps it, whoever closes: Escape, the row's own close, and edit mode
- * (Task 8), which closes an open add form by bumping `editEpoch` (the form
- * shows only while the epoch it was opened in is current) — no effect, no
- * reaching into the form. Only Cancel and a save that landed forget a draft.
- * The same draft carries `parked`: an add that got no answer stays refused
- * across a close and a reopen, so no reopen can invite a duplicate.
+ * EVERYTHING A PRESS LEAVES BEHIND LIVES IN THE TILE, never in the form: the
+ * typed values, the press in flight (`sending`), the refusal after a press
+ * that got no answer (`parked`) and the press's sentence (`said`). The add
+ * draft is TodoTile's state; each row's edit draft is the tile's FormDrafts
+ * map. The form is a view of it, so a close, a reopen, a remount (edit mode
+ * closing the form by bumping `editEpoch`, a body swap) can never lose what
+ * was typed, drop a sentence, or re-enable a press that is still in flight —
+ * no form can send twice. Only Cancel and a save that landed forget a draft.
  *
  * FOCUS, and no effect hook (R33). Opening the add form moves focus into
  * Title inside the pill's handler (flushSync, then the ref); closing returns
  * it to the pill. The edit form's Title takes `autoFocus`, honestly: its only
  * mount is the Edit press that opened it (TodoRow owns that handler), and
  * its close goes back through `useRowEdit().close()` to the row's Edit
- * button. The delete confirmation moves focus to `Keep`, and `Keep` returns
- * it to `Delete`.
+ * button — or to the tile's pill when the row is leaving (deleted, or moved
+ * to another section). The confirmation moves focus to `Keep`; `Keep`
+ * returns it to `Delete`.
  *
  * BUSY WITHOUT DROPPING FOCUS (L9). Every pill in the form that can hold
  * focus when a press starts takes `aria-disabled` plus a guard, never
- * `disabled` (which would throw focus to <body>). The switch keeps
- * `disabled`: pressing it never submits, so it is never the focused control
- * when a press starts.
+ * `disabled`. The switch keeps `disabled`: pressing it never submits.
  *
  * OUTCOMES (L7: pressOutcome decides, and nothing here re-derives it).
- *   ok       the form closes, the draft is forgotten, and the page re-reads.
- *            A calendar leg that did not finish says its sentence under the
- *            tile's head, with the `--stale` dot (R49 — a claim about
- *            Google, not about the press).
+ *   ok       the form closes, the draft is forgotten, the page re-reads. A
+ *            calendar leg that did not finish says so under the tile's head
+ *            with the `--stale` dot (R49: a claim about Google).
  *   failed   the sentence sits above the buttons; the form keeps everything.
  *   unknown  `Couldn’t tell if that saved.` — never a claimed failure. An
  *            ADD parks: `Add` stays refused and `Cancel` is the only live
- *            control, because a to-do that may already exist must not be
- *            added twice. An edit re-sends the same values harmlessly, so
- *            `Save` stays live. The page re-reads either way.
+ *            control, so a to-do that may already exist is never added
+ *            twice. An edit re-sends the same values harmlessly, so `Save`
+ *            stays live.
  */
 
 import {
@@ -62,7 +59,7 @@ import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { PRESS_TIMEOUT_MS, TODO_TITLE_MAX } from "@/lib/constants";
 import type { DayKey } from "@/lib/days";
-import { ERROR_SENTENCES, type CalendarOutcome } from "@/lib/personalErrors";
+import { ENTRY_LEFT_SENTENCE, ERROR_SENTENCES, type CalendarOutcome } from "@/lib/personalErrors";
 import type { SayLine } from "@/lib/personalView";
 import { pressOutcome } from "@/lib/pressOutcome";
 import { TileBody, TileFoot, TileHead, usePersonalPage } from "./LayoutEditor";
@@ -72,22 +69,43 @@ import { useRowEdit } from "./TodoRow";
 
 type CalendarFailCause = Extract<CalendarOutcome, { kind: "failed" }>["cause"];
 
+/** Which deck §7 sentence a reason fills: `gone` reads differently in each. */
+export type ReasonFor = "event" | "pin" | "move";
+
 /**
  * THE ONE LIST of `<reason>` words, for deck §7's three sentences that carry
  * one: `Google didn’t accept it: <its reason>.` (Add an event), `Saved, but
  * the calendar entry failed: <reason>. …` (Add a to-do) and `Saved, but the
  * calendar entry couldn’t be moved: <reason>.` (Edit a to-do). The deck
- * names the slot and not the words; the doors answer a cause, never Google's
- * own message. EventForm imports this map; nothing else writes a reason.
+ * names the slot and not the words, and the doors answer a cause, never
+ * Google's own message. EventForm reads this through calendarReason.
  */
-export const CALENDAR_REASONS: Readonly<Record<CalendarFailCause, string>> = Object.freeze({
-  "not-configured": "Google isn’t connected", // PROVISIONAL (P10c)
-  expired: "Google access has expired", // PROVISIONAL (P10c)
-  refused: "the request was refused", // PROVISIONAL (P10c)
-  gone: "that calendar or entry no longer exists", // PROVISIONAL (P10c)
-  changed: "the to-do changed while the entry was being added", // PROVISIONAL (P10c)
-  store: "the entry couldn’t be recorded", // PROVISIONAL (P10c)
-});
+const CALENDAR_REASONS: Readonly<Record<CalendarFailCause, string | Readonly<Record<ReasonFor, string>>>> =
+  Object.freeze({
+    "not-configured": "Google isn’t connected yet", // PROVISIONAL (P10c)
+    expired: "Google access has expired", // PROVISIONAL (P10c)
+    refused: "Google refused the request", // PROVISIONAL (P10c)
+    gone: Object.freeze({
+      event: "the calendar is no longer on your Google account", // PROVISIONAL (P10c)
+      pin: "the calendar is no longer on your Google account", // PROVISIONAL (P10c)
+      move: "the entry is no longer on Google", // PROVISIONAL (P10c)
+    }),
+    changed: "the to-do changed at the same moment", // PROVISIONAL (P10c)
+    store: "the app couldn’t record it", // PROVISIONAL (P10c)
+  });
+
+export function calendarReason(cause: CalendarFailCause, sentence: ReasonFor): string {
+  const r = CALENDAR_REASONS[cause];
+  return typeof r === "string" ? r : r[sentence];
+}
+
+/**
+ * A pin whose entry may exist on Google with no record pointing at it (an
+ * unanswered insert, or a failure whose clean-up did not take): saying `The
+ * to-do is not on the calendar.` there could be false.
+ */
+const PIN_MAYBE_MADE =
+  "Saved. A calendar entry may have been made anyway. Check Google Calendar before switching it on again."; // PROVISIONAL (P10c)
 
 /** The door's `calendar` field, checked before it is trusted; null when it is not the door's shape. */
 export function calendarOf(body: unknown): CalendarOutcome | null {
@@ -110,27 +128,39 @@ export function calendarOf(body: unknown): CalendarOutcome | null {
  */
 type Leg = "pin" | "move" | "unpin";
 
-/** deck §7 / §15: what a calendar leg that did not finish says, under the tile's head. */
+/**
+ * What a calendar leg that did not finish says, under the tile's head. The
+ * to-do's own write landed (the door answered 2xx), so nothing here says the
+ * save failed. An outcome the door did not spell out is treated as unknown.
+ */
 function calendarLine(leg: Leg, outcome: CalendarOutcome | null): SayLine | null {
   if (outcome !== null && (outcome.kind === "none" || outcome.kind === "ok")) return null;
-  if (outcome === null || outcome.kind === "unknown") {
-    return { text: ERROR_SENTENCES["calendar-unknown"], dot: null }; // deck §15
-  }
-  const reason = CALENDAR_REASONS[outcome.cause];
+  const c: CalendarOutcome = outcome ?? { kind: "unknown", orphaned: false };
   switch (leg) {
-    case "pin":
-      // deck §7, Add a to-do
-      return { text: `Saved, but the calendar entry failed: ${reason}. The to-do is not on the calendar.`, dot: "stale" };
-    case "move":
-      // deck §7, Edit a to-do
-      return { text: `Saved, but the calendar entry couldn’t be moved: ${reason}.`, dot: "stale" };
     case "unpin":
-      // deck §7, Edit a to-do (after done, switch-off, or delete)
-      return { text: "Done, but the calendar entry couldn’t be removed. Remove it in Google Calendar.", dot: "stale" };
+      // deck §7 (after done, switch-off, or delete) / §15: the entry may still be there.
+      return { text: ENTRY_LEFT_SENTENCE, dot: "stale" };
+    case "pin":
+      if (c.kind === "failed" && !c.orphaned) {
+        // deck §7, Add a to-do: nothing was left on Google.
+        return {
+          text: `Saved, but the calendar entry failed: ${calendarReason(c.cause, "pin")}. The to-do is not on the calendar.`,
+          dot: "stale",
+        };
+      }
+      return { text: PIN_MAYBE_MADE, dot: "stale" };
+    case "move":
+      if (c.kind === "failed") {
+        // deck §7, Edit a to-do
+        return { text: `Saved, but the calendar entry couldn’t be moved: ${calendarReason(c.cause, "move")}.`, dot: "stale" };
+      }
+      // deck §15: the move may or may not have landed; the row's own
+      // `entry on the old day` reports it after the re-read if it did not.
+      return { text: ERROR_SENTENCES["calendar-unknown"], dot: null };
   }
 }
 
-// ---- drafts: the typing lives in the tile -----------------------------------
+// ---- drafts: everything lives in the tile -----------------------------------
 
 type Section = "personal" | "freelance" | "academics";
 
@@ -141,23 +171,35 @@ const SECTIONS: ReadonlyArray<{ key: Section; label: string }> = [
   { key: "academics", label: "Academics" },
 ];
 
-export interface TodoDraft {
+interface TodoValues {
   title: string;
   section: Section;
   /** "" = no due day; otherwise the <input type="date"> value, a DayKey. */
   due: string;
   onCalendar: boolean;
-  /** An add that got no answer: refused until Cancel (see the header). Never set on an edit. */
+}
+
+type Sending = false | "add" | "save" | "delete";
+
+export interface TodoDraft {
+  /** An edit's starting values — a PATCH sends only what differs from these. null for an add. */
+  base: TodoValues | null;
+  values: TodoValues;
+  /** The press in flight: the form is frozen and no pill can start a second. */
+  sending: Sending;
+  /** An add that got no answer: refused until Cancel. Never set on an edit. */
   parked: boolean;
+  /** The press's sentence above the buttons. */
+  said: string | null;
 }
 
 /** The add form's empty draft (deck §7 defaults). */
-export const EMPTY_TODO: TodoDraft = Object.freeze({
-  title: "",
-  section: "personal",
-  due: "",
-  onCalendar: false,
+const EMPTY_ADD: TodoDraft = Object.freeze({
+  base: null,
+  values: Object.freeze({ title: "", section: "personal" as Section, due: "", onCalendar: false }),
+  sending: false,
   parked: false,
+  said: null,
 });
 
 /** An open to-do as its edit form starts from. */
@@ -170,14 +212,19 @@ export interface EditableTodo {
 }
 
 function draftOf(t: EditableTodo): TodoDraft {
-  return { title: t.title, section: t.section, due: t.dueOn ?? "", onCalendar: t.onCalendar, parked: false };
+  const values = { title: t.title, section: t.section, due: t.dueOn ?? "", onCalendar: t.onCalendar };
+  return { base: values, values, sending: false, parked: false, said: null };
 }
 
+type DraftUpdate = (d: TodoDraft) => TodoDraft;
+
 interface FormDraftsValue {
-  /** Each row's edit draft, by to-do id — state of the tile, so a closed row form keeps it. */
+  /** Each row's edit draft, by to-do id. */
   drafts: ReadonlyMap<string, TodoDraft>;
-  setDraft: (id: string, draft: TodoDraft | null) => void;
-  /** Focus the tile's own pill (`+ To-do` / `+ Event`) — where a deleted row's focus goes. */
+  /** Functional update of one row's draft, starting from `init` when it has none. */
+  update: (id: string, init: TodoDraft, fn: DraftUpdate) => void;
+  forget: (id: string) => void;
+  /** Focus the tile's own pill (`+ To-do` / `+ Event`), or the tile when it is off. */
   focusPill: () => void;
 }
 
@@ -185,19 +232,23 @@ const FormDrafts = createContext<FormDraftsValue | null>(null);
 
 /**
  * The state behind FormDrafts, for the two tiles whose rows carry an edit
- * form (To-do, and Today's DUE group). Immutable updates: every keystroke is
- * a state change of the tile, never a mutation.
+ * form (To-do, and Today's DUE group). Immutable updates only.
  */
 export function useFormDraftsState(focusPill: () => void): FormDraftsValue {
   const [drafts, setDrafts] = useState<ReadonlyMap<string, TodoDraft>>(() => new Map());
   return {
     drafts,
-    setDraft: (id, draft) =>
+    update: (id, init, fn) =>
       setDrafts((all) => {
-        if (draft === null && !all.has(id)) return all;
         const next = new Map(all);
-        if (draft === null) next.delete(id);
-        else next.set(id, draft);
+        next.set(id, fn(all.get(id) ?? init));
+        return next;
+      }),
+    forget: (id) =>
+      setDrafts((all) => {
+        if (!all.has(id)) return all;
+        const next = new Map(all);
+        next.delete(id);
         return next;
       }),
     focusPill,
@@ -208,29 +259,38 @@ export function FormDraftsProvider({ value, children }: { value: FormDraftsValue
   return <FormDrafts.Provider value={value}>{children}</FormDrafts.Provider>;
 }
 
+/**
+ * Where focus goes when the control holding it is leaving: the tile's pill,
+ * or — when the pill is switched off and cannot take focus — the tile itself
+ * (focusable only programmatically, out of the tab order), so it never falls
+ * to <body>. Called from handlers only.
+ */
+export function focusPillOrTile(pill: HTMLButtonElement | null) {
+  if (pill === null) return;
+  if (!pill.disabled) {
+    pill.focus();
+    return;
+  }
+  const tile = pill.closest<HTMLElement>(".pe-tile");
+  if (tile === null) return;
+  if (!tile.hasAttribute("tabindex")) tile.setAttribute("tabindex", "-1");
+  tile.focus();
+}
+
 // ---- Tile 2's client half: the pill, and the body the form replaces ---------
 
 /**
- * The To-do tile's head pill and body. The eyebrow and count (`head`), the
- * sections (`body`) and the bounds (`foot`) are rendered on the server and
- * handed in; this places them and swaps the body for the add form while it
- * is open (R28: a form replaces the tile's body, never scrolls).
+ * The To-do tile's head pill and body. The eyebrow and count (`head`) and
+ * the sections (`body`) are rendered on the server and handed in; this
+ * places them and swaps the body for the add form while it is open (R28: a
+ * form replaces the tile's body, never scrolls).
  *
  * `formCapable` false (R40, formCapableFor on the stored row) switches the
  * pill off with `Too narrow for the form.` under the head, and nothing is
- * taken away from the arrangement.
+ * taken away from the arrangement. While an add is in flight the pill is
+ * `aria-disabled`: closing then reopening must not offer a second send.
  */
-export function TodoTile({
-  head,
-  body,
-  foot,
-  formCapable,
-}: {
-  head: ReactNode;
-  body: ReactNode;
-  foot: ReactNode;
-  formCapable: boolean;
-}) {
+export function TodoTile({ head, body, formCapable }: { head: ReactNode; body: ReactNode; formCapable: boolean }) {
   const page = usePersonalPage();
   const pill = useRef<HTMLButtonElement>(null);
   const title = useRef<HTMLInputElement>(null);
@@ -239,18 +299,19 @@ export function TodoTile({
   // The epoch the form was opened in; edit mode bumps the epoch, which closes
   // it (visual spec §7.3: "An open form closes on entry, keeping what was typed").
   const [openAt, setOpenAt] = useState<number | null>(null);
-  const [draft, setDraft] = useState<TodoDraft>(EMPTY_TODO);
-  const drafts = useFormDraftsState(() => pill.current?.focus());
+  const [draft, setDraft] = useState<TodoDraft>(EMPTY_ADD);
+  const drafts = useFormDraftsState(() => focusPillOrTile(pill.current));
   const open = formCapable && openAt !== null && openAt === page.editEpoch && !page.editing;
+  const sending = draft.sending !== false;
 
   function close(keep: boolean) {
-    if (!keep) setDraft(EMPTY_TODO);
+    if (!keep) setDraft(EMPTY_ADD);
     flushSync(() => setOpenAt(null));
-    pill.current?.focus();
+    focusPillOrTile(pill.current);
   }
 
   function toggle() {
-    if (!formCapable) return;
+    if (!formCapable || sending) return;
     if (open) {
       close(true);
       return;
@@ -268,6 +329,7 @@ export function TodoTile({
           type="button"
           className="btn"
           disabled={!formCapable}
+          aria-disabled={(formCapable && sending) || undefined}
           aria-expanded={formCapable ? open : undefined}
           aria-controls={open ? formId : undefined}
           aria-describedby={formCapable ? undefined : narrowId}
@@ -291,14 +353,14 @@ export function TodoTile({
             formId={formId}
             titleRef={title}
             draft={draft}
-            setDraft={setDraft}
+            update={setDraft}
             close={close}
           />
         ) : (
           body
         )}
       </TileBody>
-      <TileFoot tile="todos">{open ? null : foot}</TileFoot>
+      <TileFoot tile="todos" />
     </FormDraftsProvider>
   );
 }
@@ -313,16 +375,17 @@ export function TodoTile({
 export default function TodoForm({ tile, todo }: { tile: "today" | "todos"; todo: EditableTodo }) {
   const store = useContext(FormDrafts);
   const rowEdit = useRowEdit();
-  const draft = store?.drafts.get(todo.id) ?? draftOf(todo);
+  const init = draftOf(todo);
+  const draft = store?.drafts.get(todo.id) ?? init;
   return (
     <TodoFormView
       mode="edit"
       tile={tile}
       todo={todo}
       draft={draft}
-      setDraft={(d) => store?.setDraft(todo.id, d)}
+      update={(fn) => store?.update(todo.id, init, fn)}
       close={(keep) => {
-        if (!keep) store?.setDraft(todo.id, null);
+        if (!keep) store?.forget(todo.id);
         rowEdit?.close();
       }}
       focusPill={() => store?.focusPill()}
@@ -335,7 +398,7 @@ export default function TodoForm({ tile, todo }: { tile: "today" | "todos"; todo
 type ViewProps = {
   tile: "today" | "todos";
   draft: TodoDraft;
-  setDraft: (d: TodoDraft) => void;
+  update: (fn: DraftUpdate) => void;
   /** keep=true keeps the draft (Escape, the pill); false forgets it (Cancel, a landed save). */
   close: (keep: boolean) => void;
 } & (
@@ -343,10 +406,8 @@ type ViewProps = {
   | { mode: "edit"; todo: EditableTodo; focusPill: () => void }
 );
 
-type Busy = null | "add" | "save" | "delete";
-
 function TodoFormView(props: ViewProps) {
-  const { tile, draft, setDraft, close } = props;
+  const { tile, draft, update, close } = props;
   const router = useRouter();
   const page = usePersonalPage();
   const ownTitle = useRef<HTMLInputElement>(null);
@@ -357,17 +418,17 @@ function TodoFormView(props: ViewProps) {
   const titleErrId = `${ids}-title-err`;
   const needId = `${ids}-need`;
 
-  const [busy, setBusy] = useState<Busy>(null);
   const [titleError, setTitleError] = useState(false);
-  const [said, setSaid] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
-  const frozen = busy !== null || draft.parked;
-  const hasDue = draft.due !== "";
+  const { values, sending } = draft;
+  const busy = sending !== false;
+  const frozen = busy || draft.parked;
+  const hasDue = values.due !== "";
 
-  function change(patch: Partial<TodoDraft>) {
+  function change(patch: Partial<TodoValues>) {
     if (frozen) return;
-    setDraft({ ...draft, ...patch });
+    update((d) => ({ ...d, values: { ...d.values, ...patch } }));
   }
 
   function onDue(value: string) {
@@ -376,7 +437,7 @@ function TodoFormView(props: ViewProps) {
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLFormElement>) {
-    if (e.key !== "Escape" || busy !== null) return;
+    if (e.key !== "Escape" || busy) return;
     e.preventDefault();
     if (confirming) {
       keep(); // Escape = Keep
@@ -386,67 +447,69 @@ function TodoFormView(props: ViewProps) {
   }
 
   function askDelete() {
-    if (busy !== null) return;
-    setSaid(null);
+    if (busy) return;
+    update((d) => ({ ...d, said: null }));
     flushSync(() => setConfirming(true));
     keepRef.current?.focus();
   }
 
   function keep() {
-    if (busy !== null) return;
+    if (busy) return;
     flushSync(() => setConfirming(false));
     deleteRef.current?.focus();
   }
 
-  /** The PATCH body: only what changed, so an unchanged title or day never sends the entry a move. */
-  function editPatch(todo: EditableTodo, title: string): Record<string, unknown> {
+  /** The PATCH body: only what differs from the values the edit started from. */
+  function editPatch(base: TodoValues, title: string): Record<string, unknown> {
     const patch: Record<string, unknown> = {};
-    if (title !== todo.title) patch.title = title;
-    if (draft.section !== todo.section) patch.section = draft.section;
-    const due = draft.due === "" ? null : draft.due;
-    if (due !== todo.dueOn) patch.dueOn = due;
-    if (draft.onCalendar !== todo.onCalendar) patch.onCalendar = draft.onCalendar;
+    if (title !== base.title) patch.title = title;
+    if (values.section !== base.section) patch.section = values.section;
+    if (values.due !== base.due) patch.dueOn = values.due === "" ? null : values.due;
+    if (values.onCalendar !== base.onCalendar) patch.onCalendar = values.onCalendar;
     return patch;
   }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (frozen || confirming) return;
-    const title = draft.title.trim();
+    const title = values.title.trim();
     if (title === "") {
       // deck §7: `Give it a title.` — on submit only, and focus goes to the field it is about.
       setTitleError(true);
-      setSaid(null);
+      update((d) => ({ ...d, said: null }));
       titleRef.current?.focus();
       return;
     }
     setTitleError(false);
 
+    const wantPinned = hasDue && values.onCalendar;
     let url: string;
     let method: "POST" | "PATCH";
     let payload: Record<string, unknown>;
     let leg: Leg | null;
+    let leaves = false;
     if (props.mode === "add") {
       url = "/api/todos";
       method = "POST";
-      payload = { title, section: draft.section, dueOn: hasDue ? draft.due : null, onCalendar: hasDue && draft.onCalendar };
-      leg = hasDue && draft.onCalendar ? "pin" : null;
+      payload = { title, section: values.section, dueOn: hasDue ? values.due : null, onCalendar: wantPinned };
+      leg = wantPinned ? "pin" : null;
     } else {
-      const { todo } = props;
-      payload = editPatch(todo, title);
+      const base = draft.base ?? draftOf(props.todo).values;
+      payload = editPatch(base, title);
       if (Object.keys(payload).length === 0) {
         close(false); // nothing changed: nothing to send
         return;
       }
-      url = `/api/todos/${encodeURIComponent(todo.id)}`;
+      url = `/api/todos/${encodeURIComponent(props.todo.id)}`;
       method = "PATCH";
-      const wantPinned = hasDue && draft.onCalendar;
-      leg = todo.onCalendar ? (wantPinned ? "move" : "unpin") : wantPinned ? "pin" : null;
+      leg = base.onCalendar ? (wantPinned ? "move" : "unpin") : wantPinned ? "pin" : null;
+      // In the To-do tile a new section moves the row out from under its Edit button.
+      leaves = tile === "todos" && values.section !== base.section;
     }
 
     page.press(tile);
-    setSaid(null);
-    setBusy(props.mode === "add" ? "add" : "save");
+    const kind: Sending = props.mode === "add" ? "add" : "save";
+    update((d) => ({ ...d, sending: kind, said: null }));
     const out = await pressOutcome(
       fetch(url, {
         method,
@@ -455,28 +518,27 @@ function TodoFormView(props: ViewProps) {
         signal: AbortSignal.timeout(PRESS_TIMEOUT_MS),
       }),
     );
-    setBusy(null);
 
     if (out.kind === "ok") {
       const line = leg === null ? null : calendarLine(leg, calendarOf(out.body));
       close(false);
+      if (leaves && props.mode === "edit") props.focusPill();
       if (line !== null) page.note(tile, line);
     } else if (out.kind === "failed") {
-      setSaid(out.sentence);
+      update((d) => ({ ...d, sending: false, said: out.sentence }));
     } else if (props.mode === "add") {
-      setDraft({ ...draft, parked: true });
+      update((d) => ({ ...d, sending: false, parked: true, said: null }));
     } else {
-      setSaid(out.sentence);
+      update((d) => ({ ...d, sending: false, said: out.sentence }));
     }
     router.refresh();
   }
 
   async function remove() {
-    if (props.mode !== "edit" || busy !== null) return;
+    if (props.mode !== "edit" || busy) return;
     const { todo, focusPill } = props;
     page.press(tile);
-    setSaid(null);
-    setBusy("delete");
+    update((d) => ({ ...d, sending: "delete", said: null }));
     const out = await pressOutcome(
       fetch(`/api/todos/${encodeURIComponent(todo.id)}`, {
         method: "DELETE",
@@ -484,24 +546,17 @@ function TodoFormView(props: ViewProps) {
       }),
       "delete-failed",
     );
-    setBusy(null);
 
     if (out.kind === "failed") {
       // deck §15 `Couldn’t delete.` — the question gives way to the buttons again.
-      flushSync(() => {
-        setConfirming(false);
-        setSaid(out.sentence);
-      });
+      update((d) => ({ ...d, sending: false, said: out.sentence }));
+      flushSync(() => setConfirming(false));
       deleteRef.current?.focus();
     } else {
-      // Gone, or maybe gone: the row leaves both tiles at once (C11). A no-answer
-      // delete keeps it hidden, as a no-answer tick does; the re-read decides.
-      const line =
-        out.kind === "ok"
-          ? todo.onCalendar
-            ? calendarLine("unpin", calendarOf(out.body))
-            : null
-          : { text: out.sentence, dot: null };
+      // The row leaves both tiles at once (C11). A delete that landed always
+      // reports its entry by the unpin rule; one that got no answer keeps the
+      // row hidden, as a no-answer tick does, and the re-read decides.
+      const line = out.kind === "ok" ? calendarLine("unpin", calendarOf(out.body)) : { text: out.sentence, dot: null };
       close(false); // forgets the draft, closes the row's form
       page.hide(`open:${todo.id}`);
       focusPill(); // the row is leaving; its Edit button cannot keep focus
@@ -510,9 +565,9 @@ function TodoFormView(props: ViewProps) {
     router.refresh();
   }
 
-  const shownSaid = draft.parked ? ERROR_SENTENCES["calendar-unknown"] : said; // deck §15
+  const shownSaid = draft.parked ? ERROR_SENTENCES["calendar-unknown"] : draft.said; // deck §15
   const submitLabel =
-    busy === "add" ? "Adding…" : busy === "save" ? "Saving…" : props.mode === "add" ? "Add" : "Save"; // deck §7, §15
+    sending === "add" ? "Adding…" : sending === "save" ? "Saving…" : props.mode === "add" ? "Add" : "Save"; // deck §7, §15
 
   return (
     <form
@@ -535,7 +590,7 @@ function TodoFormView(props: ViewProps) {
             maxLength={TODO_TITLE_MAX /* deck §7: up to 140 */}
             autoComplete="off"
             autoFocus={props.mode === "edit"}
-            value={draft.title}
+            value={values.title}
             readOnly={frozen}
             aria-invalid={titleError || undefined}
             aria-describedby={titleError ? titleErrId : undefined}
@@ -556,7 +611,7 @@ function TodoFormView(props: ViewProps) {
               <select
                 className="fld"
                 id={`${ids}-sec`}
-                value={draft.section}
+                value={values.section}
                 aria-readonly={frozen || undefined}
                 onChange={(e) => change({ section: e.target.value as Section })}
               >
@@ -576,7 +631,7 @@ function TodoFormView(props: ViewProps) {
               className="fld"
               id={`${ids}-due`}
               type="date"
-              value={draft.due}
+              value={values.due}
               readOnly={frozen}
               onChange={(e) => onDue(e.target.value)}
             />
@@ -586,13 +641,13 @@ function TodoFormView(props: ViewProps) {
           <div className="pe-ctl">
             <button
               type="button"
-              className={draft.onCalendar ? "swx on" : "swx"}
+              className={values.onCalendar ? "swx on" : "swx"}
               role="switch"
-              aria-checked={draft.onCalendar}
+              aria-checked={values.onCalendar}
               aria-label="Put on calendar"
               disabled={!hasDue || frozen}
               aria-describedby={hasDue ? undefined : needId}
-              onClick={() => change({ onCalendar: !draft.onCalendar })}
+              onClick={() => change({ onCalendar: !values.onCalendar })}
             >
               <b></b>
             </button>
@@ -615,14 +670,14 @@ function TodoFormView(props: ViewProps) {
           </span>
           {/* one group, wrapping together (S4) */}
           <span className="pe-yn">
-            <button type="button" className="btn" aria-disabled={busy === "delete" || undefined} onClick={remove}>
-              {busy === "delete" ? "Deleting…" : "Delete" /* deck §7, §15 */}
+            <button type="button" className="btn" aria-disabled={sending === "delete" || undefined} onClick={remove}>
+              {sending === "delete" ? "Deleting…" : "Delete" /* deck §7, §15 */}
             </button>
             <button
               ref={keepRef}
               type="button"
               className="btn hi"
-              aria-disabled={busy === "delete" || undefined}
+              aria-disabled={sending === "delete" || undefined}
               onClick={keep}
             >
               Keep
@@ -636,7 +691,7 @@ function TodoFormView(props: ViewProps) {
               ref={deleteRef}
               type="button"
               className="btn pe-left"
-              aria-disabled={busy !== null || undefined}
+              aria-disabled={busy || undefined}
               onClick={askDelete}
             >
               Delete
@@ -645,9 +700,9 @@ function TodoFormView(props: ViewProps) {
           <button
             type="button"
             className="btn"
-            aria-disabled={busy !== null || undefined}
+            aria-disabled={busy || undefined}
             onClick={() => {
-              if (busy === null) close(false);
+              if (!busy) close(false);
             }}
           >
             Cancel

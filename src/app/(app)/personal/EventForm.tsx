@@ -8,7 +8,8 @@
  * The same form grammar as TodoForm: a real <form>, Enter submits, validation
  * on submit only (`Give it a title.` · `End must be after start.`), fields
  * `readonly` while busy, Escape closes keeping what was typed, Cancel closes
- * and forgets it. Every typed value is state of EventTile — the tile, not the
+ * and forgets it. Every typed value — and the press in flight, its refusal
+ * and its sentence — is state of EventTile, the tile, not the
  * form — so a close by Escape, by the pill or by edit mode (which bumps
  * `editEpoch`, see TodoTile) keeps it. Focus goes into Title inside the
  * pill's handler and back to the pill on close; no effect hook (R33).
@@ -37,16 +38,13 @@
 import { useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
-import { PRESS_TIMEOUT_MS } from "@/lib/constants";
+import { EVENT_TITLE_MAX, PRESS_TIMEOUT_MS } from "@/lib/constants";
 import { addDays, formatDay, oneHourAfter } from "@/lib/days";
 import { ERROR_SENTENCES } from "@/lib/personalErrors";
 import { pressOutcome } from "@/lib/pressOutcome";
 import { TileBody, TileFoot, TileHead, usePersonalPage } from "./LayoutEditor";
 import type { EventFormData } from "./_blocks/Today";
-import { CALENDAR_REASONS, FormDraftsProvider, calendarOf, useFormDraftsState } from "./TodoForm";
-
-/** deck §7: `Title` up to 200 characters — the event door's EVENT_TITLE_MAX (personalWrites.ts is server-only). */
-const EVENT_TITLE_MAX = 200;
+import { FormDraftsProvider, calendarOf, calendarReason, focusPillOrTile, useFormDraftsState } from "./TodoForm";
 
 /** deck §7 */
 const NO_ANSWER = "Couldn’t reach Google. Check the calendar before trying again.";
@@ -60,8 +58,14 @@ interface EventDraft {
   end: string;
   /** Once End is edited it stops tracking Start + 1h (deck §7). */
   endEdited: boolean;
+  /** Anything typed or chosen: an untouched draft re-reads the server's defaults when opened. */
+  touched: boolean;
+  /** The press in flight: the form is frozen and the pill cannot start a second. */
+  sending: boolean;
   /** A press that got no answer: refused until Cancel. */
   parked: boolean;
+  /** The press's sentence above the buttons. */
+  said: string | null;
 }
 
 /** deck §7 defaults: the first switched-on layer, today, the next full hour, +1h — all from the server. */
@@ -74,7 +78,10 @@ function freshDraft(form: EventFormData): EventDraft {
     start: form.defaults.start,
     end: form.defaults.end,
     endEdited: false,
+    touched: false,
+    sending: false,
     parked: false,
+    said: null,
   };
 }
 
@@ -122,26 +129,29 @@ export function EventTile({
   const narrowId = useId();
   const [openAt, setOpenAt] = useState<number | null>(null);
   const [draft, setDraft] = useState<EventDraft>(() => freshDraft(form));
-  const drafts = useFormDraftsState(() => pill.current?.focus());
+  const drafts = useFormDraftsState(() => focusPillOrTile(pill.current));
 
-  const noCalendar = blocked || form.calendars.length === 0;
-  const canOpen = formCapable && !noCalendar;
+  const canOpen = formCapable && !blocked;
   const open = canOpen && openAt !== null && openAt === page.editEpoch && !page.editing;
-  const why = [!formCapable ? narrowId : null, noCalendar ? reasonId : null].filter((x) => x !== null).join(" ");
+  const why = [!formCapable ? narrowId : null, blocked ? reasonId : null].filter((x) => x !== null).join(" ");
 
   function close(keep: boolean) {
     if (!keep) setDraft(freshDraft(form));
     flushSync(() => setOpenAt(null));
-    pill.current?.focus();
+    focusPillOrTile(pill.current);
   }
 
   function toggle() {
-    if (!canOpen) return;
+    if (!canOpen || draft.sending) return;
     if (open) {
       close(true);
       return;
     }
-    flushSync(() => setOpenAt(page.editEpoch));
+    flushSync(() => {
+      // Nothing typed yet: the defaults are the server's latest, not the first render's.
+      if (!draft.touched && !draft.parked) setDraft(freshDraft(form));
+      setOpenAt(page.editEpoch);
+    });
     title.current?.focus();
   }
 
@@ -154,6 +164,7 @@ export function EventTile({
           type="button"
           className="btn"
           disabled={!canOpen}
+          aria-disabled={(canOpen && draft.sending) || undefined}
           aria-expanded={canOpen ? open : undefined}
           aria-controls={open ? formId : undefined}
           aria-describedby={canOpen || why === "" ? undefined : why}
@@ -176,7 +187,7 @@ export function EventTile({
             titleRef={title}
             form={form}
             draft={draft}
-            setDraft={setDraft}
+            update={setDraft}
             close={close}
           />
         ) : (
@@ -193,14 +204,14 @@ function EventFormView({
   titleRef,
   form,
   draft,
-  setDraft,
+  update,
   close,
 }: {
   formId: string;
   titleRef: RefObject<HTMLInputElement | null>;
   form: EventFormData;
   draft: EventDraft;
-  setDraft: (d: EventDraft) => void;
+  update: (fn: (d: EventDraft) => EventDraft) => void;
   close: (keep: boolean) => void;
 }) {
   const router = useRouter();
@@ -210,11 +221,10 @@ function EventFormView({
   const titleErrId = `${ids}-title-err`;
   const endErrId = `${ids}-end-err`;
 
-  const [busy, setBusy] = useState(false);
   const [titleError, setTitleError] = useState(false);
   const [endError, setEndError] = useState(false);
-  const [said, setSaid] = useState<string | null>(null);
 
+  const busy = draft.sending;
   const frozen = busy || draft.parked;
   // A layer switched off since the draft began falls back to the first one still on.
   const calendarId = form.calendars.some((c) => c.calendarId === draft.calendarId)
@@ -223,7 +233,7 @@ function EventFormView({
 
   function change(patch: Partial<EventDraft>) {
     if (frozen) return;
-    setDraft({ ...draft, ...patch });
+    update((d) => ({ ...d, ...patch, touched: true }));
   }
 
   function onStart(start: string) {
@@ -247,7 +257,7 @@ function EventFormView({
       // On submit only; focus goes to the first field the message is about.
       setTitleError(noTitle);
       setEndError(badEnd);
-      setSaid(null);
+      update((d) => ({ ...d, said: null }));
       (noTitle ? titleRef : endRef).current?.focus();
       return;
     }
@@ -256,8 +266,7 @@ function EventFormView({
 
     const dayKey = draft.dayKey;
     page.press("today");
-    setSaid(null);
-    setBusy(true);
+    update((d) => ({ ...d, sending: true, said: null }));
     const out = await pressOutcome(
       fetch("/api/calendar/events", {
         method: "POST",
@@ -270,7 +279,6 @@ function EventFormView({
         signal: AbortSignal.timeout(PRESS_TIMEOUT_MS),
       }),
     );
-    setBusy(false);
 
     if (out.kind === "ok") {
       close(false);
@@ -280,18 +288,18 @@ function EventFormView({
       }
     } else if (out.kind === "failed") {
       const cal = out.code === "calendar-failed" ? calendarOf(out.body) : null;
-      setSaid(
+      const said =
         cal !== null && cal.kind === "failed"
-          ? `Google didn’t accept it: ${CALENDAR_REASONS[cal.cause]}.` // deck §7
-          : out.sentence,
-      );
+          ? `Google didn’t accept it: ${calendarReason(cal.cause, "event")}.` // deck §7
+          : out.sentence;
+      update((d) => ({ ...d, sending: false, said }));
     } else {
-      setDraft({ ...draft, parked: true });
+      update((d) => ({ ...d, sending: false, parked: true, said: null }));
     }
     router.refresh();
   }
 
-  const shownSaid = draft.parked ? NO_ANSWER : said;
+  const shownSaid = draft.parked ? NO_ANSWER : draft.said;
 
   return (
     <form className="formwell" id={formId} noValidate onSubmit={submit} onKeyDown={onKeyDown}>
