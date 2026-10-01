@@ -106,7 +106,7 @@ export function EventTile({
   body,
   foot,
   pair,
-  formCapable,
+  formCapable: stored,
   blocked,
   reasonId,
   form,
@@ -123,6 +123,8 @@ export function EventTile({
   form: EventFormData;
 }) {
   const page = usePersonalPage();
+  // R40 from the working copy while editing (Task 8 step 7), else the stored row's answer.
+  const formCapable = page.formCapableNow("today") ?? stored;
   const pill = useRef<HTMLButtonElement>(null);
   const title = useRef<HTMLInputElement>(null);
   const formId = useId();

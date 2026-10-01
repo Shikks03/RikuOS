@@ -290,8 +290,10 @@ export function focusPillOrTile(pill: HTMLButtonElement | null) {
  * taken away from the arrangement. While an add is in flight the pill is
  * `aria-disabled`: closing then reopening must not offer a second send.
  */
-export function TodoTile({ head, body, formCapable }: { head: ReactNode; body: ReactNode; formCapable: boolean }) {
+export function TodoTile({ head, body, formCapable: stored }: { head: ReactNode; body: ReactNode; formCapable: boolean }) {
   const page = usePersonalPage();
+  // R40 from the working copy while editing (Task 8 step 7), else the stored row's answer.
+  const formCapable = page.formCapableNow("todos") ?? stored;
   const pill = useRef<HTMLButtonElement>(null);
   const title = useRef<HTMLInputElement>(null);
   const formId = useId();
