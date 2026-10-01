@@ -17,6 +17,7 @@ import {
   dueChip,
   parseCreateTodo,
   parseUpdateTodo,
+  shortLateness,
   sortTodos,
   todoDueKey,
   WEEKDAY_CHIP_DAYS,
@@ -120,6 +121,22 @@ describe("dueChip", () => {
       expect(chip!.text).not.toContain(shortForm);
       expect(chip!.late).toBe(n < 0);
     }
+  });
+});
+
+describe("shortLateness — R96's narrow-band form of dueChip's sentence", () => {
+  it("shortens the plural and the singular", () => {
+    expect(shortLateness("3 days late")).toBe("3d late");
+    expect(shortLateness("1 day late")).toBe("1d late");
+    expect(shortLateness("120 days late")).toBe("120d late");
+  });
+  it("agrees with dueChip's own count", () => {
+    const chip = dueChip("2026-09-07", "2026-09-10");
+    expect(chip?.late).toBe(true);
+    expect(shortLateness(chip!.text)).toBe("3d late");
+  });
+  it("hands anything else back unchanged, so the narrow band is never empty", () => {
+    for (const t of ["today", "tomorrow", "Fri 12", "24 Sep", "", "3 days"]) expect(shortLateness(t)).toBe(t);
   });
 });
 

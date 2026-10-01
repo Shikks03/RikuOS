@@ -380,7 +380,13 @@ describe("buildTodayDue — the tint the Suspense fallback carries (R83)", () =>
     ["due today + overdue + later", open([todo({ dueOn: TODAY }), todo({ dueOn: "2026-09-07" }), todo({ dueOn: "2026-09-12" }), todo()])],
     ["nine pending, clamped", open(Array.from({ length: 9 }, () => todo({ dueOn: TODAY })))],
   ];
-  const calendars: CalendarFeed[] = ["layers-unavailable", okWindow([]), okWindow([ev()], ["classes@g"])];
+  const calendars: CalendarFeed[] = [
+    "layers-unavailable",
+    okWindow([]),
+    okWindow([ev()], ["classes@g"]),
+    { layers: LAYERS, window: { ok: false, reason: "none-enabled" }, calendars: null },
+    { layers: LAYERS, window: { ok: false, reason: "expired" }, calendars: null },
+  ];
 
   it.each(feeds)("%s: agrees with buildTodayView under every calendar state", (_name, feed) => {
     const alone = buildTodayDue(feed, NOW);

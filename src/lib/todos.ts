@@ -89,6 +89,18 @@ export function dueChip(dueOn: DayKey | null, today: DayKey): { text: string; la
   return { text: ahead <= WEEKDAY_CHIP_DAYS ? `${weekday} ${day}` : `${day} ${month}`, late: false };
 }
 
+/**
+ * R96's short lateness form, the one the page shows below 240px of tile
+ * (L1): `3 days late` → `3d late`, `1 day late` → `1d late`. A rendering of
+ * dueChip's own sentence, so the two can never disagree about the count.
+ * Anything that is not a lateness sentence comes back unchanged — the narrow
+ * band always renders something, never an empty meta.
+ */
+export function shortLateness(text: string): string {
+  const m = /^(\d+) days? late$/.exec(text);
+  return m ? `${m[1]}d late` : text;
+}
+
 /** Whole days past due; 0 for a to-do due today or later. */
 export function daysLate(dueOn: DayKey, today: DayKey): number {
   return Math.max(0, daysBetween(dueOn, today));

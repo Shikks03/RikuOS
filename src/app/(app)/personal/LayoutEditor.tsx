@@ -49,11 +49,16 @@ export type HiddenKey = `${"open" | "done"}:${string}`;
  *
  *   hidden  the rows a press has taken off the page. Every TodoRow reads it
  *           and filters itself, so the twin of a ticked overdue to-do leaves
- *           Today and the To-do tile at the same instant. It grows with each
- *           press and shrinks by one only on a DEFINITE failure — a press
- *           that got no answer leaves it hidden, because `Couldn't tell if
- *           that saved.` never asserts the save failed. It is a local hide,
- *           never a source of truth: router.refresh() reconciles.
+ *           Today and the To-do tile at the same instant. The rule (lead
+ *           ruling on B1): the set GROWS on a press, SHRINKS at once on a
+ *           definite failure, and otherwise the press's own server re-read
+ *           ENDS the hide. Each entry is in flight until the door answers;
+ *           an ok or no-answer press then settles it, and the first server
+ *           render after that (a new `stamp`) drops it — so the server
+ *           decides, including for a no-answer press whose write never
+ *           landed. A render that lands while the press is still in flight
+ *           (another island's refresh) cannot end the hide. It is a local
+ *           hide, never a source of truth.
  *   presses per tile, a count of presses. Every press outcome in a tile is
  *           cleared by the next press in that tile (visual spec §4.9), so a
  *           row's own sentence remembers the press it belongs to and shows
@@ -70,12 +75,18 @@ interface PageState {
    * days — remounts closed (R62) without anything reaching into the DOM.
    */
   editEpoch: number;
+  /** The keys hidden in this render (in flight, or settled and not yet re-read). */
   hidden: ReadonlySet<HiddenKey>;
   presses: Readonly<Record<PersonalTile, number>>;
-  notes: Readonly<Partial<Record<PersonalTile, SayLine>>>;
-  /** Registers a press in `tile`: clears its note, and returns the press's number. */
+  /** Each tile's head sentence with the tile's press number when it was said. */
+  notes: Readonly<Partial<Record<PersonalTile, { line: SayLine; press: number }>>>;
+  /** Registers a press in `tile` and returns the press's number (clears the tile's sentences). */
   press: (tile: PersonalTile) => number;
+  /** A press began: hide `key` until its own re-read (in flight). */
   hide: (key: HiddenKey) => void;
+  /** The door answered ok, or gave no answer: the next server render decides. */
+  settle: (key: HiddenKey) => void;
+  /** A definite failure (or the opposite state's stale hide): show it again now. */
   reveal: (key: HiddenKey) => void;
   note: (tile: PersonalTile, line: SayLine) => void;
 }
@@ -98,6 +109,7 @@ const PageContext = createContext<PageState>({
   notes: {},
   press: () => 0,
   hide: noop,
+  settle: noop,
   reveal: noop,
   note: noop,
 });
@@ -122,8 +134,10 @@ export function TileHead({
   inline?: boolean;
   children: ReactNode;
 }) {
-  const { editing, notes } = useContext(PageContext);
-  const line = tile === undefined ? undefined : notes[tile];
+  const { editing, notes, presses } = useContext(PageContext);
+  const said = tile === undefined ? undefined : notes[tile];
+  // Cleared by the next press in the tile: shown only while its press is the latest.
+  const line = said !== undefined && tile !== undefined && said.press === presses[tile] ? said.line : undefined;
   return (
     <>
       <div className={inline ? "pe-head is-inline" : "pe-head"} inert={editing || undefined}>
@@ -186,20 +200,36 @@ export default function LayoutEditor({
   layout,
   tiles,
   notice,
+  stamp,
 }: {
+  /** New on every server render of the page: how a hide knows its re-read has landed. */
+  stamp: string;
   /** The RESOLVED layout (resolvePersonalLayout), never the stored value. */
   layout: ReadonlyPersonalLayout;
   tiles: TileNodes;
   /** The page-level sentence above the grid (deck §15's fallen-back arrangement), or null. */
   notice: ReactNode;
 }) {
-  const [hidden, setHidden] = useState<ReadonlySet<HiddenKey>>(() => new Set());
+  // key -> in flight? A settled entry lives until the next server render.
+  const [entries, setEntries] = useState<ReadonlyMap<HiddenKey, boolean>>(() => new Map());
+  // Adjusting state to a new prop during render (React's documented pattern,
+  // no effect): a new stamp is a new server render, which ends every settled
+  // hide. In-flight entries survive it.
+  const [seenStamp, setSeenStamp] = useState(stamp);
+  if (seenStamp !== stamp) {
+    setSeenStamp(stamp);
+    setEntries((m) => {
+      if (![...m.values()].some((inFlight) => !inFlight)) return m;
+      return new Map([...m].filter(([, inFlight]) => inFlight));
+    });
+  }
+  const hidden: ReadonlySet<HiddenKey> = new Set(entries.keys());
   const [presses, setPresses] = useState(NO_PRESSES);
   // The press count's source of truth, written only inside event handlers
   // (never during render), so two presses before a re-render still number
   // apart. `presses` is its rendered copy.
   const pressCount = useRef<Record<PersonalTile, number>>({ ...NO_PRESSES });
-  const [notes, setNotes] = useState<Readonly<Partial<Record<PersonalTile, SayLine>>>>({});
+  const [notes, setNotes] = useState<PageState["notes"]>({});
 
   // Every setter is a functional update, so two presses landing in one tick
   // never overwrite each other.
@@ -213,29 +243,19 @@ export default function LayoutEditor({
       const n = pressCount.current[tile] + 1;
       pressCount.current[tile] = n;
       setPresses({ ...pressCount.current });
-      setNotes((all) => {
-        if (all[tile] === undefined) return all;
-        const next = { ...all };
-        delete next[tile];
-        return next;
-      });
       return n;
     },
-    hide: (key) =>
-      setHidden((s) => {
-        if (s.has(key)) return s;
-        const next = new Set(s);
-        next.add(key);
-        return next;
-      }),
+    hide: (key) => setEntries((m) => (m.get(key) === true ? m : new Map(m).set(key, true))),
+    settle: (key) => setEntries((m) => (m.get(key) === true ? new Map(m).set(key, false) : m)),
     reveal: (key) =>
-      setHidden((s) => {
-        if (!s.has(key)) return s;
-        const next = new Set(s);
+      setEntries((m) => {
+        if (!m.has(key)) return m;
+        const next = new Map(m);
         next.delete(key);
         return next;
       }),
-    note: (tile, line) => setNotes((n) => ({ ...n, [tile]: line })),
+    // Stamped with the tile's current press number, so the next press there clears it.
+    note: (tile, line) => setNotes((n) => ({ ...n, [tile]: { line, press: pressCount.current[tile] } })),
   };
 
   const cells = buildCells(layout, false);

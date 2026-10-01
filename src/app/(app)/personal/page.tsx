@@ -307,6 +307,8 @@ export default async function PersonalPage() {
   return (
     <LayoutEditor
       layout={layout}
+      // New on every server render: a hidden row's own re-read has landed (TodoRow).
+      stamp={crypto.randomUUID()}
       notice={
         fellBack ? (
           // deck §15 — the ninth dot of the whole-database outage render (R55).

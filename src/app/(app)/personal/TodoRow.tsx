@@ -6,11 +6,15 @@
  *
  * A to-do row is TWO controls (R13): the tick, and — where the tile hands in
  * an edit form — one button wrapping title and meta that opens it in place.
- * No chevron, no hover lift, and never `display:contents` on that button.
+ * No chevron, no hover lift, and that button is never given CSS's `contents`
+ * display (several browsers drop such a button from the accessibility tree).
  * Accessible names are never visible text: `Done "…"`, `Undo "…"`, `Edit "…"`.
  *
  * THE PRESS (§7.3, R21, L7). The row leaves at once — no busy state on a tick —
- * by joining the page's hidden set, which every twin reads (C11). The door is
+ * by joining the page's hidden set, which every twin reads (C11). Before it
+ * leaves, focus moves to a neighbour that stays (S1): the next tick in the
+ * tile, else the previous, else the tile itself — never to <body>. The hide
+ * lasts until the press's own server re-read, which decides (LayoutEditor). The door is
  * PATCH /api/todos/:id `{ done }`: idempotent, so an already-done tick is not
  * an error. Its answer is classified by pressOutcome and nothing else:
  *   ok       router.refresh(); the server decides what comes back. A tick whose
@@ -20,18 +24,19 @@
  *   failed   the hide is undone (the set shrinks by one), `Couldn't save.`
  *            sits under the row, and the page re-reads. Nothing is restored
  *            locally beyond the hide (R21).
- *   unknown  the row STAYS hidden — the write may have landed — and
- *            `Couldn't tell if that saved.` sits under the tile's head, no dot.
- *            The page re-reads.
+ *   unknown  `Couldn't tell if that saved.` sits under the tile's head, no
+ *            dot, and the page re-reads: the row stays hidden until that
+ *            render, and then shows exactly if the write did not land.
  * Every sentence is cleared by the next press in the same tile.
  *
  * No effect hook (R33): focus moves only inside handlers.
  */
 
-import { useRef, useState, createContext, useContext, type ReactNode } from "react";
+import { useId, useRef, useState, createContext, useContext, type MouseEvent, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { PRESS_TIMEOUT_MS } from "@/lib/constants";
+import { shortLateness } from "@/lib/todos";
 import { pressOutcome } from "@/lib/pressOutcome";
 import type { PersonalTile } from "@/lib/personalLayout";
 import type { DoneTileView, TodoRowView } from "@/lib/personalView";
@@ -51,19 +56,45 @@ function Check() {
 
 /**
  * The due meta. Lateness renders BOTH of R96's forms and CSS shows one by the
- * tile's width (L1): `3 days late` from 240px of tile up, `3d late` below. The
- * short form is a rendering of the view's long sentence, so it is derived here
- * and not in the view model (dueChip returns the long form only).
+ * tile's width (L1): `3 days late` from 240px of tile up, `3d late` below
+ * (todos.ts's shortLateness, a rendering of dueChip's own sentence). The
+ * hidden form is display:none, so a description read from this element reads
+ * only the one on screen.
  */
-function Due({ due }: { due: NonNullable<TodoRowView["due"]> }) {
-  if (!due.late) return <span className="pe-due">{due.text}</span>;
-  const n = /^(\d+) days? late$/.exec(due.text)?.[1];
+function Due({ due, id }: { due: NonNullable<TodoRowView["due"]>; id?: string }) {
+  if (!due.late) return <span className="pe-due" id={id}>{due.text}</span>;
   return (
-    <span className="pe-due is-late">
+    <span className="pe-due is-late" id={id}>
       <span className="pe-lf">{due.text}</span>
-      {n !== undefined && <span className="pe-ls">{n}d late</span>}
+      <span className="pe-ls">{shortLateness(due.text)}</span>
     </span>
   );
+}
+
+/**
+ * S1: the pressed tick is about to unmount; hand focus to a tick that stays —
+ * the next one in the tile, else the previous — or to the tile itself, so it
+ * never falls to <body>. Only when the tick holds focus (a mouse press in
+ * Safari does not focus a button, and must not start moving focus). Runs in
+ * the handler, before the hide: no effect.
+ */
+function keepFocus(from: HTMLElement) {
+  if (document.activeElement !== from) return;
+  const tile = from.closest<HTMLElement>(".pe-tile");
+  if (tile === null) return;
+  // A tick inside a closed day (<details>) cannot take focus: skip it.
+  const ticks = Array.from(tile.querySelectorAll<HTMLElement>(".tick")).filter(
+    (t) => t === from || t.closest("details:not([open]) .fl-open") === null,
+  );
+  const i = ticks.indexOf(from);
+  const next = ticks[i + 1] ?? ticks[i - 1];
+  if (next !== undefined) {
+    next.focus();
+    return;
+  }
+  // The tile is focusable only programmatically; out of the tab order.
+  if (!tile.hasAttribute("tabindex")) tile.setAttribute("tabindex", "-1");
+  tile.focus();
 }
 
 /** The door's success body says the calendar leg did not finish (failed or unknown). */
@@ -83,7 +114,8 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
   // The row's own sentence and the press it belongs to (cleared by the next press in the tile).
   const [said, setSaid] = useState<{ press: number; text: string } | null>(null);
 
-  async function toggle() {
+  async function toggle(e: MouseEvent<HTMLButtonElement>) {
+    keepFocus(e.currentTarget);
     const n = page.press(tile);
     setSaid(null);
     page.hide(key);
@@ -97,11 +129,13 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
       }),
     );
     if (out.kind === "ok") {
+      page.settle(key);
       if (entryLeftBehind(out.body)) page.note("done", { text: ENTRY_LEFT, dot: "stale" });
     } else if (out.kind === "failed") {
       page.reveal(key);
       setSaid({ press: n, text: out.sentence });
     } else {
+      page.settle(key);
       page.note(tile, { text: out.sentence, dot: null });
     }
     router.refresh();
@@ -145,7 +179,15 @@ export default function TodoRow(props: TodoRowProps) {
   return <OpenRow {...props} />;
 }
 
-function Tick({ checked, title, onPress }: { checked: boolean; title: string; onPress: () => void }) {
+function Tick({
+  checked,
+  title,
+  onPress,
+}: {
+  checked: boolean;
+  title: string;
+  onPress: (e: MouseEvent<HTMLButtonElement>) => void;
+}) {
   return (
     <button
       type="button"
@@ -164,6 +206,7 @@ function OpenRow({ tile, row, tag, edit }: Extract<TodoRowProps, { shape: "open"
   const { toggle, hidden, sentence } = usePress(tile, row.id, false);
   const [editing, setEditing] = useState(false);
   const editButton = useRef<HTMLButtonElement>(null);
+  const metaId = useId();
   if (hidden) return null;
 
   // Row grammar (R47): no empty span for an undated or untagged row — the
@@ -172,15 +215,21 @@ function OpenRow({ tile, row, tag, edit }: Extract<TodoRowProps, { shape: "open"
   const meta = (
     <>
       <span className="pe-nm">{row.title}</span>
-      {tag && <span className="tag">{row.sectionLabel}</span>}
+      {tag && <span className="tag" id={`${metaId}t`}>{row.sectionLabel}</span>}
       {row.note !== null ? (
-        <span className="pe-on">{row.note}</span>
+        <span className="pe-on" id={`${metaId}o`}>{row.note}</span>
       ) : (
-        row.onCalendar && <span className="pe-on">on calendar</span>
+        row.onCalendar && <span className="pe-on" id={`${metaId}o`}>on calendar</span>
       )}
-      {row.due !== null && <Due due={row.due} />}
+      {row.due !== null && <Due due={row.due} id={`${metaId}d`} />}
     </>
   );
+  // S2: the edit button is named `Edit "…"`; its description is the row's
+  // meta — the tag, the calendar state, the due meta (its visible form only).
+  const describedBy =
+    [tag && `${metaId}t`, (row.note !== null || row.onCalendar) && `${metaId}o`, row.due !== null && `${metaId}d`]
+      .filter((x): x is string => typeof x === "string")
+      .join(" ") || undefined;
   const said = sentence !== null && <p className="pe-said">{sentence}</p>;
 
   if (edit === undefined) {
@@ -216,6 +265,7 @@ function OpenRow({ tile, row, tag, edit }: Extract<TodoRowProps, { shape: "open"
           ref={editButton}
           className="pe-edit-row"
           aria-label={`Edit "${row.title}"`}
+          aria-describedby={describedBy}
           onClick={() => setEditing(true)}
         >
           {meta}

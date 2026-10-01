@@ -36,7 +36,7 @@ function Line({ line, bare }: { line: SayLine; bare: "fl-empty" | "fl-absent" })
 export default function Push({ view }: PushProps) {
   return (
     <section className="pe-tile">
-      <TileHead tile="push">
+      <TileHead>
         <div>
           <span className="eyebrow">This morning’s push</span>
         </div>
