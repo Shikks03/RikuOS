@@ -23,14 +23,40 @@
  * the one pure module a client component imports (§7.5).
  */
 
-import { createContext, useContext, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
+  createContext,
+  useContext,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { flushSync } from "react-dom";
+import { useRouter } from "next/navigation";
+import { PRESS_TIMEOUT_MS } from "@/lib/constants";
+import {
+  EDIT_SIBLING,
+  applyEdit,
+  canEdit,
+  copyLayout,
+  formCapableAt,
+  isDefaultLayout,
+  locate,
+  rowCaption,
+  sameLayout,
+  type EditAction,
+} from "@/lib/layoutEdit";
+import {
+  PERSONAL_LAYOUT_DEFAULT,
   buildCells,
   buildTracks,
+  type PersonalLayout,
   type PersonalTile,
   type ReadonlyPersonalLayout,
 } from "@/lib/personalLayout";
 import type { SayLine } from "@/lib/personalView";
+import { pressOutcome } from "@/lib/pressOutcome";
 
 /** The six rendered tiles, by tile id. Every id present: the grid places all six. */
 export type TileNodes = Readonly<Record<PersonalTile, ReactNode>>;
@@ -99,6 +125,22 @@ interface PageState {
   sayRow: (tile: PersonalTile, key: HiddenKey, text: string) => void;
   /** The row's sentence, or null once a later press in its tile cleared it. */
   rowNote: (tile: PersonalTile, key: HiddenKey) => string | null;
+  /**
+   * R40's form floor from the WORKING copy while editing (Task 8 step 7), so
+   * a pill's disabled state agrees with the arrangement on screen; null
+   * outside edit mode, where the server's stored-row answer stands.
+   */
+  formCapableNow: (tile: PersonalTile) => boolean | null;
+  /** The editor's working copy and its one move, while editing; null otherwise. */
+  editor: Editor | null;
+}
+
+interface Editor {
+  working: ReadonlyPersonalLayout;
+  busy: boolean;
+  act: (tile: PersonalTile, action: EditAction) => void;
+  /** A callback ref for one toolbar button, so focus can move inside a handler (R31). */
+  bind: (key: string) => (el: HTMLButtonElement | null) => void;
 }
 
 const NO_PRESSES: Readonly<Record<PersonalTile, number>> = Object.freeze({
@@ -124,6 +166,8 @@ const PageContext = createContext<PageState>({
   note: noop,
   sayRow: noop,
   rowNote: () => null,
+  formCapableNow: () => null,
+  editor: null,
 });
 
 /** For the islands inside a tile (TodoRow; the forms and switches later). */
@@ -203,10 +247,76 @@ export function TileBody({
  * in edit mode, the toolbar — nothing else. Never inert: the toolbar is the
  * one live control while editing. Renders nothing when it has nothing to hold.
  */
-export function TileFoot({ children }: { tile: PersonalTile; children?: ReactNode }) {
-  if (children === undefined || children === null || children === false) return null;
-  return <div className="pe-foot">{children}</div>;
+export function TileFoot({ tile, children }: { tile: PersonalTile; children?: ReactNode }) {
+  const { editor } = useContext(PageContext);
+  const empty = children === undefined || children === null || children === false;
+  if (empty && editor === null) return null;
+  return (
+    <div className="pe-foot">
+      {children}
+      {editor !== null && <EditBar tile={tile} editor={editor} />}
+    </div>
+  );
 }
+
+/** The tile's name in the toolbar's accessible names (`Move Today left`, `Widen Today`). */
+const TILE_NAME: Readonly<Record<PersonalTile, string>> = Object.freeze({
+  today: "Today",
+  todos: "To-do",
+  layers: "Layers",
+  push: "This morning’s push",
+  week: "Next 7 days",
+  done: "Done this week",
+});
+
+/**
+ * The toolbar (R29, §5.7), in the order the shipped CSS expects: four arrows
+ * in a 108px group, the stepper, then the row caption on its own line. The
+ * glyphs are literal characters in the mono face (U+2190–2193 have no emoji
+ * presentation, R26; − is U+2212). The stepper shows the TWELVE-column span
+ * even at six (R1). Every refusal is `disabled` before the fact (deck §8).
+ */
+function EditBar({ tile, editor }: { tile: PersonalTile; editor: Editor }) {
+  const name = TILE_NAME[tile];
+  const at = locate(editor.working, tile);
+  const span = at === null ? 0 : editor.working[at.row][at.index].span;
+  const button = (action: EditAction, glyph: string, label: string) => (
+    <button
+      type="button"
+      className="sq"
+      ref={editor.bind(`${tile}:${action}`)}
+      disabled={editor.busy || !canEdit(editor.working, tile, action)}
+      aria-label={label}
+      onClick={() => editor.act(tile, action)}
+    >
+      {glyph}
+    </button>
+  );
+  return (
+    <div className="pe-bar">
+      <div className="pe-arrows">
+        {button("left", "←", `Move ${name} left`)}
+        {button("right", "→", `Move ${name} right`)}
+        {button("up", "↑", `Move ${name} up`)}
+        {button("down", "↓", `Move ${name} down`)}
+      </div>
+      <div className="pe-step">
+        {button("narrow", "−", `Narrow ${name}`)}
+        <span className="ct">{span}</span>
+        {button("widen", "+", `Widen ${name}`)}
+      </div>
+      <span className="pe-cap" aria-live="polite">
+        {rowCaption(editor.working, tile)}
+      </span>
+    </div>
+  );
+}
+
+/** The editor's actions, in the order focus looks for a live one. */
+const ACTIONS: readonly EditAction[] = ["left", "right", "up", "down", "narrow", "widen"];
+
+/** deck §8 / §15: a definite failure of the layout's save. */
+const LAYOUT_SAVE_FAILED = "Couldn’t save the layout.";
 
 export default function LayoutEditor({
   layout,
@@ -222,11 +332,39 @@ export default function LayoutEditor({
   /** The page-level sentence above the grid (deck §15's fallen-back arrangement), or null. */
   notice: ReactNode;
 }) {
+  const router = useRouter();
+
+  // ---- edit mode (Task 8) ------------------------------------------------
+  //
+  // THE WORKING COPY is seeded from the arrangement on screen ON ENTRY ONLY,
+  // and nothing else ever writes it but the editor's own buttons and Reset.
+  // Every server render hands this component a new `layout` object (and a new
+  // stamp); neither is read while editing, so no refresh can wipe a working
+  // copy mid-edit.
+  const [working, setWorking] = useState<PersonalLayout | null>(null);
+  /** The arrangement at entry: `Save` is live only once the working copy differs from it. */
+  const [seed, setSeed] = useState<PersonalLayout | null>(null);
+  /** Bumped on entry: closes the add forms and the row forms (drafts kept) and the open days (R62). */
+  const [editEpoch, setEditEpoch] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [saveSaid, setSaveSaid] = useState<string | null>(null);
+  /**
+   * A saved arrangement shown from the moment Save answers until the page's
+   * own re-read lands (a new stamp), so the grid never flicks back to the
+   * old server layout in between.
+   */
+  const [saved, setSaved] = useState<{ layout: PersonalLayout; stamp: string } | null>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  const toolButtons = useRef(new Map<string, HTMLButtonElement>());
+  const editing = working !== null;
+
   // key -> in flight? A settled entry lives until the next server render.
   const [entries, setEntries] = useState<ReadonlyMap<HiddenKey, boolean>>(() => new Map());
   // Adjusting state to a new prop during render (React's documented pattern,
-  // no effect): a new stamp is a new server render, which ends every settled
-  // hide. In-flight entries survive it.
+  // no effect): a new stamp is a new server render. It ends every settled
+  // hide (in-flight entries survive it) and retires a just-saved layout,
+  // which the server now renders itself.
   const [seenStamp, setSeenStamp] = useState(stamp);
   if (seenStamp !== stamp) {
     setSeenStamp(stamp);
@@ -234,6 +372,7 @@ export default function LayoutEditor({
       if (![...m.values()].some((inFlight) => !inFlight)) return m;
       return new Map([...m].filter(([, inFlight]) => inFlight));
     });
+    if (saved !== null && saved.stamp !== stamp) setSaved(null);
   }
   const hidden: ReadonlySet<HiddenKey> = new Set(entries.keys());
   const [presses, setPresses] = useState(NO_PRESSES);
@@ -244,11 +383,112 @@ export default function LayoutEditor({
   const [notes, setNotes] = useState<PageState["notes"]>({});
   const [rowNotes, setRowNotes] = useState<ReadonlyMap<string, { press: number; text: string }>>(() => new Map());
 
+  const shown: ReadonlyPersonalLayout = working ?? saved?.layout ?? layout;
+  const changed = working !== null && seed !== null && !sameLayout(working, seed);
+
+  /** The first live toolbar button of `tile`, preferring `first`. */
+  function focusTool(tile: PersonalTile, first?: EditAction) {
+    const order = first === undefined ? ACTIONS : [first, ...ACTIONS.filter((a) => a !== first)];
+    for (const a of order) {
+      const b = toolButtons.current.get(`${tile}:${a}`);
+      if (b !== undefined && !b.disabled) {
+        b.focus();
+        return;
+      }
+    }
+  }
+
+  function enter() {
+    const base = copyLayout(shown);
+    flushSync(() => {
+      setWorking(base);
+      setSeed(base);
+      setEditEpoch((e) => e + 1);
+      setSaveSaid(null);
+    });
+    // R31: focus to the first tile's toolbar — its `←` when live; at a row's
+    // start `←` is disabled and cannot hold focus, so its first live button.
+    const first = buildCells(base, true).find((c) => c.tile !== null)?.tile;
+    if (first !== undefined && first !== null) focusTool(first, "left");
+  }
+
+  function leave() {
+    flushSync(() => {
+      setWorking(null);
+      setSeed(null);
+      setSaveSaid(null);
+    });
+    editButton.current?.focus();
+  }
+
+  function act(tile: PersonalTile, action: EditAction) {
+    if (working === null || saving) return;
+    const next = applyEdit(working, tile, action);
+    flushSync(() => {
+      setWorking(next);
+      setSaveSaid(null);
+    });
+    // A button that disabled itself hands focus to its sibling (R31); the
+    // moved tile kept its DOM node because cells are keyed by tile id.
+    const pressed = toolButtons.current.get(`${tile}:${action}`);
+    if (pressed === undefined || pressed.disabled) focusTool(tile, EDIT_SIBLING[action]);
+  }
+
+  function reset() {
+    if (saving) return;
+    flushSync(() => {
+      setWorking(copyLayout(PERSONAL_LAYOUT_DEFAULT));
+      setSaveSaid(null);
+    });
+    // Reset disables itself (the copy now IS the default): focus to Cancel.
+    cancelButton.current?.focus();
+  }
+
+  async function save() {
+    if (working === null || saving || !changed) return;
+    const sent = working;
+    setSaving(true);
+    setSaveSaid(null);
+    const out = await pressOutcome(
+      fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personalLayout: sent }),
+        signal: AbortSignal.timeout(PRESS_TIMEOUT_MS),
+      }),
+    );
+    if (out.kind === "ok") {
+      flushSync(() => {
+        setSaving(false);
+        setSaved({ layout: sent, stamp: seenStamp });
+        setWorking(null);
+        setSeed(null);
+      });
+      editButton.current?.focus();
+      router.refresh();
+      return;
+    }
+    // The mode stays open with the changes intact either way (deck §8). A
+    // definite failure says so. No answer may have landed — and the PATCH
+    // writes the whole arrangement, so pressing Save again is safe — so it
+    // says only that it cannot tell, and never claims the save failed.
+    setSaving(false);
+    setSaveSaid(out.kind === "failed" ? LAYOUT_SAVE_FAILED : out.sentence);
+  }
+
+  /** `Escape` anywhere in the mode is `Cancel` (R31). */
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape" && editing && !saving) {
+      e.preventDefault();
+      leave();
+    }
+  }
+
   // Every setter is a functional update, so two presses landing in one tick
   // never overwrite each other.
   const state: PageState = {
-    editing: false,
-    editEpoch: 0,
+    editing,
+    editEpoch,
     hidden,
     presses,
     notes,
@@ -280,42 +520,113 @@ export default function LayoutEditor({
       const said = rowNotes.get(`${tile}|${key}`);
       return said !== undefined && said.press === presses[tile] ? said.text : null;
     },
+    formCapableNow: (tile) => (working === null ? null : formCapableAt(working, tile)),
+    editor:
+      working === null
+        ? null
+        : {
+            working,
+            busy: saving,
+            act,
+            bind: (key) => (el) => {
+              if (el === null) toolButtons.current.delete(key);
+              else toolButtons.current.set(key, el);
+            },
+          },
   };
 
-  const cells = buildCells(layout, false);
+  // Edit mode: leftover cells drawn (dashed), sparse-row `auto` suspended (R5).
+  const cells = buildCells(shown, editing);
   // --tracks is set inline on .pe-grid, where --tb is declared (personal.css).
-  const gridStyle = { "--tracks": buildTracks(layout, false) } as CSSProperties;
+  const gridStyle = { "--tracks": buildTracks(shown, editing) } as CSSProperties;
+
+  const headRow = (
+    <div className="fl-headrow">
+      <h1 className="fl-title">Personal</h1>
+      {working !== null ? (
+        // R30: Reset to default · gap · Cancel · Save. Save is the high rung.
+        <div className="pe-pills">
+          {saveSaid !== null && <span className="pe-said">{saveSaid}</span>}
+          <button type="button" className="btn" disabled={saving || isDefaultLayout(working)} onClick={reset}>
+            Reset to default
+          </button>
+          <button type="button" ref={cancelButton} className="btn pe-sep" disabled={saving} onClick={leave}>
+            Cancel
+          </button>
+          {/* L9: the focused Save goes busy through aria-disabled, so focus stays on it. */}
+          <button
+            type="button"
+            className="btn hi"
+            disabled={!changed && !saving}
+            aria-disabled={saving || undefined}
+            onClick={save}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      ) : (
+        <button type="button" ref={editButton} className="btn" onClick={enter}>
+          Edit layout
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <PageContext.Provider value={state}>
       {/* .fl-head carries the padding and .fl the column — the same .fl the
           content uses, so the band and the grid share one left edge (P8 R34).
-          No ancestor of this header may take container-type (R30, R87). */}
-      <div className="fl-head">
-        <div className="fl">
-          <div className="fl-headrow">
-            <h1 className="fl-title">Personal</h1>
+          No ancestor of this header may take container-type (R30, R87).
+
+          The control row is sticky in edit mode only. DEVIATION from the
+          mockup, which puts .pe-sticky INSIDE .fl-head > .fl: a sticky box
+          can only travel within its parent, and .fl there is exactly the
+          row's own height, so it never sticks (measured: scrolled 452px,
+          the row went to -370px). Wrapping the whole band instead makes the
+          page column its range. Same class, same rule; the band's padding
+          is void ground under it either way, and the -10px margin still
+          gives the clearance back, so title→grid does not move. */}
+      {editing ? (
+        <div className="pe-sticky">
+          <div className="fl-head" onKeyDown={onKeyDown}>
+            <div className="fl">{headRow}</div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="fl-head">
+          <div className="fl">{headRow}</div>
+        </div>
+      )}
       <main className="app-content">
         <div className="fl">
           {notice}
-          <div className="pe-wrap">
-            <div className="pe-grid" style={gridStyle}>
-              {cells.map((cell) => (
-                // Keyed by tile id (R31): a moved tile keeps its DOM node and
-                // its focus. In normal view buildCells emits no leftover cell —
-                // the leftover is bare ground (§4.7) — so every cell is a tile.
-                <div
-                  key={cell.tile ?? `gap:${cell.rowClass}`}
-                  className={`pe-cell ${cell.rowClass} ${cell.spanClass} ${cell.collapsedClass}${
-                    cell.tile === null ? " is-gap" : ""
-                  }`}
-                >
-                  {cell.tile === null ? null : tiles[cell.tile]}
-                </div>
-              ))}
+          {/* The well (.pe-edit) wraps .pe-wrap and is ALWAYS this one element,
+              classless in normal view, so entering the mode never remounts the
+              grid — the tiles, their islands and their typed drafts survive. */}
+          <div className={editing ? "pe-edit" : undefined} onKeyDown={onKeyDown}>
+            <div className="pe-wrap">
+              <div className={editing ? "pe-grid is-editing" : "pe-grid"} style={gridStyle}>
+                {cells.map((cell) =>
+                  cell.tile === null ? (
+                    // The row's leftover, edit mode only: dashed, empty, never
+                    // focusable, never a drop target (§4.7).
+                    <div
+                      key={`gap:${cell.rowClass}`}
+                      className={`pe-cell is-gap ${cell.rowClass} ${cell.spanClass} ${cell.collapsedClass}`}
+                    >
+                      <div className="pe-gap"></div>
+                    </div>
+                  ) : (
+                    // Keyed by tile id (R31): a moved tile keeps its DOM node and its focus.
+                    <div
+                      key={cell.tile}
+                      className={`pe-cell ${cell.rowClass} ${cell.spanClass} ${cell.collapsedClass}`}
+                    >
+                      {tiles[cell.tile]}
+                    </div>
+                  ),
+                )}
+              </div>
             </div>
           </div>
         </div>

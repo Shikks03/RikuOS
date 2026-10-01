@@ -115,8 +115,10 @@
    same 14px the mockup draws. In edit mode the well's own padding is
    that 14px, so the well drops its negative top margin there instead —
    the grid does not move when the mode opens (M6). Same specificity as
-   the rule above, later in the sheet. */
-.pe-fail + .pe-wrap{margin-top:var(--sp-4)}
+   the rule above, later in the sheet. The well's element is always
+   present (classless in normal view, so entering the mode never remounts
+   the grid), hence the child step. */
+.pe-fail + :not(.pe-edit) > .pe-wrap{margin-top:var(--sp-4)}
 .pe-fail + .pe-edit{margin-top:0}
 
 /* ---- the tile (R6) ---------------------------------------------- */

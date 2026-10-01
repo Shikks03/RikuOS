@@ -8,7 +8,8 @@
  * an edit form — one button wrapping title and meta that opens it in place.
  * No chevron, no hover lift, and that button is never given CSS's `contents`
  * display (several browsers drop such a button from the accessibility tree).
- * Accessible names are never visible text: `Done "…"`, `Undo "…"`, `Edit "…"`.
+ * Accessible names are never visible text: `Done “…”`, `Undo “…”`, `Edit “…”`
+ * (curly quotes, as the delete confirmation’s `Delete “…”?`).
  *
  * THE PRESS (§7.3, R21, L7). The row leaves at once — no busy state on a tick —
  * by joining the page's hidden set, which every twin reads (C11). Before it
@@ -192,7 +193,7 @@ function Tick({
       className="tick"
       role="checkbox"
       aria-checked={checked}
-      aria-label={`${checked ? "Undo" : "Done"} "${title}"`}
+      aria-label={`${checked ? "Undo" : "Done"} “${title}”`}
       onClick={onPress}
     >
       {checked && <Check />}
@@ -202,7 +203,12 @@ function Tick({
 
 function OpenRow({ tile, row, tag, edit }: Extract<TodoRowProps, { shape: "open" }>) {
   const { toggle, hidden, sentence } = usePress(tile, row.id, false);
-  const [editing, setEditing] = useState(false);
+  // The row's edit form is open only in the edit epoch it was opened in and
+  // never while the layout editor is open: entering edit mode bumps the epoch,
+  // which closes it (Task 8 step 3); its typing survives in the tile's drafts.
+  const [editingAt, setEditingAt] = useState<number | null>(null);
+  const page = usePersonalPage();
+  const editing = editingAt !== null && editingAt === page.editEpoch && !page.editing;
   const editButton = useRef<HTMLButtonElement>(null);
   const metaId = useId();
   if (hidden) return null;
@@ -244,7 +250,7 @@ function OpenRow({ tile, row, tag, edit }: Extract<TodoRowProps, { shape: "open"
 
   if (editing) {
     const close = () => {
-      flushSync(() => setEditing(false));
+      flushSync(() => setEditingAt(null));
       editButton.current?.focus();
     };
     return (
@@ -262,9 +268,9 @@ function OpenRow({ tile, row, tag, edit }: Extract<TodoRowProps, { shape: "open"
           type="button"
           ref={editButton}
           className="pe-edit-row"
-          aria-label={`Edit "${row.title}"`}
+          aria-label={`Edit “${row.title}”`}
           aria-describedby={describedBy}
-          onClick={() => setEditing(true)}
+          onClick={() => setEditingAt(page.editEpoch)}
         >
           {meta}
         </button>
