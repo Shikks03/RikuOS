@@ -131,7 +131,7 @@ export function EventTile({
   const narrowId = useId();
   const [openAt, setOpenAt] = useState<number | null>(null);
   const [draft, setDraft] = useState<EventDraft>(() => freshDraft(form));
-  const drafts = useFormDraftsState(() => focusPillOrTile(pill.current));
+  const drafts = useFormDraftsState(() => focusPillOrTile(pill.current), form.today);
 
   const canOpen = formCapable && !blocked;
   const open = canOpen && openAt !== null && openAt === page.editEpoch && !page.editing;
