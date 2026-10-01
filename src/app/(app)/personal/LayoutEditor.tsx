@@ -90,12 +90,15 @@ interface PageState {
   reveal: (key: HiddenKey) => void;
   note: (tile: PersonalTile, line: SayLine) => void;
   /**
-   * The sentence under one ROW (`Couldn't save.`), by the row's hidden key and
-   * with the press number it was said at. Held here, not in the row, so it
-   * survives the row remounting (the week body's edit-mode reset, R62).
+   * The sentence under one ROW (`Couldn’t save.`) — the pressed row only,
+   * keyed by its tile and hidden key, never its twin in another tile. Held
+   * here, not in the row, so it survives the row remounting (the week body's
+   * edit-mode reset, R62). Stamped with the tile's press count at the moment
+   * it is said, so only a press made AFTER it clears it.
    */
-  rowNotes: ReadonlyMap<HiddenKey, { tile: PersonalTile; press: number; text: string }>;
-  sayRow: (key: HiddenKey, tile: PersonalTile, press: number, text: string) => void;
+  sayRow: (tile: PersonalTile, key: HiddenKey, text: string) => void;
+  /** The row's sentence, or null once a later press in its tile cleared it. */
+  rowNote: (tile: PersonalTile, key: HiddenKey) => string | null;
 }
 
 const NO_PRESSES: Readonly<Record<PersonalTile, number>> = Object.freeze({
@@ -119,8 +122,8 @@ const PageContext = createContext<PageState>({
   settle: noop,
   reveal: noop,
   note: noop,
-  rowNotes: new Map(),
   sayRow: noop,
+  rowNote: () => null,
 });
 
 /** For the islands inside a tile (TodoRow; the forms and switches later). */
@@ -239,7 +242,7 @@ export default function LayoutEditor({
   // apart. `presses` is its rendered copy.
   const pressCount = useRef<Record<PersonalTile, number>>({ ...NO_PRESSES });
   const [notes, setNotes] = useState<PageState["notes"]>({});
-  const [rowNotes, setRowNotes] = useState<PageState["rowNotes"]>(() => new Map());
+  const [rowNotes, setRowNotes] = useState<ReadonlyMap<string, { press: number; text: string }>>(() => new Map());
 
   // Every setter is a functional update, so two presses landing in one tick
   // never overwrite each other.
@@ -265,9 +268,18 @@ export default function LayoutEditor({
         return next;
       }),
     // Stamped with the tile's current press number, so the next press there clears it.
-    note: (tile, line) => setNotes((n) => ({ ...n, [tile]: { line, press: pressCount.current[tile] } })),
-    rowNotes,
-    sayRow: (key, tile, press, text) => setRowNotes((m) => new Map(m).set(key, { tile, press, text })),
+    note: (tile, line) => {
+      const press = pressCount.current[tile]; // read now, not when the updater runs
+      setNotes((n) => ({ ...n, [tile]: { line, press } }));
+    },
+    sayRow: (tile, key, text) => {
+      const press = pressCount.current[tile];
+      setRowNotes((m) => new Map(m).set(`${tile}|${key}`, { press, text }));
+    },
+    rowNote: (tile, key) => {
+      const said = rowNotes.get(`${tile}|${key}`);
+      return said !== undefined && said.press === presses[tile] ? said.text : null;
+    },
   };
 
   const cells = buildCells(layout, false);

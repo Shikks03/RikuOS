@@ -113,7 +113,7 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
 
   async function toggle(e: MouseEvent<HTMLButtonElement>) {
     keepFocus(e.currentTarget);
-    const n = page.press(tile);
+    page.press(tile);
     page.hide(key);
     page.reveal(opposite);
     const out = await pressOutcome(
@@ -129,7 +129,7 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
       if (entryLeftBehind(out.body)) page.note("done", { text: ENTRY_LEFT_SENTENCE, dot: "stale" });
     } else if (out.kind === "failed") {
       page.reveal(key);
-      page.sayRow(key, tile, n, out.sentence);
+      page.sayRow(tile, key, out.sentence);
     } else {
       page.settle(key);
       page.note(tile, { text: out.sentence, dot: null });
@@ -140,8 +140,7 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
   const hidden = page.hidden.has(key);
   // The row's own sentence, from the page context (it survives a remount);
   // cleared by the next press in the tile it was said in.
-  const said = page.rowNotes.get(key);
-  const sentence = said !== undefined && said.press === page.presses[said.tile] ? said.text : null;
+  const sentence = page.rowNote(tile, key);
   return { toggle, hidden, sentence };
 }
 
