@@ -37,13 +37,12 @@ import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { PRESS_TIMEOUT_MS } from "@/lib/constants";
 import { shortLateness } from "@/lib/todos";
+import { ENTRY_LEFT_SENTENCE } from "@/lib/personalErrors";
 import { pressOutcome } from "@/lib/pressOutcome";
 import type { PersonalTile } from "@/lib/personalLayout";
 import type { DoneTileView, TodoRowView } from "@/lib/personalView";
 import { usePersonalPage, type HiddenKey } from "./LayoutEditor";
 
-/** deck §15 (R49): a claim about Google's state, not about the press. */
-const ENTRY_LEFT = "Done, but the calendar entry couldn’t be removed. Remove it in Google Calendar.";
 
 /** The 8px check, in a 10-unit viewBox so strokeWidth 1.8 renders at 1.44px (R25). */
 function Check() {
@@ -127,7 +126,7 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
     );
     if (out.kind === "ok") {
       page.settle(key);
-      if (entryLeftBehind(out.body)) page.note("done", { text: ENTRY_LEFT, dot: "stale" });
+      if (entryLeftBehind(out.body)) page.note("done", { text: ENTRY_LEFT_SENTENCE, dot: "stale" });
     } else if (out.kind === "failed") {
       page.reveal(key);
       page.sayRow(key, tile, n, out.sentence);

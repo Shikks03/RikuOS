@@ -34,6 +34,7 @@
  * model and needs no database to test.
  */
 
+import { EVENT_TITLE_MAX } from "@/lib/constants";
 import { isDayKey, type DayKey } from "@/lib/days";
 import { classifyWrite, type EventInput } from "@/lib/google";
 import type { Layer } from "@/lib/osSettings";
@@ -112,7 +113,7 @@ export function parseTodoPatch(body: unknown): { ok: true; value: TodoPatch } | 
 
 // --- One event -------------------------------------------------------------------
 
-export const EVENT_TITLE_MAX = 200;
+export { EVENT_TITLE_MAX };
 
 export type EventInputError =
   | "not-object"

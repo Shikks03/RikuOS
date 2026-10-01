@@ -38,5 +38,13 @@ export const ERROR_SENTENCES = Object.freeze({
   "needs-due": "Needs a due date.",
 } as const);
 
+/**
+ * deck §15 (R49): a to-do saved done, deleted or unpinned whose calendar
+ * entry could not be removed. A claim about Google's state, not about the
+ * press, so it takes the `--stale` dot under the head where it is said.
+ * One spelling for every island that can say it (TodoRow, TodoForm).
+ */
+export const ENTRY_LEFT_SENTENCE = "Done, but the calendar entry couldn’t be removed. Remove it in Google Calendar.";
+
 /** A code that has a sentence in ERROR_SENTENCES. */
 export type ErrorSentenceCode = keyof typeof ERROR_SENTENCES;

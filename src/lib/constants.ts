@@ -47,6 +47,13 @@ export const PUSH_BODY_MAX = 320;
 export const TODO_TITLE_MAX = 140;
 
 /**
+ * An event's title bound (deck §7: `Title` up to 200 characters). The event
+ * door (personalWrites.ts, which re-exports it) and EventForm's maxLength
+ * both read this one constant; constants.ts is client-safe.
+ */
+export const EVENT_TITLE_MAX = 200;
+
+/**
  * How long an island waits for one of its own mutation doors (POST / PATCH /
  * DELETE) before it stops waiting and says `Couldn't tell if that saved.`
  * (L7, pressOutcome.ts). Without it a hung request leaves the control
