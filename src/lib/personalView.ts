@@ -690,7 +690,11 @@ export function buildWeekView(input: WeekInput): WeekView {
   else if (cal.kind === "partial" || cal.kind === "unread") fails.push(...cal.lines);
   if (todosDown) fails.push(todosFail());
 
-  if (todosDown && cal.kind === "unread") return { days: null, fails };
+  // Nothing was read: the calendar either failed or had no layer to read
+  // (none-enabled answers vacuously, but holds no item), and the to-dos are
+  // down. Seven unread rows would be seven rows saying nothing (R18, lead
+  // ruling on the Task 5 review).
+  if (todosDown && (cal.kind === "unread" || cal.kind === "none-enabled")) return { days: null, fails };
 
   const everySourceAnswered = (cal.kind === "answered" || cal.kind === "none-enabled") && !todosDown;
   const events = cal.kind === "answered" || cal.kind === "partial" ? cal.events : [];

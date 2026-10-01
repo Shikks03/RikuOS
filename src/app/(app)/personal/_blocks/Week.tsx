@@ -1,4 +1,5 @@
-import { dayShape, type DayItemView, type DayRowView, type WeekView } from "@/lib/personalView";
+import type { ReactNode } from "react";
+import { dayShape, type DayItemView, type DayRowView, type DayShape, type WeekView } from "@/lib/personalView";
 import { TileBody, TileFoot, TileHead } from "../LayoutEditor";
 import TodoRow from "../TodoRow";
 import { SettingsLine } from "./SettingsLine";
@@ -65,23 +66,33 @@ function Items({ row, items }: { row: DayRowView; items: DayItemView[] }) {
  * not collapse it until the next refresh (R67).
  */
 function Day({ row }: { row: DayRowView }) {
-  const shape = dayShape(row);
-  let cell;
+  const labelId = `pe-day-${row.key}`;
+  return (
+    <div className="pe-row is-day">
+      <span className="pe-daylbl" id={labelId}>
+        {row.label}
+      </span>
+      {cellFor(dayShape(row), row, labelId)}
+    </div>
+  );
+}
+
+/** The day row's second cell, one branch per DayShape — exhaustive, so a fifth shape fails to compile. */
+function cellFor(shape: DayShape, row: DayRowView, labelId: string): ReactNode {
   switch (shape.kind) {
     case "unread":
-      cell = <span></span>;
-      break;
+      return <span></span>;
     case "dash":
-      cell = <span className="pe-dash">—</span>;
-      break;
+      return <span className="pe-dash">—</span>;
     case "one":
-      cell = <Items row={row} items={[shape.item]} />;
-      break;
-    case "disclosure":
-      cell = (
+      return <Items row={row} items={[shape.item]} />;
+    case "disclosure": {
+      // The summary's name carries its day: "Wed 21 Project Management 2 items".
+      const sumId = `pe-sum-${row.key}`;
+      return (
         <details className="disclose">
-          <summary>
-            <div className="sumrow">
+          <summary aria-labelledby={`${labelId} ${sumId}`}>
+            <div className="sumrow" id={sumId}>
               <span>{shape.summary}</span>
               <span className="fl-count">{shape.count}</span>
             </div>
@@ -91,14 +102,12 @@ function Day({ row }: { row: DayRowView }) {
           </div>
         </details>
       );
-      break;
+    }
+    default: {
+      const unreachable: never = shape;
+      return unreachable;
+    }
   }
-  return (
-    <div className="pe-row is-day">
-      <span className="pe-daylbl">{row.label}</span>
-      {cell}
-    </div>
-  );
 }
 
 /**

@@ -111,13 +111,10 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
   const page = usePersonalPage();
   const key: HiddenKey = `${checked ? "done" : "open"}:${id}`;
   const opposite: HiddenKey = `${checked ? "open" : "done"}:${id}`;
-  // The row's own sentence and the press it belongs to (cleared by the next press in the tile).
-  const [said, setSaid] = useState<{ press: number; text: string } | null>(null);
 
   async function toggle(e: MouseEvent<HTMLButtonElement>) {
     keepFocus(e.currentTarget);
     const n = page.press(tile);
-    setSaid(null);
     page.hide(key);
     page.reveal(opposite);
     const out = await pressOutcome(
@@ -133,7 +130,7 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
       if (entryLeftBehind(out.body)) page.note("done", { text: ENTRY_LEFT, dot: "stale" });
     } else if (out.kind === "failed") {
       page.reveal(key);
-      setSaid({ press: n, text: out.sentence });
+      page.sayRow(key, tile, n, out.sentence);
     } else {
       page.settle(key);
       page.note(tile, { text: out.sentence, dot: null });
@@ -142,7 +139,10 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
   }
 
   const hidden = page.hidden.has(key);
-  const sentence = said !== null && said.press === page.presses[tile] ? said.text : null;
+  // The row's own sentence, from the page context (it survives a remount);
+  // cleared by the next press in the tile it was said in.
+  const said = page.rowNotes.get(key);
+  const sentence = said !== undefined && said.press === page.presses[said.tile] ? said.text : null;
   return { toggle, hidden, sentence };
 }
 

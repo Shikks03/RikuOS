@@ -523,6 +523,16 @@ describe("buildWeekView", () => {
     expect(v.days!.every((d) => dayShape(d).kind === "dash")).toBe(true);
   });
 
+  it("every layer off AND to-dos down: nothing was read, so no day rows (R18)", () => {
+    const off = LAYERS.map((l) => ({ ...l, enabled: false }));
+    const v = week({ layers: off, window: { ok: false, reason: "none-enabled" }, calendars: null }, "unavailable");
+    expect(v.days).toBeNull();
+    expect(v.fails).toEqual([
+      { text: "All layers are switched off.", dot: null },
+      { text: "Couldn’t load to-dos.", dot: "stale" },
+    ]);
+  });
+
   it("not-configured: the undotted sentence on top, days unread", () => {
     const v = week({ layers: LAYERS, window: { ok: false, reason: "not-configured" }, calendars: null });
     expect(v.fails).toEqual([{ text: "Google isn’t connected yet. Set it up in Settings.", dot: null }]);

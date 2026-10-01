@@ -89,6 +89,13 @@ interface PageState {
   /** A definite failure (or the opposite state's stale hide): show it again now. */
   reveal: (key: HiddenKey) => void;
   note: (tile: PersonalTile, line: SayLine) => void;
+  /**
+   * The sentence under one ROW (`Couldn't save.`), by the row's hidden key and
+   * with the press number it was said at. Held here, not in the row, so it
+   * survives the row remounting (the week body's edit-mode reset, R62).
+   */
+  rowNotes: ReadonlyMap<HiddenKey, { tile: PersonalTile; press: number; text: string }>;
+  sayRow: (key: HiddenKey, tile: PersonalTile, press: number, text: string) => void;
 }
 
 const NO_PRESSES: Readonly<Record<PersonalTile, number>> = Object.freeze({
@@ -112,6 +119,8 @@ const PageContext = createContext<PageState>({
   settle: noop,
   reveal: noop,
   note: noop,
+  rowNotes: new Map(),
+  sayRow: noop,
 });
 
 /** For the islands inside a tile (TodoRow; the forms and switches later). */
@@ -230,6 +239,7 @@ export default function LayoutEditor({
   // apart. `presses` is its rendered copy.
   const pressCount = useRef<Record<PersonalTile, number>>({ ...NO_PRESSES });
   const [notes, setNotes] = useState<PageState["notes"]>({});
+  const [rowNotes, setRowNotes] = useState<PageState["rowNotes"]>(() => new Map());
 
   // Every setter is a functional update, so two presses landing in one tick
   // never overwrite each other.
@@ -256,6 +266,8 @@ export default function LayoutEditor({
       }),
     // Stamped with the tile's current press number, so the next press there clears it.
     note: (tile, line) => setNotes((n) => ({ ...n, [tile]: { line, press: pressCount.current[tile] } })),
+    rowNotes,
+    sayRow: (key, tile, press, text) => setRowNotes((m) => new Map(m).set(key, { tile, press, text })),
   };
 
   const cells = buildCells(layout, false);
