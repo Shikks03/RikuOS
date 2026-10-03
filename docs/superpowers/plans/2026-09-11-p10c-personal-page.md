@@ -846,3 +846,584 @@ Before declaring P10 done, confirm each of the following is true of the repo, no
 - [ ] `npm test` · `npx tsc --noEmit` · `npm run build` green; `npm run lint` at **four errors and three warnings**.
 - [ ] `git -C ../ShikksTracker status --porcelain` is empty.
 - [ ] Step 7's four observations are recorded, with dates.
+
+
+---
+
+## Post-build record (executed 2026-10-03)
+
+The verification lead ran these checks against the repo, not against earlier reports. Every figure below was produced on 2026-10-03 with headless Chromium (Playwright, from the npx cache) against `next start -p 3021`, on Windows. Mutations were intercepted in the browser: every `/api/**` POST, PATCH and DELETE was aborted or answered with a canned reply, and the request log shows only intercepted PATCHes and GET reads. **Nothing was written to Riku's database or Google account (L2).**
+
+Some states cannot be produced from Riku's account without a write. They were produced with a temporary local stub in `page.tsx` that overrides the settings, to-dos, digest or `now` after the real reads; one other used `week-busy-stub.patch`. Neither was committed. The tree was restored and `.next` rebuilt from clean HEAD after the run. Every stubbed figure says so.
+
+### HEADs
+
+- **Plan start:** `bb103cf` (`bb103cf610aa456933342931687624c47c4fc9d3`).
+- **Build end:** `1b5af42` (`1b5af42208130844ca7c29d51ec23a4792a1be9e`).
+  - The browser run was made at `d4c5ea7`.
+  - `1b5af42` (L1e) followed it. The trio, lint and greps were re-run at `1b5af42`, and L1e's two effects were re-measured in the browser there.
+- This record is the one commit after the build end.
+
+### Commits
+
+`git log --oneline bb103cf..1b5af42`, oldest first, 29 commits:
+
+- `ec0a2bc` feat(p10c): two Settings cards, and the page becomes a server component
+- `81b659a` feat(p10c): /personal - the data layer, one calendar promise, two boundaries
+- `6c103ba` fix(p10c): a press that got no answer from the door never says it failed
+- `b4916b7` fix(p10c): the Today fallback carries the tint, and the fallen-back sentence its 14px
+- `cf08df4` feat(p10c): Tile 3 - the layers, with the whole row as the switch
+- `e63e0b0` feat(p10c): TodoRow - two controls, and the one page-level hidden-id set
+- `6db51fb` fix(p10c): one event-time rule, one formCapableFor, and the calendar log says what failed
+- `b4b54f2` feat(p10c): Tiles 4 and 6 - the push quoted verbatim, and Done this week
+- `7865819` fix(p10c): the page's apostrophes are typographic
+- `9e77a51` fix(p10c): a busy switch keeps its focus
+- `6d16a46` fix(p10c): a refused press keeps the door's answer
+- `741c642` docs(p10c): ARCHITECTURE - the three collections, Google, the morning read
+- `6467227` feat(p10c): Tile 5 - the week, and the one native disclosure
+- `cda776c` fix(p10c): a quoted push wraps, never clips
+- `d050670` feat(p10c): the view says when the event form can't run
+- `b19021b` fix(p10c): the server's re-read ends a hide, and a tick keeps focus
+- `160dfa8` feat(p10c): Tile 2 - the to-do list, and the form that adds and edits
+- `a2b425a` fix(p10c): the week names its days, and a row's failure survives a remount
+- `6880acc` feat(p10c): Tile 1 - the hero, the nine-step ramp, and the event form
+- `3c8ff5d` refactor(p10c): one entry-left sentence, one event title bound
+- `f947263` fix(p10c): a row's failure is said under the pressed row, after its own press
+- `1d22e3b` fix(p10c): an entry that may be on Google is said so, and a form never sends twice
+- `187e723` feat(p10c): edit mode - four signals, inert bodies, the full focus matrix
+- `7113a3d` fix(p10c): the add pills follow the working layout
+- `b391fde` fix(p10c): an unanswered delete is settled by the re-read, an unanswered pin parks
+- `cc5ae8d` fix(p10c): one draft per to-do, rebased on the server's, and a late answer never steals focus
+- `768e3ad` fix(p10c): one form-floor rule for the server and the editor
+- `d4c5ea7` fix(p10c): the event form never offers a calendar Google no longer has
+- `1b5af42` fix(p10c): legacy button casing stops at the page, and the layout sentence sits level
+
+### Files changed
+
+`bb103cf..1b5af42`: 33 files, +4784 / −231.
+
+- **Personal page:**
+  - `page.tsx` rewritten as the data layer.
+  - Five islands: `EventForm`, `LayerSwitches`, `LayoutEditor`, `TodoForm`, `TodoRow`.
+  - Seven server blocks in `_blocks/`: `Done`, `Layers`, `Push`, `SettingsLine`, `Today`, `Todos`, `Week`.
+- **Settings:**
+  - `page.tsx` is now a server component.
+  - `_blocks/AgentSwitches.tsx` holds the P3 client code, moved.
+  - `_blocks/CalendarPicker.tsx` is new.
+- **Library:**
+  - New: `layoutEdit.ts`, `pressOutcome.ts`.
+  - Changed: `constants`, `days`, `personalErrors`, `personalView`, `personalWrites`, `todos`.
+- **Tests:**
+  - New: `layoutEdit.test.ts` (16 tests), `pressOutcome.test.ts`.
+  - Extended: `days`, `personalView`, `personalWrites`, `todos`.
+- **Styles:** `components.css` (L1c) and `personal.css` (L1, L1b, L1c, L1d, L1e). See the stylesheet section.
+- **`ARCHITECTURE.md`:** §3.1, §4.2 and §5 changed.
+- **Untouched:** the shell, `(app)/layout.tsx`, the proxy, login, `package.json`, `package-lock.json`, `next.config.ts`, and every Freelance file.
+
+### Tests, types, build, lint (at `1b5af42`)
+
+- **Tests.** `npm test` passes **42 files, 1040 tests**. P10b ended at 40 files and 977 tests.
+- **Types.** `npx tsc --noEmit` exits 0.
+- **Build.** `npm run build` prints `✓ Compiled successfully`. The route table has `ƒ /personal` and `ƒ /settings`.
+- **Lint.** `npm run lint` exits 1 at the baseline, **4 errors and 3 warnings**.
+  - The four errors are `react-hooks/set-state-in-effect` at `freelance/queue/PushControls.tsx:24:7`, `freelance/queue/page.tsx:69:10`, **`settings/_blocks/AgentSwitches.tsx:35:10`** (moved there from `settings/page.tsx`, as the plan predicted) and `login/page.tsx:23:9`.
+  - The warnings are at `models.test.ts:43:22`, `queue.test.ts:258:27` and `db.ts:20:3`.
+
+### Invariant greps (step 2)
+
+Each is listed with its result. Corrected forms are used where the plan's form is wrong.
+
+- **`useEffect`.** `git grep -n useEffect -- "src/app/(app)/personal"` exits 1.
+- **Client files.** `"use client"` appears in exactly five files: `EventForm.tsx`, `LayerSwitches.tsx`, `LayoutEditor.tsx`, `TodoForm.tsx`, `TodoRow.tsx`. `Week.tsx` is not among them.
+- **`fetch(`.** Six calls, all mutations, none a read:
+  - `EventForm` POST `/api/calendar/events`;
+  - `LayerSwitches` PATCH `/api/settings`;
+  - `LayoutEditor` PATCH `/api/settings`;
+  - `TodoForm` ×2 (POST or PATCH, and DELETE);
+  - `TodoRow` PATCH `/api/todos/[id]`.
+- **`dangerouslySetInnerHTML|NEXT_PUBLIC`** over personal and settings exits 1.
+- **Shell, proxy, login, package, `next.config.ts`:** no diff. **Freelance:** no diff.
+- **Stylesheets:** two files changed. Classified in the stylesheet section.
+- **`pe-more|+N more|PERSONAL_HERO_BUSY_AT|is-clear|is-busy`** under `src/` has no code hit.
+  - Comments: `Push.tsx:22`, `personalView.ts:19`, `heroTint.test.ts:7`, `personal.css:16` and `:328`.
+  - Push-text code: `digest.ts`, `digestToday.ts`, `digest.test.ts`. They compose the morning push, not the page.
+- **`[0-9]d late`** (the corrected form of `d late`) hits only:
+  - comments at `TodoRow.tsx:59`, `todos.ts:94` and `personal.css:311`;
+  - the `shortLateness` tests at `todos.test.ts:129–136`.
+  - The short form exists in `src/` by L1's design. See the self-review.
+- **`align-items: *start`** in `personal.css` has one hit, `:199`, on `.pe-head`.
+  - It is pre-existing: `bb103cf:personal.css:188` carries it.
+  - It is not the grid. R94's stretch on `.pe-grid` stands.
+- **`container`** appears only on `.pe-wrap` (`pgw`) and `.pe-cell` (`tile`), plus the comment at `:445`. Nothing is on an ancestor of the header.
+- **`var(--missing)|var(--stale)|var(--spend)`** under personal exits 1.
+- **Repo boundary.**
+  - `git -C ../ShikksTracker status --porcelain` printed nothing.
+  - `ST_API|/api/os/` under personal exits 1.
+
+### The stylesheet diff: every hunk is a named exception
+
+`git diff bb103cf..1b5af42 -- src/styles/` has 8 hunks at default context (10 at `-U0`).
+
+- **`components.css`, 3 hunks, all L1c.** Each existing dim rule gains `[aria-disabled="true"]`:
+  - `.btn:disabled` and `.btn:disabled:hover`;
+  - `.tick:disabled`;
+  - `.btn.hi:disabled`.
+- **`personal.css`, 5 hunks:**
+  1. **L1b:** `.pe-fail + :not(.pe-edit) > .pe-wrap{margin-top:var(--sp-4)}` and `.pe-fail + .pe-edit{margin-top:0}`.
+  2. **L1:** `.pe-ls{display:none}`.
+  3. One hunk carrying three exceptions:
+     - **L1c:** `.pe-sw:disabled, .pe-sw[aria-disabled="true"]`;
+     - **L1e:** `.pe-sw, .pe-edit-row{text-transform:none; letter-spacing:normal}`;
+     - **L1d:** `overflow-wrap:anywhere` on `.pe-ptitle`, `.pe-ptitle + .fl-snip{overflow-wrap:anywhere; white-space:pre-wrap}`, and `overflow-wrap:anywhere` on `.pe-quote`.
+  4. **L1e:** `.pe-pills .pe-said{margin-top:0}`.
+  5. **L1:** inside `@container tile (max-width:239.98px)`, `.pe-lf{display:none}` and `.pe-ls{display:inline}`.
+- Nothing else.
+
+### Measured figures
+
+#### Real data, 1240px viewport, against specimen 01
+
+Riku's account on 2026-10-03:
+
+- **No calendar layers chosen.** Settings lists six real calendars, all unticked: Events, Personal, Classes, Holidays in United States, Holidays in Philippines, Org Stuff.
+- **No push stored** (`No push recorded yet.`).
+- **Zero to-dos, nothing done.**
+
+So Today, Layers and Next 7 days read `No calendars chosen. Pick them in Settings.` That is honest, and it is not specimen 01's state.
+
+- **Rows:** 340 · 200 · **268.75** · 120, grid 970.75. Row 3 is held open by its contents: the week tile is 268.75 natural, with the sentence at the top and seven `—` rows.
+- **Natural tile heights:**
+
+| Tile | Measured | Specimen 01 |
+|---|---|---|
+| Today | 213.75 | 213.35 |
+| To-do | 271.25 | 270.85 |
+| Layers (sentence only) | 99.25 | 191.85 |
+| Push | 82.75 | 112.35 (it quotes a push) |
+| Next 7 days | 268.75 | 234.25 |
+| Done this week | 51.5 | 51.1 |
+
+  Every like-for-like tile is +0.40px against the specimen.
+- **The hero** is `pe-tile is-hero pe-t0`: a green 155° wash, border `rgba(53,211,153,.2)`.
+  - It is **not** `.is-pair`, because SCHEDULED holds the layers sentence rather than `Nothing scheduled.` (R17 is exact).
+  - `+ Event` is `disabled` with `aria-describedby="pe-today-reason"`. `+ To-do` is live.
+- **One hue.** A sweep of every computed colour, background and border under `.fl` found two hued values: the hero's gradient and its border.
+- **Leftover.** Row 2 at twelve columns has about 78px of bare ground. No cell is rendered for it in normal view (T1's accepted deviation), so there is no fill, no caption and no dash.
+- **Week.** Seven `—` rows in `rgb(91,100,112)` (`--ink-3`).
+  - Two inner columns of 436px.
+  - Rows 1 and 5 have no top hairline.
+- **Labels.**
+  - `SCHEDULED` and `DUE`.
+  - `PERSONAL`, `FREELANCE`, `ACADEMICS`, each with `nothing open`, and `0 open`.
+- **Eyebrows.** Every tile's eyebrow is present at 1240, 932 and 390.
+- **Console.**
+  - The console is empty: no CSP violation and no hydration warning.
+  - No request goes to `fonts.googleapis.com` or `fonts.gstatic.com`.
+- **The blank page with three layers on.**
+  - Setup: layers stubbed to Personal, Classes and Events, all enabled, with real calendar ids from `listCalendars()`. Real Google reads and real Mongo reads.
+  - This is specimen 01's state, except that real classes fill the week.
+  - Rows **340 · 200 · 240 · 120, grid 942**, exactly as specimen 01 states. `.pe-body.is-pair` and `pe-t0` are present.
+  - Natural heights: Today 213.75, To-do 271.25, Layers 192.25, push 82.75, Next 7 days 235.25, Done 51.5. The week shows Mon, Tue, Thu and Fri classes as `2 items`, `3 items` and `4 items`.
+  - No row is held open.
+
+#### Collapse: 932px window, specimen 05
+
+- 706px grid, six columns of 106px.
+- Tiles **466 · 226 · 226 · 466 · 706 · 706**, as the plan states.
+- **Rows:**
+  - Real data: 340 · 200 · 396.25 · 120.
+  - Three-layer blank: 340 · 200 · **362.75** · 120.
+  - Specimen 05's 551 (row 1) and 210 (row 4) belong to its filled data and do not arise from this data.
+- **The empty cell closes and comes back.** In edit mode a live resize 1240 → 932 → 1240 gave a gap in row 2 at 63.83px, then no gap (2+4=6), then the 63.83px gap again.
+
+#### Stack: 390px, specimen 08
+
+- The strip is `.app-side` as a 390×44 flex bar at the top.
+- 334px of column, one column.
+- **Pills:**
+  - Real data: `+ Event` disabled (no layers), `+ To-do` live.
+  - Layers stubbed: both live.
+- Switches are 44 · 44 · 44px tall (layers stubbed).
+- No dashed element, no gap cell, no horizontal scroll.
+- Every tile keeps its eyebrow.
+
+#### Edit mode, Task 8 (all PATCHes intercepted)
+
+- **Title→grid** is **28 in normal view and 28 in edit mode**, with grid top 136 in both. M6 holds.
+- **The four signals:**
+  - **The well:** `.pe-edit`, background `rgb(14,16,19)`, padding 14, margin −14.
+  - **One dashed leftover:** row 2, span 1, 63.83px wide, no tabindex.
+  - **Six toolbars** (`.pe-bar`).
+  - **The pills:** `Reset to default[disabled] · Cancel · Save[disabled]`.
+- **Inert.**
+  - Six heads and five bodies are `inert`.
+  - A force-clicked `+ To-do` in an inert head opened nothing.
+  - A force-clicked tick in an inert body left `aria-checked="false"` and sent no request.
+  - A force-clicked `<summary>` in an inert body stayed closed.
+- **The hero** keeps its tint in edit mode: `pe-t0`, and with three to-dos due it keeps `pe-t3`, gradient `rgb(42,20,8)` and border `rgba(255,138,61,.2)`.
+  - Not measured: the tint behind an open form.
+- **An open day closes on entry:** one `details[open]` before, zero after.
+- **Focus.**
+  - On entry focus goes to `Move Today right`, the first live toolbar button (T8's accepted deviation).
+  - Tab walks only the live buttons.
+  - `Escape` after a move restores the arrangement, closes the mode and puts **focus on `Edit layout`**. `Cancel` does the same.
+  - `Reset to default` disables itself and hands focus to `Cancel`.
+- **The disabling matrix, default arrangement:** 24 buttons are disabled.
+  - Every up and down move is disabled (the target row lacks room, and there are four rows).
+  - Every widen in a full row is disabled, as are the edge arrows.
+  - **After `Narrow Next 7 days` ×10 the week stops at span 2:**
+    - `Narrow` is disabled (`SPAN_MIN`).
+    - The caption reads `10 columns left`.
+    - `Move Layers down` and `Move This morning’s push down` turn live.
+    - Focus survives each move.
+- **Sticky pills.** Previously unmeasured. The `.pe-sticky` deviation (wrapping the whole header band) **sticks**. In a 1240×700 window:
+
+| Scroll position | `.pe-sticky` top |
+|---|---|
+| Before scrolling | 44 |
+| scrollY 500 | 0 (bottom 74, pills' top 32.7) |
+| Maximum scroll (676) | 0 |
+
+  At scrollY 500, `elementFromPoint` at the pills returns `Reset to default`, on `--void` ground (`rgb(8,9,11)`).
+- **Save failure** (500 `{"error":"save-failed"}`): `Couldn’t save the layout.` appears beside the pills. The mode stays open with the change intact, and focus stays on `Save`.
+  - **Offset.** At `d4c5ea7` the sentence's centre sat 5.0px below the pills' (53.34 against 48.35), from `.pe-said`'s `margin-top:10px` under `align-items:center`. The lead had estimated ~10px.
+  - **After L1e** (`1b5af42`): 48.34 against 48.35, level.
+- **Unknown outcome** (504 HTML): `Couldn’t tell if that saved.` in the same place; the mode stays open.
+- **Specimen 04's rows** (382 · 263 · 305 · 162):
+  - Three-layer blank: **382 · 263.5 · 306.5 · 162**. Row 3 is +1.5 from real week events.
+  - Real data: 382 · 242 · 340 · 162.
+  - Three to-dos due: 451 · 263.5 · 306.5 · 162.
+  - 932, real data: 382 · 242 · 467.5 · 162, no gap.
+- **R53/R91, the shrink case.** Moves cannot reach it from the default: `Move This morning’s push up` stays disabled with row 1 full and four rows. So the stored arrangement `[[push 4]], [[today 8], [todos 4]], [[layers 3], [week 9]], [[done 12]]` was rendered through the stub.
+  - **Normal view, row 1:** **82.75** with `No push recorded yet.`, and **150.25** with a stubbed quoted push (title plus two body lines).
+  - The plan's 131 assumes specimen 01's quote; not reproduced on this data.
+  - In edit mode row 1 goes back to 382, with an 8-span dashed leftover.
+- **R91, two tiles summing to 5** (layers 2 + push 3, stub):
+  - Normal view: rows 379.75 · **200** · 240 · 120.
+  - The row **keeps its weight** with seven columns of bare ground. Looked at: it reads as a deliberate short row, not a failure.
+- **A Save that lands.** PATCH answered 200 `{settings}`, with the refresh stubbed to the same arrangement (layers 2, push 5).
+  - Normal view shows that arrangement with row 2 at 200.
+  - Focus is on `Edit layout`.
+
+#### Next 7 days, Task 5 (`week-busy-stub.patch`, applied then reverted)
+
+- **Closed:** 240 at two columns; **364.25** at one column (932), against the stated 362.75. The +1.5 is the one-item day's 44px row with a tick.
+- **R65, fully open busy week: 393.75** at two columns, **510.75** at one column.
+- **R65, mixed** (only Mon 5 open beside a closed Thu 1): **339.75**.
+- **R94's slack, judged by eye.** The closed Thu 1 row stretches to 144.5 to match the open Mon 5, leaving about 100px of blank ground under a one-line summary. Thu 1's chevron sits about 17px from Mon 5's label.
+  - Judged noticeable but acceptable: it is the grid's row height, not a clipped or floating element.
+- **Counts.** `2 items`, `3 items` and `4 items` render. The one-item day (`Renew ID · Personal`) has no `<details>`.
+- **Layout.** Opening a day pushes content down (week bottom 747.75, Done top 761.75); nothing overlays. Opening one day closes no other: all four were open at once.
+- **Keyboard.** `Enter` on a focused summary opened it and `Space` closed it, with no script.
+- **The summary's accessible name** includes the day (`aria-labelledby="pe-day-… pe-sum-…"`). Chrome's accessibility tree reads `DisclosureTriangle "Thu 1 Math Methods 3 items"`.
+
+#### R88/R96 lateness at 106px, and the forms (Tasks 3, 4)
+
+Setup: stubbed to-dos due 2026-09-30, 2026-10-02 and 2026-10-03, plus one undated; `today` is 2026-10-03.
+
+- **At ≥240px of tile** (To-do 297.33, Today 608.66 and 466, 334 at 390): `3 days late` / `1 day late` render (`.pe-lf` inline, `.pe-ls` none), each on one line.
+- **At 226px** (To-do at six columns) the short form shows, which is correct: it is below 240.
+- **At 106px (1 of 6)**, both To-do and Today: **`3d late` and `1d late` fit on their own line.**
+  - Height 14.25, `white-space:nowrap`, no wrap.
+  - The chip's right edge is 292.91, against the row's 291 and the tile's inner edge 292. It overhangs the row's box by 1.91px, 0.91px into the tile's 12px padding.
+  - It is not clipped. R96 settled the short form, and this is its record.
+- **Accessibility.** The DOM `textContent` holds both forms. The hidden one is `display:none`, so it is out of the accessibility tree.
+- **Hero tint.** With three due, the hero is `pe-t3`.
+- **The to-do form at span 4** (1240): well **342.47**, tile **428.72**. The plan says 340.5 / 426.35, so +1.97 / +2.37.
+  - One column.
+  - Focus goes to the title field. `Escape` closes the form and returns focus to `+ To-do`.
+- **The event form at span 8:** well **323.97**, tile **423.72**. The plan says 322 / 421.35, so the same +1.97 / +2.37.
+  - Row 1 grows from 340 to 423.72.
+- **At 932:**
+  - To-do form well 334.47 / tile 414.72 (a 226px tile, one column).
+  - Event form well 323.97 / tile 428.5.
+- **At 390:**
+  - To-do form well 342.47 / tile 428.72.
+  - Event form one column, well 474.75 / tile 574.5.
+  - **The date field sits inside its well in both:** 60–330 inside 45–345.
+- **Too narrow.** At To-do 1 of 6 (106px) and at span 2 of 12 (141.66px): `+ To-do` is disabled, with `Too narrow for the form.` Today at 106px likewise disables `+ Event`.
+
+#### L1d and the 07:00 dot (Task 6, stub)
+
+- **L1d.** An 80-character alphanumeric token with no break opportunity, in both the push title and the body.
+  - At 106px, `.pe-ptitle` and `.fl-snip` wrap: `scrollWidth` = `clientWidth` = 80, tile 543.25.
+  - At 141.66px, tile 394.75.
+  - Nothing is clipped. `.fl-snip` computes `pre-wrap` / `anywhere`.
+- **The 07:00 dot.** Setup: yesterday's push stored, `now` stubbed.
+  - At 06:30, `No push this morning.` is `.fl-empty` with no dot.
+  - At 07:30 it is `pe-fail is-missing` with a red dot (`rgb(248,113,113)`).
+  - Both under `Last: Fri 2 Oct 07:00` and the `.pe-quote` well.
+
+#### /settings (Task 9)
+
+- **Four cards:**
+  - Follow-up chaser.
+  - Monitoring.
+  - `Google Calendar — Connected.` (the real `listCalendars()`).
+  - Calendar layers, with six real 40px `.pickrow`s.
+- **L9, picker.** I pressed `Space` on the focused Events tick with a delayed 500 answer.
+  - While busy, all six ticks were `aria-disabled="true"` at opacity .45, never `disabled`, and **focus stayed on Events**.
+  - Then `Couldn’t save.` appeared in `.fl-note` under the row (row 40 → 53.25), with focus still on Events.
+  - Exactly one PATCH was sent.
+- **L9, the page's switches** (layers stubbed, same test):
+  - All three went `aria-disabled` at .45.
+  - The pressed knob showed its target state while busy, then returned.
+  - Focus stayed on the switch.
+  - A second `Space` while busy was ignored (one PATCH).
+  - `Couldn’t save.` appeared under the row.
+
+#### L1e (`1b5af42`), re-measured
+
+- **Casing.** Before L1e, `legacy.css`'s bare `button{text-transform:uppercase; letter-spacing:.14em}` set every to-do row title, tag and due chip, and every layer switch name, in capitals with 1.82px tracking. That covered every row with an edit button, i.e. every row in a form-capable tile.
+  - After L1e, `.pe-sw`, `.pe-sw .nm`, `.pe-edit-row` and `.pe-edit-row .pe-nm` compute `text-transform:none; letter-spacing:normal`.
+  - This was measured on elements injected into a live tile, since Riku's data has no rows.
+- **The Save sentence** sits level, as given in the edit-mode section.
+
+#### Arrow glyphs (R26)
+
+At 390px in edit mode, Chrome's platform-font report gives:
+
+- **←, →: Arial** (13.45px wide);
+- **↑, ↓, −, +: JetBrains Mono (web)** (6px).
+
+All six render as monochrome text in `--ink-3`, not emoji, so R26 holds. The shipped JetBrains Mono subset lacks U+2190 and U+2192 (carry-forward).
+
+### Failure states observed (step 4)
+
+The grid rendered in every one, and no failure was rendered as data.
+
+- **Bad `MONGODB_URI`** (`mongodb+srv://nohost.invalid/x`):
+  - **Nine dots:**
+    1. The page notice `Couldn’t load your arrangement, so this is the default.`, 14px above the grid.
+    2. Today: `Couldn’t load layers, so the calendar wasn’t read.`
+    3. Today: `Couldn’t load to-dos.`
+    4. To-do: `Couldn’t load to-dos.`
+    5. Layers: `Couldn’t load layers.`
+    6. Push: `Couldn’t load this morning’s push.`
+    7. Next 7 days: `Couldn’t load layers, so the calendar wasn’t read.`
+    8. Next 7 days: `Couldn’t load to-dos.`
+    9. Done: `Couldn’t load to-dos.`
+  - **The week shows no day rows.** Rows 340 · 200 · 240 · 120. The hero is untinted (`pe-tile is-hero`).
+  - The server log has five `[personal] … read failed: querySrv ENOTFOUND` lines, one per read.
+  - **`/settings`** shows `Google Calendar — Connected.` and `Calendar layers — Couldn’t load layers.` The chaser and monitoring cards give way to AgentSwitches' P3 `Could not load settings.` (P3 behaviour, moved verbatim).
+- **`GOOGLE_REFRESH_TOKEN` unset** (set to whitespace, which `readGoogleConfig` reads as missing; layers stubbed):
+  - Today, Layers and Next 7 days read `Google isn’t connected yet. Set it up in Settings.` as `.fl-empty`, with **no dot**. That follows `personalView.ts`'s DOTS table (an absence by configuration); the plan's Task 4 text "each with its dot" is superseded by Plan B.
+  - The week's day rows are blank, with no `—` (R18).
+  - **The hero stays `pe-t0`.**
+  - `/settings`: both cards read `Not set up. Add the three Google values to the environment and redeploy.`, with no list.
+- **Invalid refresh token** (`1//0verifier-invalid-token`):
+  - `Google access has expired. Renew it from Settings.` with an amber dot on Today, Layers and Next 7 days (three dots).
+  - `/settings`: both cards read `Access expired. Run the sign-in again and replace the token.`
+  - The server log has `[personal] calendar window: expired` and `[settings] calendar list failed (expired) … invalid_grant`.
+- **`layers: []`** is Riku's real state: `No calendars chosen. Pick them in Settings.` on Today, Layers and Next 7 days, and seven `—` rows.
+- **Bogus calendarId** (stub: layer `Gone Cal` with an id the account lacks, beside real Personal and Classes):
+  - `Gone Cal is no longer on your Google account. Untick it in Settings.` as `.fl-empty`, with no dot.
+  - In Today it replaces `Nothing scheduled.`
+  - In Layers the row is kept and the sentence comes after the list.
+  - At the top of Next 7 days, where days with no items go blank rather than `—` (conservative, per the contract).
+  - Real Personal and Classes events still render.
+  - The server log has `couldn't read Gone Cal`.
+- **All layers off** (stub):
+  - `All layers are switched off.` on Today and Next 7 days, with seven `—` rows as measurements.
+  - Three switches, unchecked and live.
+  - **The hero is still `pe-t0` green** (R74/R45).
+  - `+ Event` is disabled.
+- **Malformed layout** (stub `[[{today, span:99}]]`): the default arrangement, the page notice with its dot (one dot), 14px to the grid (L1b).
+
+### Not measured, and why
+
+- **`Couldn’t read Classes.`** (one layer failing, the others fine) cannot be produced against a healthy account without a fault. The JSX-against-specimen-03 read was not done in this run.
+- **A real phone.** Headless Chromium on Windows only. Step 6 item 6 (date-field fit on Riku's phone) and R26 on a phone stay with Riku.
+- **R53's 340 → 131.** Riku has no stored push; 82.75 (none) and 150.25 (a stubbed quote) were measured instead.
+- **The hero's tint behind an open form.**
+- **Every write**, under L2. They are listed under "What remains".
+
+### Deviations and lead rulings
+
+Checked against the code at `1b5af42`. "(log)" marks a claim taken from the lead log and not re-derived in this run.
+
+**Lead rulings L1–L10, plus L1e:**
+
+- **L1, R96.** The lateness meta renders both forms, `.pe-lf` and `.pe-ls`. `.pe-ls{display:none}` at base, and the 240px container band swaps them.
+  - Verified in the CSS and in the browser: `3 days late` at ≥240px, `3d late` below.
+  - This supersedes the plan's "no stylesheet edit" and its "`3d late` does not exist in `src/`".
+- **L1b.** The `fellBack` sentence's 14px. The selector was adjusted to `.pe-fail + :not(.pe-edit) > .pe-wrap`, because the well's element is always present. Measured 14.
+- **L1c.** `[aria-disabled="true"]` was appended to the existing dim rules for `.btn`, `.btn.hi`, `.tick` and `.pe-sw`.
+- **L1d.** A quoted push never clips. Measured at 106px.
+- **L1e** (added after verification, `1b5af42`):
+  - `.pe-sw, .pe-edit-row{text-transform:none; letter-spacing:normal}` against `legacy.css`'s bare `button` rule.
+  - `.pe-pills .pe-said{margin-top:0}`.
+  - Measured above.
+- **L2.** No writes to real data. Every write is owed to Riku.
+- **L3.** Ports 3021 to 3023 only.
+- **L4.** The page wiring is Task 1's.
+- **L5.** Parallel builders do not build.
+- **L6.** Browser checks.
+- **L7.** `pressOutcome` (`6c103ba`, `PRESS_TIMEOUT_MS = 60_000`). Every island's `fetch` goes through it. The five page islands and `CalendarPicker.tsx` import it.
+- **L8.** No worktrees, junctions or `npm install`.
+- **L9.** A busy control that is focused uses `aria-disabled` and a guard, not `disabled`. Verified on `LayerSwitches`, `CalendarPicker` and the layout `Save`.
+- **L10.** Typographic apostrophes on the page and on Settings. Every sentence observed in this run uses U+2019. The push text in `digest.ts` keeps ASCII (`wasn't read`), as ruled.
+
+**Accepted deviations (verified unless marked log):**
+
+- **T1:**
+  - Three Suspense boundaries, not two (Today, Layers, Week), in `page.tsx`.
+  - `listCalendars()` sits inside the one calendar promise.
+  - Phase 1 is settled read by read.
+  - No leftover cell in normal view (`buildCells`).
+  - **Event defaults** (`days.ts` `eventTimeDefaults`): from 23:00 the default is tomorrow 00:00–01:00, and at 22:xx it is 23:00–23:59 (`oneHourAfter` caps at `DAY_LAST`). This deviates from deck §7.
+  - **The Today fallback carries the tint** (`buildTodayDue`, `page.tsx:334`).
+- **T2:**
+  - Hidden keys are `open:` and `done:` (`HiddenKey`, `LayoutEditor.tsx:72`; `TodoRow.tsx:112`).
+  - The unknown-outcome sentence sits under the tile head; specimen 06 draws it after the rows. (log)
+  - The unknown calendar leg gets R49's sentence. (log)
+  - B1: the press's own re-read ends a hide, through a per-render `stamp={crypto.randomUUID()}`.
+  - **Residual race** (log): another island's refresh, requested before this press's answer but landing after it, can briefly unhide a settled row. Accepted.
+- **T5:**
+  - Week event items link out through a plain `<a target="_blank" rel="noopener noreferrer">` with no ↗ (`Week.tsx:32`).
+  - N3: none-enabled with to-dos down gives `days: null` (`personalView.ts:698`).
+  - Row failure sentences moved to context (`rowNotes`). (log)
+- **T6.** Today's push is `.pe-ptitle` plus `.fl-snip` (the mockup's form), not the spec's `.pe-quote` well. The older push uses `.pe-quote`. Observed.
+- **T7:**
+  - All switches are disabled while one saves (spec §4.3 says that row only; amend the spec).
+  - The outcome sits under the row.
+  - Vanished-calendar sentences come after the list.
+  - `SettingsLine.tsx` is the shared Settings link.
+  - All observed.
+- **T8 (`187e723`):**
+  - `layoutEdit.ts` is pure, with 16 tests.
+  - Entry focus goes to the first live button.
+  - A Save with an unknown outcome keeps the mode open with the changes intact.
+  - The `.pe-edit` well's element is always rendered (classless in normal view).
+  - `.pe-sticky` wraps the whole header band.
+  - All observed.
+  - The log's two Mongo-down figures (title→grid 61.5 in both modes; edit rows 382·242·282·162) were not reproduced in this run. With the database down this run measured normal rows 340 · 200 · 240 · 120 and a 14px notice gap.
+- **T9:**
+  - AgentSwitches keeps its own client GET.
+  - Every picker box is busy while saving (observed: all six `aria-disabled`).
+  - `Couldn’t load layers.` when Google answers but the layers read fails (observed with Mongo down).
+  - `pickerRows`, `pickerToggle` and `buildSettingsCards` exist in `personalView.ts`.
+  - Names over 120 characters are shortened on tick. (log)
+- **T10.** `ARCHITECTURE.md` §3.1, §4.2 and §5 are updated, with `Todo`, `LastDigest`, `AgentRun.skipped`, `OsSettings.layers`/`personalLayout`, the Google row and the morning read. §7 is untouched (no hunk reaches line 164). The diff has no "S19" citation.
+- **Forms:**
+  - Drafts live in the tiles; the forms are views.
+  - A no-answer add or event parks (only `Cancel` clears it); a no-answer edit keeps `Save` live; an edit sends only the changed fields.
+  - Clearing Date or Start gives the door's 400, read as `Couldn’t save.`
+  - The per-section `Showing 20 of N.` sits directly under its section (deviation from R16).
+  - The orphaned or unknown pin sentence is provisional (`PIN_MAYBE_MADE`).
+  - Not exercised (writes); from the log and the code.
+- **`personalView` additions:**
+  - Exported: `buildTodayDue`, `formCapableFor`, `pickerRows`, `pickerToggle`, `buildSettingsCards`.
+  - `eventFormBlocked` is a module-private function feeding the field `TodayView.eventFormBlocked`, not an export.
+- **S1 focus.** When the last tick leaves a tile, focus goes to the tile itself, through `setAttribute("tabindex","-1")` (`TodoRow.tsx` `keepFocus`). A keyboard tick then draws `base.css`'s `:focus-visible` ring on the tile (squared corners). (log; not looked at in this run)
+
+**Where the lead log is wrong or imprecise:**
+
+1. **"stylesheet = L1/L1b/L1c/L1d only, 10 hunks"** (principal review at `b391fde`). At `b391fde` the diff from `bb103cf` has **7 hunks at default context and 9 at `-U0`**, not 10. The classification (L1–L1d only) is right. At `1b5af42` it is 8 and 10.
+   - The verification report sent to the lead also said 8 at `d4c5ea7`; that was a miscount, and the true figure is 7.
+2. **"PROVISIONAL (P10c) CALENDAR_REASONS in TodoForm.tsx — six phrases."** `CALENDAR_REASONS` has **six causes and eight strings**, because `gone` carries three: `event`, `pin` and `move`. With `PIN_MAYBE_MADE` there are **nine** `PROVISIONAL (P10c)` markers.
+3. **"`Couldn’t save the layout.` may sit ~10px low."** Measured **5.0px** low, now fixed by L1e.
+4. **"No live regions (role=status) for press outcomes anywhere in the app."** True of press outcomes. But the editor's row caption `.pe-cap` is `aria-live="polite"` (`LayoutEditor.tsx:323`), the one live region on the page.
+5. **"`.pe-sticky` … UNMEASURED."** Now measured: it sticks.
+
+### Carry-forwards (not fixed in P10c)
+
+- **The arrow font.** ← and → fall back to Arial: the JetBrains Mono web subset lacks U+2190 and U+2192. They are still text, so R26 holds. Glyph widths are uneven, 13.45px against 6px. Decide in a font or subset pass.
+- **The settings route's 500.** `PATCH /api/settings` answers 500 `{code:"save-failed"}` (`route.ts:67`), which is ambiguous after a sent write (T9 review S2).
+- **Live regions.** No live region announces a press outcome anywhere in the app. This is an app-wide decision.
+- **AgentSwitches** (P3, moved verbatim) still sets `disabled={busy}` on its focused buttons (`:81`, `:104`, `:125`), so focus drops to `<body>`. It is also the lint error.
+- **AgentSwitches with Mongo down** renders `Could not load settings.` in place of the chaser and monitoring cards (P3 behaviour).
+- **ARCHITECTURE §3.1** has no `HealthSnapshot` row (pre-existing).
+- **A stale success.** A success whose `router.refresh()` never lands shows the old knob state (T7 N1).
+- **Duplications left** (log, confirmed present):
+  - `focusPillOrTile` (`TodoForm.tsx:297`) against `keepFocus`'s tile fallback (`TodoRow.tsx:81`);
+  - `TILE_NAME` repeats the eyebrows;
+  - the `SayLine` renderer exists three times;
+  - the outside-week and due-group windows are re-derived in the islands.
+- **R94's slack.** The open-day stretch leaves about 100px under a closed neighbour at two columns. Accepted by eye; revisit only if Riku dislikes it.
+- **The RikuOS dev server on 3011** crashed during the `node_modules` incident and was left for Riku. (log)
+
+### Provisional strings awaiting Riku
+
+- **P10c**, `git grep -n "PROVISIONAL (P10c)"`, nine markers, all in `TodoForm.tsx`.
+  - The `<reason>` words for deck §7's three reason sentences (`:105–114`):
+
+| Cause | Phrase |
+|---|---|
+| not-configured | `Google isn’t connected yet` |
+| expired | `Google access has expired` |
+| refused | `Google refused the request` |
+| gone (event / pin) | `the calendar is no longer on your Google account` |
+| gone (move) | `the entry is no longer on Google` |
+| changed | `the to-do changed at the same moment` |
+| store | `the app couldn’t record it` |
+
+  - `PIN_MAYBE_MADE` (`:128`): `Saved. A calendar entry may have been made anyway. Check Google Calendar before switching it on again.`
+  - Related: on the event form, `Google didn’t accept it: Google isn’t connected yet.` The host clause is inaccurate for not-configured, which is decided before any call.
+- **P10b**, still open, six markers in `digest.ts`:
+  - `:76`, the problems line's `+N more`;
+  - `:140`, `calendar check incomplete`;
+  - `:226`, the comma before `+N more`;
+  - `:235`, the plural `X, Y and N more`;
+  - `:240`, `… weren't read.`;
+  - `:301`, `Today: <miss>` alone.
+- **A wording question.** `ENTRY_LEFT_SENTENCE` (`personalErrors.ts:47`), `Done, but the calendar entry couldn’t be removed. Remove it in Google Calendar.`, is deck §7 line 402's sentence as written. It is used for done, switch-off **and delete**. "Done" after a delete reads oddly: Riku's call.
+
+### What remains: Riku's hands, in order
+
+1. **Push `master`.** At `1b5af42`, `master` is 29 commits ahead of `origin/master`: exactly this plan's commits. This record makes 30.
+2. **Vercel:** add `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REFRESH_TOKEN`, then **redeploy**. Confirm `npm run migrate:indexes` / `:apply` for the two `Todo` indexes if not already done (plan step 6 item 4).
+3. **Settings → Calendar layers: tick Personal, Classes and Events.** None is chosen today, so the page reads `No calendars chosen…` everywhere.
+4. **The live write checks owed under L2,** on `/personal` and `/settings`:
+   - **To-dos:** add a to-do; tick and untick; edit; delete through the confirmation.
+   - **Twin rows:** confirm the twins (Today's DUE and the To-do tile) leave together.
+   - **The R49 case.**
+   - **Calendar pins:** a to-do with `Put on calendar` appears in Google Calendar on its day, and is removed on tick.
+   - **Events:** create an event, including the timeout path.
+   - **Layers:** a layer toggle persists across a reload and drops out of the push.
+   - **Settings:** the picker tick and untick.
+   - **Agents:** the chaser toggle and threshold still work.
+   - **Edit mode:** Save a real arrangement, then Reset to default.
+   - **Phone fit:** open `+ Event` and `+ To-do` on his phone and confirm the date field fits.
+5. **Approve or reword** the provisional strings above: nine P10c, six P10b, and the "Done, but…" question.
+6. **One automatic 07:00 push.** Not a manual trigger, and with at least one to-do in it. The push tile quotes it the same morning with `sent 07:00` in `APP_TZ`.
+7. **Plan step 7's four observations, dated:**
+   1. `/personal` on Vercel, reading the real calendars and the three chosen layers.
+   2. A real to-do pinned to Google Calendar and removed on tick.
+   3. One automatic 07:00 push naming what was due and scheduled.
+   4. The push tile quoting that push the same morning.
+
+### Self-review, checked against the repo at `1b5af42`
+
+- [x] `useEffect` under `src/app/(app)/personal/` is empty; exactly five files carry `"use client"`.
+- [x] `Week.tsx` is a server component, and the day-row disclosure is a native `<details>`. `Enter` and `Space` work with no script (measured).
+- [x] The hero's class is `pe-tile is-hero` plus at most one `pe-t{0..8}` (`Today.tsx:33`).
+  - `heroTint` is called with the DUE row count or `null` (`personalView.ts:604`, `:611`), never with anything from the calendar.
+  - The tint is unchanged in edit mode (measured).
+  - **Behind an open form: not measured.**
+- [ ] `.pe-more`, `+N more`, `PERSONAL_HERO_BUSY_AT`, `.is-clear`, `.is-busy` and `3d late` do not exist anywhere in `src/`. **Not literally true, by ruling.**
+  - The names survive only in comments and in the push composer.
+  - `3d late` exists by L1/R96, as `.pe-ls` through `shortLateness`.
+  - There is no code identifier for the cut items.
+- [x] `2 items` and `3 items` render on a day with two or more items; a one-item day has no `<details>`; `1 items` is unreachable (pinned in `personalView.test.ts`).
+- [ ] No stylesheet, shell, `_shell/`, Freelance, proxy or `package.json` file changed. **Superseded for stylesheets** by L1, L1b, L1c, L1d and L1e, with every hunk classified above. Shell, `_shell/`, Freelance, proxy and `package.json` are unchanged.
+- [x] **Mutating islands.**
+  - Every mutating island ends its success path in `router.refresh()`.
+  - Every no-answer outcome says `Couldn’t tell if that saved.` through `pressOutcome` (measured on the layout Save).
+  - A switch shows its target position only while busy (deck §6 Tile 3) and returns on a definite failure (measured).
+- [x] **Edit mode:**
+  - four signals and no colour;
+  - title→grid 28 in and out;
+  - every body `inert`;
+  - every open day closed on entry;
+  - a failed Save keeps the mode open with the changes intact.
+- [x] `/settings` has no `pe-` class, calls `listCalendars()` once server-side (`settings/page.tsx:55`), and derives both cards from that one answer.
+- [x] `ARCHITECTURE.md` §3.1, §4.2 and §5 are updated; §7 is untouched.
+- [x] `npm test`, `npx tsc --noEmit` and `npm run build` are green; `npm run lint` is at four errors and three warnings.
+- [x] `git -C ../ShikksTracker status --porcelain` is empty.
+- [ ] Step 7's four observations are recorded with dates. **Riku's:** see "What remains", item 7.
+
+**Also against the plan's text:**
+
+- "This plan adds no test file" is **not true**. `pressOutcome.test.ts` (L7) and `layoutEdit.test.ts` (T8) are new. Both are additions the lead's rulings asked for.
+- The test-file count went from 40 to 42.
