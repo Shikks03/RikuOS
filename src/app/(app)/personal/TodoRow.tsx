@@ -147,13 +147,19 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
 
 // ---- the edit seam ----------------------------------------------------------
 
-const RowEdit = createContext<{ close: () => void } | null>(null);
+interface RowEditValue {
+  /**
+   * Puts the row back and returns focus to its `Edit "…"` button — unless
+   * `focus` is false: a close caused by a late answer moves focus only when
+   * the form still held it (TodoForm decides; S2).
+   */
+  close: (focus?: boolean) => void;
+}
 
-/**
- * For the edit form a tile hands a row (TodoForm, Task 3): `close()` puts the
- * row back and returns focus to its `Edit "…"` button.
- */
-export function useRowEdit(): { close: () => void } | null {
+const RowEdit = createContext<RowEditValue | null>(null);
+
+/** For the edit form a tile hands a row (TodoForm, Task 3). */
+export function useRowEdit(): RowEditValue | null {
   return useContext(RowEdit);
 }
 
@@ -210,6 +216,7 @@ function OpenRow({ tile, row, tag, edit }: Extract<TodoRowProps, { shape: "open"
   const page = usePersonalPage();
   const editing = editingAt !== null && editingAt === page.editEpoch && !page.editing;
   const editButton = useRef<HTMLButtonElement>(null);
+  const inline = useRef<HTMLDivElement>(null);
   const metaId = useId();
   if (hidden) return null;
 
@@ -249,12 +256,12 @@ function OpenRow({ tile, row, tag, edit }: Extract<TodoRowProps, { shape: "open"
   }
 
   if (editing) {
-    const close = () => {
+    const close = (focus = true) => {
       flushSync(() => setEditingAt(null));
-      editButton.current?.focus();
+      if (focus) editButton.current?.focus();
     };
     return (
-      <div className="pe-inline">
+      <div className="pe-inline" ref={inline}>
         <RowEdit.Provider value={{ close }}>{edit}</RowEdit.Provider>
       </div>
     );
@@ -270,7 +277,11 @@ function OpenRow({ tile, row, tag, edit }: Extract<TodoRowProps, { shape: "open"
           className="pe-edit-row"
           aria-label={`Edit “${row.title}”`}
           aria-describedby={describedBy}
-          onClick={() => setEditingAt(page.editEpoch)}
+          onClick={() => {
+            // The form mounts in this handler, and focus goes to its first field (Title).
+            flushSync(() => setEditingAt(page.editEpoch));
+            inline.current?.querySelector<HTMLInputElement>("input")?.focus();
+          }}
         >
           {meta}
         </button>

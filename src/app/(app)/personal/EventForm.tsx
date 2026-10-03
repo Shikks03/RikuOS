@@ -40,11 +40,11 @@ import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { EVENT_TITLE_MAX, PRESS_TIMEOUT_MS } from "@/lib/constants";
 import { addDays, formatDay, oneHourAfter } from "@/lib/days";
-import { ERROR_SENTENCES } from "@/lib/personalErrors";
+import { ERROR_SENTENCES, TOO_NARROW_SENTENCE } from "@/lib/personalErrors";
 import { pressOutcome } from "@/lib/pressOutcome";
 import { TileBody, TileFoot, TileHead, usePersonalPage } from "./LayoutEditor";
 import type { EventFormData } from "./_blocks/Today";
-import { FormDraftsProvider, calendarOf, calendarReason, focusPillOrTile, useFormDraftsState } from "./TodoForm";
+import { TileFormsProvider, calendarOf, calendarReason, focusPillOrTile, focusStillIn } from "./TodoForm";
 
 /** deck §7 */
 const NO_ANSWER = "Couldn’t reach Google. Check the calendar before trying again.";
@@ -87,7 +87,7 @@ function freshDraft(form: EventFormData): EventDraft {
 
 /**
  * Tile 1's client half: the `+ Event` pill, the body the form replaces, and
- * the FormDrafts the DUE rows' edit forms keep their typing in. The groups
+ * what the DUE rows' edit forms need from their tile (TileForms). The groups
  * (`body`) and the bound (`foot`) are rendered on the server.
  *
  * The pill is refused before the fact (R40, R20, R42): too narrow (`Too
@@ -131,16 +131,16 @@ export function EventTile({
   const narrowId = useId();
   const [openAt, setOpenAt] = useState<number | null>(null);
   const [draft, setDraft] = useState<EventDraft>(() => freshDraft(form));
-  const drafts = useFormDraftsState(() => focusPillOrTile(pill.current), form.today);
+  const forms = { focusPill: () => focusPillOrTile(pill.current), dueGroupUntil: form.today };
 
   const canOpen = formCapable && !blocked;
   const open = canOpen && openAt !== null && openAt === page.editEpoch && !page.editing;
   const why = [!formCapable ? narrowId : null, blocked ? reasonId : null].filter((x) => x !== null).join(" ");
 
-  function close(keep: boolean) {
+  function close(keep: boolean, focus = true) {
     if (!keep) setDraft(freshDraft(form));
     flushSync(() => setOpenAt(null));
-    focusPillOrTile(pill.current);
+    if (focus) focusPillOrTile(pill.current);
   }
 
   function toggle() {
@@ -158,7 +158,7 @@ export function EventTile({
   }
 
   return (
-    <FormDraftsProvider value={drafts}>
+    <TileFormsProvider value={forms}>
       <TileHead tile="today">
         {head}
         <button
@@ -178,8 +178,7 @@ export function EventTile({
       </TileHead>
       {!formCapable && (
         <p className="pe-said" id={narrowId}>
-          {/* deck §15 */}
-          Too narrow for the form.
+          {TOO_NARROW_SENTENCE /* deck §15 */}
         </p>
       )}
       <TileBody pair={pair && !open}>
@@ -197,7 +196,7 @@ export function EventTile({
         )}
       </TileBody>
       <TileFoot tile="today">{open ? null : foot}</TileFoot>
-    </FormDraftsProvider>
+    </TileFormsProvider>
   );
 }
 
@@ -214,11 +213,13 @@ function EventFormView({
   form: EventFormData;
   draft: EventDraft;
   update: (fn: (d: EventDraft) => EventDraft) => void;
-  close: (keep: boolean) => void;
+  /** focus=false: an answer closed it after focus had moved on (S2). */
+  close: (keep: boolean, focus?: boolean) => void;
 }) {
   const router = useRouter();
   const page = usePersonalPage();
   const endRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const ids = useId();
   const titleErrId = `${ids}-title-err`;
   const endErrId = `${ids}-end-err`;
@@ -283,7 +284,7 @@ function EventFormView({
     );
 
     if (out.kind === "ok") {
-      close(false);
+      close(false, focusStillIn(formRef.current));
       // The page shows today (Tile 1) and today+1 … today+7 (Tile 5); anything else would vanish silently.
       if (dayKey < form.today || dayKey > addDays(form.today, 7)) {
         page.note("today", { text: `Added. It’s on ${formatDay(dayKey)}, outside this week.`, dot: null }); // deck §15
@@ -304,7 +305,7 @@ function EventFormView({
   const shownSaid = draft.parked ? NO_ANSWER : draft.said;
 
   return (
-    <form className="formwell" id={formId} noValidate onSubmit={submit} onKeyDown={onKeyDown}>
+    <form ref={formRef} className="formwell" id={formId} noValidate onSubmit={submit} onKeyDown={onKeyDown}>
       <div className="pe-fields">
         <div>
           <label className="fld-l" htmlFor={`${ids}-title`}>

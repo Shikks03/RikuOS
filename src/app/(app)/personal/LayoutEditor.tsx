@@ -57,6 +57,7 @@ import {
 } from "@/lib/personalLayout";
 import type { SayLine } from "@/lib/personalView";
 import { pressOutcome } from "@/lib/pressOutcome";
+import type { TodoDraft } from "./TodoForm";
 
 /** The six rendered tiles, by tile id. Every id present: the grid places all six. */
 export type TileNodes = Readonly<Record<PersonalTile, ReactNode>>;
@@ -126,11 +127,22 @@ interface PageState {
   /** The row's sentence, or null once a later press in its tile cleared it. */
   rowNote: (tile: PersonalTile, key: HiddenKey) => string | null;
   /**
-   * R40's form floor from the WORKING copy while editing (Task 8 step 7), so
-   * a pill's disabled state agrees with the arrangement on screen; null
-   * outside edit mode, where the server's stored-row answer stands.
+   * R40's form floor from the arrangement on screen when it is not yet the
+   * server's — the WORKING copy while editing (Task 8 step 7), a just-saved
+   * layout until its re-read lands — so a pill's disabled state agrees with
+   * what is drawn; null otherwise, where the server's stored-row answer stands.
    */
   formCapableNow: (tile: PersonalTile) => boolean | null;
+  /**
+   * Every open row's edit-form draft, by to-do id — ONE store for the page,
+   * so a to-do's twins (its row in Today's DUE group and in the To-do tile)
+   * share one draft: what was typed, the press in flight, a parked refusal
+   * (TodoForm). Held here so it outlives any row or tile remount.
+   */
+  todoDrafts: ReadonlyMap<string, TodoDraft>;
+  /** Functional update of one draft, starting from `init` when there is none. */
+  updateTodoDraft: (id: string, init: TodoDraft, fn: (d: TodoDraft) => TodoDraft) => void;
+  forgetTodoDraft: (id: string) => void;
   /** The editor's working copy and its one move, while editing; null otherwise. */
   editor: Editor | null;
 }
@@ -167,6 +179,9 @@ const PageContext = createContext<PageState>({
   sayRow: noop,
   rowNote: () => null,
   formCapableNow: () => null,
+  todoDrafts: new Map(),
+  updateTodoDraft: noop,
+  forgetTodoDraft: noop,
   editor: null,
 });
 
@@ -382,6 +397,7 @@ export default function LayoutEditor({
   const pressCount = useRef<Record<PersonalTile, number>>({ ...NO_PRESSES });
   const [notes, setNotes] = useState<PageState["notes"]>({});
   const [rowNotes, setRowNotes] = useState<ReadonlyMap<string, { press: number; text: string }>>(() => new Map());
+  const [todoDrafts, setTodoDrafts] = useState<ReadonlyMap<string, TodoDraft>>(() => new Map());
 
   const shown: ReadonlyPersonalLayout = working ?? saved?.layout ?? layout;
   const changed = working !== null && seed !== null && !sameLayout(working, seed);
@@ -520,7 +536,26 @@ export default function LayoutEditor({
       const said = rowNotes.get(`${tile}|${key}`);
       return said !== undefined && said.press === presses[tile] ? said.text : null;
     },
-    formCapableNow: (tile) => (working === null ? null : formCapableAt(working, tile)),
+    // The arrangement on screen when it is not the server's: the working copy
+    // while editing, and a just-saved layout until its re-read lands.
+    formCapableNow: (tile) => {
+      const onScreen = working ?? saved?.layout;
+      return onScreen === undefined ? null : formCapableAt(onScreen, tile);
+    },
+    todoDrafts,
+    updateTodoDraft: (id, init, fn) =>
+      setTodoDrafts((all) => {
+        const next = new Map(all);
+        next.set(id, fn(all.get(id) ?? init));
+        return next;
+      }),
+    forgetTodoDraft: (id) =>
+      setTodoDrafts((all) => {
+        if (!all.has(id)) return all;
+        const next = new Map(all);
+        next.delete(id);
+        return next;
+      }),
     editor:
       working === null
         ? null

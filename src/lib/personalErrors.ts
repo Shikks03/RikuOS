@@ -46,5 +46,11 @@ export const ERROR_SENTENCES = Object.freeze({
  */
 export const ENTRY_LEFT_SENTENCE = "Done, but the calendar entry couldn’t be removed. Remove it in Google Calendar.";
 
+/**
+ * deck §15: under the head of a tile too narrow for its form, where the
+ * switched-off `+ Event` or `+ To-do` sits (R40). One spelling for both pills.
+ */
+export const TOO_NARROW_SENTENCE = "Too narrow for the form.";
+
 /** A code that has a sentence in ERROR_SENTENCES. */
 export type ErrorSentenceCode = keyof typeof ERROR_SENTENCES;
