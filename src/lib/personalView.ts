@@ -30,7 +30,8 @@ import { APP_TZ, PUSH_EXPECTED_HOUR } from "@/lib/constants";
 import { addDays, clockHHMM, dayKey, formatDay, todayKey, type DayKey } from "@/lib/days";
 import { compareEvents } from "@/lib/eventOrder";
 import { dueChip, sortTodos, type CreateTodoInput } from "@/lib/todos";
-import { formCapable, type PersonalTile, type ReadonlyPersonalLayout } from "@/lib/personalLayout";
+import type { PersonalTile, ReadonlyPersonalLayout } from "@/lib/personalLayout";
+import { formCapableAt } from "@/lib/layoutEdit";
 import type { CalendarEvent, CalendarListEntry, CalendarWindow, GoogleErrorKind } from "@/lib/google";
 import type { StoredDigest } from "@/lib/lastDigest";
 import type { Layer } from "@/lib/osSettings";
@@ -528,13 +529,13 @@ function uniqueLines(lines: SayLine[]): SayLine[] {
   });
 }
 
-/** R40's form floor for one tile, from its stored row: formCapable takes the whole row. */
+/**
+ * R40's form floor for one tile, from its stored row. ONE rule: this is
+ * layoutEdit's formCapableAt — the same function the editor asks of its
+ * working copy — so the server's answer and the editor's cannot drift.
+ */
 export function formCapableFor(layout: ReadonlyPersonalLayout, tile: PersonalTile): boolean {
-  for (const row of layout) {
-    const index = row.findIndex((e) => e.tile === tile);
-    if (index >= 0) return formCapable(row.map((e) => e.span), index);
-  }
-  return false;
+  return formCapableAt(layout, tile);
 }
 
 /**
