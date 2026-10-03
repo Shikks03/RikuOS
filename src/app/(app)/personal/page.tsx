@@ -295,14 +295,25 @@ export default async function PersonalPage() {
 
   const todoDue: TodoDueKeys =
     todos === "unavailable" ? {} : Object.fromEntries(todos.rows.map((t) => [t.id, t.dueOn]));
-  const eventForm: EventFormData = {
-    today,
-    calendars:
-      settings === "unavailable"
-        ? []
-        : settings.layers.filter((l) => l.enabled).map((l) => ({ calendarId: l.calendarId, name: l.name })),
-    defaults: eventTimeDefaults(now),
-  };
+  // The event form lists the switched-on layers it can write to — never one
+  // that listCalendars() says is gone from the Google account (R42); with no
+  // list (null) nothing is called gone. Behind the one calendar promise.
+  const eventForm: Promise<EventFormData> = calendar.then((feed) => {
+    const present =
+      feed === "layers-unavailable" || feed.calendars === null
+        ? null
+        : new Set(feed.calendars.map((c) => c.calendarId));
+    return {
+      today,
+      calendars:
+        feed === "layers-unavailable"
+          ? []
+          : feed.layers
+              .filter((l) => l.enabled && (present === null || present.has(l.calendarId)))
+              .map((l) => ({ calendarId: l.calendarId, name: l.name })),
+      defaults: eventTimeDefaults(now),
+    };
+  });
 
   return (
     <LayoutEditor

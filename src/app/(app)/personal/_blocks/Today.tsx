@@ -23,7 +23,8 @@ export interface EventFormData {
 export interface TodayProps {
   /** buildTodayView's result, behind the page's one calendar promise (R34). */
   view: Promise<TodayView>;
-  eventForm: EventFormData;
+  /** Behind the same calendar promise: the layers it lists drop any listCalendars() reports gone (R42). */
+  eventForm: Promise<EventFormData>;
   /** The open to-dos' due days, for a DUE row's edit form (TodoRowView carries only the chip). */
   todoDue: TodoDueKeys;
 }
@@ -79,8 +80,8 @@ function Line({ line, id }: { line: SayLine; id?: string }) {
  * Deviation 2: the mockup's `<span class="fl-h">` is an <h2> here, and the
  * wrapper that now holds a heading is a <div>.
  */
-export default async function Today({ view, eventForm, todoDue }: TodayProps) {
-  const v = await view;
+export default async function Today({ view, eventForm: eventFormP, todoDue }: TodayProps) {
+  const [v, eventForm] = await Promise.all([view, eventFormP]);
   const s = v.scheduled;
   const blocked = v.eventFormBlocked || eventForm.calendars.length === 0;
 
