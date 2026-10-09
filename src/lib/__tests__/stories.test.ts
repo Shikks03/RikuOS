@@ -193,6 +193,54 @@ describe("groupProblems", () => {
     ).toEqual(["The chaser and the site check both failed on their last run."]);
   });
 
+  it("groups two unrelated job-failed problems into one story", () => {
+    expect(
+      texts([
+        { key: "job-failed", job: "watchdog", raw: "weird one" },
+        { key: "job-failed", job: "site-health", raw: "weird two" },
+      ]),
+    ).toEqual(["The watchdog and the site check both broke this morning."]);
+  });
+
+  it("groups three or more unrelated job-failed problems with 'all'", () => {
+    expect(
+      texts([
+        { key: "job-failed", job: "watchdog", raw: "weird one" },
+        { key: "job-failed", job: "site-health", raw: "weird two" },
+        { key: "job-failed", job: "outreach-health", raw: "weird three" },
+      ]),
+    ).toEqual(["The watchdog, the site check and the outreach check all broke this morning."]);
+  });
+
+  it("lets a shared cause win over same-key grouping for job-failed (rule 2 before rule 3)", () => {
+    const stories = groupProblems([
+      { key: "job-failed", job: "watchdog", raw: "connect ETIMEDOUT" },
+      { key: "job-failed", job: "site-health", raw: "aborted" },
+    ]);
+    expect(stories).toHaveLength(1);
+    expect(stories[0].sentence.text).toBe("Two checks failed, and they both point to something being too slow to answer.");
+  });
+
+  it("groups two agent-degraded problems into one story", () => {
+    expect(
+      texts([
+        { key: "agent-degraded", agent: "chaser", itemsFailed: 2 },
+        { key: "agent-degraded", agent: "retro", itemsFailed: 1 },
+      ]),
+    ).toEqual(["The chaser and the retro both had items that didn't go through on their last runs."]);
+  });
+
+  it("groups three or more agent-degraded problems with 'all'", () => {
+    expect(
+      texts([
+        { key: "agent-degraded", agent: "chaser", itemsFailed: 2 },
+        { key: "agent-degraded", agent: "retro", itemsFailed: 1 },
+        { key: "agent-degraded", agent: "dispatcher", itemsFailed: 3 },
+      ]),
+    ).toEqual(["The chaser, the retro and the morning run all had items that didn't go through on their last runs."]);
+  });
+
+
   it("bolds the subjects of a grouped story", () => {
     const [story] = groupProblems([
       { key: "site-status", site: "Meowchi", status: 503 },

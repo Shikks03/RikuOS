@@ -30,6 +30,7 @@
 import { explain, explainCause } from "@/lib/causes";
 import { AGENT_NAMES, type Problem } from "@/lib/problems";
 import type { CauseKey } from "@/lib/briefingTypes";
+import type { Agent } from "@/models/AgentRun";
 import { b, capFirst, capWord, numberWord, say, type Said, type Seg } from "@/lib/voice";
 
 export interface Story {
@@ -79,6 +80,13 @@ function isRealOutage(p: Problem): boolean {
   if (p.key === "site-unreachable" || p.key === "site-timeout") return true;
   if (p.key === "site-status") return p.status >= 500;
   return false;
+}
+
+/** The agent a same-key group's problem names — `job` for job-failed, `agent` otherwise. */
+function agentOf(p: Problem): Agent {
+  if (p.key === "job-failed") return p.job;
+  if ("agent" in p) return p.agent;
+  throw new Error(`agentOf: ${p.key} names no agent`);
 }
 
 export function groupProblems(problems: Problem[]): Story[] {
@@ -166,8 +174,9 @@ export function groupProblems(problems: Problem[]): Story[] {
   for (const [cause, group] of byCause) {
     if (group.length < 2) continue;
     take((p) => group.includes(p));
+    const verb = group.length === 2 ? "both" : "all";
     stories.push({
-      sentence: say(`${capWord(numberWord(group.length))} checks failed, and they all point to `, b(CAUSE_THREAD[cause]!), "."),
+      sentence: say(`${capWord(numberWord(group.length))} checks failed, and they ${verb} point to `, b(CAUSE_THREAD[cause]!), "."),
       symptoms: group,
     });
   }
@@ -182,14 +191,22 @@ export function groupProblems(problems: Problem[]): Story[] {
       symptoms: sites,
     });
   }
-  for (const key of ["agent-failed", "agent-never-ran", "agent-stale"] as const) {
+  for (const key of ["agent-failed", "agent-never-ran", "agent-stale", "agent-degraded", "job-failed"] as const) {
     const group = left.filter((p) => p.key === key);
     if (group.length < 2) continue;
     take((p) => group.includes(p));
-    const names = group.map((p) => ("agent" in p ? AGENT_NAMES[p.agent] : ""));
+    const names = group.map((p) => AGENT_NAMES[agentOf(p)]);
     const both = group.length === 2 ? "both" : "all";
     const tail =
-      key === "agent-failed" ? ` ${both} failed on their last run.` : key === "agent-never-ran" ? ` have ${both} never run.` : ` are ${both} overdue.`;
+      key === "agent-failed"
+        ? ` ${both} failed on their last run.`
+        : key === "agent-never-ran"
+          ? ` have ${both} never run.`
+          : key === "agent-stale"
+            ? ` are ${both} overdue.`
+            : key === "agent-degraded"
+              ? ` ${both} had items that didn't go through on their last runs.`
+              : ` ${both} broke this morning.`;
     stories.push({ sentence: capFirst(say(...boldList(names), tail)), symptoms: group });
   }
 

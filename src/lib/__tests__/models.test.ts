@@ -14,6 +14,8 @@ import OsSettings from "@/models/OsSettings";
 import { PERSONAL_LAYOUT_DEFAULT } from "@/lib/personalLayout";
 import HealthSnapshot, { HEALTH_SNAPSHOT_ID } from "@/models/HealthSnapshot";
 import LastDigest from "@/models/LastDigest";
+import { buildBriefing, type DigestInput, type DigestTodayInput } from "@/lib/digest";
+import type { Problem } from "@/lib/problems";
 
 const validPayload = {
   contactId: "c1",
@@ -486,6 +488,77 @@ describe("LastDigest — S21's briefing and seenAt", () => {
 
   it("stays valid with no briefing and no seenAt — old records stay valid", async () => {
     const doc = new LastDigest({ ...BASE });
+    await expect(doc.validate()).resolves.toBeUndefined();
+  });
+
+  it("accepts a worst-case real buildBriefing output — a save can never fail on bounds", async () => {
+    // Not a hand-built StoredBriefing: a real DigestInput, run through the
+    // real buildBriefing (digest.ts), pinning that whatever the catalogue and
+    // stories.ts can produce, LastDigest's schema bounds always hold. 14
+    // distinct stories (over BRIEFING_BOUNDS.stories = 12), several of them
+    // multi-symptom chains and same-key groups (five agents failing together
+    // among them), long calendar names, and 300+ char raw errors.
+    const QUIET: DigestTodayInput = { events: [], missedLayers: [], due: [], overdue: [] };
+    const longName = (prefix: string) => `${prefix}-${"x".repeat(110)}`.slice(0, 120);
+    const longRaw = (prefix: string) => `${prefix} ${"z".repeat(290)}`;
+
+    const problems: Problem[] = [
+      // Chain 1: ShikksTracker looks down (5 symptoms, including its own
+      // outreach-health check — plan deviation 12).
+      { key: "site-status", site: "ShikksTracker", status: 503 },
+      { key: "pipeline-unavailable", raw: longRaw("fetch failed") },
+      { key: "engine-stale", ageMs: 50 * 3600_000 },
+      { key: "stranded-approved", count: 4 },
+      { key: "job-failed", job: "outreach-health", raw: longRaw("ST down") },
+      // Chain 3: the database behind two failed checks and both side effects
+      // (4 symptoms).
+      { key: "job-failed", job: "watchdog", raw: longRaw("MongoNetworkError: closed") },
+      { key: "job-failed", job: "site-health", raw: longRaw("MongoNetworkError: closed") },
+      { key: "todos-unavailable" },
+      { key: "snapshot-unsaved" },
+      // Same-key: five agents failing together (5 symptoms).
+      { key: "agent-failed", agent: "chaser" },
+      { key: "agent-failed", agent: "lead-sweep" },
+      { key: "agent-failed", agent: "triage" },
+      { key: "agent-failed", agent: "dispatcher" },
+      { key: "agent-failed", agent: "retro" },
+      // Same-key: three unrelated job-failed problems (3 symptoms).
+      { key: "job-failed", job: "expiry-sweep", raw: longRaw("zzqqxx one") },
+      { key: "job-failed", job: "dispatcher", raw: longRaw("zzqqxx two") },
+      { key: "job-failed", job: "retro", raw: longRaw("zzqqxx three") },
+      // Same-key: two agent-degraded problems (2 symptoms).
+      { key: "agent-degraded", agent: "lead-sweep", itemsFailed: 7 },
+      { key: "agent-degraded", agent: "triage", itemsFailed: 9 },
+      // Same-key: two down sites (2 symptoms).
+      { key: "site-timeout", site: "Meowchi" },
+      { key: "site-unreachable", site: "AzeroTech" },
+      // One-problem stories, one per remaining key.
+      { key: "agent-never-ran", agent: "watchdog" },
+      { key: "agent-stale", agent: "expiry-sweep", ageHours: 72 },
+      { key: "unstuck-items", count: 6 },
+      { key: "engine-never-ran" },
+      { key: "engine-unreadable" },
+      { key: "engine-errors", count: 5 },
+      { key: "calendar-unavailable", cause: "expired" },
+      // Long calendar names, past symptomSentence's bound — exercises the
+      // plain-count fallback (plan deviation 10) as well as the schema bound.
+      { key: "calendar-partial", calendars: [longName("Work"), longName("Classes"), longName("Personal")] },
+    ];
+
+    const input: DigestInput = {
+      day: "2026-10-13",
+      pending: 9,
+      attention: { repliedUnanswered: 3, overdue: 2 },
+      attentionError: null,
+      problems,
+      offAgents: ["chaser"],
+      today: QUIET,
+    };
+
+    const briefing = buildBriefing(input);
+    expect(briefing.stories.length).toBeGreaterThanOrEqual(12);
+
+    const doc = new LastDigest({ ...BASE, briefing });
     await expect(doc.validate()).resolves.toBeUndefined();
   });
 });

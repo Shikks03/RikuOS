@@ -65,6 +65,26 @@ export function boundRaw(raw: string | undefined | null): string | null {
   return raw.slice(0, BRIEFING_BOUNDS.raw);
 }
 
+/**
+ * A rejected fetch's text for a problem card: the error's own message, plus a
+ * system error code in parens when the cause carries one (Node's fetch
+ * failures set `cause.code`, e.g. "ENOTFOUND"). Only `cause.code` is ever
+ * read — never `cause.message`, which could repeat or contradict the outer
+ * error's own text, or belong to a different failure entirely. A non-Error
+ * value is stringified rather than dropped, so a rejection that never threw
+ * an Error still gets a card. Bounded to BRIEFING_BOUNDS.raw (boundRaw), same
+ * as every other raw error this app stores.
+ */
+export function describeFetchError(err: unknown): string | null {
+  const message = err instanceof Error ? err.message : String(err);
+  const cause = err instanceof Error ? err.cause : undefined;
+  const code =
+    cause !== null && typeof cause === "object" && typeof (cause as { code?: unknown }).code === "string"
+      ? (cause as { code: string }).code
+      : null;
+  return boundRaw(code ? `${message} (${code})` : message);
+}
+
 export interface MorningOutcomes {
   expiry: { ok: boolean; error?: string; unstuck: number };
   watchdog: { ok: boolean; error?: string; anomalies: Anomaly[] };

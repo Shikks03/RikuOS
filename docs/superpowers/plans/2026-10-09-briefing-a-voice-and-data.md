@@ -57,6 +57,7 @@ The lead session decides and orchestrates; it does not write code. One **builder
 10. **`calendar-partial` falls back to a plain count instead of being clipped.** Calendar layer names are caller-supplied (up to 120 characters) and several joined can exceed `BRIEFING_BOUNDS.symptomSentence`; rather than clip the sentence mid-name, the catalogue measures the full sentence first and, only when it would overrun, falls back to "I couldn't read two of your calendars, so today might be missing something." Every other row is fixed prose and is never clipped.
 11. **Chain 2 also takes `engine-unreadable`, joined with "and" rather than "so".** A malformed run-time report isn't shown to be the cause of the stranded messages, so the chain must not claim it is.
 12. **Chain 1 only fires on a real ShikksTracker outage, and also takes a failed outreach-health check.** `site-status` only qualifies at 500 or above (401/403/404 are not an outage); a `job-failed` whose job is `outreach-health` joins the same story when ShikksTracker's site and the pipeline are both down, so a real outage reads as one story including its own check's failure.
+13. **An unknown calendar read failure is stored as `calendar-unavailable` with cause `read-failed` and no raw error** — `digestToday.ts` discards the caught message, so its card says honestly "I can see it failed, but not why." rather than running the raw through §4.3's rules. Passing the raw through is left for later.
 
 ---
 

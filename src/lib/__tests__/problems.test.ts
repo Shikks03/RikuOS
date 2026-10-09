@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { AGENT_NAMES, buildProblems, type MorningOutcomes } from "@/lib/problems";
+import { AGENT_NAMES, buildProblems, describeFetchError, type MorningOutcomes } from "@/lib/problems";
 import { AGENTS } from "@/models/AgentRun";
 
 const healthy: MorningOutcomes = {
@@ -169,6 +169,39 @@ describe("buildProblems", () => {
       { key: "engine-never-ran" },
       { key: "engine-unreadable" },
     ]);
+  });
+});
+
+describe("describeFetchError", () => {
+  it("names a plain Error by its message", () => {
+    expect(describeFetchError(new Error("fetch failed"))).toBe("fetch failed");
+  });
+
+  it("appends the cause's error code when it's a string", () => {
+    const err = new Error("fetch failed", { cause: { code: "ENOTFOUND" } });
+    expect(describeFetchError(err)).toBe("fetch failed (ENOTFOUND)");
+  });
+
+  it("stringifies a non-Error value rather than dropping it", () => {
+    expect(describeFetchError("boom")).toBe("boom");
+    expect(describeFetchError({ not: "an error" })).toBe("[object Object]");
+  });
+
+  it("bounds a long message to 300 characters", () => {
+    const long = "x".repeat(2000);
+    expect(describeFetchError(new Error(long))).toBe("x".repeat(300));
+  });
+
+  it("never includes cause.message, only cause.code", () => {
+    const err = new Error("outer failed", { cause: { code: "ETIMEDOUT", message: "inner secret" } });
+    const described = describeFetchError(err);
+    expect(described).toBe("outer failed (ETIMEDOUT)");
+    expect(described).not.toContain("inner secret");
+  });
+
+  it("ignores a cause with no string code", () => {
+    const err = new Error("fetch failed", { cause: "a string cause" });
+    expect(describeFetchError(err)).toBe("fetch failed");
   });
 });
 

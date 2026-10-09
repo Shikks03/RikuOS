@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { requireCronSecret } from "@/lib/auth";
@@ -9,7 +10,7 @@ import { checkSites } from "@/lib/siteHealth";
 import { saveHealthSnapshot } from "@/lib/healthSnapshot";
 import { evaluateOutreach } from "@/lib/outreachHealth";
 import { buildBriefing, composeDigest, type DigestInput } from "@/lib/digest";
-import { boundRaw, buildProblems } from "@/lib/problems";
+import { buildProblems, describeFetchError } from "@/lib/problems";
 import { ATTENTION_LIMIT, fetchAttention, fetchSummary } from "@/lib/stApi";
 import { buildPushPayload, sendPushToAll } from "@/lib/push";
 import { readDigestToday } from "@/lib/digestToday";
@@ -135,6 +136,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Dispatcher last: every other record is written by now.
     const dispatch = await runJob("dispatcher", async () => {
       const pending = await ApprovalItem.countDocuments({ status: "pending" });
+      const dayKey = todayKey(new Date());
 
       // A dependency being down must not cost the whole digest. The reason is
       // logged rather than discarded: the digest can only say "unavailable",
@@ -152,16 +154,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           (value) => ({ value, error: null as string | null }),
           (attentionErr: unknown) => {
             console.error("[cron/morning] attention check failed:", attentionErr);
-            const message = attentionErr instanceof Error ? attentionErr.message : String(attentionErr);
-            const cause = attentionErr instanceof Error ? attentionErr.cause : undefined;
-            const code =
-              cause !== null && typeof cause === "object" && typeof (cause as { code?: unknown }).code === "string"
-                ? (cause as { code: string }).code
-                : null;
-            return { value: null, error: boundRaw(code ? `${message} (${code})` : message) };
+            return { value: null, error: describeFetchError(attentionErr) };
           },
         ),
-        readDigestToday(settings.layers, todayKey(new Date())),
+        readDigestToday(settings.layers, dayKey),
       ]);
       const attention = attentionRead.value;
 
@@ -182,7 +178,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       });
 
       const digestInput: DigestInput = {
-        day: todayKey(new Date()),
+        day: dayKey,
         pending,
         attention: attention
           ? {
@@ -237,8 +233,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       try {
         await saveLastDigest(sentAt, payload, delivery.sent, briefing);
       } catch (err) {
-        digestStored = false;
-        console.error("[cron/morning] last digest write failed:", err);
+        if (briefing !== null && err instanceof mongoose.Error.ValidationError) {
+          // The briefing itself failed validation. Retry once with it dropped
+          // (still unset, as a pre-S21 record would be) so a bug in the
+          // briefing can never cost the title/body record the rail and the
+          // Personal page's push tile read (R22) — that record must save
+          // every morning, briefing or no briefing.
+          console.error("[cron/morning] briefing failed validation, saving without it:", err);
+          briefing = null;
+          try {
+            await saveLastDigest(sentAt, payload, delivery.sent, null);
+          } catch (retryErr) {
+            digestStored = false;
+            console.error("[cron/morning] last digest write failed:", retryErr);
+          }
+        } else {
+          digestStored = false;
+          console.error("[cron/morning] last digest write failed:", err);
+        }
       }
       const failedItems = (digestStored ? 0 : 1) + (briefing === null ? 1 : 0);
       return {
