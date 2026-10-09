@@ -4,6 +4,8 @@ import {
   calendarForDigest,
   composeDigest,
   composeTodayLine,
+  freelanceLine,
+  offLine,
   todosForDigest,
   type DigestInput,
   type DigestTodayInput,
@@ -14,6 +16,7 @@ import type { Layer } from "@/lib/osSettings";
 import { opener } from "@/lib/voice";
 import { BRIEFING_BOUNDS } from "@/lib/briefingTypes";
 import type { Problem } from "@/lib/problems";
+import { explain } from "@/lib/causes";
 
 const DAY = "2026-10-13"; // a Tuesday
 const QUIET: DigestTodayInput = { events: [], missedLayers: [], due: [], overdue: [] };
@@ -118,6 +121,14 @@ describe("composeDigest — the body", () => {
     expect(composeDigest({ ...base, today: { ...QUIET, due: "unavailable" } }).body).toBe("I couldn't read your to-dos.");
   });
 
+  it("never claims 'nothing on' over a calendar it couldn't fully read (D6)", () => {
+    const today: DigestTodayInput = { events: [], missedLayers: ["Classes"], due: [], overdue: [] };
+    const { body } = composeDigest({ ...base, today });
+    expect(body).not.toMatch(/Nothing on today/);
+    expect(body).toBe("I couldn't read your Classes calendar, so today might be missing something. Nothing due.");
+    expect(buildBriefing({ ...base, today }).today).toBe("Nothing due.");
+  });
+
   it("stays within 320 characters and collapses extra stories into a pointer to the Briefing", () => {
     const many = Array.from({ length: 20 }, (_, i) => ({ key: "site-status" as const, site: `Site number ${i} with a long name`, status: 503 }));
     // 20 sites are ONE story (same kind); make them unrelated instead:
@@ -144,20 +155,93 @@ describe("composeDigest — the body", () => {
     expect(body).toMatch(/drafts are ready for your review\.$/); // the freelance line survives
   });
 
-  it("cuts a single enormous story rather than exceed the budget", () => {
-    // A single catalogue sentence (explain()) is already clipped to
-    // BRIEFING_BOUNDS.symptomSentence by causes.ts's own row(), with no
-    // ellipsis — so this needs an UNCLIPPED story (stories.ts builds its own
-    // sentence for a same-kind group) long enough to force digest.ts's own
-    // cut.
-    const sites = Array.from({ length: 10 }, (_, i) => ({
-      key: "site-status" as const,
-      site: `Site Number ${i} With An Extremely Long Configured Name That Keeps Going On`,
-      status: 503,
-    }));
-    const { body } = composeDigest({ ...base, problems: sites });
+  it("stays within 320 on a heavy problems morning with agents switched off too, keeping freelance and off whole", () => {
+    const problems = [
+      { key: "site-status" as const, site: "Site number 0 with a long name", status: 503 },
+      { key: "agent-failed" as const, agent: "chaser" as const },
+      { key: "agent-never-ran" as const, agent: "site-health" as const },
+      { key: "engine-errors" as const, count: 3 },
+      { key: "unstuck-items" as const, count: 2 },
+      { key: "snapshot-unsaved" as const },
+      { key: "todos-unavailable" as const },
+      { key: "calendar-unavailable" as const, cause: "expired" as const },
+    ];
+    const input: DigestInput = {
+      ...base,
+      problems,
+      pending: 4,
+      attention: { repliedUnanswered: 2, overdue: 1 },
+      offAgents: ["chaser", "lead-sweep"],
+      today: { ...QUIET, events: [{ title: "Math Methods", time: "09:00" }] },
+    };
+    const { body } = composeDigest(input);
+    expect(body.length).toBeLessThanOrEqual(320);
+    const expectedFreelance = freelanceLine(input)!;
+    const expectedOff = offLine(input.offAgents)!;
+    expect(body.endsWith(`${expectedFreelance} ${expectedOff}`)).toBe(true);
+    expect(body).toMatch(/…and (one|two|three|four|five|six|seven|\d+) more, see the Briefing\./);
+  });
+
+  it("gives the problems line the wider, Today-free budget rather than cutting mid-word, when the stories fit without Today but not with it", () => {
+    const calendars = ["Semester 2 Classes - University of the Philippines Diliman", "Org meetings and things"];
+    const input: DigestInput = {
+      ...base,
+      pending: 3,
+      attention: { repliedUnanswered: 1, overdue: 1 },
+      offAgents: ["chaser"],
+      today: {
+        events: [
+          { title: "Morning class", time: "09:00" },
+          { title: "Afternoon meeting", time: "13:00" },
+        ],
+        missedLayers: calendars,
+        due: [{ title: "Essay draft", dayLabel: "today" }],
+        overdue: [],
+      },
+    };
+    const { body } = composeDigest(input);
+    const expectedStory = explain({ key: "calendar-partial", calendars }).sentence.text;
+    const expectedFreelance = freelanceLine(input)!;
+    const expectedOff = offLine(input.offAgents)!;
+    expect(body.length).toBeLessThanOrEqual(320);
+    expect(body).not.toContain("…"); // the story is whole, not clipped
+    expect(body).toBe(`${expectedStory} ${expectedFreelance} ${expectedOff}`);
+    expect(body).not.toMatch(/Today you've got|Coming up:/); // the Today line was dropped, not the story
+    // The stored Briefing keeps the full Today sentence regardless of the push's trade-off.
+    expect(buildBriefing(input).today).toMatch(/Morning class at 09:00/);
+  });
+
+  it("cuts a single enormous story rather than exceed the budget, even the Today-free budget", () => {
+    // Problem.site has no length bound at the type level (real SITES names are
+    // short — AzeroTech, Meowchi, ShikksTracker — this is a defensive
+    // worst-case against whatever a caller actually hands it, not a realistic
+    // site name).
+    const { body } = composeDigest({ ...base, problems: [{ key: "site-status", site: "X".repeat(400), status: 503 }] });
     expect(body.length).toBeLessThanOrEqual(320);
     expect(body).toContain("…");
+  });
+
+  it("on a heavy NO-problems morning, reserves room for freelance and off so they stay whole", () => {
+    const events = Array.from({ length: 4 }, (_, i) => ({
+      title: `A rather long class or meeting title number ${i}`,
+      time: "09:00",
+    }));
+    const input: DigestInput = {
+      ...base,
+      pending: 3,
+      attention: { repliedUnanswered: 2, overdue: 1 },
+      offAgents: ["chaser", "lead-sweep"],
+      today: { ...QUIET, events, due: [{ title: "Essay draft", dayLabel: "today" }] },
+    };
+    const { body } = composeDigest(input);
+    const expectedFreelance = freelanceLine(input)!;
+    const expectedOff = offLine(input.offAgents)!;
+    expect(body.length).toBeLessThanOrEqual(320);
+    // Would fail if the zero-stories branch's budget were replaced by
+    // PUSH_BODY_MAX (i.e. stopped reserving room for `others`): the Today
+    // line's full form is long enough that, left uncut, it would push the
+    // freelance and off lines either off the end or over 320.
+    expect(body.endsWith(`${expectedFreelance} ${expectedOff}`)).toBe(true);
   });
 
   it("uses straight apostrophes only", () => {
@@ -210,6 +294,90 @@ describe("composeTodayLine — the voice", () => {
     );
     expect(line.length).toBeLessThanOrEqual(90);
     expect(line).toContain("09:00");
+  });
+
+  it("collapses to plain English, with number words and nouns, when every name must be dropped", () => {
+    expect(
+      composeTodayLine(
+        {
+          events: [
+            { title: "A", time: "09:00" },
+            { title: "B", time: "09:00" },
+            { title: "C", time: "09:00" },
+          ],
+          missedLayers: [],
+          due: [
+            { title: "D", dayLabel: "today" },
+            { title: "E", dayLabel: "today" },
+          ],
+          overdue: [{ title: "F", daysLate: 1 }],
+        },
+        0,
+      ),
+    ).toBe("Today you've got three things on. Two to-dos coming up. One running late.");
+  });
+
+  it("gets the singular right too: 'one thing on', 'one to-do coming up'", () => {
+    expect(
+      composeTodayLine(
+        {
+          events: [{ title: "A", time: "09:00" }],
+          missedLayers: [],
+          due: [{ title: "B", dayLabel: "today" }],
+          overdue: [{ title: "C", daysLate: 2 }],
+        },
+        0,
+      ),
+    ).toBe("Today you've got one thing on. One to-do coming up. One running late.");
+  });
+
+  it("never names an event, a to-do or a thing with a bare digit count on an ordinary problem morning", () => {
+    // One short story, 3 events, 2 due, 1 overdue, full freelance, chaser off:
+    // the Today line is squeezed small enough to need the limit-0 collapse.
+    const input: DigestInput = {
+      ...base,
+      problems: [{ key: "agent-degraded", agent: "dispatcher", itemsFailed: 2 }],
+      pending: 3,
+      attention: { repliedUnanswered: 1, overdue: 1 },
+      offAgents: ["chaser"],
+      today: {
+        events: [
+          { title: "Math Methods", time: "09:00" },
+          { title: "Study group", time: "11:00" },
+          { title: "Gym", time: "18:00" },
+        ],
+        missedLayers: [],
+        due: [
+          { title: "Essay draft", dayLabel: "today" },
+          { title: "Tuition", dayLabel: "tomorrow" },
+        ],
+        overdue: [{ title: "Invoice", daysLate: 1 }],
+      },
+    };
+    const { body } = composeDigest(input);
+    expect(body).not.toMatch(/got \d+ more\.|up: \d+ more\.|late: \d+ more\./);
+    expect(body).not.toMatch(/\bthings? on\b.*\bthings? on\b/); // sanity: not duplicated
+  });
+
+  it("cuts titles through TITLE_CAPS before dropping names (the '…' lands inside a title, not in place of a name)", () => {
+    const long = "A very long event title that goes on and on and on";
+    const events = [1, 2, 3].map((i) => ({ title: `${long} ${i}`, time: "09:00" }));
+    const line = composeTodayLine({ ...QUIET, events }, 120);
+    // All three events are still named (not collapsed to "and N more") …
+    expect(line).toMatch(/^Today you've got .+ at 09:00, .+ at 09:00 and .+ at 09:00\.$/);
+    // … but their titles were shortened, each with its own ellipsis.
+    expect(line).toContain("…");
+    expect(line.length).toBeLessThanOrEqual(120);
+  });
+
+  it("honours overdueTotal directly, not just via todosForDigest's integration", () => {
+    expect(
+      composeTodayLine({
+        ...QUIET,
+        overdue: ["A", "B", "C"].map((t) => ({ title: t, daysLate: 1 })),
+        overdueTotal: 9,
+      }),
+    ).toBe("Running late: A (1 day), B (1 day), C (1 day) and 6 more.");
   });
 });
 

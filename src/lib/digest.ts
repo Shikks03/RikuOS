@@ -79,14 +79,18 @@ function moreSuffix(dropped: number): string {
   return `…and ${numberWord(dropped)} more, see the Briefing.`;
 }
 
-/** The problems line within `budget`: whole stories, the rest pointed at the Briefing. */
-function problemsWithin(sentences: Said[], budget: number): string {
-  const texts = sentences.map((s) => s.text);
+/** Whole stories (plus the "…and N more" suffix) that fit within `budget`, or null if even the first doesn't. */
+function problemsFit(texts: string[], budget: number): string | null {
   for (let keep = texts.length; keep >= 1; keep--) {
     const dropped = texts.length - keep;
     const line = [...texts.slice(0, keep), ...(dropped > 0 ? [moreSuffix(dropped)] : [])].join(" ");
     if (line.length <= budget) return line;
   }
+  return null;
+}
+
+/** Last resort: the first story cut mid-word (with "…") to fit `budget`. */
+function problemsCut(texts: string[], budget: number): string {
   const dropped = texts.length - 1;
   const suffix = dropped > 0 ? ` ${moreSuffix(dropped)}` : "";
   const room = Math.max(2, budget - suffix.length);
@@ -147,9 +151,21 @@ export function composeDigest(input: DigestInput): Digest {
   const afterLength = after.reduce((n, part) => n + 1 + part.length, 0);
   const compact = composeTodayLine(input.today, 0);
   const problemsBudget = PUSH_BODY_MAX - afterLength - (compact.length > 0 ? compact.length + 1 : 0);
-  const problemsLine = problemsWithin(storySentences(stories), problemsBudget);
+  const texts = storySentences(stories).map((s) => s.text);
+
+  // Problems are never cut just to leave room for Today (fix round, item 2).
+  // If the stories don't fit while reserving Today's compact form, try again
+  // with Today dropped from the push entirely (the stored Briefing keeps it
+  // whole regardless) before ever cutting a story mid-word.
+  let problemsLine = problemsFit(texts, problemsBudget);
+  let dropToday = false;
+  if (problemsLine === null) {
+    const widerBudget = PUSH_BODY_MAX - afterLength - 1;
+    problemsLine = problemsFit(texts, widerBudget) ?? problemsCut(texts, widerBudget);
+    dropToday = true;
+  }
   const used = problemsLine.length + afterLength;
-  const todayLine = composeTodayLine(input.today, Math.max(0, PUSH_BODY_MAX - used - 1));
+  const todayLine = dropToday ? "" : composeTodayLine(input.today, Math.max(0, PUSH_BODY_MAX - used - 1));
   return { title, body: sep([problemsLine, todayLine, ...after]) };
 }
 
@@ -281,30 +297,49 @@ function renderToday(today: DigestTodayInput, cap: number, limit: number): strin
   if (today.events === "none-enabled") {
     parts.push("Your calendar layers are all switched off.");
   } else if (Array.isArray(today.events) && today.events.length > 0) {
-    const names = today.events.map((e) => (e.time === null ? `${t(e.title)} (all day)` : `${t(e.title)} at ${e.time}`));
-    parts.push(`Today you've got ${listPart(names, names.length, limit)}.`);
+    if (limit === 0) {
+      const n = today.events.length;
+      parts.push(`Today you've got ${numberWord(n)} ${n === 1 ? "thing" : "things"} on.`);
+    } else {
+      const names = today.events.map((e) => (e.time === null ? `${t(e.title)} (all day)` : `${t(e.title)} at ${e.time}`));
+      parts.push(`Today you've got ${listPart(names, names.length, limit)}.`);
+    }
   }
 
   if (today.due !== "unavailable") {
     if (today.due.length > 0) {
-      parts.push(`Coming up: ${listPart(today.due.map((d) => `${t(d.title)} ${dueWhen(d.dayLabel)}`), today.dueTotal, limit)}.`);
+      if (limit === 0) {
+        const n = Math.max(today.dueTotal ?? today.due.length, today.due.length);
+        parts.push(`${capWord(numberWord(n))} ${n === 1 ? "to-do" : "to-dos"} coming up.`);
+      } else {
+        parts.push(`Coming up: ${listPart(today.due.map((d) => `${t(d.title)} ${dueWhen(d.dayLabel)}`), today.dueTotal, limit)}.`);
+      }
     }
     if (today.overdue.length > 0) {
-      parts.push(
-        `Running late: ${listPart(
-          today.overdue.map((o) => `${t(o.title)} (${o.daysLate} ${o.daysLate === 1 ? "day" : "days"})`),
-          today.overdueTotal,
-          limit,
-        )}.`,
-      );
+      if (limit === 0) {
+        const n = Math.max(today.overdueTotal ?? today.overdue.length, today.overdue.length);
+        parts.push(`${capWord(numberWord(n))} running late.`);
+      } else {
+        parts.push(
+          `Running late: ${listPart(
+            today.overdue.map((o) => `${t(o.title)} (${o.daysLate} ${o.daysLate === 1 ? "day" : "days"})`),
+            today.overdueTotal,
+            limit,
+          )}.`,
+        );
+      }
     }
   }
 
-  const calendarEmpty = Array.isArray(today.events) && today.events.length === 0;
+  // A calendar that answered but missed some layers is never read as "nothing
+  // scheduled" — the calendar-partial story already says the honest thing
+  // about it, so the quiet line only fires when nothing was missed either.
+  const calendarEmpty = Array.isArray(today.events) && today.events.length === 0 && today.missedLayers.length === 0;
+  const calendarPartiallyEmpty = Array.isArray(today.events) && today.events.length === 0 && today.missedLayers.length > 0;
   const todosEmpty = todosAnswered && (today.due as unknown[]).length === 0 && today.overdue.length === 0;
   if (calendarAnswered && todosAnswered && todosEmpty) {
     if (calendarEmpty) return "Nothing on today, and nothing due.";
-    if (today.events === "none-enabled") parts.push("Nothing due.");
+    if (today.events === "none-enabled" || calendarPartiallyEmpty) parts.push("Nothing due.");
   }
   return parts.join(" ");
 }
