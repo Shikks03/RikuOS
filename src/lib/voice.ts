@@ -16,7 +16,7 @@
  * text, which is what lets the page show exactly what the phone got.
  */
 
-import type { DayKey } from "@/lib/days";
+import { dayStart, type DayKey } from "@/lib/days";
 
 export interface BoldRange {
   start: number;
@@ -96,15 +96,19 @@ export function toPage(text: string): string {
   return text.replace(/'/g, "’");
 }
 
+/**
+ * The day key as an integer day count. Delegates its parsing entirely to
+ * days.ts's validated `dayStart`, which throws a RangeError on a malformed
+ * or non-existent key (e.g. "2026-02-30") rather than letting Date.UTC roll
+ * it silently into some other day.
+ */
 function dayNumber(key: DayKey): number {
-  const [y, m, d] = key.split("-").map(Number);
-  return Math.round(Date.UTC(y, m - 1, d) / 86_400_000);
+  return Math.round(dayStart(key).getTime() / 86_400_000);
 }
 
-/** 0 = Sunday … 6 = Saturday, for an APP_TZ day key. */
+/** 0 = Sunday … 6 = Saturday, for an APP_TZ day key. Throws on a bad key (see dayNumber). */
 export function weekday(key: DayKey): number {
-  const [y, m, d] = key.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return dayStart(key).getUTCDay();
 }
 
 function saltHash(salt: string): number {
@@ -113,18 +117,33 @@ function saltHash(salt: string): number {
   return h;
 }
 
+function gcd(a: number, b: number): number {
+  while (b !== 0) {
+    [a, b] = [b, a % b];
+  }
+  return a;
+}
+
 /**
  * One line of `pool` for `day`. index(d) = (d × step + offset) mod n, with
- * step in 1..n−1: consecutive days differ by `step`, which is never 0 mod n,
- * so a line never repeats on consecutive days. The salt varies the step and
- * offset per pool, so two pools don't move in lockstep.
+ * step chosen — by the salt's hash — from the steps in 1..n−1 that share no
+ * factor with n (gcd(step, n) === 1), not just any step in that range. A
+ * step coprime with n makes d ↦ d × step mod n a bijection on Z/n, so this
+ * is coprime by construction, not by luck of the salt: consecutive days
+ * never repeat a line, AND any run of n consecutive days visits every line
+ * of the pool exactly once. The salt varies both the step and the offset
+ * per pool, so two pools don't move in lockstep.
  */
 export function pickLine<T>(pool: readonly T[], day: DayKey, salt: string): T {
   if (pool.length === 0) throw new Error("pickLine: empty pool");
   if (pool.length === 1) return pool[0];
   const n = pool.length;
   const h = saltHash(salt);
-  const step = 1 + (h % (n - 1));
+  const steps: number[] = [];
+  for (let s = 1; s < n; s++) {
+    if (gcd(s, n) === 1) steps.push(s);
+  }
+  const step = steps[h % steps.length];
   const idx = (((dayNumber(day) * step + h) % n) + n) % n;
   return pool[idx];
 }
@@ -163,7 +182,14 @@ export type Mood =
   | { kind: "quiet" }
   | { kind: "ordinary" };
 
-/** The read on the day. Problems always outrank the mood (R23). */
+/**
+ * The read on the day. Problems always outrank the mood (R23).
+ *
+ * Precondition: the `problems` mood requires `stories >= 1` — callers map
+ * zero stories to busy/quiet/ordinary before this is ever reached. Not
+ * enforced here with a throw: a throw in the morning push's read-on-the-day
+ * step would cost the whole push.
+ */
 export function readOnTheDay(mood: Mood, day: DayKey): string {
   switch (mood.kind) {
     case "problems": {

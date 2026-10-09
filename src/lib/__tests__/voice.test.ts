@@ -15,6 +15,7 @@ import {
   weekday,
 } from "@/lib/voice";
 import { addDays } from "@/lib/days";
+import { PUSH_TITLE_MAX } from "@/lib/constants";
 
 const START = "2026-01-05"; // a Monday
 
@@ -44,6 +45,20 @@ describe("say / bold ranges", () => {
     expect(lowerLead(say("I couldn't read your to-dos.")).text).toBe("I couldn't read your to-dos.");
     expect(lowerLead(say("Meowchi's site isn't answering.")).text).toBe("Meowchi's site isn't answering.");
     expect(lowerLead(say("ShikksTracker's sender …")).text).toBe("ShikksTracker's sender …");
+  });
+
+  it("keeps bold ranges intact through toPage and lowerLead", () => {
+    const original = say("The ", b("chaser's job"), " failed.");
+    const range = original.bold[0];
+
+    const paged = toPage(original.text);
+    expect(paged.length).toBe(original.text.length);
+    expect(paged.slice(range.start, range.end).replace(/’/g, "'")).toBe("chaser's job");
+
+    const lowered = lowerLead(original);
+    expect(lowered.text.length).toBe(original.text.length);
+    expect(lowered.bold).toEqual(original.bold);
+    expect(lowered.text.slice(range.start, range.end)).toBe("chaser's job");
   });
 });
 
@@ -83,6 +98,25 @@ describe("pickLine", () => {
   it("returns the only line of a one-line pool and throws on an empty one", () => {
     expect(pickLine(["only"], START, "x")).toBe("only");
     expect(() => pickLine([], START, "x")).toThrow();
+  });
+
+  it("throws on a malformed or empty day key rather than silently picking undefined", () => {
+    const pool = ["a", "b"];
+    expect(() => pickLine(pool, "2026-02-30", "x")).toThrow(RangeError);
+    expect(() => pickLine(pool, "", "x")).toThrow();
+  });
+
+  it("visits every line of the pool within any run of n consecutive days, for pool sizes 2..6", () => {
+    for (let n = 2; n <= 6; n++) {
+      const pool = Array.from({ length: n }, (_, i) => `line ${i}`);
+      for (const salt of ["opener", "busy", "quiet", "ordinary", "problems"]) {
+        const picks = Array.from({ length: 400 }, (_, d) => pickLine(pool, addDays(START, d), salt));
+        for (let start = 0; start + n <= picks.length; start++) {
+          const window = new Set(picks.slice(start, start + n));
+          expect(window.size).toBe(n);
+        }
+      }
+    }
   });
 });
 
@@ -139,7 +173,7 @@ describe("readOnTheDay / greeting", () => {
       const day = addDays(START, d);
       for (const stories of [1, 2, 3, 10, 99]) {
         const t = greeting(day, { kind: "problems", stories });
-        expect(t.length).toBeLessThanOrEqual(80);
+        expect(t.length).toBeLessThanOrEqual(PUSH_TITLE_MAX);
         expect(t).toMatch(/^\S.*\. \S.*\.$/);
       }
     }
