@@ -26,7 +26,7 @@ The "This morning's push" tile on the Personal page is removed. The Briefing rep
 
 | # | Decision | Riku's choice |
 |---|---|---|
-| V1 | Where the voice speaks | The morning push and the Briefing only. Short UI errors ("Couldn't save.") stay plain. |
+| V1 | Where the voice speaks | The morning push, the Briefing, and the Personal page's calendar messages (§7.4, added on Riku's review). Plain one-line errors ("Couldn't save.") stay plain. |
 | V2 | Character | Composed and human, like a good butler, not AI-sounding. Friendly. Calls him **Riku**, never "sir". |
 | V3 | Problems | The push says them in plain words. The Briefing adds a next step for each. The likely cause appears **only on tap**, in a card that grows out of the tapped line. Key words are bold (Briefing only). |
 | V4 | Where causes come from | A **fixed catalogue** matched against the real error. No AI. Unrecognised errors are reported honestly and **marked** so they can be counted. Asking Claude about unrecognised errors comes later (§10). |
@@ -225,7 +225,7 @@ one story, and whatever is left becomes a one-problem story.
    503 and timed out).` / `The chaser and the site check both failed last night.`
 4. **Unrelated:** stories are joined with `, and separately, ` for the second and `; also, ` after that.
 
-**Counting (Riku to confirm, §11 Q1):** the title counts **stories**. Each story keeps its symptoms,
+**Counting (Riku confirmed 2026-10-09):** the title counts **stories**. Each story keeps its symptoms,
 and the Briefing lists every one of them. Links use "looks like", "points to" or "behind", never
 "caused by".
 
@@ -396,7 +396,50 @@ failed item.
   `RETIRED_TILES = ["push"]`. On read, `resolveLayoutAgainst` drops retired entries before parsing and
   keeps everything else. On write, `validateLayout` stays strict and rejects `push`. There's a test
   with Riku's real stored shape that includes `push`.
-- New default row 2: `[{ tile: "layers", span: 12 }]` **(Riku to confirm, §11 Q2)**.
+- New default row 2: `[{ tile: "layers", span: 12 }]` (Riku confirmed 2026-10-09).
+
+### 7.4 The Personal page's calendar messages, in the voice
+
+Today these are a fixed frame plus a slotted reason (`Google didn't accept it: …`, `Saved, but the
+calendar entry failed: … The to-do is not on the calendar.`, `Saved, but the calendar entry couldn't be
+moved: …`, and `ENTRY_LEFT_SENTENCE`). The frame-and-slot shape is what made them read mechanically.
+They become **whole sentences per case**, approved by Riku 2026-10-09. Page text uses curly
+apostrophes.
+
+| Action | Cause | Sentence |
+|---|---|---|
+| New event | not-configured | I couldn’t add that. Google isn’t connected yet. You can set it up in Settings. |
+| New event | expired | I couldn’t add that. My access to Google has expired. You can renew it in Settings. |
+| New event | refused | Google turned that one down, so it’s not on your calendar. |
+| New event | gone | I couldn’t add that. That calendar isn’t on your Google account anymore. |
+| Pin a to-do | not-configured | Saved, but I couldn’t put it on your calendar. Google isn’t connected yet. |
+| Pin a to-do | expired | Saved, but I couldn’t put it on your calendar. My Google access has expired. |
+| Pin a to-do | refused | Saved, but Google wouldn’t take the calendar entry. |
+| Pin a to-do | gone | Saved, but I couldn’t find your main calendar on Google, so it’s not on there. |
+| Pin a to-do | changed | Saved, but the to-do changed somewhere else while I was adding it, so I left it off the calendar. |
+| Pin a to-do | store | Saved, but I couldn’t keep track of the calendar entry, so I took it back off. |
+| Pin a to-do | unknown / orphaned (was `PIN_MAYBE_MADE`) | Saved. I’m not sure whether the calendar entry went through, so have a look in Google Calendar before switching it on again. |
+| Move a pinned to-do | gone | Saved the new date. Its calendar entry had already been deleted in Google, so I’ve unlinked it. |
+| Move a pinned to-do | not-configured | Saved the new date, but I couldn’t move the calendar entry. Google isn’t connected yet. |
+| Move a pinned to-do | expired | Saved the new date, but I couldn’t move the calendar entry. My Google access has expired. |
+| Move a pinned to-do | refused | Saved the new date, but Google wouldn’t move the calendar entry. |
+| Tick a pinned to-do done | entry left behind | Done. I couldn’t remove its calendar entry, though, so you’ll want to delete it in Google Calendar. |
+| Delete a pinned to-do | entry left behind | Deleted. I couldn’t remove its calendar entry, though, so you’ll want to delete it in Google Calendar. |
+| Switch "Put on calendar" off | entry left behind | Taken off the calendar here, but I couldn’t remove the entry in Google. You’ll want to delete it there. |
+
+- `CALENDAR_REASONS` and `calendarReason` (TodoForm.tsx) become one closed table keyed by `(action,
+  cause)`, typed so that a missing pair fails to compile. `ENTRY_LEFT_SENTENCE` (personalErrors.ts)
+  splits into three, one per action. `calendarLine`'s single `unpin` leg currently can't tell tick,
+  switch-off and delete apart, so it becomes three legs. The plan must check that every caller passes
+  the right one. If the server can return `changed` or `store` for a move, those pairs get sentences
+  too (in the same style as the pin row). The plan settles this from `todoStore.ts`. This also settles the open "Done, but…" question from the P10
+  go-live checklist: "Done" now only appears after a tick.
+- Every combination the server can actually return (`todoStore.ts` `CalendarOutcome` × the action) has
+  a sentence. Tests enumerate the pairs. Pairs the server can't produce (for example, a new event with
+  `changed`) are left out of the type rather than filled with filler.
+- The nine `PROVISIONAL (P10c)` markers are removed, because these sentences are ratified.
+- Unknown press outcomes (`Couldn’t tell if that saved.`, L7) and validation lines (`Give it a title.`)
+  stay as they are. They're short and they're the facts.
 
 ---
 
@@ -442,7 +485,9 @@ doesn't greet again.
 > `N problems · N to review` / `All clear · N to review` (P5a monitoring design, kept by P10's content
 > spec §10); the raw problem-fragment wording in `digest.ts`, including the six P10b provisional
 > strings; the Today sentence's `X wasn't read.` phrasing (R23's meaning is kept, its words replaced);
-> the push tile, Tile 4 (P10 content spec §6, R14, R22); and TopBar's "exactly one element" rule (the
+> the push tile, Tile 4 (P10 content spec §6, R14, R22); the P10 content spec §7 calendar-failure
+> sentence frames, their nine P10c provisional reasons, and `Done, but the calendar entry couldn’t be
+> removed…` (replaced by whole sentences per action and cause, spec §7.4); and TopBar's "exactly one element" rule (the
 > greeting line is the second). **Unchanged:** P5a-4 (the push every day), D12's ordering (problems
 > before Today, the freelance line never sliced), R42 (the app opens on /freelance), the approval rule
 > for outward actions, and every non-push UI string.
@@ -461,14 +506,14 @@ doesn't greet again.
 
 ---
 
-## 11. Open questions for Riku
+## 11. Questions settled on review (2026-10-09)
 
-1. **Counting:** should the title count stories (one root cause = "One thing needs you") or every
-   symptom? The spec uses stories.
-2. **Personal default layout:** with the push tile gone, row 2 becomes Layers alone at full width. Fine,
-   or do you want something else there?
-3. **The greeting and reply lines:** the pools in §3.1 and every sentence in §4.2 are drafts. Reword
-   any you like before building, or approve them as written.
-4. **The P10 go-live checklist answers** you gave in the artifact (word choices, the four dates) aren't
-   visible to Claude. Paste them so P10 can be closed. The six P10b push strings are superseded by
-   this spec, but the nine P10c strings on the Personal page still need your call.
+1. **Counting:** stories. Confirmed.
+2. **Personal default layout:** Layers alone on row 2, full width. Confirmed.
+3. **Greeting pools and catalogue sentences:** approved as written, in the voice agreed.
+4. **P10 go-live words:** Riku approved almost everything and asked for a more human tone. The six
+   P10b push strings are superseded by §3–§4, and the nine P10c strings plus the "Done, but…" question
+   are settled by §7.4.
+
+**Still open, outside this spec:** P10's four dated observations (plan step 7) haven't been reported
+yet, so P10's post-build record can't be closed until they are.
