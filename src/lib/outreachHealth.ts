@@ -60,6 +60,10 @@ export interface OutreachFinding {
   kind: OutreachFindingKind;
   /** One short human-readable line; goes straight into the digest. */
   detail: string;
+  /** engine-stale: how long ago it last ran. The Briefing reads this, never `detail`. */
+  ageMs?: number;
+  /** engine-errors / stranded-approved: the count. */
+  count?: number;
 }
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -128,6 +132,7 @@ export function evaluateOutreach(
       findings.push({
         kind: "engine-stale",
         detail: `ShikksTracker send engine last ran ${formatAge(ageMs)} ago`,
+        ageMs,
       });
     } else if (engine.lastRunErrors !== null && engine.lastRunErrors > 0) {
       findings.push({
@@ -135,6 +140,7 @@ export function evaluateOutreach(
         detail:
           `ShikksTracker send engine reported ${engine.lastRunErrors} ` +
           pluralise(engine.lastRunErrors, "error"),
+        count: engine.lastRunErrors,
       });
     }
   }
@@ -148,6 +154,7 @@ export function evaluateOutreach(
       detail: `${queue.approved} approved message${
         queue.approved === 1 ? " is" : "s are"
       } stranded, unsent`,
+      count: queue.approved,
     });
   }
 

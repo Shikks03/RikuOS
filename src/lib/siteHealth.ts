@@ -37,12 +37,16 @@ export interface SiteResult {
   up: boolean;
   /** One short human-readable line; goes straight into the digest. */
   detail: string;
+  /** Why it is down; absent when up. The Briefing's catalogue reads this, never `detail`. */
+  failure?: "status" | "timeout" | "unreachable";
+  /** The final HTTP status, when `failure` is "status". */
+  status?: number;
 }
 
 /** Pure. Redirects are followed by fetch, so this judges the final status. */
 export function classifyStatus(name: string, status: number): SiteResult {
   if (status >= 400) {
-    return { name, up: false, detail: `${name} returned HTTP ${status}` };
+    return { name, up: false, detail: `${name} returned HTTP ${status}`, failure: "status", status };
   }
   return { name, up: true, detail: `${name} ok` };
 }
@@ -55,6 +59,7 @@ export function classifyError(name: string, err: unknown): SiteResult {
     name,
     up: false,
     detail: `${name} ${timedOut ? "timed out" : "unreachable"}`,
+    failure: timedOut ? "timeout" : "unreachable",
   };
 }
 

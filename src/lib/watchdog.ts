@@ -54,6 +54,10 @@ export interface Anomaly {
   kind: AnomalyKind;
   /** One short human-readable line; goes straight into the digest. */
   detail: string;
+  /** stale: whole hours since the newest run. The Briefing reads this, never `detail`. */
+  ageHours?: number;
+  /** degraded: how many items the run failed. */
+  itemsFailed?: number;
 }
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -121,6 +125,7 @@ export function evaluateWatchdog(
           agent,
           kind: "stale",
           detail: `${agent} last ran ${verdict.ageHours}h ago`,
+          ageHours: verdict.ageHours,
         });
         break;
       case "failed":
@@ -131,6 +136,7 @@ export function evaluateWatchdog(
           agent,
           kind: "degraded",
           detail: `${agent}: ${verdict.itemsFailed} item${verdict.itemsFailed === 1 ? "" : "s"} failed`,
+          itemsFailed: verdict.itemsFailed,
         });
         break;
       case "ok":

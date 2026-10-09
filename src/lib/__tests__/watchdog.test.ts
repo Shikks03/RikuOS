@@ -82,3 +82,25 @@ describe("evaluateWatchdog", () => {
     expect(EXPECTATIONS.some((e) => e.agent === "watchdog")).toBe(false);
   });
 });
+
+describe("evaluateWatchdog — typed facts beside the detail line", () => {
+  it("carries ageHours on stale and itemsFailed on degraded", () => {
+    const exp = [{ agent: "chaser" as const, everyHours: 24, graceHours: 6 }];
+    const stale = evaluateWatchdog(
+      NOW,
+      [{ agent: "chaser", startedAt: hoursAgo(31), ok: true, itemsFailed: 0 }],
+      exp
+    );
+    expect(stale[0]).toMatchObject({ kind: "stale", ageHours: 31, detail: "chaser last ran 31h ago" });
+    const degraded = evaluateWatchdog(
+      NOW,
+      [{ agent: "chaser", startedAt: NOW, ok: true, itemsFailed: 2 }],
+      exp
+    );
+    expect(degraded[0]).toMatchObject({
+      kind: "degraded",
+      itemsFailed: 2,
+      detail: "chaser: 2 items failed",
+    });
+  });
+});

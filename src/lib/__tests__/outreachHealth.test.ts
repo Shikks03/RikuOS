@@ -136,7 +136,7 @@ describe("evaluateOutreach — the fault it was built for", () => {
   it("reports engine errors on a fresh run, pluralised", () => {
     expect(
       evaluateOutreach(NOW, summary({ engine: { lastRunAt: hoursAgo(1), lastRunErrors: 1 } }))[0]
-    ).toEqual({ kind: "engine-errors", detail: "ShikksTracker send engine reported 1 error" });
+    ).toEqual({ kind: "engine-errors", detail: "ShikksTracker send engine reported 1 error", count: 1 });
 
     expect(
       evaluateOutreach(NOW, summary({ engine: { lastRunAt: hoursAgo(1), lastRunErrors: 4 } }))[0]
@@ -211,5 +211,30 @@ describe("every finding fits the digest's 80-character budget", () => {
     for (const finding of findings) {
       expect(finding.detail.length).toBeLessThanOrEqual(80);
     }
+  });
+});
+
+describe("evaluateOutreach — typed facts beside the detail line", () => {
+  it("carries the age, the error count and the stranded count beside the detail", () => {
+    const stalled = evaluateOutreach(
+      NOW,
+      summary({ engine: { lastRunAt: hoursAgo(50), lastRunErrors: 0 }, queue: { drafts: 24, approved: 4 } })
+    );
+    expect(stalled).toContainEqual(expect.objectContaining({ kind: "engine-stale", ageMs: 50 * HOUR }));
+    expect(stalled).toContainEqual(
+      expect.objectContaining({
+        kind: "stranded-approved",
+        count: 4,
+        detail: "4 approved messages are stranded, unsent",
+      })
+    );
+    const erring = evaluateOutreach(NOW, summary({ engine: { lastRunAt: hoursAgo(2), lastRunErrors: 3 } }));
+    expect(erring).toEqual([
+      expect.objectContaining({
+        kind: "engine-errors",
+        count: 3,
+        detail: "ShikksTracker send engine reported 3 errors",
+      }),
+    ]);
   });
 });

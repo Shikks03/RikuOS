@@ -73,3 +73,24 @@ describe("SITES", () => {
     }
   });
 });
+
+describe("typed facts beside the detail line (the Briefing reads these, never `detail`)", () => {
+  it("carries the status and the failure kind beside the detail", () => {
+    expect(classifyStatus("Meowchi", 503)).toMatchObject({
+      up: false,
+      failure: "status",
+      status: 503,
+      detail: "Meowchi returned HTTP 503",
+    });
+    expect(classifyStatus("Meowchi", 200)).toMatchObject({ up: true, detail: "Meowchi ok" });
+    expect(classifyStatus("Meowchi", 200)).not.toHaveProperty("failure");
+    expect(classifyStatus("Meowchi", 200)).not.toHaveProperty("status");
+    expect(
+      classifyError("AzeroTech", new Error("The operation was aborted due to timeout"))
+    ).toMatchObject({ failure: "timeout", detail: "AzeroTech timed out" });
+    expect(classifyError("AzeroTech", new Error("getaddrinfo ENOTFOUND x"))).toMatchObject({
+      failure: "unreachable",
+      detail: "AzeroTech unreachable",
+    });
+  });
+});
