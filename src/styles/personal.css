@@ -600,6 +600,21 @@
     grid-template-rows:repeat(4,auto);column-gap:var(--sp-4);
   }
   .pe-week>.pe-row:nth-child(5){border-top:0}
+  /* the second column's vertical hairline (R4): the same border every row
+     already carries on top, turned onto column 2's leading edge instead —
+     no absolute positioning, so it needs no containing block and no
+     dependency on .pe-week's own computed height. box-sizing:border-box
+     (base.css) means this 1px comes out of the row's own content width,
+     not the 14px gap, so nothing shifts. Column 2 is only ever items 5+
+     (R4's 4|3 split), so this is exact regardless of row count.
+     --line, not --line-soft: this is the one divider that carries the
+     column split itself, so it gets the stronger structural token the
+     tile's own border already uses — every other hairline here stays
+     --line-soft. padding-left matches the column-gap on the line's other
+     side, so the line sits centred between the two columns' text rather
+     than hugging column 2's — the column itself gives up the room, not
+     the type, which stays whatever size it already was. */
+  .pe-week>.pe-row:nth-child(n+5){border-left:1px solid var(--line);padding-left:var(--sp-4)}
 }
 
 /* DIFFERENCE 3 (§5.8): no prefers-reduced-motion rule here. base.css
