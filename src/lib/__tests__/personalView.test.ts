@@ -728,8 +728,8 @@ describe("buildDoneView", () => {
 
 // ----------------------------------------------------------------- Push ----
 
-const TODAY_PUSH = { sentAt: new Date("2026-09-09T23:00:12Z"), title: "All clear · 0 to review", body: "All clear.", devices: 2 };
-const OLD_PUSH = { sentAt: new Date("2026-08-08T23:00:00Z"), title: "Old", body: "Old body", devices: 1 };
+const TODAY_PUSH = { sentAt: new Date("2026-09-09T23:00:12Z"), title: "All clear · 0 to review", body: "All clear.", devices: 2, briefing: null, seenAt: null };
+const OLD_PUSH = { sentAt: new Date("2026-08-08T23:00:00Z"), title: "Old", body: "Old body", devices: 1, briefing: null, seenAt: null };
 const AFTER_SEVEN = new Date("2026-09-10T02:00:00Z"); // 10:00 Manila
 const BEFORE_SEVEN = new Date("2026-09-09T16:30:00Z"); // 00:30 Manila, Thu 10
 

@@ -13,6 +13,7 @@ import PushSubscription from "@/models/PushSubscription";
 import OsSettings from "@/models/OsSettings";
 import { PERSONAL_LAYOUT_DEFAULT } from "@/lib/personalLayout";
 import HealthSnapshot, { HEALTH_SNAPSHOT_ID } from "@/models/HealthSnapshot";
+import LastDigest from "@/models/LastDigest";
 
 const validPayload = {
   contactId: "c1",
@@ -414,5 +415,77 @@ describe("HealthSnapshot", () => {
   it("refuses any other _id, so a second document cannot be written", async () => {
     const doc = new HealthSnapshot({ _id: "other", checkedAt: new Date(), sites: [] });
     await expect(doc.validate()).rejects.toThrow(/_id/);
+  });
+});
+
+describe("LastDigest — S21's briefing and seenAt", () => {
+  const BASE = {
+    sentAt: new Date("2026-10-13T23:00:00.000Z"),
+    title: "T",
+    body: "B",
+    devices: 2,
+  };
+
+  it("rejects an over-length story sentence", async () => {
+    const doc = new LastDigest({
+      ...BASE,
+      briefing: {
+        stories: [{ sentence: "x".repeat(241), bold: [], symptoms: [] }],
+        today: "",
+        freelance: null,
+        off: null,
+        unrecognised: 0,
+      },
+    });
+    await expect(doc.validate()).rejects.toThrow(/briefing\.stories\.0\.sentence/);
+  });
+
+  it("bounds the stories array at 12", async () => {
+    const doc = new LastDigest({
+      ...BASE,
+      briefing: {
+        stories: Array.from({ length: 13 }, () => ({ sentence: "x", bold: [], symptoms: [] })),
+        today: "",
+        freelance: null,
+        off: null,
+        unrecognised: 0,
+      },
+    });
+    await expect(doc.validate()).rejects.toThrow(/briefing\.stories/);
+  });
+
+  it("rejects an unknown causeKey", async () => {
+    const doc = new LastDigest({
+      ...BASE,
+      briefing: {
+        stories: [
+          {
+            sentence: "x",
+            bold: [],
+            symptoms: [
+              {
+                key: "site-status",
+                sentence: "x",
+                bold: [],
+                nextStep: "y",
+                causeKey: "nope",
+                cause: "z",
+                causeBold: [],
+              },
+            ],
+          },
+        ],
+        today: "",
+        freelance: null,
+        off: null,
+        unrecognised: 0,
+      },
+    });
+    await expect(doc.validate()).rejects.toThrow(/causeKey/);
+  });
+
+  it("stays valid with no briefing and no seenAt — old records stay valid", async () => {
+    const doc = new LastDigest({ ...BASE });
+    await expect(doc.validate()).resolves.toBeUndefined();
   });
 });

@@ -7,10 +7,12 @@ export interface IHealthSite {
 }
 
 /**
- * Mirrors SiteResult in src/lib/siteHealth.ts exactly, so the stored shape IS
- * the produced shape and there is no mapping layer to drift. `detail` holds the
- * strings classifyStatus/classifyError produce ("Meowchi ok",
- * "Meowchi returned HTTP 503"), which the health strip renders verbatim.
+ * Mirrored SiteResult in src/lib/siteHealth.ts exactly once; no longer true —
+ * SiteResult has since gained optional `failure`/`status` fields that this
+ * schema deliberately does not store (`strict` drops them on write, and the
+ * reader that builds IHealthSite copies only name/up/detail). `detail` holds
+ * the strings classifyStatus/classifyError produce ("Meowchi ok", "Meowchi
+ * returned HTTP 503"), which the health strip renders verbatim.
  */
 const HealthSiteSchema = new Schema<IHealthSite>(
   {

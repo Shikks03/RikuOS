@@ -7,8 +7,9 @@
  * the filter, the projection and the retry are this file's subject.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getLastDigest, saveLastDigest } from "@/lib/lastDigest";
+import { getLastDigest, saveLastDigest, markBriefingSeen } from "@/lib/lastDigest";
 import LastDigest from "@/models/LastDigest";
+import type { StoredBriefing } from "@/lib/briefingTypes";
 
 vi.mock("@/models/LastDigest", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/models/LastDigest")>();
@@ -30,6 +31,13 @@ beforeEach(() => {
 
 const SENT_AT = new Date("2026-09-10T23:00:04.000Z");
 const PAYLOAD = { title: "Morning: 2 to look at", body: "Today: dentist 10:00.", url: "/" };
+const BRIEFING: StoredBriefing = {
+  stories: [],
+  today: "Nothing on today, and nothing due.",
+  freelance: null,
+  off: null,
+  unrecognised: 0,
+};
 
 describe("getLastDigest", () => {
   it("returns null when no push has ever been stored — never the schema's defaults", async () => {
@@ -47,7 +55,33 @@ describe("getLastDigest", () => {
       title: "T",
       body: "B",
       devices: 2,
+      briefing: null,
+      seenAt: null,
     });
+  });
+
+  it("returns the stored briefing and an unchanged seenAt Date", async () => {
+    const seenAt = new Date("2026-09-11T00:15:00.000Z");
+    findOne.mockImplementation(() =>
+      query({ _id: "latest", sentAt: SENT_AT, title: "T", body: "B", devices: 2, briefing: BRIEFING, seenAt })
+    );
+
+    expect(await getLastDigest()).toStrictEqual({
+      sentAt: SENT_AT,
+      title: "T",
+      body: "B",
+      devices: 2,
+      briefing: BRIEFING,
+      seenAt,
+    });
+  });
+
+  it("reads a briefing that is not an object as null, never a throw", async () => {
+    findOne.mockImplementation(() =>
+      query({ _id: "latest", sentAt: SENT_AT, title: "T", body: "B", devices: 2, briefing: "junk" })
+    );
+
+    expect((await getLastDigest())?.briefing).toBeNull();
   });
 
   it("returns null rather than a push whose sentAt is not a Date", async () => {
@@ -69,7 +103,7 @@ describe("getLastDigest", () => {
 
     expect(findOne).toHaveBeenCalledWith(
       { _id: "latest" },
-      { sentAt: 1, title: 1, body: 1, devices: 1, _id: 0 }
+      { sentAt: 1, title: 1, body: 1, devices: 1, briefing: 1, seenAt: 1, _id: 0 }
     );
   });
 
@@ -87,16 +121,28 @@ describe("saveLastDigest", () => {
   it("overwrites the one singleton whole, with the schema's validators on", async () => {
     findOneAndUpdate.mockResolvedValue(null);
 
-    await saveLastDigest(SENT_AT, PAYLOAD, 2);
+    await saveLastDigest(SENT_AT, PAYLOAD, 2, BRIEFING);
 
     expect(findOneAndUpdate).toHaveBeenCalledTimes(1);
     const [filter, update, options] = findOneAndUpdate.mock.calls[0];
     expect(filter).toEqual({ _id: "latest" });
     // The url is where a tap goes, not what was said — it is not stored.
     expect(update).toEqual({
-      $set: { sentAt: SENT_AT, title: PAYLOAD.title, body: PAYLOAD.body, devices: 2 },
+      $set: { sentAt: SENT_AT, title: PAYLOAD.title, body: PAYLOAD.body, devices: 2, seenAt: null, briefing: BRIEFING },
     });
     expect(options).toMatchObject({ upsert: true, runValidators: true });
+  });
+
+  it("unsets an old briefing when this morning has none", async () => {
+    findOneAndUpdate.mockResolvedValue(null);
+
+    await saveLastDigest(SENT_AT, PAYLOAD, 2, null);
+
+    const [, update] = findOneAndUpdate.mock.calls[0];
+    expect(update).toEqual({
+      $set: { sentAt: SENT_AT, title: PAYLOAD.title, body: PAYLOAD.body, devices: 2, seenAt: null },
+      $unset: { briefing: 1 },
+    });
   });
 
   it("retries the identical write once when it loses the first-write race", async () => {
@@ -104,7 +150,7 @@ describe("saveLastDigest", () => {
       .mockRejectedValueOnce(Object.assign(new Error("E11000 duplicate key"), { code: 11000 }))
       .mockResolvedValueOnce(null);
 
-    await expect(saveLastDigest(SENT_AT, PAYLOAD, 2)).resolves.toBeUndefined();
+    await expect(saveLastDigest(SENT_AT, PAYLOAD, 2, BRIEFING)).resolves.toBeUndefined();
 
     expect(findOneAndUpdate).toHaveBeenCalledTimes(2);
     expect(findOneAndUpdate.mock.calls[1]).toEqual(findOneAndUpdate.mock.calls[0]);
@@ -115,14 +161,32 @@ describe("saveLastDigest", () => {
       Object.assign(new Error("E11000 duplicate key"), { code: 11000 })
     );
 
-    await expect(saveLastDigest(SENT_AT, PAYLOAD, 2)).rejects.toThrow(/E11000/);
+    await expect(saveLastDigest(SENT_AT, PAYLOAD, 2, BRIEFING)).rejects.toThrow(/E11000/);
     expect(findOneAndUpdate).toHaveBeenCalledTimes(2);
   });
 
   it("propagates any other error without a retry", async () => {
     findOneAndUpdate.mockRejectedValue(new Error("boom"));
 
-    await expect(saveLastDigest(SENT_AT, PAYLOAD, 2)).rejects.toThrow("boom");
+    await expect(saveLastDigest(SENT_AT, PAYLOAD, 2, BRIEFING)).rejects.toThrow("boom");
     expect(findOneAndUpdate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("markBriefingSeen", () => {
+  it("marks only the briefing it was shown, and only once", async () => {
+    findOneAndUpdate.mockResolvedValueOnce({ _id: "latest" });
+    const at = new Date("2026-10-13T00:30:00Z");
+    expect(await markBriefingSeen(SENT_AT, at)).toBe(true);
+    expect(findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: "latest", sentAt: SENT_AT, seenAt: null },
+      { $set: { seenAt: at } },
+      { new: true, runValidators: true },
+    );
+  });
+
+  it("reports a stale or already-seen briefing as not applied", async () => {
+    findOneAndUpdate.mockResolvedValueOnce(null);
+    expect(await markBriefingSeen(SENT_AT, new Date())).toBe(false);
   });
 });

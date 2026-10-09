@@ -1,4 +1,7 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
+// S21: briefingTypes.ts is import-free (see its header), so a model is allowed
+// to pull its enums and bounds in without breaking the lib-layer boundary.
+import { BRIEFING_BOUNDS as B, CAUSE_KEYS, PROBLEM_KEYS, type StoredBriefing } from "@/lib/briefingTypes";
 
 export interface ILastDigest extends Document<string> {
   _id: string;
@@ -6,7 +9,55 @@ export interface ILastDigest extends Document<string> {
   title: string;
   body: string;
   devices: number;
+  briefing?: StoredBriefing;
+  seenAt?: Date | null;
 }
+
+const maxItems = (n: number) => ({
+  validator: (v: unknown[]) => Array.isArray(v) && v.length <= n,
+  message: `at most ${n} items`,
+});
+
+const BoldSchema = new Schema(
+  { start: { type: Number, required: true, min: 0 }, end: { type: Number, required: true, min: 0 } },
+  { _id: false },
+);
+
+const SymptomSchema = new Schema(
+  {
+    key: { type: String, required: true, enum: PROBLEM_KEYS },
+    sentence: { type: String, required: true, maxlength: B.symptomSentence },
+    bold: { type: [BoldSchema], default: [], validate: maxItems(B.bold) },
+    nextStep: { type: String, required: true, maxlength: B.nextStep },
+    causeKey: { type: String, required: true, enum: CAUSE_KEYS },
+    cause: { type: String, required: true, maxlength: B.cause },
+    causeBold: { type: [BoldSchema], default: [], validate: maxItems(B.bold) },
+    raw: { type: String, default: null, maxlength: B.raw },
+  },
+  { _id: false },
+);
+
+const StorySchema = new Schema(
+  {
+    sentence: { type: String, required: true, maxlength: B.storySentence },
+    bold: { type: [BoldSchema], default: [], validate: maxItems(B.bold) },
+    symptoms: { type: [SymptomSchema], default: [], validate: maxItems(B.symptoms) },
+  },
+  { _id: false },
+);
+
+const BriefingSchema = new Schema(
+  {
+    stories: { type: [StorySchema], default: [], validate: maxItems(B.stories) },
+    // `today` may be "" (a read failed and its story says so) — not `required`,
+    // which rejects the empty string; a default keeps it present.
+    today: { type: String, default: "", maxlength: B.today },
+    freelance: { type: String, default: null, maxlength: B.freelance },
+    off: { type: String, default: null, maxlength: B.off },
+    unrecognised: { type: Number, required: true, min: 0 },
+  },
+  { _id: false },
+);
 
 /** The singleton's one and only _id. See the schema docblock below. */
 export const LAST_DIGEST_ID = "latest";
@@ -36,6 +87,12 @@ export const LAST_DIGEST_ID = "latest";
  * NO TTL, like HealthSnapshot: the newest push has to be present whenever the
  * Personal page renders, and expiring it would manufacture `No push recorded
  * yet.` out of our own cleanup.
+ *
+ * S21: `briefing` is the structured Briefing the site renders (typed
+ * sub-schemas, every string bounded, every array capped — no Mixed); `seenAt`
+ * is set once by markBriefingSeen and reset to null by each morning's save.
+ * Both optional, so records saved before S21 stay valid. No index change:
+ * _id is still the only index.
  */
 const LastDigestSchema = new Schema<ILastDigest>(
   {
@@ -44,6 +101,8 @@ const LastDigestSchema = new Schema<ILastDigest>(
     title: { type: String, required: true, maxlength: 80 },
     body: { type: String, required: true, maxlength: 320 },
     devices: { type: Number, required: true, min: 0 },
+    briefing: { type: BriefingSchema, required: false },
+    seenAt: { type: Date, default: null },
   },
   { timestamps: { createdAt: false, updatedAt: false }, strict: true }
 );
