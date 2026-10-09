@@ -93,7 +93,7 @@ describe("explain — every catalogue row", () => {
     [{ key: "agent-stale", agent: "chaser", ageHours: 31 }, "The chaser hasn't run in 31 hours.", /Crons/, "fixed"],
     [{ key: "agent-stale", agent: "chaser", ageHours: 72 }, "The chaser hasn't run in 3 days.", /Crons/, "fixed"],
     [{ key: "agent-failed", agent: "chaser" }, "The chaser failed on its last run.", /last run's error/, "none"],
-    [{ key: "agent-degraded", agent: "chaser", itemsFailed: 2 }, "The chaser's last run had two items that didn't go through.", /failed items/, "fixed"],
+    [{ key: "agent-degraded", agent: "chaser", itemsFailed: 2 }, "The chaser had two items that didn't go through on its last run.", /failed items/, "fixed"],
     [{ key: "job-failed", job: "site-health", raw: "connect ETIMEDOUT" }, "The site check broke this morning.", /last run's error/, "timeout"],
     [{ key: "job-failed", job: "site-health", raw: null }, "The site check broke this morning.", /last run's error/, "none"],
     [{ key: "snapshot-unsaved" }, "I checked the sites but couldn't save the result.", /gone tomorrow/, "fixed"],

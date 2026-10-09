@@ -218,7 +218,7 @@ export function explain(p: Problem): Explained {
     case "agent-degraded": {
       const n = p.itemsFailed;
       return row(
-        capFirst(say(b(`${AGENT_NAMES[p.agent]}'s last run`), ` had ${numberWord(n)} ${n === 1 ? "item" : "items"} that didn't go through.`)),
+        capFirst(say(b(AGENT_NAMES[p.agent]), ` had ${numberWord(n)} ${n === 1 ? "item" : "items"} that didn't go through on its last run.`)),
         "Look at that run's failed items.",
         fixed(say("Most likely ", b("some items were rejected"), " while the rest went through, usually bad data on those items.")),
       );

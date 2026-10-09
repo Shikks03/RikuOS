@@ -118,7 +118,18 @@ describe("composeDigest — the body", () => {
     expect(composeDigest({ ...base, today: { ...QUIET, events: "unavailable", calendarCause: "timeout" } }).body).toBe(
       "I couldn't read your calendar.",
     );
-    expect(composeDigest({ ...base, today: { ...QUIET, due: "unavailable" } }).body).toBe("I couldn't read your to-dos.");
+    expect(composeDigest({ ...base, today: { ...QUIET, due: "unavailable" } }).body).toBe(
+      "I couldn't read your to-dos. Nothing on today.",
+    );
+  });
+
+  it("says the calendar is clear even when the to-dos couldn't be read, and never claims 'nothing due' (R55-style honesty)", () => {
+    const today: DigestTodayInput = { ...QUIET, due: "unavailable" };
+    const { body } = composeDigest({ ...base, today });
+    expect(body).toBe("I couldn't read your to-dos. Nothing on today.");
+    expect(body).not.toMatch(/nothing due/i);
+    const briefing = buildBriefing({ ...base, today });
+    expect(briefing.today).toBe("Nothing on today.");
   });
 
   it("never claims 'nothing on' over a calendar it couldn't fully read (D6)", () => {

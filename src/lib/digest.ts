@@ -268,7 +268,8 @@ function dueWhen(label: string): string {
  *   Today you've got Math Methods at 09:00 and Meeting at 13:00. Coming up: Essay today. Running late: Invoice (3 days).
  *   Your calendar layers are all switched off. Nothing due.
  *   Nothing on today, and nothing due.        (both reads answered, both empty)
- *   ""                                         (a read failed and nothing else to say — its story says it)
+ *   Nothing on today.                         (calendar answered and empty; to-dos unreadable — never "nothing due")
+ *   ""                                         (calendar unreadable too — nothing left to say; its story says it)
  * Budget behaviour is unchanged from P10b: titles cut through TITLE_CAPS, then
  * names move into `and N more`; times, days and lateness are never cut.
  */
@@ -340,6 +341,11 @@ function renderToday(today: DigestTodayInput, cap: number, limit: number): strin
   if (calendarAnswered && todosAnswered && todosEmpty) {
     if (calendarEmpty) return "Nothing on today, and nothing due.";
     if (today.events === "none-enabled" || calendarPartiallyEmpty) parts.push("Nothing due.");
+  } else if (!todosAnswered && calendarEmpty) {
+    // The to-dos couldn't be read — the todos-unavailable story already says
+    // so — but a clear calendar is still a fact worth saying, not silence
+    // that reads as nothing to report at all.
+    parts.push("Nothing on today.");
   }
   return parts.join(" ");
 }
