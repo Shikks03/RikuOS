@@ -87,11 +87,11 @@ The lead session decides and orchestrates; it does not write code. One **builder
 
 **Files:** Modify `ARCHITECTURE.md` (§3.1 data list; §7 after S20).
 
-- [ ] **Step 1: Append S21 to §7**, directly after the S20 entry, verbatim from spec §9 (the blockquote, without the `>` markers), starting `- **S21 — The morning push speaks in an assistant's voice, and the Briefing replaces the push tile.**`, and then one more sentence: `Design: docs/superpowers/specs/2026-10-09-briefing-assistant-voice-design.md. Plans: docs/superpowers/plans/2026-10-09-briefing-a-voice-and-data.md, …-briefing-b-on-the-site.md.`
+- [x] **Step 1: Append S21 to §7**, directly after the S20 entry, verbatim from spec §9 (the blockquote, without the `>` markers), starting `- **S21 — The morning push speaks in an assistant's voice, and the Briefing replaces the push tile.**`, and then one more sentence: `Design: docs/superpowers/specs/2026-10-09-briefing-assistant-voice-design.md. Plans: docs/superpowers/plans/2026-10-09-briefing-a-voice-and-data.md, …-briefing-b-on-the-site.md.`
 
-- [ ] **Step 2: In §3.1**, find the `LastDigest` line (if §3.1 lacks one — the P10c record notes it may — add it after HealthSnapshot's line) and make it read: `LastDigest — singleton (fixed _id "latest"), the last morning push: sentAt, title, body, devices, and since S21 the structured briefing (stories → symptoms with next step, cause, raw error) and seenAt (once-a-day full-screen greeting, reset by each morning's write). No TTL.`
+- [x] **Step 2: In §3.1**, find the `LastDigest` line (if §3.1 lacks one — the P10c record notes it may — add it after HealthSnapshot's line) and make it read: `LastDigest — singleton (fixed _id "latest"), the last morning push: sentAt, title, body, devices, and since S21 the structured briefing (stories → symptoms with next step, cause, raw error) and seenAt (once-a-day full-screen greeting, reset by each morning's write). No TTL.`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add ARCHITECTURE.md
@@ -104,7 +104,7 @@ git commit -m "docs(arch): S21 - the morning push speaks in an assistant's voice
 
 **Files:** Create `src/lib/voice.ts`, `src/lib/__tests__/voice.test.ts`.
 
-- [ ] **Step 1: Write the failing test** `src/lib/__tests__/voice.test.ts`:
+- [x] **Step 1: Write the failing test** `src/lib/__tests__/voice.test.ts`:
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -256,12 +256,12 @@ describe("readOnTheDay / greeting", () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `npx vitest run src/lib/__tests__/voice.test.ts`
 Expected: FAIL — `Cannot find module '@/lib/voice'`.
 
-- [ ] **Step 3: Write `src/lib/voice.ts`**
+- [x] **Step 3: Write `src/lib/voice.ts`**
 
 ```ts
 /**
@@ -454,12 +454,12 @@ export function greeting(day: DayKey, mood: Mood): string {
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `npx vitest run src/lib/__tests__/voice.test.ts`
 Expected: PASS (all).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/voice.ts src/lib/__tests__/voice.test.ts
@@ -474,7 +474,7 @@ The catalogue needs facts that today exist only inside `detail` strings. Add the
 
 **Files:** Modify `src/lib/siteHealth.ts`, `src/lib/watchdog.ts`, `src/lib/outreachHealth.ts`, and their tests in `src/lib/__tests__/` (`siteHealth.test.ts`, `watchdog.test.ts`, `outreachHealth.test.ts` — grep for the exact names with `ls src/lib/__tests__ | grep -i -E "site|watchdog|outreach"`).
 
-- [ ] **Step 1: Write the failing tests** (append to each file):
+- [x] **Step 1: Write the failing tests** (append to each file):
 
 ```ts
 // siteHealth.test.ts
@@ -512,9 +512,9 @@ it("carries the age, the error count and the stranded count beside the detail", 
 });
 ```
 
-- [ ] **Step 2: Run them** — `npx vitest run src/lib/__tests__/siteHealth.test.ts src/lib/__tests__/watchdog.test.ts src/lib/__tests__/outreachHealth.test.ts` → FAIL on the new fields.
+- [x] **Step 2: Run them** — `npx vitest run src/lib/__tests__/siteHealth.test.ts src/lib/__tests__/watchdog.test.ts src/lib/__tests__/outreachHealth.test.ts` → FAIL on the new fields.
 
-- [ ] **Step 3: Implement.** In `siteHealth.ts`:
+- [x] **Step 3: Implement.** In `siteHealth.ts`:
 
 ```ts
 export interface SiteResult {
@@ -553,9 +553,9 @@ In `outreachHealth.ts`, extend `OutreachFinding` with `/** engine-stale: how lon
 
 **Check `healthSnapshot.ts`:** if it persists `SiteResult` through a schema, confirm `strict` drops the two new fields (or that its write maps only `name/up/detail`). Do not change its schema in this plan. A `siteHealth` result written with extra keys under `strict: true` is silently stripped, which is fine.
 
-- [ ] **Step 4: Run all three test files + `npx tsc --noEmit`** → PASS, no type errors.
+- [x] **Step 4: Run all three test files + `npx tsc --noEmit`** → PASS, no type errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/siteHealth.ts src/lib/watchdog.ts src/lib/outreachHealth.ts src/lib/__tests__/
@@ -568,7 +568,7 @@ git commit -m "feat(checks): sites, agents and the sender keep their numbers bes
 
 **Files:** Create `src/lib/briefingTypes.ts`, `src/lib/problems.ts`, `src/lib/__tests__/problems.test.ts`. Delete `src/lib/__tests__/buildProblems.test.ts` (its cases move into `problems.test.ts`, re-asserted on the typed shape). Modify `src/lib/digest.ts`: remove `MorningOutcomes`, `buildProblems`, `OWN_FRAGMENTS`, `capitalise` and the `Anomaly`/`SiteResult`/`OutreachFinding` type imports **only** (the rest of digest.ts is A6's).
 
-- [ ] **Step 1: Write `src/lib/briefingTypes.ts`** (import-free, so the model can import it):
+- [x] **Step 1: Write `src/lib/briefingTypes.ts`** (import-free, so the model can import it):
 
 ```ts
 /**
@@ -668,7 +668,7 @@ export interface StoredBriefing {
 }
 ```
 
-- [ ] **Step 2: Write the failing test** `src/lib/__tests__/problems.test.ts` — port every case from `buildProblems.test.ts` onto the typed shape, plus the new keys. Complete file:
+- [x] **Step 2: Write the failing test** `src/lib/__tests__/problems.test.ts` — port every case from `buildProblems.test.ts` onto the typed shape, plus the new keys. Complete file:
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -822,9 +822,9 @@ describe("AGENT_NAMES", () => {
 });
 ```
 
-- [ ] **Step 3: Run it** — `npx vitest run src/lib/__tests__/problems.test.ts` → FAIL (module missing).
+- [x] **Step 3: Run it** — `npx vitest run src/lib/__tests__/problems.test.ts` → FAIL (module missing).
 
-- [ ] **Step 4: Write `src/lib/problems.ts`**
+- [x] **Step 4: Write `src/lib/problems.ts`**
 
 ```ts
 /**
@@ -968,7 +968,7 @@ export function buildProblems(outcomes: MorningOutcomes): Problem[] {
 
 **Note on test order:** the "names each failed morning job" test expects watchdog, site-health, outreach-health in that order; the implementation pushes expiry first, then watchdog, site-health, snapshot, outreach — matching.
 
-- [ ] **Step 5: Remove the moved code from `digest.ts`** (`MorningOutcomes`, `buildProblems`, `OWN_FRAGMENTS`, `capitalise`, and the three type imports for Anomaly/SiteResult/OutreachFinding). `composeDigest` still references `capitalise` and `problems: string[]` — **leave composeDigest compiling** by keeping a local copy of `capitalise` and `OWN_FRAGMENTS` until A6 rewrites it, OR (preferred) stop after deleting `buildProblems`/`MorningOutcomes` only and leave `capitalise`/`OWN_FRAGMENTS` for A6 to delete. Do the preferred one. Then update `src/app/api/cron/morning/route.ts`'s import line to `import { composeDigest } from "@/lib/digest"; import { buildProblems } from "@/lib/problems";` and, so the route type-checks until A8, map the typed problems back to strings at the call site:
+- [x] **Step 5: Remove the moved code from `digest.ts`** (`MorningOutcomes`, `buildProblems`, `OWN_FRAGMENTS`, `capitalise`, and the three type imports for Anomaly/SiteResult/OutreachFinding). `composeDigest` still references `capitalise` and `problems: string[]` — **leave composeDigest compiling** by keeping a local copy of `capitalise` and `OWN_FRAGMENTS` until A6 rewrites it, OR (preferred) stop after deleting `buildProblems`/`MorningOutcomes` only and leave `capitalise`/`OWN_FRAGMENTS` for A6 to delete. Do the preferred one. Then update `src/app/api/cron/morning/route.ts`'s import line to `import { composeDigest } from "@/lib/digest"; import { buildProblems } from "@/lib/problems";` and, so the route type-checks until A8, map the typed problems back to strings at the call site:
 
 ```ts
 problems: problems.map((p) => p.key), // TEMPORARY until A8 — A6 changes composeDigest's input
@@ -976,9 +976,9 @@ problems: problems.map((p) => p.key), // TEMPORARY until A8 — A6 changes compo
 
 This temporary line is deleted in A8; it exists only so every commit builds.
 
-- [ ] **Step 6: Delete `src/lib/__tests__/buildProblems.test.ts`**, then run `npx vitest run src/lib/__tests__/problems.test.ts && npx tsc --noEmit` → PASS.
+- [x] **Step 6: Delete `src/lib/__tests__/buildProblems.test.ts`**, then run `npx vitest run src/lib/__tests__/problems.test.ts && npx tsc --noEmit` → PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/briefingTypes.ts src/lib/problems.ts src/lib/__tests__/problems.test.ts src/lib/digest.ts src/app/api/cron/morning/route.ts
@@ -992,7 +992,7 @@ git commit -m "feat(problems): this morning's problems as typed facts, moved out
 
 **Files:** Create `src/lib/causes.ts`, `src/lib/__tests__/causes.test.ts`.
 
-- [ ] **Step 1: Write the failing test** `src/lib/__tests__/causes.test.ts`:
+- [x] **Step 1: Write the failing test** `src/lib/__tests__/causes.test.ts`:
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -1097,9 +1097,9 @@ describe("explain — every catalogue row", () => {
 });
 ```
 
-- [ ] **Step 2: Run it** — `npx vitest run src/lib/__tests__/causes.test.ts` → FAIL.
+- [x] **Step 2: Run it** — `npx vitest run src/lib/__tests__/causes.test.ts` → FAIL.
 
-- [ ] **Step 3: Write `src/lib/causes.ts`**
+- [x] **Step 3: Write `src/lib/causes.ts`**
 
 ```ts
 /**
@@ -1359,9 +1359,9 @@ export function explain(p: Problem): Explained {
 
 **Note for the builder:** the test row `"MongoServerSelectionError: Server selection timed out …" → "timeout"` is deliberate: the timeout rule is first in the spec's order, and the message says "timed out". Do not reorder the rules to make it read "database". The ordering is the spec's and the test pins it.
 
-- [ ] **Step 4: Run** `npx vitest run src/lib/__tests__/causes.test.ts` → PASS.
+- [x] **Step 4: Run** `npx vitest run src/lib/__tests__/causes.test.ts` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/causes.ts src/lib/__tests__/causes.test.ts
@@ -1374,7 +1374,7 @@ git commit -m "feat(causes): the problem catalogue - plain sentence, next step, 
 
 **Files:** Create `src/lib/stories.ts`, `src/lib/__tests__/stories.test.ts`.
 
-- [ ] **Step 1: Write the failing test** `src/lib/__tests__/stories.test.ts`:
+- [x] **Step 1: Write the failing test** `src/lib/__tests__/stories.test.ts`:
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -1505,9 +1505,9 @@ describe("groupProblems", () => {
 });
 ```
 
-- [ ] **Step 2: Run it** → FAIL.
+- [x] **Step 2: Run it** → FAIL.
 
-- [ ] **Step 3: Write `src/lib/stories.ts`**
+- [x] **Step 3: Write `src/lib/stories.ts`**
 
 ```ts
 /**
@@ -1682,9 +1682,9 @@ export function groupProblems(problems: Problem[]): Story[] {
 
 **Check the expected strings against this code before running.** The chain-2 test expects `"ShikksTracker's sender hasn't run in 2 days, so four approved messages are stuck."` — `explain(engine-stale).sentence.text` is `"ShikksTracker's sender hasn't run in 2 days."`, its period is removed and the tail appended. For `engine-never-ran` the head reads `"ShikksTracker's sender has never reported a run, so …"`, which is fine.
 
-- [ ] **Step 4: Run** `npx vitest run src/lib/__tests__/stories.test.ts` → PASS.
+- [x] **Step 4: Run** `npx vitest run src/lib/__tests__/stories.test.ts` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/stories.ts src/lib/__tests__/stories.test.ts
@@ -1746,7 +1746,7 @@ export interface DigestInput {
 
 10. **`buildBriefing`**: for each story `{ sentence, bold, symptoms: symptoms.map(explain → {key, sentence, bold, nextStep, causeKey, cause, causeBold, raw}) }`, `today: composeTodayLine(today)` (unbudgeted, never compacted), `freelance`, `off`, `unrecognised = count of symptoms with causeKey "unrecognised"`. Then **bound everything** with `boundBriefing` (strings sliced to `BRIEFING_BOUNDS`, arrays sliced, bold ranges dropped if `end > text.length`), so the model's validators can never reject a save.
 
-- [ ] **Step 1: Rewrite the composeDigest + Today blocks of `src/lib/__tests__/digest.test.ts`.** Replace everything from the top of the file through the end of the `describe("composeDigest's Today sentence"` block, and every later block that calls `composeDigest` with string problems (lines ~550–680 today: the "problems line" and "capitalised" describes), with the file below. Keep the `calendarForDigest` and `todosForDigest` describes, but update the `calendarForDigest` expectations to include `calendarCause` where events is `"unavailable"`.
+- [x] **Step 1: Rewrite the composeDigest + Today blocks of `src/lib/__tests__/digest.test.ts`.** Replace everything from the top of the file through the end of the `describe("composeDigest's Today sentence"` block, and every later block that calls `composeDigest` with string problems (lines ~550–680 today: the "problems line" and "capitalised" describes), with the file below. Keep the `calendarForDigest` and `todosForDigest` describes, but update the `calendarForDigest` expectations to include `calendarCause` where events is `"unavailable"`.
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -2007,9 +2007,9 @@ describe("buildBriefing", () => {
 
 Also update the existing `calendarForDigest` describe: wherever it expects `{ events: "unavailable", missedLayers: [] }`, it now expects `{ events: "unavailable", missedLayers: [], calendarCause: <reason> }` (`"not-configured"`, `"expired"`, `"timeout"`, or `"read-failed"` for the every-layer-failed / unjoinable branch). Wherever it expects a non-unavailable result, add no field (`calendarCause` absent; use `toStrictEqual` only where the file already does).
 
-- [ ] **Step 2: Run** `npx vitest run src/lib/__tests__/digest.test.ts` → FAIL.
+- [x] **Step 2: Run** `npx vitest run src/lib/__tests__/digest.test.ts` → FAIL.
 
-- [ ] **Step 3: Rewrite the top half of `src/lib/digest.ts`.** Replace the file header through the end of `renderToday`/`missedSentence` with the code below, keep `calendarForDigest` (with the `calendarCause` additions), `DigestTodoRow` and `todosForDigest` unchanged, and delete the leftover `OWN_FRAGMENTS`/`capitalise`/`MAX_PROBLEM_CHARS`/`short`/`end`/`problemsWithin` from A3.
+- [x] **Step 3: Rewrite the top half of `src/lib/digest.ts`.** Replace the file header through the end of `renderToday`/`missedSentence` with the code below, keep `calendarForDigest` (with the `calendarCause` additions), `DigestTodoRow` and `todosForDigest` unchanged, and delete the leftover `OWN_FRAGMENTS`/`capitalise`/`MAX_PROBLEM_CHARS`/`short`/`end`/`problemsWithin` from A3.
 
 ```ts
 /**
@@ -2334,9 +2334,9 @@ and its return type to `Pick<DigestTodayInput, "events" | "missedLayers" | "cale
 
 **Check the freelance test string:** pending 3, attention `{1, 0}` → parts `["one lead is waiting on your reply", "three drafts are ready for your review"]` → `"One lead is waiting on your reply and three drafts are ready for your review."` ✓ (the test above expects exactly that).
 
-- [ ] **Step 4: Run** `npx vitest run src/lib/__tests__/digest.test.ts src/lib/__tests__/stories.test.ts src/lib/__tests__/causes.test.ts` → PASS. Then `npx tsc --noEmit` → the morning route **fails to compile** (its `composeDigest` call is the old shape). That is A8's. To keep this commit building, apply the minimum route edit now: pass `day: todayKey(new Date())`, `attentionError: null`, `problems` (the typed array, deleting A3's temporary `.map`), and `offAgents: settings.chaserEnabled ? [] : ["chaser"] as Agent[]`. A8 finishes the wiring.
+- [x] **Step 4: Run** `npx vitest run src/lib/__tests__/digest.test.ts src/lib/__tests__/stories.test.ts src/lib/__tests__/causes.test.ts` → PASS. Then `npx tsc --noEmit` → the morning route **fails to compile** (its `composeDigest` call is the old shape). That is A8's. To keep this commit building, apply the minimum route edit now: pass `day: todayKey(new Date())`, `attentionError: null`, `problems` (the typed array, deleting A3's temporary `.map`), and `offAgents: settings.chaserEnabled ? [] : ["chaser"] as Agent[]`. A8 finishes the wiring.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/digest.ts src/lib/digestToday.ts src/lib/__tests__/digest.test.ts src/app/api/cron/morning/route.ts
@@ -2349,7 +2349,7 @@ git commit -m "feat(digest): the morning push in the assistant's voice, and the 
 
 **Files:** Modify `src/models/LastDigest.ts`, `src/lib/lastDigest.ts`, `src/lib/__tests__/lastDigest.test.ts`, and `src/lib/__tests__/models.test.ts` (it has LastDigest assertions — grep `LastDigest` in it).
 
-- [ ] **Step 1: Write the failing tests.** In `lastDigest.test.ts`:
+- [x] **Step 1: Write the failing tests.** In `lastDigest.test.ts`:
   - Change the projection expectation to `{ sentAt: 1, title: 1, body: 1, devices: 1, briefing: 1, seenAt: 1, _id: 0 }`.
   - Change "returns the stored push" to expect `briefing: null, seenAt: null` when the doc has neither, and add a case returning a stored briefing object and a `seenAt` Date unchanged.
   - Add: `it("reads a briefing that is not an object as null, never a throw")` with `briefing: "junk"` → `briefing: null`.
@@ -2386,9 +2386,9 @@ it("reports a stale or already-seen briefing as not applied", async () => {
 
   In `models.test.ts`, add a validation test: a `new LastDigest({...valid, briefing: { stories: [ { sentence: "x".repeat(241), bold: [], symptoms: [] } ], today: "", freelance: null, off: null, unrecognised: 0 } })` fails `validateSync()` on `briefing.stories.0.sentence`; one with 13 stories fails on `briefing.stories`; one with `causeKey: "nope"` fails on the enum; and a document with no `briefing` and no `seenAt` passes (old records stay valid).
 
-- [ ] **Step 2: Run** `npx vitest run src/lib/__tests__/lastDigest.test.ts src/lib/__tests__/models.test.ts` → FAIL.
+- [x] **Step 2: Run** `npx vitest run src/lib/__tests__/lastDigest.test.ts src/lib/__tests__/models.test.ts` → FAIL.
 
-- [ ] **Step 3: Implement the model.** In `src/models/LastDigest.ts`, add (above `LastDigestSchema`):
+- [x] **Step 3: Implement the model.** In `src/models/LastDigest.ts`, add (above `LastDigestSchema`):
 
 ```ts
 import { BRIEFING_BOUNDS as B, CAUSE_KEYS, PROBLEM_KEYS, type StoredBriefing } from "@/lib/briefingTypes";
@@ -2451,7 +2451,7 @@ and append to the model docblock: `S21: \`briefing\` is the structured Briefing 
 
 **Model-import rule check:** `src/models/LastDigest.ts` importing `@/lib/briefingTypes` is allowed because that file is import-free. Add a one-line comment at the import saying so.
 
-- [ ] **Step 4: Implement `src/lib/lastDigest.ts`:**
+- [x] **Step 4: Implement `src/lib/lastDigest.ts`:**
 
 ```ts
 import type { StoredBriefing } from "@/lib/briefingTypes";
@@ -2538,11 +2538,11 @@ export async function markBriefingSeen(sentAt: Date, at: Date): Promise<boolean>
 }
 ```
 
-- [ ] **Step 5: Fix the two other callers.** `src/app/(app)/personal/page.tsx` reads `StoredDigest` and passes it to `buildPushTileView` — still compiles (extra fields). `personalView.test.ts` builds `StoredDigest` literals — add `briefing: null, seenAt: null` to each (grep `devices:` in that file). Run `npx tsc --noEmit` and fix every literal it names, adding only those two fields.
+- [x] **Step 5: Fix the two other callers.** `src/app/(app)/personal/page.tsx` reads `StoredDigest` and passes it to `buildPushTileView` — still compiles (extra fields). `personalView.test.ts` builds `StoredDigest` literals — add `briefing: null, seenAt: null` to each (grep `devices:` in that file). Run `npx tsc --noEmit` and fix every literal it names, adding only those two fields.
 
-- [ ] **Step 6: Run** `npx vitest run src/lib/__tests__/lastDigest.test.ts src/lib/__tests__/models.test.ts src/lib/__tests__/personalView.test.ts && npx tsc --noEmit` → PASS. (The route's `saveLastDigest` call now lacks the 4th argument — pass `null` there in this commit; A8 passes the real briefing.)
+- [x] **Step 6: Run** `npx vitest run src/lib/__tests__/lastDigest.test.ts src/lib/__tests__/models.test.ts src/lib/__tests__/personalView.test.ts && npx tsc --noEmit` → PASS. (The route's `saveLastDigest` call now lacks the 4th argument — pass `null` there in this commit; A8 passes the real briefing.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/models/LastDigest.ts src/lib/lastDigest.ts src/lib/__tests__/lastDigest.test.ts src/lib/__tests__/models.test.ts src/lib/__tests__/personalView.test.ts src/app/api/cron/morning/route.ts
@@ -2555,7 +2555,7 @@ git commit -m "feat(last-digest): the saved push carries its Briefing and when i
 
 **Files:** Modify `src/app/api/cron/morning/route.ts` only.
 
-- [ ] **Step 1: Keep the attention error.** Replace the `fetchAttention(...).catch(...)` element with:
+- [x] **Step 1: Keep the attention error.** Replace the `fetchAttention(...).catch(...)` element with:
 
 ```ts
         fetchAttention(settings.chaserNDays, ATTENTION_LIMIT).then(
@@ -2569,7 +2569,7 @@ git commit -m "feat(last-digest): the saved push carries its Briefing and when i
 
 and destructure as `const [attentionRead, today] = …; const attention = attentionRead.value;`.
 
-- [ ] **Step 2: Compose, send, then build the briefing.** Replace the composeDigest call through the `saveLastDigest` try/catch with:
+- [x] **Step 2: Compose, send, then build the briefing.** Replace the composeDigest call through the `saveLastDigest` try/catch with:
 
 ```ts
       const digestInput: DigestInput = {
@@ -2623,11 +2623,11 @@ and destructure as `const [attentionRead, today] = …; const attention = attent
 
 Imports: `import { buildBriefing, composeDigest, type DigestInput } from "@/lib/digest"; import { buildProblems } from "@/lib/problems"; import type { StoredBriefing } from "@/lib/briefingTypes";`. Keep the existing comments about the delivery guard and R22 (move them above the new code unchanged).
 
-- [ ] **Step 3: Keep the route failure alert and the monitoring-off alerts as they are** (spec §3.4 — plain wording stays for alerts).
+- [x] **Step 3: Keep the route failure alert and the monitoring-off alerts as they are** (spec §3.4 — plain wording stays for alerts).
 
-- [ ] **Step 4: Verify.** `npx tsc --noEmit` → clean. `npm test` → all green. `grep -n "TEMPORARY" src/app/api/cron/morning/route.ts` → no output.
+- [x] **Step 4: Verify.** `npx tsc --noEmit` → clean. `npm test` → all green. `grep -n "TEMPORARY" src/app/api/cron/morning/route.ts` → no output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/api/cron/morning/route.ts
@@ -2638,9 +2638,9 @@ git commit -m "feat(cron/morning): send the voiced push, then save its Briefing;
 
 ### Task A9: Principal review, then verification (Principal Reviewer, Verification Lead)
 
-- [ ] **Step 1: Principal cross-module review** (one reviewer, all of A1–A8 at once). Brief: "Read the spec §2–§4 and §7, then `voice.ts`, `problems.ts`, `causes.ts`, `stories.ts`, `digest.ts`, `lastDigest.ts`, the model and the route as one system. Look for seams: a problem key with no catalogue row; a chain that can drop or duplicate a symptom; a page/push apostrophe mix; a stored string that can exceed its bound; R23 broken by any mood path; the freelance line sliced by the payload; a briefing failure that can cost the push; `seenAt` not reset by a save. Report findings; don't edit." Fix rounds go back to the owning builder.
+- [x] **Step 1: Principal cross-module review** (one reviewer, all of A1–A8 at once). Brief: "Read the spec §2–§4 and §7, then `voice.ts`, `problems.ts`, `causes.ts`, `stories.ts`, `digest.ts`, `lastDigest.ts`, the model and the route as one system. Look for seams: a problem key with no catalogue row; a chain that can drop or duplicate a symptom; a page/push apostrophe mix; a stored string that can exceed its bound; R23 broken by any mood path; the freelance line sliced by the payload; a briefing failure that can cost the push; `seenAt` not reset by a save. Report findings; don't edit." Fix rounds go back to the owning builder.
 
-- [ ] **Step 2: The trio + lint baseline.**
+- [x] **Step 2: The trio + lint baseline.**
 
 ```bash
 npm test
@@ -2651,7 +2651,7 @@ npm run lint
 
 Expected: tests all green (count recorded in the post-build record), tsc clean, build green, lint at its baseline: four `react-hooks/set-state-in-effect` errors and three warnings, exit 1. A fifth error or a fourth warning fails the step.
 
-- [ ] **Step 3: A rendered sample, no network.** Write a throwaway script in the scratchpad (not the repo) that imports `composeDigest`/`buildBriefing` through `npx tsx` and prints the push for five fixtures: clear Monday, busy Wednesday, one-problem Thursday, the ShikksTracker-down chain, and a twelve-problem night. Paste the five outputs into the post-build record so Riku can read the voice before 07:00.
+- [x] **Step 3: A rendered sample, no network.** Write a throwaway script in the scratchpad (not the repo) that imports `composeDigest`/`buildBriefing` through `npx tsx` and prints the push for five fixtures: clear Monday, busy Wednesday, one-problem Thursday, the ShikksTracker-down chain, and a twelve-problem night. Paste the five outputs into the post-build record so Riku can read the voice before 07:00.
 
 - [ ] **Step 4: Riku's observation (his hands, next morning).** The 07:00 push arrives in the new voice. The Personal page tile still quotes it (Plan B removes the tile). Tapping the push opens `/freelance` (the `?briefing=open` parameter does nothing until Plan B).
 
@@ -2659,4 +2659,72 @@ Expected: tests all green (count recorded in the post-build record), tsc clean, 
 
 ## Post-build record
 
-*(Filled in by the lead after A9: commits, test count, deviations taken, the five sample pushes, findings and their fixes, and what remains for Riku.)*
+**Commits** (`git log --oneline 7450149..HEAD`):
+
+```
+e932124 fix(briefing): partial runs read plainly; a clear calendar is still said when to-dos fail
+0b28806 fix(digest): never 'nothing on' over an unread calendar; problems keep their words before Today does; compact Today in English
+b97399a fix(briefing): same-key stories for failed jobs and partial runs; tested fetch-error helper; a briefing can't cost the saved push
+34f7da4 fix(briefing): ShikksTracker status read first, real-world error text, honest unknowns, whole-sentence fallback; story chains tightened
+48ab4b3 feat(cron/morning): send the voiced push, then save its Briefing; a tap opens the Briefing
+7008aca feat(digest): the morning push in the assistant's voice, and the structured Briefing
+19c79f7 feat(last-digest): the saved push carries its Briefing and when it was seen
+d4f11fa feat(stories): problems that happen together are told as one story
+f22a8b2 feat(causes): the problem catalogue - plain sentence, next step, likely cause, honest unknowns
+c86132b fix(voice): validated day keys, coprime line steps; LastDigest line keeps R55 facts
+cc303fc feat(problems): this morning's problems as typed facts, moved out of the digest
+26cf120 feat(checks): sites, agents and the sender keep their numbers beside the detail line
+d9ddcb2 feat(voice): the assistant's greeting, deterministic line choice and bold ranges
+826d993 docs(arch): S21 - the morning push speaks in an assistant's voice; the Briefing replaces the push tile
+```
+
+**Final counts:** 1171 tests, all green (`npm test`). `npx tsc --noEmit` clean. `npm run build` green (23 routes, no type errors). `npm run lint` at its recorded baseline: four `react-hooks/set-state-in-effect` errors, three warnings, exit 1 — exact count, no fifth error or fourth warning.
+
+**Method:** built by the P10 agent team under this plan's task table — one builder subagent per task, named roles, disjoint files. Riku's 2026-10-10 call: Sonnet for all building, Opus reserved for reviews only. Feature reviews ran after A-I and A-II as planned; the A-III feature review (due after A8) was merged into the principal review (A9 Step 1) instead of running separately, to save tokens — the lead's call, since A-III's own files (digest.ts, lastDigest.ts, the route) were about to be read again for the principal pass regardless.
+
+**Deviations taken:** all of the plan's "Deviations from the spec" list, 1–13 (above) — every one was taken as written; none reverted.
+
+**Findings and their fixes:**
+- A-I review — a malformed day key threw nothing by itself; validated through `days.ts`'s `dayStart`, which throws a `RangeError` on a bad or non-existent key. `pickLine`'s step is coprime with the pool size by construction (picked from the steps in 1..n-1 with `gcd(step, n) === 1`), not by luck of the salt. The `LastDigest` §3.1 line keeps stating R55's facts (HealthSnapshot's null-on-absent reasoning) rather than papering over them.
+- A-II review — ShikksTracker's own `stApi.ts` help text embeds the string "401" in every error (its fixed legend naming every status code), so the generic auth rule matched every ShikksTracker failure regardless of its real status; fixed by classifying a named `returned NNN` status directly, before the rule list runs (deviation 8, CRITICAL). Real-world error text recognised case-insensitively: Node's `fetch failed` and Atlas's "could not connect to any servers" (deviation 9). An unknown calendar read failure is now honestly "I can see it failed, but not why" with no claim about a run record it doesn't have (`explainCause`'s `hasRunRecord` parameter). The `calendar-partial` row measures its own full sentence and falls back to a plain count rather than clipping mid-name (deviation 10). Story chains tightened: `engine-unreadable` joins chain 2 with "and", never "so" (deviation 11); the outreach-check job joins chain 1 only on a real outage (deviation 12); the database chain only fires on `job-failed`, not on every symptom that happens to mention a database. R58's regression tests (de-duplicating one failure counted once) were restored after the A3 move. Symptoms were counted as unrecognised before stories were sliced to the stored bound of 12, so an overflowing morning's count is never silently read as zero.
+- Principal review — a false "Nothing on today" claim over an unread calendar was the standing bug this session's Job 1 closed out (see Verification below); Today never gets cut just to make room for a problems line — on a tight budget the Today line is dropped from the push instead, the stored Briefing keeping it whole regardless. The compact (budget-0) form of the Today line reads in English ("Three things on today.") rather than a terse fragment. Budget tests were restored after the A6 rewrite. Same-key problems (two or more failed jobs, two or more partial-run agents) group into one story instead of one sentence per agent. The fetch-error text that `pipeline-unavailable` and `job-failed` read moved into one tested helper so both call sites stay worded the same. A Briefing that fails validation on write is dropped silently and the push record is still saved — a briefing bug can never cost the saved push (spec §7.2, upheld end to end).
+- Verification (this session, Job 1) — two wording fixes, both TDD: `agent-degraded`'s sentence now reads `"{Agent} had {n} item(s) that didn't go through on its last run."` (was the clumsy `"{Agent}'s last run had {n} items…"`); `renderToday` now says `"Nothing on today."` when the to-dos are unavailable and the calendar answered empty with nothing missed, instead of returning `""` — the todos-unavailable story already explains the to-dos; the Today line now states the one fact it does have (a clear calendar) without ever claiming "nothing due" over a read that never happened.
+
+**The five sample pushes** (via `npx tsx` against `composeDigest`/`buildBriefing`, no network, no database):
+
+1. **Clear Monday (2026-10-12)**
+   - TITLE: `New week, Riku. All's well.`
+   - BODY: `Today you've got Math Methods at 09:00 and Meeting at 13:00. Coming up: Essay today. One lead is waiting on your reply and one draft is ready for your review.`
+
+2. **Busy Wednesday (2026-10-14)**
+   - TITLE: `Morning. Here's your day, Riku. Busy one today.`
+   - BODY: `Today you've got Standup at 08:00, Client Call at 10:30, Math Methods at 13:00 and 2 more. Coming up: Essay draft today, Invoice Meowchi today, Submit timesheet tomorrow and 1 more. Running late: Return library book (2 days).`
+
+3. **One-problem Thursday (2026-10-15)**
+   - TITLE: `Riku, good morning. One thing needs you.`
+   - BODY: `Meowchi's site isn't answering (error 503). Nothing on today, and nothing due.`
+
+4. **The ShikksTracker-down chain (2026-10-20)**
+   - TITLE: `Morning. Here's your day, Riku. One thing needs you.`
+   - BODY: `ShikksTracker looks down, which is why I couldn't check freelance and why its sender hasn't run. Four approved messages are stuck. Today you've got Math Methods at 09:00.`
+   - Stored symptoms (one story, five symptoms, one line each):
+     - `site-unreachable` — "ShikksTracker's site can't be reached at all."
+     - `job-failed` — "The outreach check broke this morning."
+     - `engine-stale` — "ShikksTracker's sender hasn't run in 5 hours."
+     - `stranded-approved` — "Four approved messages are stuck, unsent."
+     - `pipeline-unavailable` — "I couldn't reach ShikksTracker, so I don't know how freelance is going."
+
+5. **Twelve-problem night (2026-10-17, Saturday)**
+   - TITLE: `Easy morning, Riku. A rough night. Eight things need you.`
+   - BODY: `AzeroTech, Meowchi and ShikksTracker are all down (error 500, timed out, unreachable). Separately, the watchdog has never run. Also, the site check hasn't run in 30 hours. Also, the chaser failed on its last run. …and four more, see the Briefing. Nothing on today.`
+
+**Riku's decisions this session:** the weekend/Monday/Friday openers stay even on problem mornings — fixture 5 above proves it (`Easy morning, Riku. A rough night. Eight things need you.` on a Saturday with twelve problems), confirming problems and the day-of-week opener are independent and R23 (problems always outrank the mood) only governs the *read*, not the opener. The stray `.claude/worktrees` copy (which had been doubling lint's count) and the `spec/assistant-voice` branch were deleted.
+
+**Carried to Plan B:**
+1. On a morning that reaches zero devices, nothing is saved — so the site must not read that as "the 07:00 run didn't happen"; tell the two apart via the dispatcher's own error. Whether to save a briefing even at devices = 0 is Riku's later call.
+2. More than 12 stories: the stored briefing drops the rest with no marker, while the title's count still counts them all. Consider storing an omitted count.
+3. The `agent-degraded` cause for the morning run (`dispatcher`) points Riku at "that run's failed items," but an ok `AgentRun` stores no error text for a run that partly succeeded — there is nowhere today for Riku to actually look.
+
+**Later hardening (not done):** discriminated `Anomaly`/`OutreachFinding` types, to remove the `?? 0`/`?? 1` fallbacks in `problems.ts`'s `fromAnomaly`/`fromFinding` (today a missing `ageHours`/`itemsFailed`/`count` silently becomes a number instead of failing to compile). Passing the calendar's raw read-failure error through to `calendar-unavailable` instead of discarding it (deviation 13) is also left for later.
+
+**What remains for Riku:** push master — 19 commits ahead of `origin/master`, needs his say-so; Vercel deploys on push. The 07:00 observation per A9 Step 4 (left unticked above, it's his): the push arrives in the new voice, the Personal page tile still quotes it, and tapping it opens `/freelance` (`?briefing=open` does nothing until Plan B ships).
