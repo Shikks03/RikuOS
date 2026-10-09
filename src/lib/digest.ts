@@ -164,8 +164,17 @@ function boundBold(bold: StoredBold[], text: string): StoredBold[] {
 }
 
 export function buildBriefing(input: DigestInput): StoredBriefing {
-  const stories = groupProblems(allProblems(input)).slice(0, BRIEFING_BOUNDS.stories);
-  let unrecognised = 0;
+  const allStories = groupProblems(allProblems(input));
+  // Counted over EVERY story and symptom, before either is sliced to the
+  // stored bounds (BRIEFING_BOUNDS.stories / .symptoms) — a morning with more
+  // than 12 stories or more than 8 symptoms in one story must never under-
+  // count unrecognised errors just because the overflow was dropped from
+  // what gets stored (feature review, A-II item 10).
+  const unrecognised = allStories.reduce(
+    (n, story) => n + story.symptoms.filter((p) => explain(p).causeKey === "unrecognised").length,
+    0,
+  );
+  const stories = allStories.slice(0, BRIEFING_BOUNDS.stories);
   const stored = stories.map((story) => {
     const sentence = boundText(story.sentence.text, BRIEFING_BOUNDS.storySentence);
     return {
@@ -173,7 +182,6 @@ export function buildBriefing(input: DigestInput): StoredBriefing {
       bold: boundBold(story.sentence.bold, sentence),
       symptoms: story.symptoms.slice(0, BRIEFING_BOUNDS.symptoms).map((p) => {
         const e = explain(p);
-        if (e.causeKey === "unrecognised") unrecognised++;
         const s = boundText(e.sentence.text, BRIEFING_BOUNDS.symptomSentence);
         const cause = boundText(e.cause.text, BRIEFING_BOUNDS.cause);
         return {

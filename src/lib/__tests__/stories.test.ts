@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { groupProblems } from "@/lib/stories";
 import type { Problem } from "@/lib/problems";
-import { BRIEFING_BOUNDS, PROBLEM_KEYS } from "@/lib/briefingTypes";
+import { PROBLEM_KEYS } from "@/lib/briefingTypes";
 
 const texts = (problems: Problem[]) => groupProblems(problems).map((s) => s.sentence.text);
 
@@ -39,6 +39,55 @@ describe("groupProblems", () => {
     expect(texts([{ key: "pipeline-unavailable", raw: null }])[0]).toMatch(/^I couldn't reach ShikksTracker/);
   });
 
+  it("chains ShikksTracker down with the pipeline even with no sender problem", () => {
+    const stories = groupProblems([
+      { key: "site-unreachable", site: "ShikksTracker" },
+      { key: "pipeline-unavailable", raw: "fetch failed" },
+    ]);
+    expect(stories).toHaveLength(1);
+    expect(stories[0].symptoms.map((p) => p.key)).toEqual(["site-unreachable", "pipeline-unavailable"]);
+  });
+
+  it("includes a failed outreach-health check in the ShikksTracker-down story", () => {
+    const stories = groupProblems([
+      { key: "site-unreachable", site: "ShikksTracker" },
+      { key: "pipeline-unavailable", raw: "fetch failed" },
+      { key: "job-failed", job: "outreach-health", raw: "ST down" },
+    ]);
+    expect(stories).toHaveLength(1);
+    expect(stories[0].symptoms.map((p) => p.key)).toEqual([
+      "site-unreachable",
+      "pipeline-unavailable",
+      "job-failed",
+    ]);
+  });
+
+  it("does not chain a ShikksTracker 401/403/404 with the pipeline — that's not an outage", () => {
+    for (const status of [401, 403, 404]) {
+      const stories = groupProblems([
+        { key: "site-status", site: "ShikksTracker", status },
+        { key: "pipeline-unavailable", raw: "answered " + status },
+      ]);
+      expect(stories).toHaveLength(2);
+    }
+  });
+
+  it("does not chain a different site's outage with the pipeline being unavailable", () => {
+    const stories = groupProblems([
+      { key: "site-unreachable", site: "Meowchi" },
+      { key: "pipeline-unavailable", raw: "fetch failed" },
+    ]);
+    expect(stories).toHaveLength(2);
+  });
+
+  it("still chains a real ShikksTracker outage (site-status >= 500) with the pipeline", () => {
+    const stories = groupProblems([
+      { key: "site-status", site: "ShikksTracker", status: 503 },
+      { key: "pipeline-unavailable", raw: "ShikksTracker answered HTTP 503" },
+    ]);
+    expect(stories).toHaveLength(1);
+  });
+
   it("ties a stalled sender to its stuck messages", () => {
     expect(
       texts([
@@ -46,6 +95,27 @@ describe("groupProblems", () => {
         { key: "stranded-approved", count: 4 },
       ]),
     ).toEqual(["ShikksTracker's sender hasn't run in 2 days, so four approved messages are stuck."]);
+  });
+
+  it("ties a stalled sender to its stuck messages when the sender has never run", () => {
+    expect(
+      texts([
+        { key: "engine-never-ran" },
+        { key: "stranded-approved", count: 4 },
+      ]),
+    ).toEqual(["ShikksTracker's sender has never reported a run, so four approved messages are stuck."]);
+  });
+
+  it("joins an unreadable run report to its stuck messages with 'and', not 'so' (not shown to be the cause)", () => {
+    const stories = groupProblems([
+      { key: "engine-unreadable" },
+      { key: "stranded-approved", count: 4 },
+    ]);
+    expect(stories).toHaveLength(1);
+    expect(stories[0].sentence.text).toBe(
+      "ShikksTracker's sender reported a run time I can't read, and four approved messages are stuck.",
+    );
+    expect(stories[0].symptoms.map((p) => p.key)).toEqual(["engine-unreadable", "stranded-approved"]);
   });
 
   it("names the database as the thread behind failed checks and unread to-dos", () => {
@@ -58,6 +128,25 @@ describe("groupProblems", () => {
     expect(stories[0].sentence.text).toBe(
       "The database didn't answer this morning. That looks like what's behind the failed checks and why I couldn't read your to-dos.",
     );
+  });
+
+  it("names the database as the thread behind a failed check and an unsaved site reading", () => {
+    const stories = groupProblems([
+      { key: "job-failed", job: "watchdog", raw: "MongoNetworkError: closed" },
+      { key: "snapshot-unsaved" },
+    ]);
+    expect(stories).toHaveLength(1);
+    expect(stories[0].sentence.text).toBe(
+      "The database didn't answer this morning. That looks like what's behind the failed check and why the site reading wasn't saved.",
+    );
+  });
+
+  it("never pulls pipeline-unavailable into the database chain — that's ShikksTracker's database, not ours", () => {
+    const stories = groupProblems([
+      { key: "pipeline-unavailable", raw: "MongoNetworkError: closed" },
+      { key: "todos-unavailable" },
+    ]);
+    expect(stories).toHaveLength(2);
   });
 
   it("groups failures that share a recognised cause", () => {
@@ -161,26 +250,44 @@ describe("groupProblems", () => {
     for (const p of input) expect(out.filter((q) => q === p)).toHaveLength(1);
   });
 
-  it("does not self-clip a worst-case chain — bounds are buildBriefing's job (A6)", () => {
-    // Five sites down at once is the realistic worst case for "same kind"
-    // grouping: Rule 3 takes them all into ONE story, so its bold list grows
-    // one range per site. groupProblems does not cap this itself (see the
-    // BOUNDS SEAM note atop stories.ts) — digest.ts's buildBriefing clips the
-    // stored sentence to BRIEFING_BOUNDS.storySentence and keeps only the
-    // first BRIEFING_BOUNDS.bold ranges. This test pins the current,
-    // uncapped shape so a future change to groupProblems can't silently grow
-    // past what buildBriefing expects to truncate.
-    const input: Problem[] = [
-      { key: "site-status", site: "Meowchi", status: 503 },
-      { key: "site-timeout", site: "AzeroTech" },
-      { key: "site-unreachable", site: "ThirdSite" },
-      { key: "site-status", site: "FourthSite", status: 500 },
-      { key: "site-timeout", site: "FifthSite" },
+  it("keeps every story's bold ranges valid — within the sentence, never overlapping", () => {
+    // Bounds (BRIEFING_BOUNDS.bold, .storySentence) are buildBriefing's job
+    // (digest.ts, A6), not groupProblems' — see the BOUNDS SEAM note atop
+    // stories.ts. A fixed cap here, pinned against a count stories.ts can
+    // never realistically produce (this app watches 3 sites, siteHealth.ts's
+    // SITES), would be testing a scenario that cannot happen. What must
+    // always hold, however many symptoms a story carries, is that its bold
+    // ranges are internally consistent.
+    const scenarios: Problem[][] = [
+      [
+        { key: "site-status", site: "Meowchi", status: 503 },
+        { key: "site-timeout", site: "AzeroTech" },
+        { key: "site-unreachable", site: "ShikksTracker" },
+      ],
+      [
+        { key: "agent-failed", agent: "chaser" },
+        { key: "agent-failed", agent: "site-health" },
+        { key: "agent-failed", agent: "watchdog" },
+      ],
+      [
+        { key: "site-unreachable", site: "ShikksTracker" },
+        { key: "pipeline-unavailable", raw: "fetch failed" },
+        { key: "engine-stale", ageMs: 50 * 3600_000 },
+        { key: "stranded-approved", count: 4 },
+      ],
     ];
-    const [story] = groupProblems(input);
-    expect(story.symptoms).toHaveLength(5);
-    expect(story.sentence.bold).toHaveLength(5);
-    expect(story.sentence.bold.length).toBeGreaterThan(BRIEFING_BOUNDS.bold);
-    expect(story.sentence.text.length).toBeLessThanOrEqual(BRIEFING_BOUNDS.storySentence);
+    for (const problems of scenarios) {
+      for (const story of groupProblems(problems)) {
+        const sorted = [...story.sentence.bold].sort((a, z) => a.start - z.start);
+        for (const r of sorted) {
+          expect(r.start).toBeGreaterThanOrEqual(0);
+          expect(r.start).toBeLessThanOrEqual(r.end);
+          expect(r.end).toBeLessThanOrEqual(story.sentence.text.length);
+        }
+        for (let i = 1; i < sorted.length; i++) {
+          expect(sorted[i].start).toBeGreaterThanOrEqual(sorted[i - 1].end);
+        }
+      }
+    }
   });
 });

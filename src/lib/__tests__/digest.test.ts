@@ -12,6 +12,8 @@ import { buildPushPayload } from "@/lib/push";
 import type { CalendarEvent } from "@/lib/google";
 import type { Layer } from "@/lib/osSettings";
 import { opener } from "@/lib/voice";
+import { BRIEFING_BOUNDS } from "@/lib/briefingTypes";
+import type { Problem } from "@/lib/problems";
 
 const DAY = "2026-10-13"; // a Tuesday
 const QUIET: DigestTodayInput = { events: [], missedLayers: [], due: [], overdue: [] };
@@ -257,6 +259,48 @@ describe("buildBriefing", () => {
     expect(briefing.freelance).toBeNull();
     expect(briefing.off).toBeNull();
     expect(briefing.today).toBe("Nothing on today, and nothing due.");
+  });
+
+  it("counts unrecognised symptoms BEFORE slicing stories to 12 (feature review, A-II item 10)", () => {
+    // 13 unrelated problems, none chaining or grouping (each a distinct key,
+    // no two site-* or two of the same agent-* key, no engine+stranded pair,
+    // no site+pipeline pair), so each becomes its own one-problem story: the
+    // 13th (an unrecognised job-failed) is dropped from what's STORED
+    // (BRIEFING_BOUNDS.stories = 12), but must still be counted — a count
+    // taken after slicing would silently read 0.
+    const problems: Problem[] = [
+      { key: "site-status", site: "Meowchi", status: 503 },
+      { key: "agent-never-ran", agent: "chaser" },
+      { key: "agent-stale", agent: "watchdog", ageHours: 40 },
+      { key: "agent-failed", agent: "triage" },
+      { key: "agent-degraded", agent: "dispatcher", itemsFailed: 2 },
+      { key: "snapshot-unsaved" },
+      { key: "unstuck-items", count: 3 },
+      { key: "engine-errors", count: 2 },
+      { key: "calendar-unavailable", cause: "not-configured" },
+      { key: "calendar-partial", calendars: ["Work"] },
+      { key: "todos-unavailable" },
+      { key: "stranded-approved", count: 1 },
+      { key: "job-failed", job: "retro", raw: "a weird unrecognised error" },
+    ];
+    const briefing = buildBriefing({ ...base, problems });
+    expect(briefing.stories).toHaveLength(BRIEFING_BOUNDS.stories);
+    expect(briefing.unrecognised).toBe(1);
+  });
+
+  it("stores at most BRIEFING_BOUNDS.bold ranges per story and per symptom, even when five agents fail together", () => {
+    // Moved from stories.test.ts (feature review, A-II item 8): groupProblems
+    // itself does not cap bold ranges (that's buildBriefing's job), so this
+    // belongs here, against the function that actually enforces the bound.
+    const problems: Problem[] = (["chaser", "lead-sweep", "triage", "site-health", "outreach-health"] as const).map(
+      (agent) => ({ key: "agent-failed" as const, agent }),
+    );
+    const briefing = buildBriefing({ ...base, problems });
+    expect(briefing.stories).toHaveLength(1);
+    expect(briefing.stories[0].bold.length).toBeLessThanOrEqual(BRIEFING_BOUNDS.bold);
+    for (const symptom of briefing.stories[0].symptoms) {
+      expect(symptom.bold.length).toBeLessThanOrEqual(BRIEFING_BOUNDS.bold);
+    }
   });
 });
 

@@ -36,6 +36,52 @@ describe("matchRaw — first match wins, in the spec's order", () => {
     for (const [raw] of cases.slice(0, -1)) expect(matchRaw(raw).cause.text).toMatch(/^Most likely /);
     expect(matchRaw("something nobody planned for").cause.text).toBe("I don't recognise this one. The raw error is below.");
   });
+
+  it("matches the real-world patterns we actually get, case-insensitively", () => {
+    expect(matchRaw("fetch failed").causeKey).toBe("network");
+    expect(matchRaw("FETCH FAILED").causeKey).toBe("network");
+    expect(
+      matchRaw(
+        "Could not connect to any servers in your MongoDB Atlas cluster. One or more of the following issues might be the cause",
+      ).causeKey,
+    ).toBe("database");
+    expect(
+      matchRaw("could not connect to any servers in your mongodb atlas cluster").causeKey,
+    ).toBe("database");
+  });
+
+  it("resolves adjacent rules to the earlier one when a raw error matches both (§4.3 order)", () => {
+    const pairs: Array<[string, string]> = [
+      ["connect ETIMEDOUT then ECONNREFUSED", "timeout"], // timeout before network
+      ["ECONNREFUSED then MongoNetworkError", "network"], // network before database
+      ["MongoNetworkError: the token has expired", "database"], // database before auth
+      ["status 401 then 403 Forbidden", "auth"], // auth before forbidden
+      ["403 Forbidden then 429 too many requests", "forbidden"], // forbidden before rate-limit
+      ["429 rate limited then 503 upstream error", "rate-limit"], // rate-limit before upstream
+    ];
+    for (const [raw, key] of pairs) expect(matchRaw(raw).causeKey).toBe(key);
+  });
+
+  // The raw stApi.ts (fetchSummary/fetchAttention/fetchVariantStats) template:
+  // every status's legend is present in EVERY failure's text, so the old
+  // \b401\b auth rule matched every status including a plain 404 (feature
+  // review, A-II: CRITICAL). The actual status, named by "returned NNN", must
+  // decide the cause on its own, without scanning the legend text.
+  const stApiError = (status: number) =>
+    `GET /api/os/summary returned ${status}. ` +
+    "503 = OS_API_SECRET unset or under 32 chars on ShikksTracker; " +
+    "401 = secret mismatch; 404 = the deployment predates the P1 merge.";
+
+  it("classifies ShikksTracker's own error text by its actual status, not the legend it repeats", () => {
+    expect(matchRaw(stApiError(401)).causeKey).toBe("auth");
+    expect(matchRaw(stApiError(403)).causeKey).toBe("forbidden");
+    expect(matchRaw(stApiError(404)).causeKey).toBe("unrecognised");
+    expect(matchRaw(stApiError(429)).causeKey).toBe("rate-limit");
+    expect(matchRaw(stApiError(500)).causeKey).toBe("upstream");
+    expect(matchRaw(stApiError(502)).causeKey).toBe("upstream");
+    expect(matchRaw(stApiError(503)).causeKey).toBe("upstream");
+    expect(matchRaw(stApiError(504)).causeKey).toBe("upstream");
+  });
 });
 
 describe("explain — every catalogue row", () => {
@@ -100,6 +146,26 @@ describe("explain — every catalogue row", () => {
   });
 });
 
+describe("the no-raw honest line only claims a run record where one exists", () => {
+  it("keeps the two-sentence form for agent/job failures, which really do have a run record", () => {
+    expect(explain({ key: "agent-failed", agent: "chaser" }).cause.text).toBe(
+      "I can see it failed, but not why. Its run record holds the error.",
+    );
+    expect(explain({ key: "job-failed", job: "watchdog", raw: null }).cause.text).toBe(
+      "I can see it failed, but not why. Its run record holds the error.",
+    );
+  });
+
+  it("drops the run-record claim for a failed calendar read and a null-raw pipeline failure", () => {
+    expect(explain({ key: "calendar-unavailable", cause: "read-failed" }).cause.text).toBe(
+      "I can see it failed, but not why.",
+    );
+    expect(explain({ key: "pipeline-unavailable", raw: null }).cause.text).toBe(
+      "I can see it failed, but not why.",
+    );
+  });
+});
+
 describe("a raw error never leaks into sentence, next step or cause text", () => {
   // A marker distinctive enough that it could never appear in hand-written
   // catalogue prose. If it shows up in sentence/nextStep/cause, raw has
@@ -130,12 +196,33 @@ describe("a raw error never leaks into sentence, next step or cause text", () =>
   });
 });
 
+describe("calendar-partial falls back to a plain count instead of being clipped", () => {
+  it("builds the full sentence when it fits", () => {
+    const e = explain({ key: "calendar-partial", calendars: ["Classes"] });
+    expect(e.sentence.text).toBe("I couldn't read your Classes calendar, so today might be missing something.");
+  });
+
+  it("falls back to a count when several long calendar names would overrun the bound", () => {
+    const long1 = "C".repeat(120);
+    const long2 = "D".repeat(120);
+    const e = explain({ key: "calendar-partial", calendars: [long1, long2] });
+    expect(e.sentence.text).toBe("I couldn't read two of your calendars, so today might be missing something.");
+    expect(e.sentence.text.length).toBeLessThanOrEqual(BRIEFING_BOUNDS.symptomSentence);
+    expect(e.sentence.text.slice(e.sentence.bold[0].start, e.sentence.bold[0].end)).toBe(
+      "I couldn't read two of your calendars",
+    );
+  });
+});
+
 describe("every catalogue row stays within BRIEFING_BOUNDS, for worst-case realistic input", () => {
   // Real-world worst cases this app actually allows: a site name as long as
   // HealthSnapshot's schema permits (60, src/models/HealthSnapshot.ts), a
   // calendar name as long as OsSettings' layer name permits (120,
   // LAYER_NAME_MAX in src/models/OsSettings.ts), and counts that read as
-  // plain digits once past voice.ts's numberWord() word-list (>10).
+  // plain digits once past voice.ts's numberWord() word-list (>10). This now
+  // genuinely exercises the catalogue (no clipping left in causes.ts): the
+  // only row that can run long, calendar-partial, falls back to a plain
+  // count instead of being cut.
   const LONG_SITE = "A".repeat(60);
   const LONG_AGENT = "outreach-health" as const; // longest AGENT_NAMES value
   const LONG_CAL_1 = "C".repeat(120);

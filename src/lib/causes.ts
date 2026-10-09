@@ -11,14 +11,18 @@
  * goes behind it and nothing else changes.
  *
  * A raw error travels only in Explained.raw — never interpolated into
- * sentence, nextStep or cause text (feature review, A-II). Every row() below
- * also clips its sentence/cause to BRIEFING_BOUNDS before returning: most
- * rows are fixed prose and never come close, but site/calendar names are
- * caller-supplied and, at their schema's own maxlength (60 for a site name,
- * HealthSnapshot.ts; 120 for a calendar layer name, OsSettings.ts), a
- * calendar-partial sentence can run past BRIEFING_BOUNDS.symptomSentence.
- * Clipping here means the catalogue can never hand `StoredSymptom` a string
- * its schema's maxlength will reject.
+ * sentence, nextStep or cause text (feature review, A-II).
+ *
+ * BOUNDS: next steps and causes are fixed prose, nowhere near
+ * BRIEFING_BOUNDS. Site names come from the hard-coded SITES list
+ * (siteHealth.ts), not caller-supplied text, so a site-* sentence can't run
+ * long either. `calendar-partial` is the one row that can overflow: a
+ * calendar layer's name is as long as OsSettings' LAYER_NAME_MAX (120)
+ * allows, and several of them joined can exceed BRIEFING_BOUNDS.symptomSentence
+ * (200). That row alone measures its own full sentence and, only when it
+ * would overrun, falls back to a short, honest count ("I couldn't read two
+ * of your calendars…") rather than being clipped mid-name, which would risk
+ * a stale bold range pointing past truncated text (feature review, A-II).
  */
 
 import { BRIEFING_BOUNDS, type CauseKey } from "@/lib/briefingTypes";
@@ -39,7 +43,18 @@ interface RawRule {
   cause: Said;
 }
 
-/** Spec §4.3, in order. First match wins; numbers match as whole tokens only. */
+const AUTH_CAUSE: Said = say("Most likely ", b("a key or token stopped working"), ". It needs renewing.");
+const FORBIDDEN_CAUSE: Said = say("Most likely ", b("access was refused"), ": a permission changed.");
+const RATE_LIMIT_CAUSE: Said = say("Most likely ", b("too many requests"), ". A rate limit that waits itself out.");
+const UPSTREAM_CAUSE: Said = say("Most likely ", b("the other service had an error on its end"), ".");
+
+/**
+ * Spec §4.3, in order. First match wins; numbers match as whole tokens only.
+ * Network and database patterns are case-insensitive, per the table's own
+ * header (feature review, A-II): Node's fetch failures read as plain lower-
+ * case `fetch failed`, and Atlas outages aren't always cased the same way
+ * twice.
+ */
 const RAW_RULES: readonly RawRule[] = [
   {
     test: /ETIMEDOUT|timed out|timeout|aborted/i,
@@ -47,51 +62,81 @@ const RAW_RULES: readonly RawRule[] = [
     cause: say("Most likely ", b("it took too long"), ": the service or network was slow. Usually clears by itself."),
   },
   {
-    test: /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET/,
+    test: /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|fetch failed/i,
     causeKey: "network",
     cause: say("Most likely ", b("I couldn't find or connect to the server"), ": network or DNS trouble, or the service is down."),
   },
   {
-    test: /MongoServerSelectionError|MongoNetworkError|MongooseServerSelectionError/,
+    test: /MongoServerSelectionError|MongoNetworkError|MongooseServerSelectionError|could not connect to any servers/i,
     causeKey: "database",
     cause: say("Most likely ", b("the database didn't answer"), ": an Atlas blip or the connection limit."),
   },
   {
     test: /invalid_grant|\b401\b|expired/i,
     causeKey: "auth",
-    cause: say("Most likely ", b("a key or token stopped working"), ". It needs renewing."),
+    cause: AUTH_CAUSE,
   },
   {
     test: /\b403\b/,
     causeKey: "forbidden",
-    cause: say("Most likely ", b("access was refused"), ": a permission changed."),
+    cause: FORBIDDEN_CAUSE,
   },
   {
     test: /\b429\b/,
     causeKey: "rate-limit",
-    cause: say("Most likely ", b("too many requests"), ". A rate limit that waits itself out."),
+    cause: RATE_LIMIT_CAUSE,
   },
   {
     test: /\b5\d\d\b/,
     causeKey: "upstream",
-    cause: say("Most likely ", b("the other service had an error on its end"), "."),
+    cause: UPSTREAM_CAUSE,
   },
 ];
 
 const UNRECOGNISED: Said = say(b("I don't recognise this one."), " The raw error is below.");
+/** Used where a run record really exists (agent/job failures): two sentences. */
 const NO_RAW: Said = say(b("I can see it failed, but not why."), " Its run record holds the error.");
+/** Used where no run record holds this failure at all (feature review, A-II). */
+const NO_RAW_SHORT: Said = say(b("I can see it failed, but not why."));
+
+/**
+ * ShikksTracker's own GET helpers (stApi.ts) throw `GET … returned ${status}.`
+ * followed by a fixed legend explaining every status code's meaning
+ * ("503 = …; 401 = secret mismatch; 404 = …") — that legend text is present
+ * in EVERY failure regardless of the real status, so the generic `\b401\b`
+ * auth rule below used to match every one of them, including plain 404s and
+ * other 5xx errors (feature review, A-II: CRITICAL). When the raw error
+ * names its own status this plainly, that status is classified directly and
+ * the rest of the raw text is never scanned.
+ */
+function statusCause(status: number): { causeKey: CauseKey; cause: Said } {
+  if (status === 401) return { causeKey: "auth", cause: AUTH_CAUSE };
+  if (status === 403) return { causeKey: "forbidden", cause: FORBIDDEN_CAUSE };
+  if (status === 429) return { causeKey: "rate-limit", cause: RATE_LIMIT_CAUSE };
+  if (status >= 500 && status <= 599) return { causeKey: "upstream", cause: UPSTREAM_CAUSE };
+  return { causeKey: "unrecognised", cause: UNRECOGNISED };
+}
 
 /** A raw error's cause, by the rules above. */
 export function matchRaw(raw: string): { causeKey: CauseKey; cause: Said } {
+  const returned = raw.match(/\breturned (\d{3})\b/);
+  if (returned) return statusCause(Number(returned[1]));
   for (const rule of RAW_RULES) {
     if (rule.test.test(raw)) return { causeKey: rule.causeKey, cause: rule.cause };
   }
   return { causeKey: "unrecognised", cause: UNRECOGNISED };
 }
 
-/** THE SEAM. Today: the rules, or the honest no-raw line. */
-export function explainCause(raw: string | null): { causeKey: CauseKey; cause: Said } {
-  if (raw === null) return { causeKey: "none", cause: NO_RAW };
+/**
+ * THE SEAM. Today: the rules, or the honest no-raw line. `hasRunRecord` is
+ * false only where nothing ever holds the error for a later look — a
+ * `calendar-unavailable` read failure and a null-raw `pipeline-unavailable`
+ * both have no run record anywhere, so the second sentence ("Its run record
+ * holds the error") would be a claim the data can't back (feature review,
+ * A-II). Agent/job failures really do have a run record, so they keep it.
+ */
+export function explainCause(raw: string | null, hasRunRecord: boolean = true): { causeKey: CauseKey; cause: Said } {
+  if (raw === null) return { causeKey: "none", cause: hasRunRecord ? NO_RAW : NO_RAW_SHORT };
   return matchRaw(raw);
 }
 
@@ -108,21 +153,18 @@ function calendarList(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-/** Clips a Said to `max` characters, clamping any bold range that overruns it. */
-function clipSaid(s: Said, max: number): Said {
-  if (s.text.length <= max) return s;
-  const text = s.text.slice(0, max);
-  const bold = s.bold.filter((r) => r.start < max).map((r) => ({ start: r.start, end: Math.min(r.end, max) }));
-  return { text, bold };
-}
-
-/** One problem, fully explained. Every string is push-form. */
+/**
+ * One problem, fully explained. Every string is push-form. Rows build the
+ * full sentence and never clip it (feature review, A-II) — every row here is
+ * fixed prose or a bounded name except `calendar-partial`, which measures its
+ * own sentence and falls back to a shorter one rather than being cut.
+ */
 export function explain(p: Problem): Explained {
   const row = (sentence: Said, nextStep: string, c: { causeKey: CauseKey; cause: Said }, raw: string | null = null): Explained => ({
-    sentence: clipSaid(sentence, BRIEFING_BOUNDS.symptomSentence),
-    nextStep: nextStep.length > BRIEFING_BOUNDS.nextStep ? nextStep.slice(0, BRIEFING_BOUNDS.nextStep) : nextStep,
+    sentence,
+    nextStep,
     causeKey: c.causeKey,
-    cause: clipSaid(c.cause, BRIEFING_BOUNDS.cause),
+    cause: c.cause,
     raw,
   });
 
@@ -238,7 +280,10 @@ export function explain(p: Problem): Explained {
       return row(
         say(b("I couldn't reach ShikksTracker"), ", so I don't know how freelance is going."),
         "Open ShikksTracker and check it's up.",
-        explainCause(p.raw),
+        // No run record holds ShikksTracker's own API failure, so a null raw
+        // gets the short honest line, not a claim about a run record
+        // (feature review, A-II).
+        explainCause(p.raw, false),
         p.raw,
       );
     case "calendar-unavailable": {
@@ -250,16 +295,35 @@ export function explain(p: Problem): Explained {
       return row(
         say(b("I couldn't read your calendar"), "."),
         "Settings → Google Calendar.",
-        p.cause === "read-failed" ? explainCause(null) : { causeKey: "known", cause: known[p.cause] },
+        // Nothing holds a run record for a calendar read, so the honest line
+        // stays one sentence (feature review, A-II).
+        p.cause === "read-failed" ? explainCause(null, false) : { causeKey: "known", cause: known[p.cause] },
       );
     }
     case "calendar-partial": {
       const many = p.calendars.length > 1;
-      return row(
-        say(b(`I couldn't read your ${calendarList(p.calendars)} ${many ? "calendars" : "calendar"}`), ", so today might be missing something."),
-        many ? "Check those calendars still exist in Google." : "Check that calendar still exists in Google.",
-        fixed(say("Most likely ", b(many ? "those calendars refused or were removed" : "that one calendar refused or was removed"), ", while the others answered.")),
+      const nextStep = many ? "Check those calendars still exist in Google." : "Check that calendar still exists in Google.";
+      const cause = fixed(
+        say(
+          "Most likely ",
+          b(many ? "those calendars refused or were removed" : "that one calendar refused or was removed"),
+          ", while the others answered.",
+        ),
       );
+      const full = say(
+        b(`I couldn't read your ${calendarList(p.calendars)} ${many ? "calendars" : "calendar"}`),
+        ", so today might be missing something.",
+      );
+      // Calendar layer names are caller-supplied (up to 120 chars,
+      // OsSettings' LAYER_NAME_MAX) and several joined can run past the
+      // bound. Rather than clip mid-name, fall back to a plain count
+      // (feature review, A-II).
+      if (full.text.length <= BRIEFING_BOUNDS.symptomSentence) return row(full, nextStep, cause);
+      const fallback = say(
+        b(`I couldn't read ${numberWord(p.calendars.length)} of your calendars`),
+        ", so today might be missing something.",
+      );
+      return row(fallback, nextStep, cause);
     }
     case "todos-unavailable":
       return row(

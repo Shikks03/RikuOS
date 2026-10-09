@@ -14,13 +14,17 @@
  *
  * BOUNDS SEAM: a story's sentence can, in principle, run past
  * BRIEFING_BOUNDS.storySentence (240) or carry more bold ranges than
- * BRIEFING_BOUNDS.bold (4) — see stories.test.ts's "several down sites"
- * worst-case test, which pins the current (uncapped) output of a 5-site
- * group. groupProblems does NOT clip here: digest.ts's buildBriefing (A6)
- * is the one place that owns BRIEFING_BOUNDS for the stored Briefing
+ * BRIEFING_BOUNDS.bold (4) — a same-kind group grows one bold range per
+ * member, and there is no fixed ceiling on how many problems can share a
+ * kind. groupProblems does NOT clip here: digest.ts's buildBriefing (A6) is
+ * the one place that owns BRIEFING_BOUNDS for the stored Briefing
  * (boundText/boundBold truncate text and drop later bold ranges), and the
  * push body is separately budgeted by composeDigest. Clipping twice would
- * risk disagreeing about where a sentence breaks.
+ * risk disagreeing about where a sentence breaks. (The realistic worst case
+ * — this app watches 3 sites, siteHealth.ts's SITES — is covered by
+ * digest.test.ts's five-agents test, which exercises buildBriefing's own
+ * cap; stories.test.ts checks only that every bold range groupProblems
+ * produces is itself valid.)
  */
 
 import { explain, explainCause } from "@/lib/causes";
@@ -70,6 +74,13 @@ function causeOf(p: Problem): CauseKey | null {
   return null;
 }
 
+/** A real outage, not merely an unfriendly status (401/403/404 aren't down). */
+function isRealOutage(p: Problem): boolean {
+  if (p.key === "site-unreachable" || p.key === "site-timeout") return true;
+  if (p.key === "site-status") return p.status >= 500;
+  return false;
+}
+
 export function groupProblems(problems: Problem[]): Story[] {
   const left = [...problems];
   const stories: Story[] = [];
@@ -79,8 +90,10 @@ export function groupProblems(problems: Problem[]): Story[] {
     return hit;
   };
 
-  // --- Chain 1: ShikksTracker looks down (needs BOTH its site and the pipeline).
-  const stSite = left.find((p) => SITE_KEYS.has(p.key) && siteName(p) === "ShikksTracker");
+  // --- Chain 1: ShikksTracker looks down (needs BOTH its site and the pipeline,
+  // and the site problem must be a real outage — 401/403/404 are not a site
+  // being down, so they must not chain).
+  const stSite = left.find((p) => isRealOutage(p) && siteName(p) === "ShikksTracker");
   const pipeline = left.find((p) => p.key === "pipeline-unavailable");
   if (stSite && pipeline) {
     const symptoms = take(
@@ -89,7 +102,8 @@ export function groupProblems(problems: Problem[]): Story[] {
         p === pipeline ||
         p.key === "engine-stale" ||
         p.key === "engine-never-ran" ||
-        p.key === "stranded-approved",
+        p.key === "stranded-approved" ||
+        (p.key === "job-failed" && p.job === "outreach-health"),
     );
     const sender = symptoms.some((p) => p.key === "engine-stale" || p.key === "engine-never-ran");
     const stranded = symptoms.find((p) => p.key === "stranded-approved");
@@ -103,21 +117,31 @@ export function groupProblems(problems: Problem[]): Story[] {
     stories.push({ sentence: say(...segs), symptoms });
   }
 
-  // --- Chain 2: a stalled sender and the messages it stranded.
-  const engine = left.find((p) => p.key === "engine-stale" || p.key === "engine-never-ran");
+  // --- Chain 2: a stalled sender and the messages it stranded. A malformed
+  // run-time report (engine-unreadable) joins too, but it isn't SHOWN to be
+  // the cause of the stranded messages, so it joins with "and", not "so".
+  const engine = left.find((p) => p.key === "engine-stale" || p.key === "engine-never-ran" || p.key === "engine-unreadable");
   const stranded = left.find((p) => p.key === "stranded-approved");
   if (engine && stranded && stranded.key === "stranded-approved") {
     take((p) => p === engine || p === stranded);
     const head = explain(engine).sentence.text.replace(/\.$/, "");
     const one = stranded.count === 1;
+    const joiner = engine.key === "engine-unreadable" ? "and" : "so";
     stories.push({
-      sentence: say(b("ShikksTracker's sender"), head.slice("ShikksTracker's sender".length), `, so ${numberWord(stranded.count)} approved ${one ? "message is" : "messages are"} stuck.`),
+      sentence: say(
+        b("ShikksTracker's sender"),
+        head.slice("ShikksTracker's sender".length),
+        `, ${joiner} ${numberWord(stranded.count)} approved ${one ? "message is" : "messages are"} stuck.`,
+      ),
       symptoms: [engine, stranded],
     });
   }
 
-  // --- Chain 3: the database behind failed checks / unread to-dos / unsaved reading.
-  const dbFails: Problem[] = left.filter((p) => causeOf(p) === "database");
+  // --- Chain 3: the database behind failed checks / unread to-dos / unsaved
+  // reading. Only job-failed problems count as "database failed" here —
+  // pipeline-unavailable is ShikksTracker's OWN database, a different thing,
+  // and must never be pulled into this chain even when its causeKey matches.
+  const dbFails: Problem[] = left.filter((p) => p.key === "job-failed" && causeOf(p) === "database");
   const dbSide: Problem[] = left.filter((p) => p.key === "todos-unavailable" || p.key === "snapshot-unsaved");
   if (dbFails.length >= 1 && dbFails.length + dbSide.length >= 2) {
     const symptoms = take((p) => dbFails.includes(p) || dbSide.includes(p));

@@ -91,6 +91,40 @@ describe("buildProblems", () => {
     ]);
   });
 
+  it("R58: a failed site-health job never also reports snapshot-unsaved", () => {
+    // Regression guard restored from the old buildProblems.test.ts (port to
+    // problems.test.ts, feature review A-II item 9a). A job that failed
+    // outright has no reading to have saved or not — reporting both would
+    // double-count one failure as two problems.
+    const problems = buildProblems({
+      ...healthy,
+      siteHealth: { ok: false, error: "fetch failed", sites: [], snapshotStored: false },
+    });
+    expect(problems).toEqual([{ key: "job-failed", job: "site-health", raw: "fetch failed" }]);
+  });
+
+  it("keeps a different agent's anomaly when the expiry sweep failed (e.g. the chaser)", () => {
+    // Regression guard restored from the old buildProblems.test.ts (port to
+    // problems.test.ts, feature review A-II item 9b). The de-duplication
+    // only drops the expiry-sweep's OWN "failed" anomaly when the sweep
+    // really failed this run; every other agent's anomaly must survive.
+    const problems = buildProblems({
+      ...healthy,
+      expiry: { ok: false, error: "mongo down", unstuck: 0 },
+      watchdog: {
+        ok: true,
+        anomalies: [
+          { agent: "expiry-sweep", kind: "failed", detail: "expiry-sweep failed" },
+          { agent: "chaser", kind: "failed", detail: "chaser failed" },
+        ],
+      },
+    });
+    expect(problems).toEqual([
+      { key: "job-failed", job: "expiry-sweep", raw: "mongo down" },
+      { key: "agent-failed", agent: "chaser" },
+    ]);
+  });
+
   it("counts interrupted approved items", () => {
     expect(buildProblems({ ...healthy, expiry: { ok: true, unstuck: 2 } })).toEqual([{ key: "unstuck-items", count: 2 }]);
   });
