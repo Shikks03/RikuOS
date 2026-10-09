@@ -14,9 +14,6 @@
  * cut off, and before the freelance line.
  */
 
-import type { Anomaly } from "@/lib/watchdog";
-import type { SiteResult } from "@/lib/siteHealth";
-import type { OutreachFinding } from "@/lib/outreachHealth";
 import type { CalendarWindow } from "@/lib/google";
 import type { Layer } from "@/lib/osSettings";
 import { APP_TZ, PUSH_BODY_MAX } from "@/lib/constants";
@@ -427,88 +424,3 @@ export function todosForDigest(
   };
 }
 
-/**
- * The job outcomes a morning run produces, as `runJob` reports them. Typed
- * against the real Anomaly/SiteResult so the "expiry-sweep" comparison below
- * is checked by the compiler — a renamed agent would otherwise disable the
- * de-duplication silently. `import type` keeps this module free of runtime
- * imports, so it stays pure.
- */
-export interface MorningOutcomes {
-  expiry: { ok: boolean; error?: string; unstuck: number };
-  watchdog: { ok: boolean; error?: string; anomalies: Anomaly[] };
-  /**
-   * `snapshotStored` is false when the job ran but its reading could not be
-   * stored — the write is caught and counted inside the job, never allowed to
-   * fail it.
-   */
-  siteHealth: { ok: boolean; error?: string; sites: SiteResult[]; snapshotStored: boolean };
-  outreachHealth: { ok: boolean; error?: string; findings: OutreachFinding[] };
-}
-
-/**
- * Pure. Turns one morning's job outcomes into the lines the digest reports.
- *
- * This lives here rather than in the route because it is the only branching
- * logic in the phase that decides what Riku is actually TOLD — inverting one
- * condition would report every healthy site as down, and a route is not
- * testable (CLAUDE.md: handlers stay thin, the logic layer holds behaviour).
- *
- * A job that failed in THIS run — or that ran but could not store its write —
- * is reported from its in-memory outcome, not from the watchdog: the watchdog
- * reads run records, so it would otherwise only notice tomorrow. That is why
- * site-health carries snapshotStored beside ok: the job itself did not fail,
- * so the watchdog only ever sees the failed write tomorrow, in the run record,
- * as a red `1 item failed` — and only this file can name it on the morning it
- * happened (R58).
- *
- * The expiry sweep is the one job that both runs before the watchdog and
- * writes its record first, so the watchdog re-reads the row that was just
- * written — hence the filter, without which a single failed sweep is counted
- * as two problems and the title's count is wrong.
- *
- * That filter is deliberately as narrow as the duplicate it removes: only a
- * `failed` anomaly, and only when the sweep really did fail here. A `stale` or
- * `degraded` expiry-sweep anomaly still gets through, so a broader skip cannot
- * quietly punch a hole in the monitor.
- */
-export function buildProblems(outcomes: MorningOutcomes): string[] {
-  const { expiry, watchdog, siteHealth, outreachHealth } = outcomes;
-  const problems: string[] = [];
-
-  if (!expiry.ok) problems.push(`expiry sweep failed: ${expiry.error ?? "unknown"}`);
-  if (!watchdog.ok) problems.push(`watchdog failed: ${watchdog.error ?? "unknown"}`);
-  if (!siteHealth.ok) problems.push(`site health failed: ${siteHealth.error ?? "unknown"}`);
-  // Named on its own morning: the watchdog reads yesterday's record and would
-  // only notice tomorrow, and itemsFailed on the run is the rail's generic
-  // vocabulary (R58).
-  if (siteHealth.ok && !siteHealth.snapshotStored) {
-    problems.push("site reading could not be stored");
-  }
-  // Distinct wording from composeDigest's "pipeline check unavailable", which
-  // means the /attention call failed. Both can be true at once — one API, two
-  // endpoints — and two identical lines would read as one duplicated bug.
-  if (!outreachHealth.ok) {
-    problems.push(`outreach check failed: ${outreachHealth.error ?? "unknown"}`);
-  }
-
-  if (expiry.unstuck > 0) {
-    problems.push(
-      `${expiry.unstuck} approved item${expiry.unstuck === 1 ? "" : "s"} could not confirm their result`
-    );
-  }
-
-  for (const anomaly of watchdog.anomalies) {
-    const alreadyReported = !expiry.ok && anomaly.agent === "expiry-sweep" && anomaly.kind === "failed";
-    if (alreadyReported) continue;
-    problems.push(anomaly.detail);
-  }
-  for (const site of siteHealth.sites) {
-    if (!site.up) problems.push(site.detail);
-  }
-  for (const finding of outreachHealth.findings) {
-    problems.push(finding.detail);
-  }
-
-  return problems;
-}

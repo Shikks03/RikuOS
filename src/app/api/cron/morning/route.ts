@@ -8,7 +8,8 @@ import { EXPECTATIONS, evaluateWatchdog, fetchLatestRuns } from "@/lib/watchdog"
 import { checkSites } from "@/lib/siteHealth";
 import { saveHealthSnapshot } from "@/lib/healthSnapshot";
 import { evaluateOutreach } from "@/lib/outreachHealth";
-import { buildProblems, composeDigest } from "@/lib/digest";
+import { composeDigest } from "@/lib/digest";
+import { buildProblems } from "@/lib/problems";
 import { ATTENTION_LIMIT, fetchAttention, fetchSummary } from "@/lib/stApi";
 import { buildPushPayload, sendPushToAll } from "@/lib/push";
 import { readDigestToday } from "@/lib/digestToday";
@@ -176,7 +177,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
               overdue: attention.overdueActions?.length ?? 0,
             }
           : null,
-        problems,
+        problems: problems.map((p) => p.key), // TEMPORARY until A8 — A6 changes composeDigest's input
         offAgents: settings.chaserEnabled ? [] : ["chaser"],
         today,
       });
