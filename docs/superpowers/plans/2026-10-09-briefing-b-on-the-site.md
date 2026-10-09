@@ -14,7 +14,14 @@
 
 ## How this is built
 
-The P10 method, as in Plan A: one named-role builder per task, a spec + quality reviewer per commit, fix rounds back to the same builder, a principal cross-module review, then the Verification Lead (headless Chromium, every mutation intercepted), then the post-build record. **No agent writes to Riku's database or calendar or sends a push.** Ports 3021–3023, one `next start` at a time, never worktrees with a `node_modules` junction.
+The P10 method, as in Plan A: one named-role builder per task, a principal cross-module review, then the Verification Lead (headless Chromium, every mutation intercepted), then the post-build record. **Review once per feature, not per commit** (Riku, 2026-10-09). Builders commit per task and run their own tests and type check. One spec + quality reviewer reads each feature's commits together once its last task lands, and fix rounds go back to the owning builder(s):
+
+| Feature | Tasks | Reviewed after |
+|---|---|---|
+| B-I · The Briefing's logic and doors | B1, B2, B3 | B3 |
+| B-II · The Briefing in the shell | B4 | B4 |
+| B-III · The push tile retired | B5 | B5 |
+| B-IV · The calendar messages | B6 | B6 (may run beside B-I) | **No agent writes to Riku's database or calendar or sends a push.** Ports 3021–3023, one `next start` at a time, never worktrees with a `node_modules` junction.
 
 | Task | Role | Files (exclusive while running) | Parallel with |
 |---|---|---|---|

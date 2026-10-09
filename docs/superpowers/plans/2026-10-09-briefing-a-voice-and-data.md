@@ -14,7 +14,15 @@
 
 ## How this is built (the P10 method — Riku's call, 2026-10-09)
 
-The lead session decides and orchestrates; it does not write code. One **builder subagent per task** with the named role below, then a **spec + quality reviewer per commit**, fix rounds back to the same builder. Disjoint-file tasks may run in parallel **only** where the table says so, and parallel builders never run `next build` (one owner of `.next` at a time). After the last task: a **principal cross-module review** (it caught real seam bugs in P10b and P10c — budget for it), then the **Verification Lead**, then the post-build record at the foot of this file.
+The lead session decides and orchestrates; it does not write code. One **builder subagent per task** with the named role below. Disjoint-file tasks may run in parallel **only** where the table says so, and parallel builders never run `next build` (one owner of `.next` at a time). After the last task: a **principal cross-module review** (it caught real seam bugs in P10b and P10c — budget for it), then the **Verification Lead**, then the post-build record at the foot of this file.
+
+**Review once per feature, not per commit (Riku, 2026-10-09: saves tokens and avoids repetitive reviews).** Builders still commit per task, and each builder still runs its own tests and `npx tsc --noEmit` before committing. One **spec + quality reviewer** reads a whole feature's commits together once its last task lands; fix rounds go back to the owning builder(s). The features:
+
+| Feature | Tasks | Reviewed after |
+|---|---|---|
+| A-I · The decision and the voice | A0, A1 | A1 |
+| A-II · The problem catalogue | A2, A3, A4, A5 | A5 |
+| A-III · The push and its saved Briefing | A6, A7, A8 | A8 (then the principal review, A9) |
 
 | Task | Role | Files (exclusive while running) | Parallel with |
 |---|---|---|---|
