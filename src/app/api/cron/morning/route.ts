@@ -8,8 +8,8 @@ import { EXPECTATIONS, evaluateWatchdog, fetchLatestRuns } from "@/lib/watchdog"
 import { checkSites } from "@/lib/siteHealth";
 import { saveHealthSnapshot } from "@/lib/healthSnapshot";
 import { evaluateOutreach } from "@/lib/outreachHealth";
-import { composeDigest } from "@/lib/digest";
-import { buildProblems } from "@/lib/problems";
+import { buildBriefing, composeDigest, type DigestInput } from "@/lib/digest";
+import { boundRaw, buildProblems } from "@/lib/problems";
 import { ATTENTION_LIMIT, fetchAttention, fetchSummary } from "@/lib/stApi";
 import { buildPushPayload, sendPushToAll } from "@/lib/push";
 import { readDigestToday } from "@/lib/digestToday";
@@ -17,6 +17,7 @@ import { saveLastDigest } from "@/lib/lastDigest";
 import { todayKey } from "@/lib/days";
 import ApprovalItem from "@/models/ApprovalItem";
 import type { Agent } from "@/models/AgentRun";
+import type { StoredBriefing } from "@/lib/briefingTypes";
 
 /**
  * GET /api/cron/morning
@@ -146,13 +147,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // Promise.all cannot throw here. The layers are the ones this route
       // already read above; no second settings read, and no write (never
       // getOsSettings for this).
-      const [attention, today] = await Promise.all([
-        fetchAttention(settings.chaserNDays, ATTENTION_LIMIT).catch((attentionErr: unknown) => {
-          console.error("[cron/morning] attention check failed:", attentionErr);
-          return null;
-        }),
+      const [attentionRead, today] = await Promise.all([
+        fetchAttention(settings.chaserNDays, ATTENTION_LIMIT).then(
+          (value) => ({ value, error: null as string | null }),
+          (attentionErr: unknown) => {
+            console.error("[cron/morning] attention check failed:", attentionErr);
+            const message = attentionErr instanceof Error ? attentionErr.message : String(attentionErr);
+            const cause = attentionErr instanceof Error ? attentionErr.cause : undefined;
+            const code =
+              cause !== null && typeof cause === "object" && typeof (cause as { code?: unknown }).code === "string"
+                ? (cause as { code: string }).code
+                : null;
+            return { value: null, error: boundRaw(code ? `${message} (${code})` : message) };
+          },
+        ),
         readDigestToday(settings.layers, todayKey(new Date())),
       ]);
+      const attention = attentionRead.value;
 
       const problems = buildProblems({
         expiry: { ok: expiry.ok, error: expiry.error, unstuck: expiry.data?.unstuck ?? 0 },
@@ -170,7 +181,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         },
       });
 
-      const digest = composeDigest({
+      const digestInput: DigestInput = {
         day: todayKey(new Date()),
         pending,
         attention: attention
@@ -179,11 +190,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
               overdue: attention.overdueActions?.length ?? 0,
             }
           : null,
-        attentionError: null, // TEMPORARY until A8 wires the real attention-fetch failure through
+        attentionError: attention ? null : attentionRead.error,
         problems,
         offAgents: settings.chaserEnabled ? [] : (["chaser"] as Agent[]),
         today,
-      });
+      };
+      const digest = composeDigest(digestInput);
 
       // A digest nobody received is a total failure of this run's purpose, not
       // a partial one — so it fails the run rather than being counted (design
@@ -192,7 +204,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // without this an invalidated iPhone subscription would file a healthy
       // run every morning while reaching nobody, and the absent push — the
       // outer safety net this whole phase rests on — would be all that is left.
-      const payload = buildPushPayload(digest.title, digest.body);
+      // A tap opens the Briefing full-screen over the landing page (S21).
+      const payload = buildPushPayload(digest.title, digest.body, "/freelance?briefing=open");
       const delivery = await sendPushToAll(payload);
       const sentAt = new Date();
       if (delivery.sent === 0) {
@@ -200,6 +213,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           `the digest reached no device (failed ${delivery.failed}, removed ${delivery.removed}). ` +
             "Re-subscribe from /freelance/queue."
         );
+      }
+
+      // The Briefing is built AFTER the send and inside its own catch: it is
+      // derived from the same sentences, but a bug in it must never cost the
+      // push that already went out (spec §7.2). Without it the record is saved
+      // plain and the site shows the quoted text.
+      let briefing: StoredBriefing | null = null;
+      try {
+        briefing = buildBriefing(digestInput);
+      } catch (err) {
+        console.error("[cron/morning] briefing could not be built:", err);
       }
 
       // What the Personal page's push tile quotes (R22). After the guard, so
@@ -211,13 +235,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // named in THIS push — that has already gone.
       let digestStored = true;
       try {
-        await saveLastDigest(sentAt, payload, delivery.sent);
+        await saveLastDigest(sentAt, payload, delivery.sent, briefing);
       } catch (err) {
         digestStored = false;
         console.error("[cron/morning] last digest write failed:", err);
       }
+      const failedItems = (digestStored ? 0 : 1) + (briefing === null ? 1 : 0);
       return {
-        counts: { itemsProcessed: problems.length, itemsFailed: digestStored ? 0 : 1 },
+        counts: { itemsProcessed: problems.length, itemsFailed: failedItems },
         data: digest,
       };
     });
