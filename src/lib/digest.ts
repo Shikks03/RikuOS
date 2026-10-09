@@ -1,38 +1,48 @@
 /**
- * digest.ts — the one push Riku gets each morning.
+ * digest.ts — the one push Riku gets each morning, in the assistant's voice (S21).
  *
  * Pure, so the wording is testable without sending anything.
  *
- * It goes out EVERY day, including when nothing is wrong (design P5a-4). That
- * is deliberate: Riku chose "the missing push is enough" as the outer safety
- * net, and an absence only means something if the presence is unconditional.
- * Hence "All clear" rather than a silent morning.
+ * It goes out EVERY day, including when nothing is wrong (P5a-4): an absence
+ * only means something if the presence is unconditional.
  *
- * Problems come first in the body because buildPushPayload truncates it at 320
- * characters and a lock-screen preview is shorter still. The Today sentence
- * comes second (deck §10, D12): after the problems, so a bad night is never
- * cut off, and before the freelance line.
+ * ORDER (D12, kept): problems, then the Today sentence, then freelance, then
+ * what is switched off. Problems lead because buildPushPayload slices the body
+ * at 320 and a lock screen shows less; the problems line is budgeted so that
+ * slice never cuts the freelance line.
+ *
+ * TWO OUTPUTS. composeDigest is the push (title + body, budgeted). buildBriefing
+ * is the full structured Briefing the site renders (never budgeted, only
+ * bounded to the model's limits). They share their sentences, so the page can
+ * never say something the push didn't. The route builds the briefing after the
+ * send, inside a catch: a briefing bug never costs the push (spec §7.2).
+ *
+ * TITLE (S21): opener + read on the day, counting STORIES, not symptoms. A
+ * problem morning never gets a cheerful read (R23).
  */
 
-import type { CalendarWindow } from "@/lib/google";
-import type { Layer } from "@/lib/osSettings";
 import { APP_TZ, PUSH_BODY_MAX } from "@/lib/constants";
 import { addDays, clockHHMM, formatDay, type DayKey } from "@/lib/days";
 import { daysLate, digestWindow, sortTodos, todoDueKey } from "@/lib/todos";
+import type { CalendarWindow } from "@/lib/google";
+import type { Layer } from "@/lib/osSettings";
+import type { Agent } from "@/models/AgentRun";
+import { AGENT_NAMES, boundRaw, type CalendarUnavailableCause, type Problem } from "@/lib/problems";
+import { explain } from "@/lib/causes";
+import { groupProblems, type Story } from "@/lib/stories";
+import { capWord, greeting, joinSaid, lowerLead, numberWord, say, type Mood, type Said } from "@/lib/voice";
+import { BRIEFING_BOUNDS, type StoredBold, type StoredBriefing } from "@/lib/briefingTypes";
 
 export interface DigestInput {
-  /** ApprovalItems waiting on a decision. */
+  /** The APP_TZ day this push is for (todayKey(now)). Drives the greeting. */
+  day: DayKey;
   pending: number;
-  /** null means the OS API call failed — reported as unavailable, never as zero. */
+  /** null = the OS API call failed: a problem, never zeros. */
   attention: { repliedUnanswered: number; overdue: number } | null;
-  /**
-   * Watchdog anomalies, down sites, and any job that failed in this same run
-   * or whose write failed inside it.
-   */
-  problems: string[];
-  /** Agents switched off in OsSettings, so a pause cannot be forgotten. */
-  offAgents: string[];
-  /** The Today sentence's parts. Required, so the route cannot forget it. */
+  /** The failed attention call's message, bounded; null when it answered or said nothing. */
+  attentionError: string | null;
+  problems: Problem[];
+  offAgents: Agent[];
   today: DigestTodayInput;
 }
 
@@ -41,156 +51,165 @@ export interface Digest {
   body: string;
 }
 
-/**
- * One problem's worth of body text. A job failure carries a raw exception
- * message bounded only by runJob's 2000-character cap, and the body is sliced
- * at 200 — so without this, one long Mongo error silently evicts every finding
- * behind it. Every real finding ("expiry-sweep last ran 31h ago", "Meowchi
- * unreachable") is far shorter, so only the pathological case is touched.
- */
-const MAX_PROBLEM_CHARS = 80;
-
-/** Closes the problems line, without doubling a period `short` already added. */
-function end(line: string): string {
-  return /[.…!?]$/.test(line) ? line : `${line}.`;
+/** The input's problems plus the four the digest itself detects, in report order. */
+function allProblems(input: DigestInput): Problem[] {
+  const problems = [...input.problems];
+  if (input.attention === null) problems.push({ key: "pipeline-unavailable", raw: boundRaw(input.attentionError) });
+  const { today } = input;
+  if (today.events === "unavailable") {
+    problems.push({ key: "calendar-unavailable", cause: today.calendarCause ?? "read-failed" });
+  } else if (today.events !== "none-enabled" && today.missedLayers.length > 0) {
+    problems.push({ key: "calendar-partial", calendars: today.missedLayers });
+  }
+  if (today.due === "unavailable") problems.push({ key: "todos-unavailable" });
+  return problems;
 }
 
-function short(problem: string): string {
-  return problem.length > MAX_PROBLEM_CHARS
-    ? `${problem.slice(0, MAX_PROBLEM_CHARS - 1)}…`
-    : problem;
+/** First story as is; then `Separately, …`; then `Also, …` (plan deviation 3). */
+function storySentences(stories: Story[]): Said[] {
+  return stories.map((s, i) => {
+    if (i === 0) return s.sentence;
+    const lead = i === 1 ? "Separately, " : "Also, ";
+    const lowered = lowerLead(s.sentence);
+    return joinSaid([say(lead), lowered], "");
+  });
 }
 
-/**
- * The problems line within `budget` characters. Problems lead, so the leading
- * fragments are kept whole and the tail collapses into `+N more`, N being the
- * fragments dropped (the title still carries the true count). If even one
- * fragment plus its `+N more` is over, that one fragment is cut to fit, so the
- * line never exceeds its budget and the payload's slice never has to cut.
- */
-function problemsWithin(problems: string[], budget: number): string {
-  const frags = problems.map(short);
-  // PROVISIONAL (P10b): not in the deck - Riku to approve (the problems line's `+N more`)
-  const more = (dropped: number) => `+${dropped} more`;
-  for (let keep = frags.length; keep >= 1; keep--) {
-    const dropped = frags.length - keep;
-    const kept = frags.slice(0, keep);
-    const line = capitalise(end((dropped > 0 ? [...kept, more(dropped)] : kept).join("; ")));
+function moreSuffix(dropped: number): string {
+  return `…and ${numberWord(dropped)} more, see the Briefing.`;
+}
+
+/** The problems line within `budget`: whole stories, the rest pointed at the Briefing. */
+function problemsWithin(sentences: Said[], budget: number): string {
+  const texts = sentences.map((s) => s.text);
+  for (let keep = texts.length; keep >= 1; keep--) {
+    const dropped = texts.length - keep;
+    const line = [...texts.slice(0, keep), ...(dropped > 0 ? [moreSuffix(dropped)] : [])].join(" ");
     if (line.length <= budget) return line;
   }
-  const dropped = frags.length - 1;
-  const suffix = dropped > 0 ? `; ${more(dropped)}.` : ".";
+  const dropped = texts.length - 1;
+  const suffix = dropped > 0 ? ` ${moreSuffix(dropped)}` : "";
   const room = Math.max(2, budget - suffix.length);
-  const first = frags[0].length > room ? `${frags[0].slice(0, room - 1)}…` : frags[0];
-  return capitalise(end(dropped > 0 ? `${first}; ${more(dropped)}` : first));
+  const first = texts[0].length > room ? `${texts[0].slice(0, room - 1).trimEnd()}…` : texts[0];
+  return `${first}${suffix}`;
 }
 
-/**
- * How the app's OWN problem fragments begin — the lowercase ones this file
- * writes (here and in buildProblems). Only these are capitalised when they
- * lead the line. Everything else leads as written: a site's detail begins
- * with its configured name (`meowchi.dev returned HTTP 503`) and a watchdog
- * anomaly with an agent id (`dispatcher failed`), and upper-casing either
- * would misspell a name. A new fragment in this file belongs in this list.
- */
-const OWN_FRAGMENTS = [
-  "pipeline check ",
-  "calendar check ",
-  "to-do check ",
-  "expiry sweep failed",
-  "watchdog failed",
-  "site health failed",
-  "site reading could not",
-  "outreach check failed",
-] as const;
+/** `One lead is waiting on your reply, one follow-up is overdue and three drafts are ready for your review.` */
+export function freelanceLine(input: Pick<DigestInput, "attention" | "pending">): string | null {
+  const parts: string[] = [];
+  const count = (n: number, one: string, many: string) => (n === 1 ? `one ${one}` : `${numberWord(n)} ${many}`);
+  if (input.attention !== null) {
+    const { repliedUnanswered: r, overdue: o } = input.attention;
+    if (r > 0) parts.push(`${count(r, "lead is", "leads are")} waiting on your reply`);
+    if (o > 0) parts.push(`${count(o, "follow-up is", "follow-ups are")} overdue`);
+  }
+  if (input.pending > 0) parts.push(`${count(input.pending, "draft is", "drafts are")} ready for your review`);
+  if (parts.length === 0) return null;
+  const joined = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return `${capWord(joined)}.`;
+}
 
-/**
- * The first letter up, for an own fragment only. Fragments are written
- * lowercase so they read right anywhere in the joined line; the rendered line
- * is a sentence, so deck §10's `Calendar check unavailable.` is what the
- * fragment `calendar check unavailable` renders as when it leads (R23).
- */
-function capitalise(line: string): string {
-  return OWN_FRAGMENTS.some((f) => line.startsWith(f))
-    ? line.charAt(0).toUpperCase() + line.slice(1)
-    : line;
+/** `The chaser's still off, by the way.` / `The chaser and the lead sweep are still off, by the way.` */
+export function offLine(offAgents: Agent[]): string | null {
+  if (offAgents.length === 0) return null;
+  const names = offAgents.map((a) => AGENT_NAMES[a]);
+  if (names.length === 1) return `${capWord(names[0])}'s still off, by the way.`;
+  const joined = `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return `${capWord(joined)} are still off, by the way.`;
+}
+
+function moodOf(stories: Story[], today: DigestTodayInput): Mood {
+  if (stories.length > 0) return { kind: "problems", stories: stories.length };
+  const events = Array.isArray(today.events) ? today.events.length : 0;
+  const due = today.due === "unavailable" ? [] : today.due;
+  const busy = events + due.filter((d) => d.dayLabel === "today").length + today.overdue.length;
+  if (busy >= 4) return { kind: "busy" };
+  const calendarQuiet = Array.isArray(today.events) ? today.events.length === 0 : today.events === "none-enabled";
+  if (calendarQuiet && due.length === 0 && today.overdue.length === 0) return { kind: "quiet" };
+  return { kind: "ordinary" };
 }
 
 export function composeDigest(input: DigestInput): Digest {
-  // A pipeline check that could not run is itself a problem. Reporting it as
-  // "All clear" would make a total ShikksTracker outage — the one dependency
-  // every outreach feature rests on — read as reassurance, every morning, for
-  // as long as it lasted. The route cannot count it either: it downgrades the
-  // failed call to null rather than letting it fail the run, so this is the
-  // only place the outage can still be named.
-  //
-  // The calendar and the to-do store are counted the same way (deck §10), and
-  // a PARTIAL calendar read is counted too (R23), so the title never says all
-  // clear over a blind spot. Every layer switched off is not counted: it is a
-  // choice, not a fault (deck §15).
-  const problems = [...input.problems];
-  if (input.attention === null) problems.push("pipeline check unavailable");
-  const { today } = input;
-  if (today.events === "unavailable") {
-    problems.push("calendar check unavailable");
-  } else if (today.events !== "none-enabled" && today.missedLayers.length > 0) {
-    // PROVISIONAL (P10b): not in the deck - Riku to approve
-    problems.push("calendar check incomplete");
-  }
-  if (today.due === "unavailable") problems.push("to-do check unavailable");
+  const stories = groupProblems(allProblems(input));
+  const title = greeting(input.day, moodOf(stories, input.today));
 
-  const problemCount = problems.length;
-  const reviewPart = `${input.pending} to review`;
+  const after = [freelanceLine(input), offLine(input.offAgents)].filter((s): s is string => s !== null);
+  const sep = (parts: string[]) => parts.filter((p) => p.length > 0).join(" ");
 
-  const title =
-    problemCount > 0
-      ? `${problemCount} problem${problemCount === 1 ? "" : "s"} · ${reviewPart}`
-      : `All clear · ${reviewPart}`;
-
-  const after: string[] = [];
-  if (input.attention !== null) {
-    after.push(`${input.attention.repliedUnanswered} waiting on you, ${input.attention.overdue} overdue.`);
-  }
-  if (input.offAgents.length > 0) {
-    after.push(`Off: ${input.offAgents.join(", ")}.`);
+  if (stories.length === 0) {
+    const others = after;
+    const budget = PUSH_BODY_MAX - (others.length > 0 ? others.join(" ").length + 1 : 0);
+    return { title, body: sep([composeTodayLine(input.today, budget), ...after]) };
   }
 
-  // Both lines ahead of the freelance line are budgeted, so the payload's
-  // slice never cuts it (D12). One space separates each part. The problems
-  // line may take everything except the parts after it and the Today
-  // sentence's most compact form (budget 0 returns that form); the Today
-  // sentence then gets whatever the problems line actually left.
+  // Reserve the parts after the problems line and the Today line's most compact
+  // form, then give the Today line whatever the problems line actually left.
   const afterLength = after.reduce((n, part) => n + 1 + part.length, 0);
-  const problemsBudget = PUSH_BODY_MAX - afterLength - 1 - composeTodayLine(today, 0).length;
-  const problemsLine = problemCount > 0 ? problemsWithin(problems, problemsBudget) : "All clear.";
-  const others = [problemsLine, ...after];
-  const budget = PUSH_BODY_MAX - (others.join(" ").length + others.length);
-  const lines = [problemsLine, composeTodayLine(today, budget), ...after];
-
-  return { title, body: lines.join(" ") };
+  const compact = composeTodayLine(input.today, 0);
+  const problemsBudget = PUSH_BODY_MAX - afterLength - (compact.length > 0 ? compact.length + 1 : 0);
+  const problemsLine = problemsWithin(storySentences(stories), problemsBudget);
+  const used = problemsLine.length + afterLength;
+  const todayLine = composeTodayLine(input.today, Math.max(0, PUSH_BODY_MAX - used - 1));
+  return { title, body: sep([problemsLine, todayLine, ...after]) };
 }
 
-// --- The Today sentence (deck §10, §15) --------------------------------------
+// --- The stored Briefing (S21, spec §7.1) ------------------------------------
+
+function boundText(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
+function boundBold(bold: StoredBold[], text: string): StoredBold[] {
+  return bold.filter((r) => r.start >= 0 && r.end <= text.length && r.start < r.end).slice(0, BRIEFING_BOUNDS.bold);
+}
+
+export function buildBriefing(input: DigestInput): StoredBriefing {
+  const stories = groupProblems(allProblems(input)).slice(0, BRIEFING_BOUNDS.stories);
+  let unrecognised = 0;
+  const stored = stories.map((story) => {
+    const sentence = boundText(story.sentence.text, BRIEFING_BOUNDS.storySentence);
+    return {
+      sentence,
+      bold: boundBold(story.sentence.bold, sentence),
+      symptoms: story.symptoms.slice(0, BRIEFING_BOUNDS.symptoms).map((p) => {
+        const e = explain(p);
+        if (e.causeKey === "unrecognised") unrecognised++;
+        const s = boundText(e.sentence.text, BRIEFING_BOUNDS.symptomSentence);
+        const cause = boundText(e.cause.text, BRIEFING_BOUNDS.cause);
+        return {
+          key: p.key,
+          sentence: s,
+          bold: boundBold(e.sentence.bold, s),
+          nextStep: boundText(e.nextStep, BRIEFING_BOUNDS.nextStep),
+          causeKey: e.causeKey,
+          cause,
+          causeBold: boundBold(e.cause.bold, cause),
+          raw: e.raw === null ? null : e.raw.slice(0, BRIEFING_BOUNDS.raw),
+        };
+      }),
+    };
+  });
+  const freelance = freelanceLine(input);
+  const off = offLine(input.offAgents);
+  return {
+    stories: stored,
+    today: boundText(composeTodayLine(input.today), BRIEFING_BOUNDS.today),
+    freelance: freelance === null ? null : boundText(freelance, BRIEFING_BOUNDS.freelance),
+    off: off === null ? null : boundText(off, BRIEFING_BOUNDS.off),
+    unrecognised,
+  };
+}
+
+// --- The Today sentence (deck §10, re-voiced by S21) --------------------------
 
 /**
- * What the Today sentence is built from. Named apart from personalView.ts's
- * `TodayInput`, which is the page's and a different shape.
- *
- * `events` is `"none-enabled"` when every layer is switched off — a choice,
- * not a fault, so it is never counted as a problem (deck §15) — and
- * `"unavailable"` when no layer could be read. `missedLayers` names the layers
- * that did not answer when SOME did (R23's partial form), and is empty
- * otherwise. `overdue` is ignored when `due` is `"unavailable"`: both come
- * from one to-do read, and an omitted `Overdue:` must not read as "nothing
- * overdue" — `Due: to-dos unavailable.` covers it.
- *
- * `dueTotal` / `overdueTotal` are the STORE's counts, which the arrays may
- * fall short of (the read is bounded). `+N more` counts them, so it never
- * undercounts past the read's limit. Absent, the array length is the total.
+ * What the Today sentence is built from. `calendarCause` says why `events` is
+ * "unavailable" (S21: the cause card states it as a fact).
  */
 export interface DigestTodayInput {
   events: Array<{ title: string; time: string | null }> | "unavailable" | "none-enabled";
   missedLayers: string[];
+  calendarCause?: CalendarUnavailableCause;
   due: Array<{ title: string; dayLabel: string }> | "unavailable";
   overdue: Array<{ title: string; daysLate: number }>;
   dueTotal?: number;
@@ -200,66 +219,34 @@ export interface DigestTodayInput {
 /** Up to 3 names per part (deck §10). */
 const TODAY_NAMES = 3;
 
-/**
- * The title caps tried, longest first, when the sentence is over its budget.
- * A name's suffix — its time, its day, its lateness — is never cut; only the
- * title before it.
- */
+/** Title caps tried, longest first, when over budget. A suffix is never cut. */
 const TITLE_CAPS = [60, 40, 24, 12] as const;
 
-/** A title cut to `cap` characters, the cut marked with `…`. */
 function capTitle(title: string, cap: number): string {
   return title.length > cap ? `${title.slice(0, cap - 1).trimEnd()}…` : title;
 }
 
-/**
- * `A, B, C, +2 more` — singular `+1 more`. `total` is the true count when the
- * names are a bounded read of something larger; never below `names.length`.
- * `limit` is how many names are shown before `+N more` takes the rest.
- */
+/** `A, B and C` · `A, B, C and 2 more`. `total` is the store's count, never below names.length. */
 function listPart(names: string[], total: number = names.length, limit: number = TODAY_NAMES): string {
   const shown = names.slice(0, limit);
   const rest = Math.max(total, names.length) - shown.length;
-  // PROVISIONAL (P10b): not in the deck - Riku to approve (the comma before `+N more`)
-  return rest > 0 ? [...shown, `+${rest} more`].join(", ") : shown.join(", ");
+  if (rest > 0) return shown.length > 0 ? `${shown.join(", ")} and ${rest} more` : `${rest} more`;
+  if (shown.length <= 1) return shown.join("");
+  return `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`;
 }
 
-/** `Classes wasn't read.` · `Classes and Events weren't read.` */
-function missedSentence(layers: string[]): string {
-  if (layers.length === 1) return `${layers[0]} wasn't read.`;
-  const shown = layers.slice(0, TODAY_NAMES);
-  const rest = layers.length - shown.length;
-  // PROVISIONAL (P10b): not in the deck - Riku to approve (the plural forms)
-  const named =
-    rest > 0
-      ? `${shown.join(", ")} and ${rest} more`
-      : `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`;
-  // PROVISIONAL (P10b): not in the deck - Riku to approve
-  return `${named} weren't read.`;
+function dueWhen(label: string): string {
+  return label === "today" || label === "tomorrow" ? label : `on ${label}`;
 }
 
 /**
- * Pure. The push's Today sentence, in deck §10's and §15's forms:
- *
- *   Today: Math Methods 09:00, Meeting 13:00. Due: Pay tuition (today). Overdue: Send invoice (3d).
- *   Today: nothing scheduled, nothing due.           every part empty (D6)
- *   Today: calendar unavailable. Due: …              no layer answered
- *   Today: Math Methods 09:00. Classes wasn't read.  some answered (R23)
- *   Due: to-dos unavailable.                         the to-do read failed
- *   Today: no layers switched on.                    every layer off (deck §15)
- *
- * Absent parts are omitted; the quiet line is the one exception, so silence
- * and "couldn't read the calendar" never look the same (D6).
- *
- * `budget` is the most characters the sentence may take. Over it, the titles
- * are cut to each of TITLE_CAPS in turn, then names are moved into `+N more`
- * three, two, one, none per part — until it fits. A part's label, a name's
- * time/day/lateness, the partial-read clause and every failure sentence are
- * never cut (under pressure a missed layer's NAME is cut like a title, the
- * clause itself never). If even no names at all does not fit, that most
- * compact form is returned — `budget` 0 asks for it. composeDigest reserves
- * room for this form before it sizes the problems line, so inside a digest it
- * always fits and the payload's slice never cuts the freelance line.
+ * Pure. The Today sentence:
+ *   Today you've got Math Methods at 09:00 and Meeting at 13:00. Coming up: Essay today. Running late: Invoice (3 days).
+ *   Your calendar layers are all switched off. Nothing due.
+ *   Nothing on today, and nothing due.        (both reads answered, both empty)
+ *   ""                                         (a read failed and nothing else to say — its story says it)
+ * Budget behaviour is unchanged from P10b: titles cut through TITLE_CAPS, then
+ * names move into `and N more`; times, days and lateness are never cut.
  */
 export function composeTodayLine(today: DigestTodayInput, budget: number = Infinity): string {
   const full = renderToday(today, Infinity, TODAY_NAMES);
@@ -280,40 +267,38 @@ export function composeTodayLine(today: DigestTodayInput, budget: number = Infin
 function renderToday(today: DigestTodayInput, cap: number, limit: number): string {
   const t = (title: string) => capTitle(title, cap);
   const parts: string[] = [];
+  const calendarAnswered = today.events !== "unavailable";
+  const todosAnswered = today.due !== "unavailable";
 
   if (today.events === "none-enabled") {
-    parts.push("Today: no layers switched on.");
-  } else if (today.events === "unavailable") {
-    parts.push("Today: calendar unavailable.");
-  } else {
-    const names = today.events.map((e) => `${t(e.title)} ${e.time ?? "(all day)"}`);
-    const missed = today.missedLayers.length > 0 ? missedSentence(today.missedLayers.map(t)) : null;
-    if (names.length > 0) {
-      parts.push(`Today: ${listPart(names, names.length, limit)}.`);
-      if (missed) parts.push(missed);
-    } else if (missed) {
-      // Nothing arrived from the layers that answered. Naming only the miss
-      // makes no claim about the day: `nothing scheduled` here would be said
-      // over a calendar that was not read.
-      // PROVISIONAL (P10b): not in the deck - Riku to approve (the miss alone)
-      parts.push(`Today: ${missed}`);
-    }
+    parts.push("Your calendar layers are all switched off.");
+  } else if (Array.isArray(today.events) && today.events.length > 0) {
+    const names = today.events.map((e) => (e.time === null ? `${t(e.title)} (all day)` : `${t(e.title)} at ${e.time}`));
+    parts.push(`Today you've got ${listPart(names, names.length, limit)}.`);
   }
 
-  if (today.due === "unavailable") {
-    parts.push("Due: to-dos unavailable.");
-  } else {
+  if (today.due !== "unavailable") {
     if (today.due.length > 0) {
-      parts.push(`Due: ${listPart(today.due.map((d) => `${t(d.title)} (${d.dayLabel})`), today.dueTotal, limit)}.`);
+      parts.push(`Coming up: ${listPart(today.due.map((d) => `${t(d.title)} ${dueWhen(d.dayLabel)}`), today.dueTotal, limit)}.`);
     }
     if (today.overdue.length > 0) {
       parts.push(
-        `Overdue: ${listPart(today.overdue.map((o) => `${t(o.title)} (${o.daysLate}d)`), today.overdueTotal, limit)}.`
+        `Running late: ${listPart(
+          today.overdue.map((o) => `${t(o.title)} (${o.daysLate} ${o.daysLate === 1 ? "day" : "days"})`),
+          today.overdueTotal,
+          limit,
+        )}.`,
       );
     }
   }
 
-  return parts.length > 0 ? parts.join(" ") : "Today: nothing scheduled, nothing due.";
+  const calendarEmpty = Array.isArray(today.events) && today.events.length === 0;
+  const todosEmpty = todosAnswered && (today.due as unknown[]).length === 0 && today.overdue.length === 0;
+  if (calendarAnswered && todosAnswered && todosEmpty) {
+    if (calendarEmpty) return "Nothing on today, and nothing due.";
+    if (today.events === "none-enabled") parts.push("Nothing due.");
+  }
+  return parts.join(" ");
 }
 
 /**
@@ -340,12 +325,11 @@ export function calendarForDigest(
   layers: readonly Layer[],
   today: DayKey,
   tz: string = APP_TZ
-): Pick<DigestTodayInput, "events" | "missedLayers"> {
+): Pick<DigestTodayInput, "events" | "missedLayers" | "calendarCause"> {
   if (!window.ok) {
-    return {
-      events: window.reason === "none-enabled" ? "none-enabled" : "unavailable",
-      missedLayers: [],
-    };
+    return window.reason === "none-enabled"
+      ? { events: "none-enabled", missedLayers: [] }
+      : { events: "unavailable", missedLayers: [], calendarCause: window.reason };
   }
   const failedIds = new Set(window.failed);
   const enabled = layers.filter((l) => l.enabled);
@@ -354,7 +338,7 @@ export function calendarForDigest(
     failedIds.size > 0 &&
     (failedLayers.length < failedIds.size || enabled.every((l) => failedIds.has(l.calendarId)))
   ) {
-    return { events: "unavailable", missedLayers: [] };
+    return { events: "unavailable", missedLayers: [], calendarCause: "read-failed" };
   }
   const events = window.events
     .filter((e) => e.dayKey === today)
@@ -423,4 +407,3 @@ export function todosForDigest(
     overdueTotal: Math.max(totals.overdue, overdue.length),
   };
 }
-

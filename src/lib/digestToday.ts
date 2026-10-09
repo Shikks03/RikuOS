@@ -35,7 +35,7 @@ export async function readDigestToday(layers: readonly Layer[], today: DayKey): 
 async function readCalendarPart(
   layers: readonly Layer[],
   today: DayKey
-): Promise<Pick<DigestTodayInput, "events" | "missedLayers">> {
+): Promise<Pick<DigestTodayInput, "events" | "missedLayers" | "calendarCause">> {
   try {
     const window = await readCalendarWindow(layers, today, today);
     if (!window.ok && window.reason !== "none-enabled") {
@@ -46,7 +46,7 @@ async function readCalendarPart(
     return calendarForDigest(window, layers, today);
   } catch (err) {
     console.error("[cron/morning] calendar check failed:", err);
-    return { events: "unavailable", missedLayers: [] };
+    return { events: "unavailable", missedLayers: [], calendarCause: "read-failed" };
   }
 }
 

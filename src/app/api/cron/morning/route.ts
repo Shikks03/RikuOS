@@ -16,6 +16,7 @@ import { readDigestToday } from "@/lib/digestToday";
 import { saveLastDigest } from "@/lib/lastDigest";
 import { todayKey } from "@/lib/days";
 import ApprovalItem from "@/models/ApprovalItem";
+import type { Agent } from "@/models/AgentRun";
 
 /**
  * GET /api/cron/morning
@@ -170,6 +171,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       });
 
       const digest = composeDigest({
+        day: todayKey(new Date()),
         pending,
         attention: attention
           ? {
@@ -177,8 +179,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
               overdue: attention.overdueActions?.length ?? 0,
             }
           : null,
-        problems: problems.map((p) => p.key), // TEMPORARY until A8 — A6 changes composeDigest's input
-        offAgents: settings.chaserEnabled ? [] : ["chaser"],
+        attentionError: null, // TEMPORARY until A8 wires the real attention-fetch failure through
+        problems,
+        offAgents: settings.chaserEnabled ? [] : (["chaser"] as Agent[]),
         today,
       });
 

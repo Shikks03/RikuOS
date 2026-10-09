@@ -1,333 +1,262 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildBriefing,
   calendarForDigest,
   composeDigest,
   composeTodayLine,
   todosForDigest,
+  type DigestInput,
   type DigestTodayInput,
 } from "@/lib/digest";
 import { buildPushPayload } from "@/lib/push";
 import type { CalendarEvent } from "@/lib/google";
 import type { Layer } from "@/lib/osSettings";
+import { opener } from "@/lib/voice";
 
+const DAY = "2026-10-13"; // a Tuesday
 const QUIET: DigestTodayInput = { events: [], missedLayers: [], due: [], overdue: [] };
-
-const base = {
+const base: DigestInput = {
+  day: DAY,
   pending: 0,
   attention: { repliedUnanswered: 0, overdue: 0 },
-  problems: [] as string[],
-  offAgents: [] as string[],
+  attentionError: null,
+  problems: [],
+  offAgents: [],
   today: QUIET,
 };
 
-describe("composeDigest", () => {
-  it("says all clear when nothing is wrong", () => {
-    const digest = composeDigest({ ...base, pending: 2 });
-    expect(digest.title).toContain("All clear");
-    expect(digest.title).toContain("2");
-    expect(digest.body).toContain("All clear");
+describe("composeDigest — the title", () => {
+  it("greets Riku and reads a quiet day as quiet", () => {
+    const { title } = composeDigest(base);
+    expect(title.startsWith(opener(DAY))).toBe(true);
+    expect(title).toMatch(/(Quiet one today|Clear runway today)\.$/);
   });
 
-  it("leads the title with the problem count", () => {
-    const digest = composeDigest({ ...base, problems: ["chaser failed", "Meowchi unreachable"] });
-    expect(digest.title).toContain("2 problems");
-  });
-
-  it("puts problems first in the body so truncation cannot eat them", () => {
-    const digest = composeDigest({
+  it("counts stories, not symptoms", () => {
+    const { title } = composeDigest({
       ...base,
-      pending: 5,
-      attention: { repliedUnanswered: 3, overdue: 1 },
-      problems: ["Meowchi unreachable"],
-    });
-    expect(digest.body.indexOf("Meowchi unreachable")).toBe(0);
-  });
-
-  it("reports the pipeline as unavailable rather than as zero", () => {
-    const digest = composeDigest({ ...base, attention: null });
-    expect(digest.body).toContain("unavailable");
-    expect(digest.body).not.toContain("0 waiting");
-  });
-
-  it("names agents that are switched off", () => {
-    const digest = composeDigest({ ...base, offAgents: ["chaser"] });
-    expect(digest.body).toContain("Off: chaser");
-  });
-
-  it("says nothing about off agents when none are off", () => {
-    expect(composeDigest(base).body).not.toContain("Off:");
-  });
-
-  it("uses singular wording for one problem", () => {
-    const digest = composeDigest({ ...base, problems: ["chaser failed"] });
-    expect(digest.title).toContain("1 problem");
-    expect(digest.title).not.toContain("problems");
-  });
-
-  it("counts an unreachable pipeline as a problem instead of saying all clear", () => {
-    const digest = composeDigest({ ...base, pending: 5, attention: null });
-    expect(digest.title).toContain("1 problem");
-    expect(digest.title).not.toContain("All clear");
-    expect(digest.body).not.toContain("All clear");
-  });
-
-  it("adds the pipeline failure to problems that already exist", () => {
-    const digest = composeDigest({
-      ...base,
+      problems: [{ key: "site-unreachable", site: "ShikksTracker" }],
       attention: null,
-      problems: ["Meowchi unreachable"],
+      attentionError: "fetch failed",
     });
-    expect(digest.title).toContain("2 problems");
-    expect(digest.body).toContain("Meowchi unreachable");
-    expect(digest.body).toContain("unavailable");
+    expect(title).toMatch(/One thing needs you\.$/);
   });
 
-  it("states the attention line exactly, so the two counts cannot be swapped", () => {
-    const digest = composeDigest({
+  it("never reads all-clear over a partial calendar (R23)", () => {
+    const { title } = composeDigest({
       ...base,
-      attention: { repliedUnanswered: 3, overdue: 1 },
+      today: { ...QUIET, events: [{ title: "Math", time: "09:00" }], missedLayers: ["Classes"] },
     });
-    expect(digest.body).toContain("3 waiting on you, 1 overdue.");
+    expect(title).toMatch(/One thing needs you\.$/);
   });
 
-  it("caps one long problem so it cannot evict the findings behind it", () => {
-    const long = `expiry sweep failed: ${"x".repeat(300)}`;
-    const digest = composeDigest({
+  it("reads busy at four things today", () => {
+    const { title } = composeDigest({
       ...base,
-      problems: [long, "Meowchi unreachable"],
-    });
-    expect(digest.body).toContain("Meowchi unreachable");
-    expect(digest.body.length).toBeLessThanOrEqual(320);
-  });
-
-  it("ends the problems line once, without doubling a period or an ellipsis", () => {
-    expect(composeDigest({ ...base, problems: ["Meowchi unreachable"] }).body).toContain(
-      "Meowchi unreachable. "
-    );
-    expect(composeDigest({ ...base, problems: ["sweep failed."] }).body).not.toContain("..");
-    const truncated = composeDigest({
-      ...base,
-      problems: [`expiry sweep failed: ${"x".repeat(300)}`],
-    }).body;
-    expect(truncated).toContain("…");
-    expect(truncated).not.toContain("….");
-  });
-});
-
-// --- The Today sentence (deck §10, §15) -------------------------------------
-
-const FULL: DigestTodayInput = {
-  events: [
-    { title: "Math Methods", time: "09:00" },
-    { title: "Meeting", time: "13:00" },
-  ],
-  missedLayers: [],
-  due: [
-    { title: "Pay tuition", dayLabel: "today" },
-    { title: "Reviewer ch.3", dayLabel: "Fri" },
-  ],
-  overdue: [{ title: "Send invoice", daysLate: 3 }],
-};
-
-describe("composeTodayLine", () => {
-  it("writes deck §10's full form exactly", () => {
-    expect(composeTodayLine(FULL)).toBe(
-      "Today: Math Methods 09:00, Meeting 13:00. Due: Pay tuition (today), Reviewer ch.3 (Fri). Overdue: Send invoice (3d)."
-    );
-  });
-
-  it("says the quiet morning out loud (D6)", () => {
-    expect(composeTodayLine(QUIET)).toBe("Today: nothing scheduled, nothing due.");
-  });
-
-  it("names an unreadable calendar and keeps the parts that did arrive", () => {
-    expect(
-      composeTodayLine({ ...QUIET, events: "unavailable", due: [{ title: "Pay tuition", dayLabel: "today" }] })
-    ).toBe("Today: calendar unavailable. Due: Pay tuition (today).");
-    expect(composeTodayLine({ ...QUIET, events: "unavailable" })).toBe("Today: calendar unavailable.");
-  });
-
-  it("names what arrived, then the calendar that was not read (R23)", () => {
-    expect(
-      composeTodayLine({ ...QUIET, events: [{ title: "Math Methods", time: "09:00" }], missedLayers: ["Classes"] })
-    ).toBe("Today: Math Methods 09:00. Classes wasn't read.");
-  });
-
-  it("names two or more missed layers in the plural", () => {
-    expect(
-      composeTodayLine({
-        ...QUIET,
-        events: [{ title: "Math Methods", time: "09:00" }],
-        missedLayers: ["Classes", "Events"],
-      })
-    ).toBe("Today: Math Methods 09:00. Classes and Events weren't read.");
-    expect(
-      composeTodayLine({
-        ...QUIET,
-        events: [{ title: "Gym", time: "06:00" }],
-        missedLayers: ["A", "B", "C", "D"],
-      })
-    ).toBe("Today: Gym 06:00. A, B, C and 1 more weren't read.");
-  });
-
-  it("never says nothing scheduled over a layer that was not read", () => {
-    const line = composeTodayLine({ ...QUIET, missedLayers: ["Classes"] });
-    expect(line).toBe("Today: Classes wasn't read.");
-    expect(line).not.toContain("nothing");
-  });
-
-  it("says every layer is off, and still names what is due", () => {
-    expect(composeTodayLine({ ...QUIET, events: "none-enabled" })).toBe("Today: no layers switched on.");
-    expect(
-      composeTodayLine({ ...QUIET, events: "none-enabled", overdue: [{ title: "Send invoice", daysLate: 1 }] })
-    ).toBe("Today: no layers switched on. Overdue: Send invoice (1d).");
-  });
-
-  it("omits Overdue under a failed to-do read, covered by Due: to-dos unavailable.", () => {
-    const line = composeTodayLine({
-      ...QUIET,
-      events: [{ title: "Meeting", time: "13:00" }],
-      due: "unavailable",
-      overdue: [{ title: "Send invoice", daysLate: 3 }],
-    });
-    expect(line).toBe("Today: Meeting 13:00. Due: to-dos unavailable.");
-    expect(line).not.toContain("Overdue");
-  });
-
-  it("omits absent parts rather than saying none", () => {
-    expect(composeTodayLine({ ...QUIET, due: [{ title: "Renew ID", dayLabel: "tomorrow" }] })).toBe(
-      "Due: Renew ID (tomorrow)."
-    );
-  });
-
-  it("writes an all-day event as (all day)", () => {
-    expect(composeTodayLine({ ...QUIET, events: [{ title: "Baguio trip", time: null }] })).toBe(
-      "Today: Baguio trip (all day)."
-    );
-  });
-
-  it("names up to 3 per part, then +N more, singular +1 more", () => {
-    const ev = (n: number) => Array.from({ length: n }, (_, i) => ({ title: `E${i + 1}`, time: "10:00" }));
-    expect(composeTodayLine({ ...QUIET, events: ev(3) })).toBe("Today: E1 10:00, E2 10:00, E3 10:00.");
-    expect(composeTodayLine({ ...QUIET, events: ev(4) })).toBe("Today: E1 10:00, E2 10:00, E3 10:00, +1 more.");
-    expect(composeTodayLine({ ...QUIET, events: ev(5) })).toBe("Today: E1 10:00, E2 10:00, E3 10:00, +2 more.");
-    const late = Array.from({ length: 5 }, (_, i) => ({ title: `T${i + 1}`, daysLate: 5 - i }));
-    expect(composeTodayLine({ ...QUIET, overdue: late })).toBe("Overdue: T1 (5d), T2 (4d), T3 (3d), +2 more.");
-  });
-});
-
-describe("composeDigest's Today sentence", () => {
-  it("places it second: after the problems, before the freelance line (D12)", () => {
-    const body = composeDigest({
-      ...base,
-      problems: ["Meowchi unreachable"],
-      offAgents: ["chaser"],
-      today: FULL,
-    }).body;
-    const problemsAt = body.indexOf("Meowchi unreachable.");
-    const todayAt = body.indexOf("Today: Math Methods");
-    const freelanceAt = body.indexOf("0 waiting on you");
-    expect(problemsAt).toBe(0);
-    expect(todayAt).toBeGreaterThan(problemsAt);
-    expect(freelanceAt).toBeGreaterThan(todayAt);
-    expect(body.indexOf("Off: chaser")).toBeGreaterThan(freelanceAt);
-  });
-
-  it("renders deck §10's all-clear forms exactly", () => {
-    expect(composeDigest({ ...base, today: FULL }).body).toBe(
-      "All clear. Today: Math Methods 09:00, Meeting 13:00. Due: Pay tuition (today), Reviewer ch.3 (Fri). Overdue: Send invoice (3d). 0 waiting on you, 0 overdue."
-    );
-    expect(composeDigest(base).body).toBe(
-      "All clear. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue."
-    );
-  });
-
-  it("renders deck §10's unavailable-calendar example exactly, counted in the title", () => {
-    const digest = composeDigest({
-      ...base,
-      today: { ...QUIET, events: "unavailable", due: [{ title: "Pay tuition", dayLabel: "today" }] },
-    });
-    expect(digest.title).toBe("1 problem · 0 to review");
-    expect(digest.body).toBe(
-      "Calendar check unavailable. Today: calendar unavailable. Due: Pay tuition (today). 0 waiting on you, 0 overdue."
-    );
-  });
-
-  it("counts a failed to-do read as a problem", () => {
-    const digest = composeDigest({ ...base, today: { ...QUIET, due: "unavailable" } });
-    expect(digest.title).toBe("1 problem · 0 to review");
-    expect(digest.body).toBe("To-do check unavailable. Due: to-dos unavailable. 0 waiting on you, 0 overdue.");
-  });
-
-  it("counts a partial calendar read, so the title never says all clear over a blind spot (R23)", () => {
-    const digest = composeDigest({
-      ...base,
-      today: { ...QUIET, events: [{ title: "Math Methods", time: "09:00" }], missedLayers: ["Classes"] },
-    });
-    expect(digest.title).toBe("1 problem · 0 to review");
-    expect(digest.body).toBe(
-      "Calendar check incomplete. Today: Math Methods 09:00. Classes wasn't read. 0 waiting on you, 0 overdue."
-    );
-  });
-
-  it("does not count every layer switched off as a problem (deck §15)", () => {
-    const digest = composeDigest({ ...base, today: { ...QUIET, events: "none-enabled" } });
-    expect(digest.title).toBe("All clear · 0 to review");
-    expect(digest.body).toBe("All clear. Today: no layers switched on. 0 waiting on you, 0 overdue.");
-  });
-
-  it("adds every unavailable check to the title's count", () => {
-    const digest = composeDigest({
-      ...base,
-      attention: null,
-      problems: ["Meowchi unreachable"],
-      today: { ...QUIET, events: "unavailable", due: "unavailable" },
-    });
-    expect(digest.title).toBe("4 problems · 0 to review");
-    expect(digest.body).toBe(
-      "Meowchi unreachable; pipeline check unavailable; calendar check unavailable; to-do check unavailable. " +
-        "Today: calendar unavailable. Due: to-dos unavailable."
-    );
-  });
-
-  it("keeps fragments lowercase with no stop, and capitalises only the rendered line (R23)", () => {
-    const digest = composeDigest({ ...base, attention: null, today: { ...QUIET, events: "unavailable" } });
-    expect(digest.body.startsWith("Pipeline check unavailable; calendar check unavailable. ")).toBe(true);
-    expect(digest.body).not.toContain("..");
-  });
-
-  it("keeps the freelance line on a heavy morning inside the 320 bound", () => {
-    const long = (n: number) => Array.from({ length: n }, (_, i) => `A fairly long to-do title ${i + 1}`);
-    const digest = composeDigest({
-      ...base,
-      attention: { repliedUnanswered: 2, overdue: 1 },
-      problems: ["Meowchi unreachable"],
       today: {
-        events: long(5).map((title) => ({ title, time: "09:00" })),
+        events: [
+          { title: "A", time: "09:00" },
+          { title: "B", time: "11:00" },
+          { title: "C", time: "13:00" },
+        ],
         missedLayers: [],
-        due: long(5).map((title) => ({ title, dayLabel: "tomorrow" })),
+        due: [{ title: "Essay", dayLabel: "today" }],
         overdue: [],
       },
     });
-    expect(digest.body.length).toBeGreaterThan(200);
-    expect(buildPushPayload(digest.title, digest.body).body).toContain("2 waiting on you, 1 overdue.");
+    expect(title).toMatch(/(Full day ahead|Busy one today)\.$/);
   });
 
-  it("never produces an empty title or body - LastDigest requires both", () => {
-    const forms: DigestTodayInput[] = [
-      QUIET,
-      FULL,
-      { ...QUIET, events: "unavailable", due: "unavailable" },
-      { ...QUIET, events: "none-enabled" },
+  it("does not count every layer off as a problem", () => {
+    expect(composeDigest({ ...base, today: { ...QUIET, events: "none-enabled" } }).title).not.toMatch(/need/);
+  });
+});
+
+describe("composeDigest — the body", () => {
+  it("puts problems first, then today, then freelance, then switched off", () => {
+    const { body } = composeDigest({
+      ...base,
+      pending: 3,
+      attention: { repliedUnanswered: 1, overdue: 0 },
+      problems: [{ key: "site-status", site: "Meowchi", status: 503 }],
+      offAgents: ["chaser"],
+      today: { ...QUIET, events: [{ title: "Math Methods", time: "09:00" }], due: [{ title: "Essay draft", dayLabel: "today" }] },
+    });
+    expect(body).toBe(
+      "Meowchi's site isn't answering (error 503). Today you've got Math Methods at 09:00. Coming up: Essay draft today. " +
+        "One lead is waiting on your reply and three drafts are ready for your review. The chaser's still off, by the way.",
+    );
+  });
+
+  it("joins unrelated stories as separate sentences", () => {
+    const { body } = composeDigest({
+      ...base,
+      problems: [
+        { key: "site-status", site: "Meowchi", status: 503 },
+        { key: "agent-failed", agent: "chaser" },
+        { key: "todos-unavailable" },
+      ],
+    });
+    expect(body.startsWith(
+      "Meowchi's site isn't answering (error 503). Separately, the chaser failed on its last run. Also, I couldn't read your to-dos.",
+    )).toBe(true);
+  });
+
+  it("never writes freelance zeros when the pipeline failed", () => {
+    const { body } = composeDigest({ ...base, attention: null, attentionError: null });
+    expect(body).toMatch(/^I couldn't reach ShikksTracker/);
+    expect(body).not.toMatch(/waiting on your reply|follow-up/);
+  });
+
+  it("says a quiet day only when the calendar and the to-dos both answered", () => {
+    expect(composeDigest(base).body).toBe("Nothing on today, and nothing due.");
+    expect(composeDigest({ ...base, today: { ...QUIET, events: "unavailable", calendarCause: "timeout" } }).body).toBe(
+      "I couldn't read your calendar.",
+    );
+    expect(composeDigest({ ...base, today: { ...QUIET, due: "unavailable" } }).body).toBe("I couldn't read your to-dos.");
+  });
+
+  it("stays within 320 characters and collapses extra stories into a pointer to the Briefing", () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({ key: "site-status" as const, site: `Site number ${i} with a long name`, status: 503 }));
+    // 20 sites are ONE story (same kind); make them unrelated instead:
+    const problems = [
+      ...many.slice(0, 1),
+      { key: "agent-failed" as const, agent: "chaser" as const },
+      { key: "agent-never-ran" as const, agent: "site-health" as const },
+      { key: "engine-errors" as const, count: 3 },
+      { key: "unstuck-items" as const, count: 2 },
+      { key: "snapshot-unsaved" as const },
+      { key: "todos-unavailable" as const },
+      { key: "calendar-unavailable" as const, cause: "expired" as const },
     ];
-    for (const today of forms) {
-      for (const attention of [null, { repliedUnanswered: 0, overdue: 0 }]) {
-        const digest = composeDigest({ ...base, attention, today });
-        const payload = buildPushPayload(digest.title, digest.body);
-        expect(payload.body.length).toBeGreaterThan(0);
-        expect(payload.title.length).toBeGreaterThan(0);
-      }
-    }
+    const { body } = composeDigest({
+      ...base,
+      problems,
+      pending: 4,
+      attention: { repliedUnanswered: 2, overdue: 1 },
+      today: { ...QUIET, events: [{ title: "Math Methods", time: "09:00" }] },
+    });
+    expect(body.length).toBeLessThanOrEqual(320);
+    expect(body).toMatch(/…and (one|two|three|four|five|six|seven|\d+) more, see the Briefing\./);
+    expect(buildPushPayload("t", body).body).toBe(body); // the payload never has to cut
+    expect(body).toMatch(/drafts are ready for your review\.$/); // the freelance line survives
+  });
+
+  it("cuts a single enormous story rather than exceed the budget", () => {
+    // A single catalogue sentence (explain()) is already clipped to
+    // BRIEFING_BOUNDS.symptomSentence by causes.ts's own row(), with no
+    // ellipsis — so this needs an UNCLIPPED story (stories.ts builds its own
+    // sentence for a same-kind group) long enough to force digest.ts's own
+    // cut.
+    const sites = Array.from({ length: 10 }, (_, i) => ({
+      key: "site-status" as const,
+      site: `Site Number ${i} With An Extremely Long Configured Name That Keeps Going On`,
+      status: 503,
+    }));
+    const { body } = composeDigest({ ...base, problems: sites });
+    expect(body.length).toBeLessThanOrEqual(320);
+    expect(body).toContain("…");
+  });
+
+  it("uses straight apostrophes only", () => {
+    const { title, body } = composeDigest({ ...base, problems: [{ key: "site-timeout", site: "Azero" }] });
+    expect(title + body).not.toMatch(/’/);
+  });
+});
+
+describe("composeTodayLine — the voice", () => {
+  it("names events with their times, all-day ones marked", () => {
+    expect(
+      composeTodayLine({ ...QUIET, events: [{ title: "Math Methods", time: "09:00" }, { title: "Foundation Day", time: null }] }),
+    ).toBe("Today you've got Math Methods at 09:00 and Foundation Day (all day).");
+  });
+
+  it("lists due and overdue to-dos in plain words", () => {
+    expect(
+      composeTodayLine({
+        ...QUIET,
+        due: [
+          { title: "Essay", dayLabel: "today" },
+          { title: "Tuition", dayLabel: "Fri" },
+        ],
+        overdue: [{ title: "Invoice", daysLate: 1 }],
+      }),
+    ).toBe("Coming up: Essay today and Tuition on Fri. Running late: Invoice (1 day).");
+  });
+
+  it("collapses past three names into 'and N more', counting the store's total", () => {
+    expect(
+      composeTodayLine({
+        ...QUIET,
+        due: ["A", "B", "C", "D"].map((t) => ({ title: t, dayLabel: "today" })),
+        dueTotal: 9,
+      }),
+    ).toBe("Coming up: A today, B today, C today and 6 more.");
+  });
+
+  it("says when every layer is off", () => {
+    expect(composeTodayLine({ ...QUIET, events: "none-enabled" })).toBe(
+      "Your calendar layers are all switched off. Nothing due.",
+    );
+  });
+
+  it("compacts under a budget without ever cutting a time", () => {
+    const long = "A very long event title that goes on and on and on";
+    const line = composeTodayLine(
+      { ...QUIET, events: [1, 2, 3, 4].map((i) => ({ title: `${long} ${i}`, time: "09:00" })) },
+      90,
+    );
+    expect(line.length).toBeLessThanOrEqual(90);
+    expect(line).toContain("09:00");
+  });
+});
+
+describe("buildBriefing", () => {
+  it("stores every story with every symptom explained", () => {
+    const briefing = buildBriefing({
+      ...base,
+      problems: [
+        { key: "site-unreachable", site: "ShikksTracker" },
+        { key: "job-failed", job: "watchdog", raw: "something odd" },
+      ],
+      attention: null,
+      // A recognised error, so the only unrecognised one is the watchdog's.
+      attentionError: "connect ECONNREFUSED 10.0.0.1:443",
+    });
+    expect(briefing.stories).toHaveLength(2);
+    expect(briefing.stories[0].symptoms.map((s) => s.key)).toEqual(["site-unreachable", "pipeline-unavailable"]);
+    expect(briefing.stories[1].symptoms[0]).toMatchObject({
+      key: "job-failed",
+      causeKey: "unrecognised",
+      cause: "I don't recognise this one. The raw error is below.",
+      raw: "something odd",
+    });
+    expect(briefing.unrecognised).toBe(1);
+  });
+
+  it("keeps the full Today sentence, never compacted", () => {
+    const events = Array.from({ length: 8 }, (_, i) => ({ title: `Event ${i}`, time: "09:00" }));
+    const briefing = buildBriefing({ ...base, today: { ...QUIET, events } });
+    expect(briefing.today).toContain("Event 0");
+    expect(briefing.today).toContain("and 5 more");
+  });
+
+  it("bounds every stored string and array", () => {
+    const briefing = buildBriefing({
+      ...base,
+      problems: [{ key: "calendar-partial", calendars: Array.from({ length: 80 }, (_, i) => `Calendar ${i}`) }],
+    });
+    expect(briefing.stories[0].sentence.length).toBeLessThanOrEqual(240);
+    expect(briefing.stories[0].symptoms[0].sentence.length).toBeLessThanOrEqual(200);
+    for (const r of briefing.stories[0].bold) expect(r.end).toBeLessThanOrEqual(briefing.stories[0].sentence.length);
+  });
+
+  it("is null-free where the page needs text, and null where a line is absent", () => {
+    const briefing = buildBriefing(base);
+    expect(briefing.stories).toEqual([]);
+    expect(briefing.freelance).toBeNull();
+    expect(briefing.off).toBeNull();
+    expect(briefing.today).toBe("Nothing on today, and nothing due.");
   });
 });
 
@@ -362,9 +291,13 @@ describe("calendarForDigest", () => {
     });
   });
 
-  it("maps every other failed window to unavailable", () => {
+  it("maps every other failed window to unavailable, with the reason as calendarCause", () => {
     for (const reason of ["not-configured", "expired", "timeout"] as const) {
-      expect(calendarForDigest({ ok: false, reason }, TWO, TODAY).events).toBe("unavailable");
+      expect(calendarForDigest({ ok: false, reason }, TWO, TODAY)).toEqual({
+        events: "unavailable",
+        missedLayers: [],
+        calendarCause: reason,
+      });
     }
   });
 
@@ -372,6 +305,7 @@ describe("calendarForDigest", () => {
     expect(calendarForDigest({ ok: true, events: [], failed: ["primary", "classes@g"] }, TWO, TODAY)).toEqual({
       events: "unavailable",
       missedLayers: [],
+      calendarCause: "read-failed",
     });
   });
 
@@ -395,9 +329,9 @@ describe("calendarForDigest", () => {
     const part = calendarForDigest(window, layers, TODAY);
     expect(part).toEqual({ events: [{ title: "Gym", time: null }], missedLayers: ["Calendar"] });
     const digest = composeDigest({ ...base, today: { ...QUIET, ...part } });
-    expect(digest.body).toContain("Calendar wasn't read.");
-    expect(digest.body).not.toContain("calendar unavailable");
-    expect(digest.body).toContain("Calendar check incomplete");
+    expect(digest.body).toBe(
+      "I couldn't read your Calendar calendar, so today might be missing something. Today you've got Gym (all day).",
+    );
   });
 
   it("a disabled layer does not stand between a failure and `unavailable`", () => {
@@ -409,6 +343,7 @@ describe("calendarForDigest", () => {
     expect(calendarForDigest({ ok: true, events: [], failed: ["stranger@g"] }, TWO, TODAY)).toEqual({
       events: "unavailable",
       missedLayers: [],
+      calendarCause: "read-failed",
     });
   });
 
@@ -488,7 +423,7 @@ describe("todosForDigest", () => {
     expect(todos.overdue).toHaveLength(50);
     expect(todos.overdueTotal).toBe(60);
     const line = composeTodayLine({ ...QUIET, ...todos });
-    expect(line).toMatch(/^Overdue: Late 1 \(\d+d\), Late 2 \(\d+d\), Late 3 \(\d+d\), \+57 more\.$/);
+    expect(line).toMatch(/^Running late: Late 1 \(\d+ days?\), Late 2 \(\d+ days?\), Late 3 \(\d+ days?\) and 57 more\.$/);
   });
 
   it("never lets a stale count fall below what was actually read", () => {
@@ -504,181 +439,7 @@ describe("todosForDigest", () => {
     );
     expect(todos.dueTotal).toBe(4);
     expect(composeTodayLine({ ...QUIET, ...todos })).toBe(
-      "Due: A (today), B (today), C (today), +1 more."
+      "Coming up: A today, B today, C today and 1 more."
     );
-  });
-});
-
-describe("composeTodayLine's totals", () => {
-  it("counts +N more from dueTotal when the store holds more than the array", () => {
-    expect(
-      composeTodayLine({
-        ...QUIET,
-        due: [
-          { title: "A", dayLabel: "today" },
-          { title: "B", dayLabel: "today" },
-          { title: "C", dayLabel: "today" },
-        ],
-        dueTotal: 12,
-      })
-    ).toBe("Due: A (today), B (today), C (today), +9 more.");
-  });
-});
-
-describe("the Today sentence's budget (D12)", () => {
-  const long = (prefix: string, n: number) => `${prefix} ${"x".repeat(n - prefix.length - 1)}`;
-  const HEAVY: DigestTodayInput = {
-    events: [
-      { title: long("Event one", 200), time: "09:00" },
-      { title: long("Event two", 180), time: "13:00" },
-      { title: long("Event three", 160), time: null },
-    ],
-    missedLayers: [],
-    due: [
-      { title: long("Due one", 140), dayLabel: "today" },
-      { title: long("Due two", 140), dayLabel: "tomorrow" },
-      { title: long("Due three", 140), dayLabel: "Sun" },
-    ],
-    overdue: [
-      { title: long("Late one", 140), daysLate: 3 },
-      { title: long("Late two", 150), daysLate: 2 },
-      { title: long("Late three", 140), daysLate: 1 },
-    ],
-  };
-
-  it("keeps the problems line and the freelance line whole with 140-200 char titles", () => {
-    const body = composeDigest({
-      ...base,
-      attention: { repliedUnanswered: 4, overdue: 2 },
-      problems: ["Meowchi unreachable"],
-      today: HEAVY,
-    }).body;
-    expect(body.length).toBeLessThanOrEqual(320);
-    expect(body.startsWith("Meowchi unreachable. Today: ")).toBe(true);
-    expect(body.endsWith(" 4 waiting on you, 2 overdue.")).toBe(true);
-    expect(body).toContain("Due: ");
-    expect(body).toContain("Overdue: ");
-    // Suffixes survive the cut.
-    expect(body).toContain("09:00");
-  });
-
-  it("keeps Off: whole too, behind the freelance line", () => {
-    const body = composeDigest({
-      ...base,
-      problems: ["Meowchi unreachable", "dispatcher failed"],
-      offAgents: ["chaser"],
-      today: HEAVY,
-    }).body;
-    expect(body.length).toBeLessThanOrEqual(320);
-    expect(body.endsWith(" 0 waiting on you, 0 overdue. Off: chaser.")).toBe(true);
-  });
-
-  it("changes nothing when the sentence already fits", () => {
-    expect(composeTodayLine(FULL, 320)).toBe(composeTodayLine(FULL));
-  });
-
-  it("cuts titles first, marking the cut, before dropping any name", () => {
-    const line = composeTodayLine(
-      { ...QUIET, events: [{ title: "A".repeat(100), time: "09:00" }] },
-      80
-    );
-    expect(line).toBe(`Today: ${"A".repeat(59)}… 09:00.`);
-  });
-
-  it("then moves names into +N more, keeping the labels and the partial clause", () => {
-    const line = composeTodayLine({ ...HEAVY, missedLayers: ["Classes"] }, 120);
-    expect(line.length).toBeLessThanOrEqual(120);
-    expect(line).toContain("Today: ");
-    expect(line).toContain("Classes wasn't read.");
-    expect(line).toContain("Due: ");
-    expect(line).toContain("Overdue: ");
-    expect(line).toMatch(/\+\d more/);
-  });
-
-  it("never cuts a failure sentence", () => {
-    const line = composeTodayLine({ ...QUIET, events: "unavailable", due: "unavailable" }, 10);
-    expect(line).toBe("Today: calendar unavailable. Due: to-dos unavailable.");
-  });
-});
-
-describe("capitalising the problems line", () => {
-  it("capitalises the app's own fragments", () => {
-    expect(
-      composeDigest({ ...base, problems: ["expiry sweep failed: mongo down"] }).body.startsWith(
-        "Expiry sweep failed: mongo down."
-      )
-    ).toBe(true);
-  });
-
-  it("never alters a configured site name that leads the line", () => {
-    const body = composeDigest({ ...base, problems: ["meowchi.dev returned HTTP 503"] }).body;
-    expect(body.startsWith("meowchi.dev returned HTTP 503.")).toBe(true);
-  });
-
-  it("leaves an agent id that leads the line as written", () => {
-    const body = composeDigest({ ...base, problems: ["dispatcher failed"] }).body;
-    expect(body.startsWith("dispatcher failed.")).toBe(true);
-  });
-});
-
-describe("the problems line's budget (D12)", () => {
-  const mongo = (job: string) =>
-    `${job} failed: MongoServerSelectionError: connection timed out after 30000ms to cluster0-shard-00-02`;
-  const BOTH_DOWN: DigestTodayInput = { ...QUIET, events: "unavailable", due: "unavailable" };
-
-  for (const count of [3, 4]) {
-    it(`keeps the freelance line and Off: whole with ${count} capped failures and both reads down`, () => {
-      const problems = ["expiry sweep", "watchdog", "site health", "outreach check"].slice(0, count).map(mongo);
-      const digest = composeDigest({
-        ...base,
-        attention: { repliedUnanswered: 4, overdue: 2 },
-        offAgents: ["chaser"],
-        problems,
-        today: BOTH_DOWN,
-      });
-      // count failures + calendar + to-do, all still counted in the title.
-      expect(digest.title).toBe(`${count + 2} problems · 0 to review`);
-      expect(digest.body.length).toBeLessThanOrEqual(320);
-      expect(digest.body.endsWith(" 4 waiting on you, 2 overdue. Off: chaser.")).toBe(true);
-      expect(digest.body).toContain("Today: calendar unavailable. Due: to-dos unavailable.");
-      expect(digest.body).toMatch(/^Expiry sweep failed: /);
-      expect(digest.body).toMatch(/; \+\d more\. Today: /);
-    });
-  }
-
-  it("names exactly how many fragments it dropped", () => {
-    const problems = ["expiry sweep", "watchdog", "site health", "outreach check"].map(mongo);
-    const body = composeDigest({
-      ...base,
-      attention: { repliedUnanswered: 4, overdue: 2 },
-      offAgents: ["chaser"],
-      problems,
-      today: BOTH_DOWN,
-    }).body;
-    const problemsLine = body.slice(0, body.indexOf(" Today: "));
-    const kept = problemsLine.split("; ").filter((f) => !f.startsWith("+")).length;
-    const dropped = Number(/\+(\d+) more\.$/.exec(problemsLine)?.[1]);
-    expect(kept + dropped).toBe(6);
-  });
-
-  it("leaves a problems line that fits untouched", () => {
-    expect(composeDigest({ ...base, problems: ["Meowchi unreachable", "dispatcher failed"] }).body).toBe(
-      "Meowchi unreachable; dispatcher failed. Today: nothing scheduled, nothing due. 0 waiting on you, 0 overdue."
-    );
-  });
-
-  it("cuts a lone fragment when even it and its +N more cannot fit", () => {
-    const body = composeDigest({
-      ...base,
-      attention: { repliedUnanswered: 4, overdue: 2 },
-      offAgents: ["chaser", "x".repeat(150)],
-      problems: [mongo("expiry sweep"), mongo("watchdog")],
-      today: BOTH_DOWN,
-    }).body;
-    expect(body.length).toBeLessThanOrEqual(320);
-    expect(body.endsWith(`Off: chaser, ${"x".repeat(150)}.`)).toBe(true);
-    expect(body).toMatch(/^Expiry sweep failed: .*…; \+3 more\. Today: /);
-    // Cut below the 80-char cap: the fragment gave way, not the freelance line.
-    expect(body.indexOf("…;")).toBeLessThan(80);
   });
 });
