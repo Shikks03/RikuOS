@@ -8,11 +8,15 @@
 
 /* ---- the greeting line, in the 44px top bar ---------------------------- */
 .bf-line{
-  display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto;
+  display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto;align-self:stretch;
   background:none;border:0;padding:0;margin:0;font:inherit;text-transform:none;letter-spacing:normal;
   font-size:12.5px;color:var(--ink-2);text-align:left;cursor:pointer;
 }
-.bf-line:disabled{cursor:default}
+/* legacy.css's bare button:disabled{opacity:.45} would fade the "couldn't
+   load"/"couldn't save" warnings exactly when they matter most (fix round
+   item 2); the tone's own colour already carries the disabled/non-openable
+   state, so this line stays at full opacity regardless. */
+.bf-line:disabled{cursor:default;opacity:1}
 .bf-line span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bf-line i{flex:0 0 5px;width:5px;height:5px;border-radius:50%;background:var(--ink-4)}
 .bf-line.is-normal i{background:var(--save)}
@@ -21,13 +25,24 @@
 .bf-line.is-muted{color:var(--ink-3)}
 .bf-line.is-loading{min-height:1em}
 .bf-line:not(:disabled):hover span{color:var(--ink)}
-.bf-line:focus-visible{outline:2px solid var(--session);outline-offset:4px;border-radius:var(--r-tag)}
+/* No focus-ring override here (fix round item 8): base.css's app-wide
+   :focus-visible rule already reaches this button; --session is recorded in
+   tokens.css as defined-and-unused on purpose, and a second ring colour here
+   would have spent it. */
 
 /* ---- the two dialogs ----------------------------------------------------- */
+/* Background scrolling must stay locked while either dialog is open (spec
+   §5.2); showModal() alone does not stop touch-scroll of the page behind it
+   on every engine, so this locks <html> itself (fix round item 3). */
+html:has(dialog.bf-dialog[open],dialog.bf-card[open]){overflow:hidden}
 .bf-dialog,.bf-card{
   padding:0;border:1px solid var(--line);background:var(--raised);color:var(--ink);
   border-radius:var(--r-feature);max-height:calc(100dvh - 32px);overflow:auto;
+  overscroll-behavior:contain;
 }
+/* tokens.css has no scrim/backdrop token (it lists ground, ink, the six
+   semantic hues and --track — nothing for a dialog's own backdrop), so this
+   is one bespoke value rather than a borrowed token. */
 .bf-dialog::backdrop,.bf-card::backdrop{background:rgba(5,6,8,.72)}
 .bf-dialog.is-full{width:min(640px, 100vw - 32px);margin:auto}
 .bf-dialog.is-panel{
@@ -60,7 +75,8 @@
   min-height:44px;
 }
 .bf-row:hover{border-color:var(--line)}
-.bf-row:focus-visible,.bf-got:focus-visible,.bf-x:focus-visible{outline:2px solid var(--session);outline-offset:2px}
+/* No focus-ring override here either (fix round item 8) — same reasoning
+   as .bf-line above; .bf-row/.bf-got/.bf-x all inherit base.css's ring. */
 .bf-said{font-size:14px;line-height:1.45}
 .bf-next{font-size:12.5px;color:var(--ink-3)}
 /* the problems list's own trailing row, for stories BRIEFING_BOUNDS.stories

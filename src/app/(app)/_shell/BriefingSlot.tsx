@@ -8,7 +8,9 @@ import {
   buildBriefingView,
   buildGreetingLine,
   shouldAutoOpen,
+  type BriefingView,
   type GreetingInput,
+  type GreetingLine,
 } from "@/lib/briefingView";
 import Briefing from "./Briefing";
 
@@ -51,8 +53,24 @@ async function BriefingRead() {
     dispatcher: settled(dispatcherR, "dispatcher read"),
     monitoringEnabled: settings === "unavailable" ? "unavailable" : settings.monitoringEnabled,
   };
-  const line = buildGreetingLine(input);
-  const view = digest === null || digest === "unavailable" ? null : buildBriefingView(digest, now);
+  // An unexpected stored record (a shape these don't recognise) must not
+  // throw past this slot: BriefingSlot sits in the (app) layout, so an
+  // uncaught throw here would take every page down with it (fix round
+  // item 9). The fallback is the line's own "couldn't load" state, same
+  // wording as buildGreetingLine's own `fail` kind, with no Briefing to open.
+  let line: GreetingLine;
+  let view: BriefingView | null;
+  let autoOpen: boolean;
+  try {
+    line = buildGreetingLine(input);
+    view = digest === null || digest === "unavailable" ? null : buildBriefingView(digest, now);
+    autoOpen = shouldAutoOpen(digest, now);
+  } catch (err) {
+    console.error("[briefing] view build failed:", err);
+    line = { kind: "fail", text: "I couldn’t load the briefing.", tone: "warning", opens: null };
+    view = null;
+    autoOpen = false;
+  }
 
   // useSearchParams (inside Briefing) needs its own boundary.
   return (
@@ -64,7 +82,11 @@ async function BriefingRead() {
         </span>
       }
     >
-      <Briefing line={line} view={view} autoOpen={shouldAutoOpen(digest, now)} />
+      {/* Keyed on the Briefing's own sentAt, not just mounted once per page
+          load: a new morning's digest (or router.refresh() finding one)
+          remounts the island so its `open` initialiser re-decides auto-open
+          fresh, rather than carrying yesterday's state (fix round item 5a). */}
+      <Briefing key={view?.sentAtIso ?? "none"} line={line} view={view} autoOpen={autoOpen} />
     </Suspense>
   );
 }

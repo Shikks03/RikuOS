@@ -8,15 +8,34 @@
  * behind it for free; Esc (`cancel`) and a backdrop click are routed through
  * close() so the shrink animation always runs. Focus returns to the line.
  *
- * STATE: `open` changes only in handlers; the first value comes from the
- * initialiser (today's unseen Briefing, or ?briefing=open from the push).
- * Effects only touch the DOM. "Since then" is fetched on every open and set
- * only in the fetch's async callback (the lint baseline holds).
+ * STATE: `open` changes only in handlers (or the dialog's own `onClose`, fix
+ * round item 7 — see below); the first value comes from the initialiser
+ * (today's unseen Briefing, or ?briefing=open from the push). Effects only
+ * touch the DOM, write a ref, or add/remove a listener. "Since then" is
+ * fetched on every open and set only in the fetch's async callback (the lint
+ * baseline holds).
+ *
+ * STALENESS (fix round item 5). BriefingSlot sits in the (app) layout, which
+ * Next does not re-render on a soft navigation, and an installed PWA can be
+ * resumed by the OS long after its last foreground with that render still in
+ * memory. Two defences: BriefingSlot keys this island on the Briefing's
+ * `sentAtIso`, so a new morning's digest remounts it and its initialiser
+ * decides auto-open afresh; and here, regaining visibility after a long gap
+ * since the last fresh props (`briefingRefresh.ts`'s pure rule) asks the
+ * server again with `router.refresh()`.
+ *
+ * DOUBLE-CLOSE (fix round item 6). close()/closeCard() run an awaited shrink
+ * animation before touching the dialog; a second tap, a backdrop click during
+ * the shrink, or two Escapes in a row must not run that twice (it would
+ * re-send the seen POST and re-focus mid-animation). A `closing` ref per
+ * dialog guards it, and the dialog is `inert` while it shrinks so a tap on a
+ * row underneath cannot open a card mid-close.
  */
 
 import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PRESS_TIMEOUT_MS } from "@/lib/constants";
+import { shouldRefreshOnVisible } from "@/lib/briefingRefresh";
 import type { BriefingView, GreetingLine, Segment, SymptomView } from "@/lib/briefingView";
 import { growFrom, shrinkTo } from "./flip";
 
@@ -40,6 +59,7 @@ export default function Briefing({
   view: BriefingView | null;
   autoOpen: boolean;
 }) {
+  const router = useRouter();
   const params = useSearchParams();
   const pathname = usePathname();
   const forced = params.get("briefing") === "open";
@@ -52,8 +72,34 @@ export default function Briefing({
   const cardRef = useRef<HTMLDialogElement>(null);
   const cardFrom = useRef<HTMLButtonElement | null>(null);
   const seenSent = useRef(false);
+  const closingMain = useRef(false);
+  const closingCard = useRef(false);
+  // null until the mount effect below sets it — Date.now() is impure and
+  // must not run during render (react-hooks/purity), so the initial value
+  // comes from the effect, which also runs once on mount.
+  const lastPropsAt = useRef<number | null>(null);
   const titleId = useId();
   const cardTitleId = useId();
+
+  // DOM/ref only: remembers when `line`/`view` last arrived fresh from the
+  // server, so a later visibilitychange can judge staleness (fix round
+  // item 5b). Writes a ref, never state.
+  useEffect(() => {
+    lastPropsAt.current = Date.now();
+  }, [line, view]);
+
+  // Resuming an installed PWA fires visibilitychange, not a navigation —
+  // the shell's props can be hours stale. Ask the server again only past the
+  // threshold, so a brief app switch never re-fetches (fix round item 5b).
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      const last = lastPropsAt.current;
+      if (last !== null && shouldRefreshOnVisible(last, Date.now())) router.refresh();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [router]);
 
   // DOM only: show the dialog when state says so, grown from the line.
   useEffect(() => {
@@ -71,11 +117,18 @@ export default function Briefing({
   }, [card]);
 
   // The push's ?briefing=open has done its job once the state is initialised.
+  // `null`, not `window.history.state`: Next patches replaceState and skips
+  // its own URL bookkeeping whenever the passed state already carries its
+  // `__NA` marker (app-router.js), which `window.history.state` does once
+  // Next has rendered. Passing null takes Next's normal path instead, which
+  // copies that bookkeeping in itself and updates its own canonical URL — so
+  // a later router.refresh() (e.g. CheckNow) doesn't write ?briefing=open
+  // back and re-greet (fix round item 1).
   useEffect(() => {
     if (!forced) return;
     const url = new URL(window.location.href);
     url.searchParams.delete("briefing");
-    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
   }, [forced, pathname]);
 
   // Since then: fetched on every open of today's Briefing; state set only async.
@@ -108,10 +161,16 @@ export default function Briefing({
 
   async function close() {
     const dlg = dlgRef.current;
-    if (!dlg || !dlg.open) return;
+    // Guards a double tap, a backdrop click mid-shrink, or two Escapes in a
+    // row from running the shrink/seen-POST path twice (fix round item 6).
+    if (!dlg || !dlg.open || closingMain.current) return;
+    closingMain.current = true;
+    dlg.inert = true; // no row can open a card while this dialog is shrinking
     const wasFull = open === "full";
     await shrinkTo(dlg, lineRef.current?.getBoundingClientRect() ?? null);
     dlg.close();
+    dlg.inert = false;
+    closingMain.current = false;
     setOpen(null);
     lineRef.current?.focus();
     if (wasFull && view !== null && view.isToday && !view.seen && !seenSent.current) {
@@ -133,9 +192,13 @@ export default function Briefing({
 
   async function closeCard() {
     const c = cardRef.current;
-    if (!c || !c.open) return;
+    if (!c || !c.open || closingCard.current) return;
+    closingCard.current = true;
+    c.inert = true;
     await shrinkTo(c, cardFrom.current?.getBoundingClientRect() ?? null);
     c.close();
+    c.inert = false;
+    closingCard.current = false;
     setCard(null);
     cardFrom.current?.focus();
   }
@@ -154,6 +217,16 @@ export default function Briefing({
         <span>{line.text}</span>
       </button>
 
+      {/* onClose (fix round item 7): if a refresh makes `view` null while this
+          dialog is open, the conditional below unmounts the <dialog> with
+          `open` still "full"/"panel" — the HTML spec's dialog-removing steps
+          close an open dialog on removal, firing this native event, so this
+          syncs React's state back to null rather than leaving it stuck (a
+          later remount would otherwise never call showModal() again, since
+          the show-dialog effect only re-runs on `open` changing). It never
+          runs close()'s shrink or seen-POST — those stay in close() alone,
+          reached only by an explicit dismissal. close()'s own dlg.close()
+          also fires this event, so setOpen(null) there is a harmless repeat. */}
       {view !== null && (
         <dialog
           ref={dlgRef}
@@ -166,6 +239,7 @@ export default function Briefing({
           onClick={(e) => {
             if (e.target === e.currentTarget) void close();
           }}
+          onClose={() => setOpen(null)}
         >
           <div className="bf-in">
             <header className="bf-head">
@@ -264,6 +338,7 @@ export default function Briefing({
         onClick={(e) => {
           if (e.target === e.currentTarget) void closeCard();
         }}
+        onClose={() => setCard(null)}
       >
         {card !== null && (
           <div className="bf-in">
