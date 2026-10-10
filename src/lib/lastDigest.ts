@@ -43,6 +43,19 @@ const DIGEST_PROJECTION: Record<keyof StoredDigest, 1> & { _id: 0 } = {
   _id: 0,
 };
 
+/**
+ * `row.briefing` as a `StoredBriefing`, or null when it isn't one. `.lean()`
+ * validates nothing on the way out and applies no schema defaults, so a
+ * record saved before `omitted` existed (Plan B) carries no such key; it
+ * reads as 0 here, the same value the schema's own default would give a
+ * fresh write, rather than undefined.
+ */
+function toBriefing(raw: unknown): StoredBriefing | null {
+  if (typeof raw !== "object" || raw === null || !Array.isArray((raw as { stories?: unknown }).stories)) return null;
+  const row = raw as StoredBriefing & { omitted?: unknown };
+  return { ...row, omitted: typeof row.omitted === "number" ? row.omitted : 0 };
+}
+
 /** findOne on the fixed id. NEVER upserts. null when absent (R55). */
 export async function getLastDigest(): Promise<StoredDigest | null> {
   const doc = await LastDigest.findOne({ _id: LAST_DIGEST_ID }, DIGEST_PROJECTION).lean();
@@ -64,10 +77,7 @@ export async function getLastDigest(): Promise<StoredDigest | null> {
     title: row.title ?? "",
     body: row.body ?? "",
     devices: row.devices ?? 0,
-    briefing:
-      typeof row.briefing === "object" && row.briefing !== null && Array.isArray((row.briefing as { stories?: unknown }).stories)
-        ? (row.briefing as StoredBriefing)
-        : null,
+    briefing: toBriefing(row.briefing),
     seenAt: row.seenAt instanceof Date ? row.seenAt : null,
   };
 }

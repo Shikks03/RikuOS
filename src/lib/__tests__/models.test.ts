@@ -491,6 +491,27 @@ describe("LastDigest — S21's briefing and seenAt", () => {
     await expect(doc.validate()).resolves.toBeUndefined();
   });
 
+  it("defaults `omitted` to 0 when a briefing is set without it — an old write stays valid", async () => {
+    const doc = new LastDigest({
+      ...BASE,
+      briefing: { stories: [], today: "", freelance: null, off: null, unrecognised: 0 },
+    });
+    await expect(doc.validate()).resolves.toBeUndefined();
+    expect(doc.briefing?.omitted).toBe(0);
+  });
+
+  it("rejects a non-whole, negative or over-1000 `omitted`", async () => {
+    const withOmitted = (omitted: number) =>
+      new LastDigest({
+        ...BASE,
+        briefing: { stories: [], today: "", freelance: null, off: null, unrecognised: 0, omitted },
+      });
+    await expect(withOmitted(1.5).validate()).rejects.toThrow(/whole number/);
+    await expect(withOmitted(-1).validate()).rejects.toThrow(/briefing\.omitted/);
+    await expect(withOmitted(1001).validate()).rejects.toThrow(/briefing\.omitted/);
+    await expect(withOmitted(1000).validate()).resolves.toBeUndefined();
+  });
+
   it("accepts a worst-case real buildBriefing output — a save can never fail on bounds", async () => {
     // Not a hand-built StoredBriefing: a real DigestInput, run through the
     // real buildBriefing (digest.ts), pinning that whatever the catalogue and

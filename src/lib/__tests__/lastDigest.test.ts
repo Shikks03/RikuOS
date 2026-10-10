@@ -37,6 +37,7 @@ const BRIEFING: StoredBriefing = {
   freelance: null,
   off: null,
   unrecognised: 0,
+  omitted: 0,
 };
 
 describe("getLastDigest", () => {
@@ -82,6 +83,16 @@ describe("getLastDigest", () => {
     );
 
     expect((await getLastDigest())?.briefing).toBeNull();
+  });
+
+  it("reads a briefing saved before `omitted` existed as 0, not undefined — .lean() skips schema defaults", async () => {
+    const { omitted, ...oldBriefing } = BRIEFING;
+    void omitted;
+    findOne.mockImplementation(() =>
+      query({ _id: "latest", sentAt: SENT_AT, title: "T", body: "B", devices: 2, briefing: oldBriefing })
+    );
+
+    expect((await getLastDigest())?.briefing).toStrictEqual({ ...oldBriefing, omitted: 0 });
   });
 
   it("returns null rather than a push whose sentAt is not a Date", async () => {

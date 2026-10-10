@@ -92,4 +92,6 @@ export interface StoredBriefing {
   freelance: string | null;
   off: string | null;
   unrecognised: number;
+  /** How many stories the slice to BRIEFING_BOUNDS.stories dropped. 0 normally; 0 also for a record saved before this field existed. */
+  omitted: number;
 }

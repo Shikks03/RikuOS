@@ -438,6 +438,7 @@ describe("buildBriefing", () => {
     expect(briefing.freelance).toBeNull();
     expect(briefing.off).toBeNull();
     expect(briefing.today).toBe("Nothing on today, and nothing due.");
+    expect(briefing.omitted).toBe(0);
   });
 
   it("counts unrecognised symptoms BEFORE slicing stories to 12 (feature review, A-II item 10)", () => {
@@ -465,6 +466,8 @@ describe("buildBriefing", () => {
     const briefing = buildBriefing({ ...base, problems });
     expect(briefing.stories).toHaveLength(BRIEFING_BOUNDS.stories);
     expect(briefing.unrecognised).toBe(1);
+    // 13 one-problem stories, 12 stored — the 13th is omitted (carried item 2, Plan B).
+    expect(briefing.omitted).toBe(1);
   });
 
   it("stores at most BRIEFING_BOUNDS.bold ranges per story and per symptom, even when five agents fail together", () => {

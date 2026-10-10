@@ -191,11 +191,15 @@ export function buildBriefing(input: DigestInput): StoredBriefing {
     0,
   );
   const stories = allStories.slice(0, BRIEFING_BOUNDS.stories);
+  const omitted = allStories.length - stories.length;
   const stored = stories.map((story) => {
     const sentence = boundText(story.sentence.text, BRIEFING_BOUNDS.storySentence);
     return {
       sentence,
       bold: boundBold(story.sentence.bold, sentence),
+      // Symptoms past BRIEFING_BOUNDS.symptoms are left dropped with no count
+      // of their own (carried item 2 only covers stories) — the story's own
+      // sentence already speaks for every symptom under it.
       symptoms: story.symptoms.slice(0, BRIEFING_BOUNDS.symptoms).map((p) => {
         const e = explain(p);
         const s = boundText(e.sentence.text, BRIEFING_BOUNDS.symptomSentence);
@@ -221,6 +225,7 @@ export function buildBriefing(input: DigestInput): StoredBriefing {
     freelance: freelance === null ? null : boundText(freelance, BRIEFING_BOUNDS.freelance),
     off: off === null ? null : boundText(off, BRIEFING_BOUNDS.off),
     unrecognised,
+    omitted,
   };
 }
 

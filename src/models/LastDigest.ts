@@ -18,6 +18,8 @@ const maxItems = (n: number) => ({
   message: `at most ${n} items`,
 });
 
+const wholeNumber = { validator: Number.isInteger, message: "must be a whole number" };
+
 const BoldSchema = new Schema(
   { start: { type: Number, required: true, min: 0 }, end: { type: Number, required: true, min: 0 } },
   { _id: false },
@@ -55,6 +57,11 @@ const BriefingSchema = new Schema(
     freelance: { type: String, default: null, maxlength: B.freelance },
     off: { type: String, default: null, maxlength: B.off },
     unrecognised: { type: Number, required: true, min: 0 },
+    // How many stories the `stories` slice (above) dropped. Defaulted so a
+    // write from before this field existed still validates (Plan B carried
+    // item 2); the read side (lastDigest.ts) defaults an absent stored value
+    // to 0 the same way, since .lean() does not apply schema defaults.
+    omitted: { type: Number, required: true, default: 0, min: 0, max: 1000, validate: wholeNumber },
   },
   { _id: false },
 );
