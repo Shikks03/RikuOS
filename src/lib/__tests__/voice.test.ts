@@ -16,6 +16,15 @@ import {
 } from "@/lib/voice";
 import { addDays } from "@/lib/days";
 import { PUSH_TITLE_MAX } from "@/lib/constants";
+import {
+  DEBRIEF_AFTERNOON_OPENERS,
+  DEBRIEF_EVENING_OPENERS,
+  DEBRIEF_NIGHT_OPENERS,
+  DEBRIEF_TAIL,
+  debriefHeading,
+  debriefOpener,
+  debriefTimeBucket,
+} from "@/lib/voice";
 
 const START = "2026-01-05"; // a Monday
 
@@ -177,5 +186,60 @@ describe("readOnTheDay / greeting", () => {
         expect(t).toMatch(/^\S.*\. \S.*\.$/);
       }
     }
+  });
+});
+
+describe("the Debrief's heading (S22, spec §2.1)", () => {
+  it.each([
+    [0, "night"],
+    [4, "night"],
+    [5, "morning"],
+    [11, "morning"],
+    [12, "afternoon"],
+    [16, "afternoon"],
+    [17, "evening"],
+    [20, "evening"],
+    [21, "night"],
+    [23, "night"],
+  ] as const)("hour %i is %s", (hour, bucket) => {
+    expect(debriefTimeBucket(hour)).toBe(bucket);
+  });
+
+  it("draws each bucket from its own pool", () => {
+    expect(ANY_DAY_OPENERS).toContain(debriefOpener(START, 9));
+    expect(DEBRIEF_AFTERNOON_OPENERS).toContain(debriefOpener(START, 13));
+    expect(DEBRIEF_EVENING_OPENERS).toContain(debriefOpener(START, 18));
+    expect(DEBRIEF_NIGHT_OPENERS).toContain(debriefOpener(START, 23));
+    expect(DEBRIEF_NIGHT_OPENERS).toContain(debriefOpener(START, 2));
+  });
+
+  it("never repeats an opener on consecutive days within a bucket, across a year", () => {
+    for (const hour of [9, 13, 18, 23]) {
+      let prev = debriefOpener(START, hour);
+      for (let d = 1; d <= 366; d++) {
+        const next = debriefOpener(addDays(START, d), hour);
+        expect(next).not.toBe(prev);
+        prev = next;
+      }
+    }
+  });
+
+  it("keeps the tail fixed, always names Riku and never says sir", () => {
+    expect(DEBRIEF_TAIL).toBe("Here's where things stand.");
+    for (let d = 0; d < 14; d++) {
+      for (const hour of [9, 13, 18, 23]) {
+        const day = addDays(START, d);
+        const h = debriefHeading(day, hour);
+        expect(h).toBe(`${debriefOpener(day, hour)} Here's where things stand.`);
+        expect(h).toContain("Riku");
+        expect(h.toLowerCase()).not.toContain("sir");
+      }
+    }
+  });
+
+  it("uses the approved pools word for word (spec §2.1, §10 item 2)", () => {
+    expect([...DEBRIEF_AFTERNOON_OPENERS]).toEqual(["Afternoon, Riku.", "Good afternoon, Riku.", "Riku, afternoon check-in."]);
+    expect([...DEBRIEF_EVENING_OPENERS]).toEqual(["Evening, Riku.", "Good evening, Riku."]);
+    expect([...DEBRIEF_NIGHT_OPENERS]).toEqual(["Still up, Riku?", "Late one, Riku."]);
   });
 });

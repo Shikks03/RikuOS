@@ -212,3 +212,48 @@ export function readOnTheDay(mood: Mood, day: DayKey): string {
 export function greeting(day: DayKey, mood: Mood): string {
   return `${opener(day)} ${readOnTheDay(mood, day)}`;
 }
+
+// ---- The Debrief's heading (S22, spec §2.1) ------------------------------------
+
+export const DEBRIEF_AFTERNOON_OPENERS = ["Afternoon, Riku.", "Good afternoon, Riku.", "Riku, afternoon check-in."] as const;
+
+export const DEBRIEF_EVENING_OPENERS = ["Evening, Riku.", "Good evening, Riku."] as const;
+
+/** Approved by Riku 2026-10-11 (spec §10 item 2). */
+export const DEBRIEF_NIGHT_OPENERS = ["Still up, Riku?", "Late one, Riku."] as const;
+
+export type DebriefTimeBucket = "morning" | "afternoon" | "evening" | "night";
+
+/** 05:00–11:59 morning · 12:00–16:59 afternoon · 17:00–20:59 evening · 21:00–04:59 night. `hour` is APP_TZ's. */
+export function debriefTimeBucket(hour: number): DebriefTimeBucket {
+  if (hour >= 5 && hour < 12) return "morning";
+  if (hour >= 12 && hour < 17) return "afternoon";
+  if (hour >= 17 && hour < 21) return "evening";
+  return "night";
+}
+
+/**
+ * The Debrief's opener: by day (pickLine's coprime step, so never the same
+ * line two days running within a bucket) and by which pool the hour selects.
+ * The morning bucket reuses the 07:00 any-day pool under its own salt.
+ */
+export function debriefOpener(day: DayKey, hour: number): string {
+  switch (debriefTimeBucket(hour)) {
+    case "morning":
+      return pickLine(ANY_DAY_OPENERS, day, "debrief-morning");
+    case "afternoon":
+      return pickLine(DEBRIEF_AFTERNOON_OPENERS, day, "debrief-afternoon");
+    case "evening":
+      return pickLine(DEBRIEF_EVENING_OPENERS, day, "debrief-evening");
+    case "night":
+      return pickLine(DEBRIEF_NIGHT_OPENERS, day, "debrief-night");
+  }
+}
+
+/** Riku's own phrase from the brainstorm; it never varies. */
+export const DEBRIEF_TAIL = "Here's where things stand.";
+
+/** The panel's heading over a Debrief: opener + the fixed tail. Push-form; the page curls it. */
+export function debriefHeading(day: DayKey, hour: number): string {
+  return `${debriefOpener(day, hour)} ${DEBRIEF_TAIL}`;
+}
