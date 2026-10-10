@@ -1,6 +1,6 @@
 # The Debrief — a briefing on demand, compared against 07:00
 
-**Status:** design, awaiting Riku's review · **Date:** 2026-10-10 · **Proposed decision:** S22 (§9)
+**Status:** approved by Riku 2026-10-11, including every §10 wording as written · **Date:** 2026-10-10 · **Decision:** S22 (§9, recorded in ARCHITECTURE.md §7) · **Plan:** `docs/superpowers/plans/2026-10-11-debrief.md` (its "Deviations from the spec" section is binding where it refines this text)
 **Content discussed with Riku:** 2026-10-10, in the Plan B post-build review (ruling e). This spec's sibling is `docs/superpowers/specs/2026-10-09-briefing-assistant-voice-design.md` (S21) — same structure, same voice, same level of detail. Read that spec first; this one assumes it.
 
 ---
@@ -843,10 +843,15 @@ intercepted, `next dev`/`next start` substitution as needed, documented if subst
 
 ---
 
-## 10. Open wording points for Riku — PROVISIONAL
+## 10. Wording points — approved by Riku 2026-10-11 (were PROVISIONAL)
 
-Everything below is this spec's own extrapolation from the literal examples Riku gave in the
-brainstorm, not something he has approved word for word. All follow the voice rules in §2 and S21 §2;
+**Approved 2026-10-11:** Riku approved every item below as written — items 1–7 exactly as worded, and
+item 8's recommendation (the "still… now…" framing is not built). The word PROVISIONAL elsewhere in
+this spec now marks where a wording came from, not that it is still open. For item 2 the two night
+openers are `"Still up, Riku?"` and `"Late one, Riku."`.
+
+Everything below was this spec's own extrapolation from the literal examples Riku gave in the
+brainstorm. All follow the voice rules in §2 and S21 §2;
 none hardcode "RikuOS" (`APP_NAME` is not implicated — "Debrief" and "ShikksTracker" are feature/
 product labels, not this app's own name).
 
