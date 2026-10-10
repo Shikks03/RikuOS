@@ -51,6 +51,16 @@ html:has(dialog.bf-dialog[open],dialog.bf-card[open]){overflow:hidden}
 }
 .bf-card{width:min(420px, 100vw - 32px);margin:auto}
 .bf-in{padding:var(--sp-5);display:grid;gap:var(--sp-4)}
+/* .is-panel has a fixed height (the viewport minus margins) but .bf-in is
+   content-height, so on a short Briefing a tap below the content landed on
+   the bare <dialog> box and the backdrop-click check (e.target ===
+   e.currentTarget) read it as a backdrop tap and closed the panel
+   (principal review, round 2, item 1). *{box-sizing:border-box} is global
+   (base.css), so 100% here is the dialog's own content box with no surprise
+   border/padding math. .is-full and .bf-card set no height — they size to
+   .bf-in's content with zero dialog padding of their own, so they can never
+   expose a dialog-background strip the same way. */
+.bf-dialog.is-panel > .bf-in{min-height:100%;align-content:start}
 .bf-head{display:grid;grid-template-columns:1fr auto;gap:4px var(--sp-3);align-items:start}
 .bf-when{grid-column:1;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin:0}
 .bf-title{grid-column:1;font-family:var(--display);font-size:20px;line-height:1.25;margin:0;overflow-wrap:anywhere}

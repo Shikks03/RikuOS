@@ -167,10 +167,18 @@ export default function Briefing({
     closingMain.current = true;
     dlg.inert = true; // no row can open a card while this dialog is shrinking
     const wasFull = open === "full";
-    await shrinkTo(dlg, lineRef.current?.getBoundingClientRect() ?? null);
+    // finally, not just after the await: shrinkTo documents that it never
+    // rejects, but if it (or anything else here) ever threw, leaving the
+    // guard set and the dialog inert would strand it closed-but-stuck — Esc
+    // is already swallowed by onCancel's preventDefault, so nothing else
+    // could ever close it again (principal review, round 2, item 2).
+    try {
+      await shrinkTo(dlg, lineRef.current?.getBoundingClientRect() ?? null);
+    } finally {
+      dlg.inert = false;
+      closingMain.current = false;
+    }
     dlg.close();
-    dlg.inert = false;
-    closingMain.current = false;
     setOpen(null);
     lineRef.current?.focus();
     if (wasFull && view !== null && view.isToday && !view.seen && !seenSent.current) {
@@ -195,10 +203,13 @@ export default function Briefing({
     if (!c || !c.open || closingCard.current) return;
     closingCard.current = true;
     c.inert = true;
-    await shrinkTo(c, cardFrom.current?.getBoundingClientRect() ?? null);
+    try {
+      await shrinkTo(c, cardFrom.current?.getBoundingClientRect() ?? null);
+    } finally {
+      c.inert = false;
+      closingCard.current = false;
+    }
     c.close();
-    c.inert = false;
-    closingCard.current = false;
     setCard(null);
     cardFrom.current?.focus();
   }
@@ -217,16 +228,18 @@ export default function Briefing({
         <span>{line.text}</span>
       </button>
 
-      {/* onClose (fix round item 7): if a refresh makes `view` null while this
-          dialog is open, the conditional below unmounts the <dialog> with
-          `open` still "full"/"panel" — the HTML spec's dialog-removing steps
-          close an open dialog on removal, firing this native event, so this
-          syncs React's state back to null rather than leaving it stuck (a
-          later remount would otherwise never call showModal() again, since
-          the show-dialog effect only re-runs on `open` changing). It never
-          runs close()'s shrink or seen-POST — those stay in close() alone,
-          reached only by an explicit dismissal. close()'s own dlg.close()
-          also fires this event, so setOpen(null) there is a harmless repeat. */}
+      {/* onClose guards any native close that doesn't go through close()
+          itself — e.g. a future change that calls dlg.close() directly —
+          keeping `open` in sync with the dialog's actual state rather than
+          React's. It is not a fix for view becoming null while open:
+          removing a <dialog> from the DOM does not fire `close`, and an
+          unmounted element drops its own handlers regardless; BriefingSlot
+          keying this island on the Briefing's sentAtIso makes that scenario
+          moot anyway (a new key remounts the component, so `open` comes
+          fresh from its initialiser). close()'s own dlg.close() call fires
+          this event too, so setOpen(null) there is a harmless repeat of
+          what close() already does a few lines later (principal review,
+          round 2, item 3). */}
       {view !== null && (
         <dialog
           ref={dlgRef}
