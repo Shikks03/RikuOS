@@ -20,13 +20,24 @@ export interface SinceEvent {
   endsAt: Date | null;
 }
 
+/**
+ * Today's events on the switched-on layers, plus whether every layer
+ * answered. `partial` is true when at least one enabled layer failed but
+ * another returned events: the read is usable but incomplete, so the page
+ * must never conclude "nothing else on" from it (fix round 1, item 1).
+ */
+export interface SinceCalendarRead {
+  events: SinceEvent[];
+  partial: boolean;
+}
+
 export interface SinceThenInput {
   /** Done since sentAt: the newest few titles and the store's count. */
   ticked: { titles: string[]; total: number } | "unavailable";
   /** Open, due today, created since sentAt. */
   newDue: { titles: string[]; total: number } | "unavailable";
   /** Today's events on the switched-on layers. */
-  events: SinceEvent[] | "unavailable" | "none-enabled";
+  events: SinceCalendarRead | "unavailable" | "none-enabled";
   /** Pending drafts created since sentAt. */
   newDrafts: number | "unavailable";
 }
@@ -42,15 +53,19 @@ export function sinceThenLines(input: SinceThenInput, sentAt: Date, now: Date, t
   }
   if (input.ticked !== "unavailable" && input.ticked.total > 0) {
     lines.push(
-      input.ticked.total === 1 && input.ticked.titles.length === 1
-        ? `You’ve ticked off ${input.ticked.titles[0]}.`
+      input.ticked.total === 1
+        ? input.ticked.titles.length === 1
+          ? `You’ve ticked off ${input.ticked.titles[0]}.`
+          : "You’ve ticked off one to-do."
         : `You’ve ticked off ${numberWord(input.ticked.total)} to-dos.`,
     );
   }
   if (input.newDue !== "unavailable" && input.newDue.total > 0) {
     lines.push(
-      input.newDue.total === 1 && input.newDue.titles.length === 1
-        ? `One new to-do is due today: ${input.newDue.titles[0]}.`
+      input.newDue.total === 1
+        ? input.newDue.titles.length === 1
+          ? `One new to-do is due today: ${input.newDue.titles[0]}.`
+          : "One new to-do is due today."
         : `${capWord(numberWord(input.newDue.total))} new to-dos are due today.`,
     );
   }
@@ -58,15 +73,19 @@ export function sinceThenLines(input: SinceThenInput, sentAt: Date, now: Date, t
   if (input.events === "unavailable") {
     lines.push("I couldn’t check your calendar just now.");
   } else if (input.events !== "none-enabled") {
-    const timed = input.events
+    const timed = input.events.events
       .filter((e) => !e.allDay && e.startsAt !== null && e.endsAt !== null)
       .sort((a, z) => a.startsAt!.getTime() - z.startsAt!.getTime());
     const done = timed.filter((e) => e.endsAt!.getTime() <= now.getTime() && e.endsAt!.getTime() > sentAt.getTime());
+    // Neither "done" (ended by now) nor a future "Next up" (starts after now)
+    // covers an event straddling now — fix round 1, item 2.
+    const inProgress = timed.some((e) => e.startsAt!.getTime() <= now.getTime() && e.endsAt!.getTime() > now.getTime());
     const next = timed.find((e) => e.startsAt!.getTime() > now.getTime());
     if (done.length === 1) lines.push(`${done[0].title} is done.`);
     if (done.length > 1) lines.push(`${capWord(numberWord(done.length))} things on your calendar are done.`);
     if (next) lines.push(`Next up: ${next.title} at ${clockHHMM(next.startsAt!, tz)}.`);
-    else if (done.length > 0) lines.push("Nothing else on today.");
+    if (input.events.partial) lines.push("I couldn’t check every calendar just now.");
+    else if (!next && !inProgress && done.length > 0) lines.push("Nothing else on today.");
   }
 
   if (input.newDrafts === "unavailable") {

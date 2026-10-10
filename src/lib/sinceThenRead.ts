@@ -61,12 +61,22 @@ export async function readSinceThen(sentAt: Date, now: Date): Promise<SinceThenI
   if (settings.status === "fulfilled") {
     try {
       const window = await readCalendarWindow(settings.value.layers, today, today);
-      if (!window.ok) events = window.reason === "none-enabled" ? "none-enabled" : "unavailable";
-      else if (window.failed.length > 0 && window.events.length === 0) events = "unavailable";
-      else
-        events = window.events
-          .filter((e) => e.dayKey === today)
-          .map((e) => ({ title: e.title, allDay: e.allDay, startsAt: e.startsAt, endsAt: e.endsAt }));
+      if (!window.ok) {
+        events = window.reason === "none-enabled" ? "none-enabled" : "unavailable";
+      } else if (window.failed.length > 0 && window.events.length === 0) {
+        // Every enabled layer failed: nothing usable came back.
+        events = "unavailable";
+      } else {
+        // Some layers may have failed while others answered — fix round 1,
+        // item 1. That partial state rides along with the events that DID
+        // come back, rather than erasing them or hiding the gap.
+        events = {
+          events: window.events
+            .filter((e) => e.dayKey === today)
+            .map((e) => ({ title: e.title, allDay: e.allDay, startsAt: e.startsAt, endsAt: e.endsAt })),
+          partial: window.failed.length > 0,
+        };
+      }
     } catch (err) {
       console.error("[since-then] calendar failed:", err);
     }
