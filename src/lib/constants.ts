@@ -27,6 +27,9 @@ export const APP_TZ = "Asia/Manila";
  */
 export const PUSH_EXPECTED_HOUR = 7;
 
+/** The end of the morning push's grace window, in APP_TZ — Vercel's free plan may start the 07:00 cron anywhere within the hour. */
+export const PUSH_LATE_HOUR = 8;
+
 /**
  * The push payload's bounds (buildPushPayload in push.ts). Here rather than
  * in push.ts because digest.ts budgets the Today sentence against the body

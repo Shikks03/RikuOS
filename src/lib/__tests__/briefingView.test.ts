@@ -47,6 +47,8 @@ const TODAY_PUSH: StoredDigest = {
 const PLAIN_TODAY: StoredDigest = { ...TODAY_PUSH, briefing: null, title: "All clear · 0 to review", body: "All clear." };
 const YESTERDAY: StoredDigest = { ...TODAY_PUSH, sentAt: new Date("2026-09-08T23:00:00Z") };
 const OLD_PUSH: StoredDigest = { ...TODAY_PUSH, sentAt: new Date("2026-08-08T23:00:00Z"), title: "Old", body: "Old body", briefing: null };
+/** A today's digest the morning route still saved, even though it reached nobody. */
+const TODAY_UNDELIVERED: StoredDigest = { ...TODAY_PUSH, devices: 0 };
 const AFTER_SEVEN = new Date("2026-09-10T02:00:00Z"); // 10:00 Manila
 const BEFORE_SEVEN = new Date("2026-09-09T16:30:00Z"); // 00:30 Manila, Thu 10
 
@@ -67,6 +69,15 @@ describe("buildGreetingLine — the push tile's states, moved and re-voiced", ()
   it("today with no problems, or an old-format record: normal tone", () => {
     expect(line({ digest: { ...TODAY_PUSH, briefing: { ...BRIEFING, stories: [] } } }).tone).toBe("normal");
     expect(line({ digest: PLAIN_TODAY })).toMatchObject({ kind: "today", text: "All clear · 0 to review", tone: "normal" });
+  });
+
+  it("today's digest, saved but reaching zero devices, is 'undelivered' rather than a plain greeting", () => {
+    expect(line({ digest: TODAY_UNDELIVERED })).toEqual({
+      kind: "undelivered",
+      text: "This morning’s briefing reached none of your devices.",
+      tone: "alarm",
+      opens: "digest",
+    });
   });
 
   it("curls the stored title's apostrophes for the page", () => {
@@ -105,9 +116,16 @@ describe("buildGreetingLine — the push tile's states, moved and re-voiced", ()
     });
   });
 
-  it("the 07:00 boundary in Manila", () => {
-    expect(line({ now: new Date("2026-09-09T22:59:00Z"), digest: OLD_PUSH }).kind).toBe("before");
-    expect(line({ now: new Date("2026-09-09T23:00:00Z"), digest: OLD_PUSH }).kind).toBe("missing");
+  it("the cron's grace window: before 07:00, due 07:00–07:59, missing from 08:00 (Manila)", () => {
+    expect(line({ now: new Date("2026-09-09T22:59:00Z"), digest: OLD_PUSH }).kind).toBe("before"); // 06:59
+    expect(line({ now: new Date("2026-09-09T23:00:00Z"), digest: OLD_PUSH })).toEqual({
+      kind: "due",
+      text: "Your briefing is on its way.",
+      tone: "muted",
+      opens: "digest",
+    }); // 07:00
+    expect(line({ now: new Date("2026-09-09T23:59:00Z"), digest: OLD_PUSH }).kind).toBe("due"); // 07:59
+    expect(line({ now: new Date("2026-09-10T00:00:00Z"), digest: OLD_PUSH }).kind).toBe("missing"); // 08:00
   });
 
   it("a failed dispatcher run today is not a briefing that went out", () => {
@@ -169,16 +187,33 @@ describe("buildGreetingLine — the push tile's states, moved and re-voiced", ()
     expect(line({ digest: TODAY_PUSH, dispatcher: "unavailable" }).kind).toBe("today");
   });
 
-  describe("a skipped run is not a briefing", () => {
+  describe("a skipped run is a fact, not a briefing that didn't happen", () => {
     const skippedToday = { ok: true, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: true, noDevice: false };
-    it("monitoring off + skipped today → monitoring-off", () => {
+    it("monitoring off + skipped today → monitoring-off (still off wins)", () => {
       expect(line({ digest: OLD_PUSH, monitoringEnabled: false, dispatcher: skippedToday }).kind).toBe("monitoring-off");
     });
-    it("monitoring back on, skipped today → missing", () => {
-      expect(line({ digest: OLD_PUSH, monitoringEnabled: true, dispatcher: skippedToday }).kind).toBe("missing");
+    it("monitoring back on, skipped today → skipped, not the missing alarm", () => {
+      expect(line({ digest: OLD_PUSH, monitoringEnabled: true, dispatcher: skippedToday })).toEqual({
+        kind: "skipped",
+        text: "Monitoring was off at 07:00, so there’s no briefing today.",
+        tone: "muted",
+        opens: "digest",
+      });
     });
-    it("skipped with nothing ever stored → never", () => {
-      expect(line({ digest: null, dispatcher: skippedToday }).kind).toBe("never");
+    it("settings unreadable, skipped today → skipped (the row we DO have still tells the truth)", () => {
+      expect(line({ digest: OLD_PUSH, monitoringEnabled: "unavailable", dispatcher: skippedToday }).kind).toBe("skipped");
+    });
+    it("skipped with nothing ever stored → skipped, with nothing to open", () => {
+      expect(line({ digest: null, dispatcher: skippedToday })).toEqual({
+        kind: "skipped",
+        text: "Monitoring was off at 07:00, so there’s no briefing today.",
+        tone: "muted",
+        opens: null,
+      });
+    });
+    it("a skipped run from an EARLIER day is still no run at all", () => {
+      const earlierSkip = { ...skippedToday, startedAt: new Date("2026-08-08T23:00:00Z") };
+      expect(line({ digest: OLD_PUSH, dispatcher: earlierSkip, now: AFTER_SEVEN }).kind).toBe("missing");
     });
   });
 });
@@ -272,6 +307,10 @@ describe("shouldAutoOpen", () => {
     expect(shouldAutoOpen(YESTERDAY, AFTER_SEVEN)).toBe(false);
     expect(shouldAutoOpen(null, AFTER_SEVEN)).toBe(false);
     expect(shouldAutoOpen("unavailable", AFTER_SEVEN)).toBe(false);
+  });
+
+  it("still greets for today's Briefing even when it reached zero devices — the site is the only channel left", () => {
+    expect(shouldAutoOpen(TODAY_UNDELIVERED, AFTER_SEVEN)).toBe(true);
   });
 });
 
