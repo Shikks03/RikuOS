@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { COOKIE_NAME, assertSessionSecret, verifySessionToken } from "@/lib/session";
 import Rail from "./_shell/Rail";
 import TopBar from "./_shell/TopBar";
+import BriefingSlot from "./_shell/BriefingSlot";
 
 /**
  * Defence in depth. src/proxy.ts already guarantees a session on every path in
@@ -48,7 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="app-body">
         <Rail />
         <div className="app-main">
-          <TopBar />
+          <TopBar greeting={<BriefingSlot />} />
           {children}
         </div>
       </div>

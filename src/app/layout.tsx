@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 import { APP_NAME } from "@/lib/constants";
-// The five stylesheets, imported side-effect style from the root layout ONLY,
+// The six stylesheets, imported side-effect style from the root layout ONLY,
 // in this fixed order. CSS imported from different components can land in a
 // non-deterministic order in the built stylesheet; importing everything here
 // in sequence makes the cascade something you read in one file rather than
@@ -11,6 +11,7 @@ import "../styles/tokens.css";
 import "../styles/base.css";
 import "../styles/components.css";
 import "../styles/personal.css";
+import "../styles/briefing.css";
 import "../styles/legacy.css";
 
 /**

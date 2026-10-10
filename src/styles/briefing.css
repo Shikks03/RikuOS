@@ -1,0 +1,80 @@
+/* ============================================================
+   briefing.css — the assistant's Briefing (S21, spec §5).
+   Tokens only; no new hue, no new @media (components.css records the
+   phone strip as the app's last one — the panel is one shape at every
+   width, plan B deviation 1). Every button sets text-transform:none
+   against legacy.css's bare `button{uppercase}` (L1e).
+   ============================================================ */
+
+/* ---- the greeting line, in the 44px top bar ---------------------------- */
+.bf-line{
+  display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto;
+  background:none;border:0;padding:0;margin:0;font:inherit;text-transform:none;letter-spacing:normal;
+  font-size:12.5px;color:var(--ink-2);text-align:left;cursor:pointer;
+}
+.bf-line:disabled{cursor:default}
+.bf-line span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bf-line i{flex:0 0 5px;width:5px;height:5px;border-radius:50%;background:var(--ink-4)}
+.bf-line.is-normal i{background:var(--save)}
+.bf-line.is-warning{color:var(--stale)} .bf-line.is-warning i{background:var(--stale)}
+.bf-line.is-alarm{color:var(--missing)} .bf-line.is-alarm i{background:var(--missing)}
+.bf-line.is-muted{color:var(--ink-3)}
+.bf-line.is-loading{min-height:1em}
+.bf-line:not(:disabled):hover span{color:var(--ink)}
+.bf-line:focus-visible{outline:2px solid var(--session);outline-offset:4px;border-radius:var(--r-tag)}
+
+/* ---- the two dialogs ----------------------------------------------------- */
+.bf-dialog,.bf-card{
+  padding:0;border:1px solid var(--line);background:var(--raised);color:var(--ink);
+  border-radius:var(--r-feature);max-height:calc(100dvh - 32px);overflow:auto;
+}
+.bf-dialog::backdrop,.bf-card::backdrop{background:rgba(5,6,8,.72)}
+.bf-dialog.is-full{width:min(640px, 100vw - 32px);margin:auto}
+.bf-dialog.is-panel{
+  width:min(480px, 100vw - 32px);height:calc(100dvh - 32px);
+  margin:16px 16px 16px auto;
+}
+.bf-card{width:min(420px, 100vw - 32px);margin:auto}
+.bf-in{padding:var(--sp-5);display:grid;gap:var(--sp-4)}
+.bf-head{display:grid;grid-template-columns:1fr auto;gap:4px var(--sp-3);align-items:start}
+.bf-when{grid-column:1;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin:0}
+.bf-title{grid-column:1;font-family:var(--display);font-size:20px;line-height:1.25;margin:0;overflow-wrap:anywhere}
+.bf-x{
+  grid-column:2;grid-row:1 / span 2;background:none;border:1px solid var(--line);border-radius:var(--r-chip);
+  color:var(--ink-2);font:inherit;text-transform:none;width:44px;height:44px;cursor:pointer;
+}
+.bf-x:hover{color:var(--ink)}
+.bf-sec{display:grid;gap:var(--sp-2)}
+.bf-h{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin:0;font-weight:500}
+.bf-p{margin:0;font-size:14px;line-height:1.5;color:var(--ink-2);overflow-wrap:anywhere}
+.bf-p strong,.bf-said strong,.bf-story strong{color:var(--ink);font-weight:650}
+.bf-wait{min-height:3em;color:var(--ink-3)}
+.bf-quote{white-space:pre-wrap}
+.bf-stories,.bf-symptoms{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-2)}
+.bf-symptoms{padding-left:var(--sp-4);border-left:1px solid var(--line);margin-top:var(--sp-2)}
+.bf-story{margin:0;font-size:14px;line-height:1.5;color:var(--ink-2)}
+.bf-row{
+  display:grid;gap:2px;width:100%;text-align:left;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line-soft);border-radius:var(--r-card);
+  padding:var(--sp-3) var(--sp-4);font:inherit;text-transform:none;letter-spacing:normal;color:var(--ink-2);
+  min-height:44px;
+}
+.bf-row:hover{border-color:var(--line)}
+.bf-row:focus-visible,.bf-got:focus-visible,.bf-x:focus-visible{outline:2px solid var(--session);outline-offset:2px}
+.bf-said{font-size:14px;line-height:1.45}
+.bf-next{font-size:12.5px;color:var(--ink-3)}
+/* the problems list's own trailing row, for stories BRIEFING_BOUNDS.stories
+   dropped (lead addition, Plan B review): same list, quieter than a row
+   because it opens nothing. */
+.bf-omitted{font-size:12.5px;line-height:1.45;color:var(--ink-3);padding:var(--sp-2) 0}
+.bf-raw{
+  margin:0;font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--ink-2);
+  background:var(--sunk);border:1px solid var(--line-soft);border-radius:var(--r-chip);
+  padding:var(--sp-3);white-space:pre-wrap;overflow-wrap:anywhere;max-height:40vh;overflow:auto;
+}
+.bf-foot{display:flex;justify-content:flex-end}
+.bf-got{
+  font:inherit;text-transform:none;letter-spacing:normal;font-weight:600;font-size:13px;
+  background:var(--ink);color:var(--void);border:0;border-radius:var(--r-pill);
+  padding:0 var(--sp-5);min-height:44px;cursor:pointer;
+}

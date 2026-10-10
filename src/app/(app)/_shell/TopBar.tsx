@@ -1,9 +1,12 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 
 /**
- * 44px, one hairline bottom, and exactly one element: the freshness stamp.
+ * 44px, one hairline bottom, and two elements: the assistant's greeting line
+ * (S21 — the one deliberate addition, which supersedes "exactly one element")
+ * and the freshness stamp.
  *
  * No breadcrumb — `Operator` named nobody in a system with exactly one user
  * and was the bar's brightest element, and the crumb's page name restated the
@@ -36,12 +39,13 @@ const STAMP = new Intl.DateTimeFormat("en-GB", {
   hour12: false,
 });
 
-export default function TopBar() {
+export default function TopBar({ greeting }: { greeting?: ReactNode }) {
   const pathname = usePathname();
 
   return (
     <div className="topbar">
       <div className="topbar-in">
+        {greeting}
         <span className="crumb">
           <Stamp key={pathname} />
         </span>
