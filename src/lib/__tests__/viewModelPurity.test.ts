@@ -31,6 +31,7 @@ import "@/lib/personalView";
 // and the client-safe error sentences.
 import "@/lib/personalLayout";
 import "@/lib/personalErrors";
+import "@/lib/sinceThen";
 
 describe("view-model purity", () => {
   it("registers no Mongoose model when the view models load", () => {
