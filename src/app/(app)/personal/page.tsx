@@ -10,7 +10,6 @@ import {
   type CalendarListEntry,
   type CalendarWindow,
 } from "@/lib/google";
-import { getLastDigest, type StoredDigest } from "@/lib/lastDigest";
 import { readOsSettings, type Layer, type OsSettingsValues } from "@/lib/osSettings";
 import { resolvePersonalLayout } from "@/lib/personalLayout";
 import {
@@ -18,7 +17,6 @@ import {
   OPEN_TODOS_CAP,
   buildDoneView,
   buildLayersView,
-  buildPushTileView,
   buildTodayDue,
   buildTodayView,
   buildTodoTileView,
@@ -28,15 +26,12 @@ import {
   type DoneInput,
   type OpenTodoInput,
   type OpenTodosFeed,
-  type PushInput,
 } from "@/lib/personalView";
 import { doneWindowStart, todoDueKey } from "@/lib/todos";
-import AgentRun from "@/models/AgentRun";
 import Todo, { TODO_SECTIONS, type TodoSection } from "@/models/Todo";
 import LayoutEditor from "./LayoutEditor";
 import Done from "./_blocks/Done";
 import Layers, { LayersFallback } from "./_blocks/Layers";
-import Push from "./_blocks/Push";
 import Today, { TodayFallback, type EventFormData } from "./_blocks/Today";
 import Todos, { type TodoDueKeys } from "./_blocks/Todos";
 import Week, { WeekFallback } from "./_blocks/Week";
@@ -67,9 +62,7 @@ export const metadata: Metadata = { title: "Personal" };
 /**
  * `PromiseSettledResult` -> the value, or "unavailable" — and a rejection is
  * LOGGED with the read named, so every sentence on screen has a line in the
- * log saying which read it was. "unavailable" is never null: a LastDigest
- * that was never stored (null) and one that could not be read are different
- * tiles (R55).
+ * log saying which read it was.
  */
 function settled<T>(result: PromiseSettledResult<T>, label: string): T | "unavailable" {
   if (result.status === "fulfilled") return result.value;
@@ -169,24 +162,6 @@ async function readDoneTodos(today: DayKey): Promise<Exclude<DoneInput["done"], 
   };
 }
 
-type Dispatcher = Exclude<PushInput["dispatcher"], "unavailable">;
-
-/**
- * The dispatcher's newest run, with `skipped` and `error` projected — which
- * watchdog's fetchLatestRuns does not select (P10b carry-forward). A row with
- * a `skipped` key says so itself; only a row WITHOUT the key (written before
- * the field) falls back to `ok && error`, never a row where it is false.
- */
-async function readDispatcher(): Promise<Dispatcher> {
-  const doc = await AgentRun.findOne({ agent: "dispatcher" })
-    .sort({ startedAt: -1 })
-    .select({ ok: 1, startedAt: 1, skipped: 1, error: 1 })
-    .lean<{ ok: boolean; startedAt: Date; skipped?: boolean; error?: string }>();
-  if (!doc) return null;
-  const skipped = typeof doc.skipped === "boolean" ? doc.skipped : doc.ok === true && typeof doc.error === "string";
-  return { ok: doc.ok, startedAt: doc.startedAt, skipped };
-}
-
 // --- Phase 2: the calendar ----------------------------------------------------
 
 /**
@@ -237,10 +212,9 @@ export default async function PersonalPage() {
 
   // --- Phase 1: one deadline-bounded round of Mongo reads ----------------
   //
-  // All five reads start together behind one connect, and each is bounded by
+  // All three reads start together behind one connect, and each is bounded by
   // the same MONGO_READ_TIMEOUT_MS from the same moment, so the phase costs
-  // one deadline however it fails. Settled one by one, not all-or-nothing:
-  // a LastDigest that cannot be read must not take the to-dos down with it.
+  // one deadline however it fails. Settled one by one, not all-or-nothing.
   // readOsSettings, never getOsSettings — the latter is an upsert, and would
   // make every page view a primary write (R37).
   const connected = connectDB();
@@ -250,18 +224,14 @@ export default async function PersonalPage() {
       MONGO_READ_TIMEOUT_MS,
       `personal ${label}`,
     );
-  const [settingsR, openR, doneR, digestR, dispatcherR] = await Promise.allSettled([
+  const [settingsR, openR, doneR] = await Promise.allSettled([
     bounded(readOsSettings, "settings read"),
     bounded(readOpenTodos, "open to-do read"),
     bounded(() => readDoneTodos(today), "done to-do read"),
-    bounded(getLastDigest, "last-digest read"),
-    bounded(readDispatcher, "dispatcher run read"),
   ]);
   const settings: OsSettingsValues | "unavailable" = settled(settingsR, "settings read");
   const todos: OpenTodosFeed = settled(openR, "open to-do read");
   const done: DoneInput["done"] = settled(doneR, "done to-do read");
-  const digest: StoredDigest | null | "unavailable" = settled(digestR, "last-digest read");
-  const dispatcher: PushInput["dispatcher"] = settled(dispatcherR, "dispatcher run read");
 
   // The grid always renders (deck §11). An arrangement that cannot be read —
   // settings down included — is the default, and says so once (deck §15).
@@ -286,12 +256,6 @@ export default async function PersonalPage() {
   const layersView = calendar.then((feed) => buildLayersView({ calendar: feed }));
   const todoTile = buildTodoTileView({ now, todos });
   const doneTile = buildDoneView({ done });
-  const pushTile = buildPushTileView({
-    now,
-    digest,
-    dispatcher,
-    monitoringEnabled: settings === "unavailable" ? "unavailable" : settings.monitoringEnabled,
-  });
 
   const todoDue: TodoDueKeys =
     todos === "unavailable" ? {} : Object.fromEntries(todos.rows.map((t) => [t.id, t.dueOn]));
@@ -341,7 +305,6 @@ export default async function PersonalPage() {
             <Layers view={layersView} />
           </Suspense>
         ),
-        push: <Push view={pushTile} />,
         week: (
           <Suspense fallback={<WeekFallback />}>
             <Week view={weekView} />

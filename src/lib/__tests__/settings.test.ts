@@ -63,7 +63,7 @@ describe("parseSettingsPatch — monitoringEnabled", () => {
 describe("parseSettingsPatch — personalLayout (P10b)", () => {
   const good = () => [
     [{ tile: "today", span: 8 }, { tile: "todos", span: 4 }],
-    [{ tile: "layers", span: 3 }, { tile: "push", span: 8 }],
+    [{ tile: "layers", span: 12 }],
     [{ tile: "week", span: 12 }],
     [{ tile: "done", span: 12 }],
   ];

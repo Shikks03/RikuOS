@@ -17,7 +17,27 @@
  * the grid's inline `--tracks`.
  */
 
-export const PERSONAL_TILES = ["today", "todos", "layers", "push", "week", "done"] as const;
+export const PERSONAL_TILES = ["today", "todos", "layers", "week", "done"] as const;
+
+/**
+ * Tiles that existed and were retired. A stored layout may still name one, so
+ * the READ path drops it before parsing and keeps every other placement;
+ * without this, parseLayout's "unknown tile" would discard Riku's whole
+ * arrangement for the default (S21 retired "push"). The WRITE path stays
+ * strict and rejects it.
+ */
+export const RETIRED_TILES: readonly string[] = ["push"];
+
+function dropRetired(stored: unknown): unknown {
+  if (!Array.isArray(stored)) return stored;
+  return stored.map((row) =>
+    Array.isArray(row)
+      ? row.filter(
+          (e) => !(typeof e === "object" && e !== null && RETIRED_TILES.includes((e as { tile?: unknown }).tile as string)),
+        )
+      : row,
+  );
+}
 
 export type PersonalTile = (typeof PERSONAL_TILES)[number];
 export interface LayoutEntry { tile: PersonalTile; span: number }
@@ -54,7 +74,7 @@ export const PERSONAL_ROWS: readonly [340, 200, 240, 120] = [340, 200, 240, 120]
  */
 export const PERSONAL_LAYOUT_DEFAULT: ReadonlyPersonalLayout = freezeLayout([
   [{ tile: "today", span: 8 }, { tile: "todos", span: 4 }],
-  [{ tile: "layers", span: 3 }, { tile: "push",  span: 8 }],
+  [{ tile: "layers", span: 12 }],
   [{ tile: "week",  span: 12 }],
   [{ tile: "done",  span: 12 }],
 ]);
@@ -296,7 +316,12 @@ export function resolveLayoutAgainst<T extends string>(
   return { layout, fellBack: false };
 }
 
-/** Total. `fellBack` drives deck 15's `Couldn't load your arrangement, so this is the default.` */
+/**
+ * Total. `fellBack` drives deck 15's `Couldn't load your arrangement, so this
+ * is the default.` `dropRetired` runs first so a layout stored before S21
+ * that still names "push" keeps every other placement instead of being
+ * read as unparseable (RETIRED_TILES).
+ */
 export function resolvePersonalLayout(stored: unknown): { layout: PersonalLayout; fellBack: boolean } {
-  return resolveLayoutAgainst(stored, PERSONAL_TILES, PERSONAL_LAYOUT_DEFAULT);
+  return resolveLayoutAgainst(dropRetired(stored), PERSONAL_TILES, PERSONAL_LAYOUT_DEFAULT);
 }

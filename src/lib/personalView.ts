@@ -1,7 +1,9 @@
 /**
  * personalView.ts — the Personal page's view models. Pure: no database, no
  * network, no environment, no clock read (`now` is a parameter). Plan B adds
- * the Today, week, to-do, push and layers models; Plan A ships the ramp, because R84 requires the
+ * the Today, week, to-do and layers models (the push model retired with the
+ * tile, S21 — see briefingView.ts's buildPushTileView-descended greeting
+ * line); Plan A ships the ramp, because R84 requires the
  * ramp's CSS, the tokens and the design-system footnote to land in one commit
  * and R80 makes the nine classes and this one lookup a single frozen artifact.
  *
@@ -26,14 +28,13 @@
  * viewModelPurity.test.ts).
  */
 
-import { APP_TZ, PUSH_EXPECTED_HOUR } from "@/lib/constants";
+import { APP_TZ } from "@/lib/constants";
 import { addDays, clockHHMM, dayKey, formatDay, todayKey, type DayKey } from "@/lib/days";
 import { compareEvents } from "@/lib/eventOrder";
 import { dueChip, sortTodos, type CreateTodoInput } from "@/lib/todos";
 import type { PersonalTile, ReadonlyPersonalLayout } from "@/lib/personalLayout";
 import { formCapableAt } from "@/lib/layoutEdit";
 import type { CalendarEvent, CalendarListEntry, CalendarWindow, GoogleErrorKind } from "@/lib/google";
-import type { StoredDigest } from "@/lib/lastDigest";
 import type { Layer } from "@/lib/osSettings";
 
 /** The model's section union, reached through todos.ts so no path here names a model. */
@@ -80,7 +81,7 @@ export function heroTint(pending: number | null): HeroTint | null {
 }
 
 // =============================================================================
-// P10b Task 9 — the six view models (R10 · R14 · R16–R23 · R42 · R45 · R49 ·
+// P10b Task 9 — the five view models (R10 · R14 · R16–R23 · R42 · R45 · R49 ·
 // R51b · R55 · R57–R59 · R69 · R73 · R83 · R85 · R90, visual spec §4.1–§4.6,
 // §5.9). `now` is always a parameter.
 //
@@ -94,14 +95,14 @@ export function heroTint(pending: number | null): HeroTint | null {
 //
 // DOTS (R10, R55, §5.9; the Honesty Critic's kinds table, round 1):
 //   "stale"   every couldn't-read — including `Google access has expired.`
-//   "missing" the past-07:00 `No push this morning.` and nothing else here
-//             (lateness is the due chip's `late`, not a SayLine)
+//   "missing" the past-07:00 `No push this morning.` — the greeting line's
+//             now, in briefingView.ts, since the push tile retired (S21);
+//             nothing here uses it (lateness is the due chip's `late`,
+//             not a SayLine)
 //   null      a measured emptiness; an absence by configuration (`Google
 //             isn't connected yet…`, `No calendars chosen…`, `All layers are
-//             switched off.`, `Monitoring is off…`); an absence of a record
-//             (`No push recorded yet.`, `A push went out… wasn't stored.`);
-//             and a vanished calendar (R42: permanent, and it hands over a
-//             lever).
+//             switched off.`); a vanished calendar (R42: permanent, and it
+//             hands over a lever).
 // =============================================================================
 
 // ---- The contract (plan "Types Plan C will render") -------------------------
@@ -231,15 +232,6 @@ export interface DoneTileView {
   fail: SayLine | null;
 }
 
-export interface PushTileView {
-  kind: "quote" | "went-out-unstored" | "no-push-today" | "never" | "monitoring-off" | "fail";
-  stamp: string | null; // "sent 07:00", in APP_TZ - never the cron's hour
-  title: string | null;
-  body: string | null;
-  last: { stamp: string; title: string; body: string } | null;
-  line: SayLine | null;
-}
-
 export interface LayersTileView {
   kind: "switches" | "sentence" | "fail";
   rows: Array<{ calendarId: string; name: string; enabled: boolean; note: string | null }>;
@@ -341,38 +333,6 @@ export interface DoneTodoInput {
 export interface DoneInput {
   /** The newest completions (the page reads DISPLAY_BOUND of them) and the week's count. */
   done: { rows: readonly DoneTodoInput[]; total: number } | "unavailable";
-}
-
-export interface PushInput {
-  now: Date;
-  /** getLastDigest(): null = never stored (R55); "unavailable" = the read threw. */
-  digest: StoredDigest | null | "unavailable";
-  /**
-   * The dispatcher's latest AgentRun; null if it never ran.
-   *
-   * `skipped` marks a run that recorded itself WITHOUT sending: with
-   * monitoring off, the morning route still writes a `dispatcher` row with
-   * `ok: true` so the watchdog can tell "switched off" from "cron never fired"
-   * (src/app/api/cron/morning/route.ts). A skipped run is treated as NO run —
-   * never as a push that went out, and never as a failure.
-   *
-   * HOW THE LOADER DERIVES IT. AgentRun carries a structured `skipped`
-   * field: runJob (src/lib/jobs/runJob.ts) writes `skipped: true` on every
-   * ok run it was handed a skip note for. fetchLatestRuns (watchdog.ts) does
-   * not select it, so Plan C's loader reads the dispatcher row itself with
-   * `skipped` and `error` projected, and sets `skipped = run.skipped === true`.
-   *
-   * FALLBACK, for rows written before the field existed (they have no
-   * `skipped` key, and AgentRun's 90-day TTL retires them): `skipped =
-   * run.ok === true && typeof run.error === "string"`. That held because
-   * runJob wrote `error` on an ok row ONLY for a `note`, and the one note any
-   * dispatcher row carried was the monitoring-off route's. Apply it only when
-   * `run.skipped` is absent — never when it is `false`. Do not match the
-   * note's text.
-   */
-  dispatcher: { ok: boolean; startedAt: Date; skipped: boolean } | null | "unavailable";
-  /** OsSettings.monitoringEnabled, or "unavailable" when settings did not load. */
-  monitoringEnabled: boolean | "unavailable";
 }
 
 export interface LayersInput {
@@ -813,75 +773,6 @@ export function buildDoneView(input: DoneInput): DoneTileView {
     rows,
     bound: boundLine(rows.length, total),
     fail: null,
-  };
-}
-
-// ---- 5. This morning's push -------------------------------------------------
-
-/**
- * The quotation tile (R14): title and body are handed through exactly as
- * stored — never clamped, re-counted or evaluated — and `devices` is not
- * carried. Precedence, first match wins:
- *
- *   digest unreadable                   → fail
- *   a digest sent today (APP_TZ)        → quote; `sent HH:MM` from sentAt
- *   (a `skipped` dispatcher run counts as no run at all — see PushInput)
- *   dispatcher ok, started today        → went-out-unstored (no dot, R22)
- *   monitoring off                      → monitoring-off
- *   dispatcher unreadable               → fail: "no push" and "a push whose
- *                                         text was not stored" can no longer
- *                                         be told apart, and the tile does
- *                                         not guess
- *   no digest ever                      → never
- *   an older digest                     → no-push-today, with `Last: …`; the
- *                                         `missing` dot from 07:00 in APP_TZ
- *
- * Monitoring-off loses to a push stored for today (invariant 11) and — a
- * judgement call — to a push the run log says went out today: the tile says
- * what happened this morning before what the switch will do.
- */
-export function buildPushTileView(input: PushInput): PushTileView {
-  const blank = { stamp: null, title: null, body: null, last: null } as const;
-  const { digest, now } = input;
-  // A skipped run (monitoring off) is NO run: not a push, not a failure.
-  const dispatcher =
-    input.dispatcher !== "unavailable" && input.dispatcher !== null && input.dispatcher.skipped
-      ? null
-      : input.dispatcher;
-  const today = todayKey(now);
-  const unreadable = stale("Couldn’t load this morning’s push."); // deck §6 Tile 4, §11
-
-  if (digest === "unavailable") return { kind: "fail", ...blank, line: unreadable };
-  if (digest !== null && dayKey(digest.sentAt, APP_TZ) === today) {
-    return {
-      kind: "quote",
-      stamp: `sent ${clock(digest.sentAt)}`, // deck §6 Tile 4: `sent 07:00` — sentAt, never the cron's hour
-      title: digest.title,
-      body: digest.body,
-      last: null,
-      line: null,
-    };
-  }
-  if (dispatcher !== "unavailable" && dispatcher !== null && dispatcher.ok && dayKey(dispatcher.startedAt, APP_TZ) === today) {
-    return { kind: "went-out-unstored", ...blank, line: bare("A push went out this morning. Its text wasn’t stored.") }; // deck §15
-  }
-  if (input.monitoringEnabled === false) {
-    return { kind: "monitoring-off", ...blank, line: bare("Monitoring is off, so no push goes out.") }; // deck §6 Tile 4
-  }
-  if (dispatcher === "unavailable") return { kind: "fail", ...blank, line: unreadable };
-  if (digest === null) return { kind: "never", ...blank, line: bare("No push recorded yet.") }; // deck §6 Tile 4
-
-  // deck §15: `No push this morning.` turns red only once 07:00 has passed.
-  const pastExpected = Number(clock(now).slice(0, 2)) >= PUSH_EXPECTED_HOUR;
-  return {
-    kind: "no-push-today",
-    ...blank,
-    last: {
-      stamp: `Last: ${formatDay(dayKey(digest.sentAt, APP_TZ))} ${clock(digest.sentAt)}`, // deck §6 Tile 4: `Last: Tue 9 Sep 07:00`
-      title: digest.title,
-      body: digest.body,
-    },
-    line: { text: "No push this morning.", dot: pastExpected ? "missing" : null }, // deck §6 Tile 4
   };
 }
 

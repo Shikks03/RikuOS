@@ -115,7 +115,7 @@ describe("readOsSettings — layers and personalLayout (P10b)", () => {
   const STORED_LAYOUT = [
     [{ tile: "week", span: 12 }],
     [{ tile: "today", span: 6 }, { tile: "todos", span: 6 }],
-    [{ tile: "layers", span: 4 }, { tile: "push", span: 8 }],
+    [{ tile: "layers", span: 12 }],
     [{ tile: "done", span: 12 }],
   ];
 

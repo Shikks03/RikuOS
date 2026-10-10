@@ -14,7 +14,6 @@ import {
   buildWeekView,
   buildTodoTileView,
   buildDoneView,
-  buildPushTileView,
   buildLayersView,
   buildSettingsCards,
   pickerRows,
@@ -27,7 +26,6 @@ import {
   type OpenTodosFeed,
   type DoneTodoInput,
   type TodoTileView,
-  type PushInput,
 } from "@/lib/personalView";
 import type { CalendarEvent, CalendarListEntry } from "@/lib/google";
 import type { Layer } from "@/lib/osSettings";
@@ -347,7 +345,7 @@ describe("buildTodayView", () => {
         { tile: "todos" as const, span: 9 },
       ],
       [{ tile: "layers" as const, span: 12 }],
-      [{ tile: "push" as const, span: 12 }],
+      [],
       [
         { tile: "week" as const, span: 6 },
         { tile: "done" as const, span: 6 },
@@ -722,113 +720,6 @@ describe("buildDoneView", () => {
       rows: [],
       bound: null,
       fail: { text: "Couldn’t load to-dos.", dot: "stale" },
-    });
-  });
-});
-
-// ----------------------------------------------------------------- Push ----
-
-const TODAY_PUSH = { sentAt: new Date("2026-09-09T23:00:12Z"), title: "All clear · 0 to review", body: "All clear.", devices: 2, briefing: null, seenAt: null };
-const OLD_PUSH = { sentAt: new Date("2026-08-08T23:00:00Z"), title: "Old", body: "Old body", devices: 1, briefing: null, seenAt: null };
-const AFTER_SEVEN = new Date("2026-09-10T02:00:00Z"); // 10:00 Manila
-const BEFORE_SEVEN = new Date("2026-09-09T16:30:00Z"); // 00:30 Manila, Thu 10
-
-function push(over: Partial<PushInput>) {
-  return buildPushTileView({ now: AFTER_SEVEN, digest: null, dispatcher: null, monitoringEnabled: true, ...over });
-}
-
-describe("buildPushTileView", () => {
-  it("quote: today's stored push, stamped with sentAt in Manila", () => {
-    expect(push({ digest: TODAY_PUSH })).toEqual({
-      kind: "quote",
-      stamp: "sent 07:00",
-      title: "All clear · 0 to review",
-      body: "All clear.",
-      last: null,
-      line: null,
-    });
-  });
-
-  it("went out, text not stored: no dot", () => {
-    const v = push({ digest: OLD_PUSH, dispatcher: { ok: true, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: false } });
-    expect(v.kind).toBe("went-out-unstored");
-    expect(v.line).toEqual({ text: "A push went out this morning. Its text wasn’t stored.", dot: null });
-    expect(v.stamp).toBeNull();
-  });
-
-  it("no push this morning, past 07:00: the missing dot, and Last: beneath", () => {
-    const v = push({ digest: OLD_PUSH, dispatcher: { ok: true, startedAt: new Date("2026-08-08T23:00:00Z"), skipped: false } });
-    expect(v.kind).toBe("no-push-today");
-    expect(v.line).toEqual({ text: "No push this morning.", dot: "missing" });
-    expect(v.last).toEqual({ stamp: "Last: Sun 9 Aug 07:00", title: "Old", body: "Old body" });
-    expect(v.stamp).toBeNull();
-  });
-
-  it("no push this morning, before 07:00: undotted", () => {
-    const v = push({ now: BEFORE_SEVEN, digest: OLD_PUSH });
-    expect(v.kind).toBe("no-push-today");
-    expect(v.line).toEqual({ text: "No push this morning.", dot: null });
-  });
-
-  it("a failed dispatcher run today is not a push that went out", () => {
-    const v = push({ digest: OLD_PUSH, dispatcher: { ok: false, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: false } });
-    expect(v.kind).toBe("no-push-today");
-  });
-
-  it("never stored: No push recorded yet.", () => {
-    const v = push({});
-    expect(v.kind).toBe("never");
-    expect(v.line).toEqual({ text: "No push recorded yet.", dot: null });
-  });
-
-  it("monitoring off: its sentence, undotted", () => {
-    const v = push({ digest: OLD_PUSH, monitoringEnabled: false });
-    expect(v.kind).toBe("monitoring-off");
-    expect(v.line).toEqual({ text: "Monitoring is off, so no push goes out.", dot: null });
-  });
-
-  it("monitoring off loses to a push stored for today", () => {
-    expect(push({ digest: TODAY_PUSH, monitoringEnabled: false }).kind).toBe("quote");
-  });
-
-  it("unreadable digest: Couldn’t load this morning’s push.", () => {
-    const v = push({ digest: "unavailable" });
-    expect(v).toMatchObject({ kind: "fail", line: { text: "Couldn’t load this morning’s push.", dot: "stale" }, stamp: null });
-  });
-
-  it("an unreadable run cannot tell no-push from unstored, so it fails rather than guess", () => {
-    expect(push({ digest: OLD_PUSH, dispatcher: "unavailable" }).kind).toBe("fail");
-    expect(push({ digest: TODAY_PUSH, dispatcher: "unavailable" }).kind).toBe("quote");
-  });
-
-  describe("a skipped run is not a push (monitoring off still writes an ok dispatcher row)", () => {
-    const skippedToday = { ok: true, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: true };
-
-    it("old digest + monitoring off + a skipped run today → monitoring-off, not went-out", () => {
-      const v = push({ digest: OLD_PUSH, monitoringEnabled: false, dispatcher: skippedToday });
-      expect(v.kind).toBe("monitoring-off");
-      expect(v.line).toEqual({ text: "Monitoring is off, so no push goes out.", dot: null });
-    });
-
-    it("monitoring back on, today's run was skipped, no digest today → no-push-today, not went-out", () => {
-      const v = push({ digest: OLD_PUSH, monitoringEnabled: true, dispatcher: skippedToday });
-      expect(v.kind).toBe("no-push-today");
-      expect(v.line).toEqual({ text: "No push this morning.", dot: "missing" });
-    });
-
-    it("a skipped run with no digest ever reads as never, not as a failure", () => {
-      expect(push({ digest: null, monitoringEnabled: true, dispatcher: skippedToday }).kind).toBe("never");
-    });
-  });
-
-  describe("the 07:00 boundary in Manila (deck §15)", () => {
-    it("06:59 stands undotted", () => {
-      const v = push({ now: new Date("2026-09-09T22:59:00Z"), digest: OLD_PUSH });
-      expect(v.line).toEqual({ text: "No push this morning.", dot: null });
-    });
-    it("07:00 takes the missing dot", () => {
-      const v = push({ now: new Date("2026-09-09T23:00:00Z"), digest: OLD_PUSH });
-      expect(v.line).toEqual({ text: "No push this morning.", dot: "missing" });
     });
   });
 });

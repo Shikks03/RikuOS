@@ -1,6 +1,6 @@
 /**
  * The layout editor's moves and its disabling matrix (deck §8, R29, R31, R1).
- * Default arrangement: [today 8, todos 4] · [layers 3, push 8] · [week 12] · [done 12].
+ * Default arrangement (S21, push retired): [today 8, todos 4] · [layers 12] · [week 12] · [done 12].
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -24,9 +24,9 @@ const can = (tile: PersonalTile, layout = D) => ALL.filter((a) => canEdit(layout
 describe("the disabling matrix on the default arrangement (specimen 04)", () => {
   it("Today: → and − only (row 1, row full)", () => expect(can("today")).toEqual(["right", "narrow"]));
   it("To-do: ← and − only", () => expect(can("todos")).toEqual(["left", "narrow"]));
-  it("Layers: → − + (↑ row 1 full, ↓ row 3 full; its row sums to 11)", () =>
-    expect(can("layers")).toEqual(["right", "narrow", "widen"]));
-  it("Push: ← − +", () => expect(can("push")).toEqual(["left", "narrow", "widen"]));
+  // CHANGED MEANING (S21): Layers is now alone on row 2 at span 12 (push
+  // retired), so its row is full both ways — no →, ↑ or ↓, widen refused too.
+  it("Layers: − only (alone on a full row)", () => expect(can("layers")).toEqual(["narrow"]));
   it("Next 7 days: − only", () => expect(can("week")).toEqual(["narrow"]));
   it("Done this week: − only (row 4 has no ↓)", () => expect(can("done")).toEqual(["narrow"]));
 });
@@ -37,11 +37,13 @@ describe("the moves", () => {
     expect(l[0].map((e) => e.tile)).toEqual(["todos", "today"]);
     expect(applyEdit(l, "todos", "right")[0].map((e) => e.tile)).toEqual(["today", "todos"]);
   });
+  // CHANGED MEANING (S21): layers now starts alone at span 12 (not span 3
+  // beside push), so it takes ten narrows to reach span 2, not one.
   it("↑ / ↓ move to the neighbouring row, at the end — when it has room", () => {
-    let l = applyEdit(D, "week", "narrow"); // week 11
-    l = applyEdit(l, "layers", "narrow"); // layers 2 — row 2 sums to 10
-    expect(canEdit(l, "layers", "down")).toBe(false); // row 3 has 1 free
-    for (let i = 0; i < 9; i++) l = applyEdit(l, "week", "narrow"); // week 2
+    let l = applyEdit(D, "week", "narrow"); // week 11, row 3 has 1 free
+    for (let i = 0; i < 10; i++) l = applyEdit(l, "layers", "narrow"); // layers 12 -> 2
+    expect(canEdit(l, "layers", "down")).toBe(false); // row 3 has 1 free, layers needs 2
+    for (let i = 0; i < 9; i++) l = applyEdit(l, "week", "narrow"); // week 2, row 3 has 10 free
     expect(canEdit(l, "layers", "down")).toBe(true);
     l = applyEdit(l, "layers", "down");
     expect(l[2].map((e) => e.tile)).toEqual(["week", "layers"]);
@@ -72,8 +74,8 @@ describe("the moves", () => {
   it("every reachable arrangement passes the strict write validator", () => {
     let l = copyLayout(D);
     const script: Array<[PersonalTile, EditAction]> = [
-      ["todos", "widen"], ["today", "narrow"], ["today", "narrow"], ["todos", "widen"], ["push", "narrow"],
-      ["layers", "up"], ["push", "left"], ["week", "narrow"], ["done", "narrow"], ["done", "up"],
+      ["todos", "widen"], ["today", "narrow"], ["today", "narrow"], ["todos", "widen"], ["layers", "narrow"],
+      ["week", "up"], ["layers", "left"], ["week", "narrow"], ["done", "narrow"], ["done", "up"],
     ];
     for (const [t, a] of script) {
       l = applyEdit(l, t, a);
@@ -85,13 +87,13 @@ describe("the moves", () => {
 describe("the caption, Save and Reset", () => {
   it("row full · 1 column left · N columns left", () => {
     expect(rowCaption(D, "today")).toBe("row full");
-    expect(rowCaption(D, "layers")).toBe("1 column left");
+    expect(rowCaption(D, "layers")).toBe("row full"); // CHANGED (S21): layers alone fills row 2 now
     expect(rowCaption(applyEdit(D, "week", "narrow"), "week")).toBe("1 column left");
     expect(rowCaption(applyEdit(applyEdit(D, "week", "narrow"), "week", "narrow"), "week")).toBe("2 columns left");
   });
   it("the default is the default; one move makes it not", () => {
     expect(isDefaultLayout(D)).toBe(true);
-    expect(isDefaultLayout(applyEdit(D, "push", "narrow"))).toBe(false);
+    expect(isDefaultLayout(applyEdit(D, "layers", "narrow"))).toBe(false);
   });
   it("siblings pair both ways", () => {
     for (const a of ALL) expect(EDIT_SIBLING[EDIT_SIBLING[a]]).toBe(a);

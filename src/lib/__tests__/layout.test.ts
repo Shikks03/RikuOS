@@ -26,6 +26,36 @@ import {
   type PersonalLayout,
 } from "@/lib/personalLayout";
 
+describe("the retired push tile (S21)", () => {
+  // Riku's real stored shape before S21: the default with push in row 2.
+  const BEFORE_S21 = [
+    [{ tile: "today", span: 8 }, { tile: "todos", span: 4 }],
+    [{ tile: "layers", span: 3 }, { tile: "push", span: 8 }],
+    [{ tile: "week", span: 12 }],
+    [{ tile: "done", span: 12 }],
+  ];
+
+  it("drops push on read and keeps every other placement, without falling back", () => {
+    const { layout, fellBack } = resolvePersonalLayout(BEFORE_S21);
+    expect(fellBack).toBe(false);
+    expect(layout).toEqual([
+      [{ tile: "today", span: 8 }, { tile: "todos", span: 4 }],
+      [{ tile: "layers", span: 3 }],
+      [{ tile: "week", span: 12 }],
+      [{ tile: "done", span: 12 }],
+    ]);
+  });
+
+  it("still rejects push on write", () => {
+    expect(validateLayout(BEFORE_S21)).toMatchObject({ ok: false });
+  });
+
+  it("has five tiles and Layers alone on row 2 by default", () => {
+    expect([...PERSONAL_TILES]).toEqual(["today", "todos", "layers", "week", "done"]);
+    expect(PERSONAL_LAYOUT_DEFAULT[1]).toEqual([{ tile: "layers", span: 12 }]);
+  });
+});
+
 /** A deep copy of the default, to mutate per case. */
 function def(): PersonalLayout {
   return PERSONAL_LAYOUT_DEFAULT.map((row) => row.map((e) => ({ ...e })));
@@ -34,8 +64,8 @@ function def(): PersonalLayout {
 const W = (px: number) => `minmax(calc(${px}px + var(--tb)), auto)`;
 
 describe("the constants", () => {
-  it("names the six tiles once each", () => {
-    expect([...PERSONAL_TILES]).toEqual(["today", "todos", "layers", "push", "week", "done"]);
+  it("names the five tiles once each", () => {
+    expect([...PERSONAL_TILES]).toEqual(["today", "todos", "layers", "week", "done"]);
   });
 
   it("weighs the rows 340 · 200 · 240 · 120 (R4, R39: row 2 is 200, not 180)", () => {
@@ -58,7 +88,7 @@ describe("validateLayout — strict on write", () => {
       [{ tile: "today", span: 8 }, { tile: "todos", span: 4 }],
       [],
       [{ tile: "week", span: 12 }],
-      [{ tile: "done", span: 4 }, { tile: "layers", span: 3 }, { tile: "push", span: 5 }],
+      [{ tile: "done", span: 4 }, { tile: "layers", span: 3 }],
     ];
     expect(validateLayout(layout).ok).toBe(true);
   });
@@ -95,7 +125,8 @@ describe("validateLayout — strict on write", () => {
 
   it("rejects a row over 12", () => {
     const layout = def();
-    layout[1] = [{ tile: "layers", span: 4 }, { tile: "push", span: 9 }]; // 13
+    layout[1] = [{ tile: "layers", span: 4 }, { tile: "done", span: 9 }]; // 13
+    layout[3] = [];
     expect(validateLayout(layout)).toEqual({ ok: false, error: "Row 2 is wider than 12 columns." });
   });
 
@@ -190,7 +221,7 @@ describe("buildTracks", () => {
 
   it("compacts an empty row and renumbers, each survivor keeping its own row's weight", () => {
     const layout: PersonalLayout = [
-      [{ tile: "today", span: 3 }, { tile: "todos", span: 3 }, { tile: "layers", span: 3 }, { tile: "push", span: 3 }],
+      [{ tile: "today", span: 3 }, { tile: "todos", span: 3 }, { tile: "layers", span: 3 }],
       [],
       [{ tile: "week", span: 12 }],
       [{ tile: "done", span: 12 }],
@@ -202,7 +233,7 @@ describe("buildTracks", () => {
 
   it("emits auto for a row whose only occupant is narrower than the row (R53)", () => {
     const layout: PersonalLayout = [
-      [{ tile: "push", span: 4 }],
+      [{ tile: "today", span: 4 }],
       [{ tile: "layers", span: 3 }, { tile: "today", span: 8 }],
       [{ tile: "week", span: 12 }],
       [{ tile: "done", span: 6 }, { tile: "todos", span: 6 }],
@@ -216,7 +247,7 @@ describe("buildTracks", () => {
 
   it("does NOT emit auto for a two-tile row summing to 5 (R91 narrows R5)", () => {
     const layout: PersonalLayout = [
-      [{ tile: "push", span: 3 }, { tile: "layers", span: 2 }],
+      [{ tile: "today", span: 3 }, { tile: "layers", span: 2 }],
       [{ tile: "today", span: 8 }, { tile: "todos", span: 4 }],
       [{ tile: "week", span: 12 }],
       [{ tile: "done", span: 12 }],
@@ -226,7 +257,7 @@ describe("buildTracks", () => {
 
   it("never emits auto while editing (R5's surviving suspension)", () => {
     const layout: PersonalLayout = [
-      [{ tile: "push", span: 4 }],
+      [{ tile: "today", span: 4 }],
       [{ tile: "layers", span: 3 }, { tile: "today", span: 8 }],
       [{ tile: "week", span: 12 }],
       [{ tile: "done", span: 6 }, { tile: "todos", span: 6 }],
@@ -242,26 +273,25 @@ describe("buildCells", () => {
     expect(buildCells(PERSONAL_LAYOUT_DEFAULT, false)).toEqual([
       { tile: "today", rowClass: "pe-r1", spanClass: "pe-s8", collapsedClass: "pe-x4" },
       { tile: "todos", rowClass: "pe-r1", spanClass: "pe-s4", collapsedClass: "pe-x2" },
-      { tile: "layers", rowClass: "pe-r2", spanClass: "pe-s3", collapsedClass: "pe-x2" },
-      { tile: "push", rowClass: "pe-r2", spanClass: "pe-s8", collapsedClass: "pe-x4" },
+      { tile: "layers", rowClass: "pe-r2", spanClass: "pe-s12", collapsedClass: "pe-x6" },
       { tile: "week", rowClass: "pe-r3", spanClass: "pe-s12", collapsedClass: "pe-x6" },
       { tile: "done", rowClass: "pe-r4", spanClass: "pe-s12", collapsedClass: "pe-x6" },
     ]);
   });
 
-  it("in edit mode adds row 2's leftover: 1 column at twelve, none at six (pe-s1 pe-x0)", () => {
+  // CHANGED MEANING (S21): every row of the five-tile default now sums to
+  // exactly 12, so edit mode draws NO leftover anywhere — the opposite of
+  // the pre-S21 default, which left row 2's push+layers one column short.
+  it("in edit mode draws no leftover: every row of the new default is full", () => {
     const gaps = buildCells(PERSONAL_LAYOUT_DEFAULT, true).filter((c) => c.tile === null);
-    expect(gaps).toEqual([{ tile: null, rowClass: "pe-r2", spanClass: "pe-s1", collapsedClass: "pe-x0" }]);
-  });
-
-  it("the leftover trails its row's tiles", () => {
+    expect(gaps).toEqual([]);
     const cells = buildCells(PERSONAL_LAYOUT_DEFAULT, true);
-    expect(cells.map((c) => c.tile)).toEqual(["today", "todos", "layers", "push", null, "week", "done"]);
+    expect(cells.map((c) => c.tile)).toEqual(["today", "todos", "layers", "week", "done"]);
   });
 
   it("emits a leftover at both counts for a sparse row (pe-sN and pe-xN)", () => {
     const layout: PersonalLayout = [
-      [{ tile: "push", span: 4 }], // 8 left at twelve; ceil 2 -> 4 left at six
+      [{ tile: "today", span: 4 }], // 8 left at twelve; ceil 2 -> 4 left at six
       [{ tile: "layers", span: 3 }, { tile: "today", span: 9 }],
       [{ tile: "week", span: 12 }],
       [{ tile: "done", span: 6 }, { tile: "todos", span: 6 }],
@@ -273,7 +303,7 @@ describe("buildCells", () => {
   it("[3,3,5] leaves 1 at twelve and 0 at six once trimmed", () => {
     const layout: PersonalLayout = [
       [{ tile: "today", span: 3 }, { tile: "todos", span: 3 }, { tile: "layers", span: 5 }],
-      [{ tile: "push", span: 12 }],
+      [{ tile: "week", span: 12 }],
       [{ tile: "week", span: 12 }],
       [{ tile: "done", span: 12 }],
     ];
@@ -284,7 +314,7 @@ describe("buildCells", () => {
 
   it("renumbers rows after compaction and draws nothing for an empty row", () => {
     const layout: PersonalLayout = [
-      [{ tile: "today", span: 3 }, { tile: "todos", span: 3 }, { tile: "layers", span: 3 }, { tile: "push", span: 3 }],
+      [{ tile: "today", span: 3 }, { tile: "todos", span: 3 }, { tile: "layers", span: 3 }, { tile: "done", span: 3 }],
       [],
       [{ tile: "week", span: 12 }],
       [{ tile: "done", span: 12 }],
@@ -294,7 +324,7 @@ describe("buildCells", () => {
       "today:pe-r1:pe-x2",
       "todos:pe-r1:pe-x2",
       "layers:pe-r1:pe-x1",
-      "push:pe-r1:pe-x1",
+      "done:pe-r1:pe-x1",
       "week:pe-r2:pe-x6",
       "done:pe-r3:pe-x6",
     ]);
@@ -322,7 +352,7 @@ describe("buildCells", () => {
   it("clamps a row that sums over 12 to no leftover rather than a negative one", () => {
     const layout: PersonalLayout = [
       [{ tile: "today", span: 12 }, { tile: "todos", span: 12 }],
-      [{ tile: "layers", span: 3 }, { tile: "push", span: 8 }],
+      [{ tile: "layers", span: 3 }, { tile: "week", span: 8 }],
       [{ tile: "week", span: 12 }],
       [{ tile: "done", span: 12 }],
     ];
@@ -373,7 +403,8 @@ describe("formCapable — R40's 213px form floor, from the row (lead ruling)", (
 describe("resolvePersonalLayout — total on read", () => {
   it("resolves a valid stored layout as itself, fellBack false", () => {
     const stored = def();
-    stored[1] = [{ tile: "push", span: 8 }, { tile: "layers", span: 4 }];
+    stored[0] = [{ tile: "todos", span: 6 }, { tile: "today", span: 6 }];
+    stored[1] = [{ tile: "layers", span: 6 }];
     expect(resolvePersonalLayout(stored)).toEqual({ layout: stored, fellBack: false });
   });
 
@@ -388,7 +419,7 @@ describe("resolvePersonalLayout — total on read", () => {
     dup[3].push({ tile: "today", span: 0 } as never);
     expect(resolvePersonalLayout(dup).fellBack).toBe(true);
     const wide = def();
-    wide[1] = [{ tile: "layers", span: 5 }, { tile: "push", span: 8 }];
+    wide[1] = [{ tile: "layers", span: 5 }, { tile: "week", span: 8 }];
     expect(resolvePersonalLayout(wide).fellBack).toBe(true);
   });
 
@@ -411,7 +442,7 @@ describe("resolvePersonalLayout — total on read", () => {
     expect(PERSONAL_LAYOUT_DEFAULT[0][0].span).toBe(8);
   });
 
-  it("appends a tile the stored layout predates (the six tiles resolve against today's six)", () => {
+  it("appends a tile the stored layout predates (the five tiles resolve against today's five)", () => {
     const stored = def();
     stored[3] = []; // stored before "done" existed
     const r = resolvePersonalLayout(stored);

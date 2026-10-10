@@ -159,7 +159,6 @@ const NO_PRESSES: Readonly<Record<PersonalTile, number>> = Object.freeze({
   today: 0,
   todos: 0,
   layers: 0,
-  push: 0,
   week: 0,
   done: 0,
 });
@@ -279,7 +278,6 @@ const TILE_NAME: Readonly<Record<PersonalTile, string>> = Object.freeze({
   today: "Today",
   todos: "To-do",
   layers: "Layers",
-  push: "This morning’s push",
   week: "Next 7 days",
   done: "Done this week",
 });
