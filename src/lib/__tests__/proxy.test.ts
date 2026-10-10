@@ -23,6 +23,8 @@ describe("isPublicPath", () => {
     "/api/queue",
     "/api/push/test",
     "/api/auth/logout",
+    "/api/briefing/seen",
+    "/api/briefing/since",
   ])("protects %s", (p) => {
     expect(isPublicPath(p)).toBe(false);
   });
