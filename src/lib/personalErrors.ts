@@ -44,14 +44,37 @@ export const ERROR_SENTENCES = Object.freeze({
 /** Every cause the doors can answer — the client checks a cause against this before trusting it. */
 export const CALENDAR_FAIL_CAUSES = ["not-configured", "expired", "refused", "gone", "changed", "store"] as const satisfies readonly CalendarFailCause[];
 
+// S1 (2026-10-10 review): a compile-time proof that CALENDAR_FAIL_CAUSES
+// lists every member of CalendarFailCause. If todoStore.ts ever adds a
+// cause this list doesn't, the `extends never` check below turns false and
+// `true` no longer type-checks against it — a build failure, not a silent gap.
+type CalendarFailCausesComplete = Exclude<CalendarFailCause, (typeof CALENDAR_FAIL_CAUSES)[number]> extends never ? true : false;
+export const CALENDAR_FAIL_CAUSES_COMPLETE: CalendarFailCausesComplete = true;
+
+/**
+ * Whether a string a door sent back is one of the causes above — checked
+ * before it is trusted. Array membership, not a property lookup, so
+ * `"__proto__"` and `"toString"` are ordinary (false) answers, never special
+ * cases. Moved out of TodoForm.tsx (2026-10-10 review) so it is testable
+ * beside the table it guards.
+ */
+export function isCalendarFailCause(cause: string): cause is CalendarFailCause {
+  return (CALENDAR_FAIL_CAUSES as readonly string[]).includes(cause);
+}
+
 /**
  * S21 (spec §7.4): the calendar messages as whole sentences per action and
  * cause, approved by Riku 2026-10-09. Replaces deck §7's frame-plus-reason
  * shape and the nine reasons P10c had marked provisional. Every pair is
  * filled, the ones the server can't produce today with honest generic
  * sentences (plan B deviation 5), so the client never meets a gap.
+ *
+ * `update` added 2026-10-10 by Riku's ruling: todoStore.ts's `behind` check
+ * (title OR due day changed) runs the same server-side leg for a rename as
+ * for a date move, so an edit save that didn't touch the due day must not
+ * claim "Saved the new date" when that leg fails. See spec §7.4's amendment.
  */
-export const CALENDAR_FAIL: Readonly<Record<"event" | "pin" | "move", Readonly<Record<CalendarFailCause, string>>>> = Object.freeze({
+export const CALENDAR_FAIL: Readonly<Record<"event" | "pin" | "move" | "update", Readonly<Record<CalendarFailCause, string>>>> = Object.freeze({
   event: Object.freeze({
     "not-configured": "I couldn’t add that. Google isn’t connected yet. You can set it up in Settings.",
     expired: "I couldn’t add that. My access to Google has expired. You can renew it in Settings.",
@@ -76,20 +99,40 @@ export const CALENDAR_FAIL: Readonly<Record<"event" | "pin" | "move", Readonly<R
     changed: "Saved the new date, but I couldn’t move the calendar entry.",
     store: "Saved the new date, but I couldn’t move the calendar entry.",
   }),
+  update: Object.freeze({
+    "not-configured": "Saved, but I couldn’t update the calendar entry. Google isn’t connected yet.",
+    expired: "Saved, but I couldn’t update the calendar entry. My Google access has expired.",
+    refused: "Saved, but Google wouldn’t update the calendar entry.",
+    gone: "Saved. Its calendar entry had already been deleted in Google, so I’ve unlinked it.",
+    changed: "Saved, but I couldn’t update the calendar entry.",
+    store: "Saved, but I couldn’t update the calendar entry.",
+  }),
 });
 
 /** A pin that may have left an entry on Google that nothing points at. */
 export const PIN_UNSURE =
   "Saved. I’m not sure whether the calendar entry went through, so have a look in Google Calendar before switching it on again.";
 
-/** An entry that couldn't be removed, worded for what Riku actually did (R49's dot: --stale). */
+/**
+ * An entry that couldn't be removed after the to-do's OWN state already
+ * moved on (ticked done, or deleted outright) — worded for what Riku did
+ * (R49's dot: --stale).
+ */
 export const ENTRY_LEFT = Object.freeze({
   done: "Done. I couldn’t remove its calendar entry, though, so you’ll want to delete it in Google Calendar.",
   delete: "Deleted. I couldn’t remove its calendar entry, though, so you’ll want to delete it in Google Calendar.",
-  unpin: "Taken off the calendar here, but I couldn’t remove the entry in Google. You’ll want to delete it there.",
 } as const);
 
-export type CalendarLeg = "pin" | "move" | "unpin" | "delete";
+/**
+ * A switch-off whose Google removal definitely failed: unlike ENTRY_LEFT's
+ * cases, the to-do's own state did NOT move on — todoStore.ts's unpinLeg
+ * keeps calendarEventId for the retry on failure, so the to-do stays pinned
+ * (2026-10-10 review, W2). An unknown outcome on this leg is not this
+ * sentence: see calendarLine.
+ */
+export const UNPIN_FAILED = "I couldn’t take it off your Google calendar, so it’s still pinned. Switch it off again to retry.";
+
+export type CalendarLeg = "pin" | "move" | "unpin" | "delete" | "update";
 
 /**
  * What a calendar leg that didn't finish says under the tile's head (moved
@@ -101,14 +144,20 @@ export function calendarLine(leg: CalendarLeg, outcome: CalendarOutcome | null):
   if (outcome !== null && (outcome.kind === "none" || outcome.kind === "ok")) return null;
   const c: CalendarOutcome = outcome ?? { kind: "unknown", orphaned: false };
   switch (leg) {
-    case "unpin":
     case "delete":
-      return { text: ENTRY_LEFT[leg], dot: "stale" };
+      return { text: ENTRY_LEFT.delete, dot: "stale" };
+    case "unpin":
+      // A definite failure leaves the to-do pinned (W2); an unknown result
+      // might have landed either way, so it may NOT claim "still pinned".
+      return c.kind === "failed"
+        ? { text: UNPIN_FAILED, dot: "stale" }
+        : { text: ERROR_SENTENCES["calendar-unknown"], dot: null };
     case "pin":
       return c.kind === "failed" && !c.orphaned ? { text: CALENDAR_FAIL.pin[c.cause], dot: "stale" } : { text: PIN_UNSURE, dot: "stale" };
     case "move":
+    case "update":
       return c.kind === "failed"
-        ? { text: CALENDAR_FAIL.move[c.cause], dot: "stale" }
+        ? { text: CALENDAR_FAIL[leg][c.cause], dot: "stale" }
         : { text: ERROR_SENTENCES["calendar-unknown"], dot: null };
   }
 }

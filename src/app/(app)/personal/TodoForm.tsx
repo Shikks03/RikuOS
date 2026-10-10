@@ -75,14 +75,13 @@ import { useRouter } from "next/navigation";
 import { PRESS_TIMEOUT_MS, TODO_TITLE_MAX } from "@/lib/constants";
 import type { DayKey } from "@/lib/days";
 import {
-  CALENDAR_FAIL_CAUSES,
   ERROR_SENTENCES,
   TOO_NARROW_SENTENCE,
   calendarLine,
+  isCalendarFailCause,
   type CalendarLeg,
   type CalendarOutcome,
 } from "@/lib/personalErrors";
-import type { CalendarFailCause } from "@/lib/todoStore";
 import { pressOutcome } from "@/lib/pressOutcome";
 import { TileBody, TileFoot, TileHead, usePersonalPage } from "./LayoutEditor";
 import { useRowEdit } from "./TodoRow";
@@ -97,8 +96,8 @@ export function calendarOf(body: unknown): CalendarOutcome | null {
   const { kind, cause, orphaned } = c as { kind?: unknown; cause?: unknown; orphaned?: unknown };
   if (kind === "none" || kind === "ok") return { kind };
   if (kind === "unknown") return { kind, orphaned: orphaned === true };
-  if (kind === "failed" && typeof cause === "string" && (CALENDAR_FAIL_CAUSES as readonly string[]).includes(cause)) {
-    return { kind, cause: cause as CalendarFailCause, orphaned: orphaned === true };
+  if (kind === "failed" && typeof cause === "string" && isCalendarFailCause(cause)) {
+    return { kind, cause, orphaned: orphaned === true };
   }
   return null;
 }
@@ -465,7 +464,18 @@ function TodoFormView(props: ViewProps) {
       url = `/api/todos/${encodeURIComponent(todo.id)}`;
       method = "PATCH";
       // From the to-do as the server last rendered it, never from the draft.
-      leg = todo.onCalendar ? (wantPinned ? "move" : "unpin") : wantPinned ? "pin" : null;
+      // "move" only when THIS patch changes the due day — a title-only edit
+      // runs the same server-side leg (todoStore.ts's `behind`) but must not
+      // claim "Saved the new date" when it fails (2026-10-10 ruling, W1).
+      leg = todo.onCalendar
+        ? wantPinned
+          ? Object.hasOwn(payload, "dueOn")
+            ? "move"
+            : "update"
+          : "unpin"
+        : wantPinned
+          ? "pin"
+          : null;
       // The re-read will move the row out from under its Edit button: a new
       // section in the To-do tile, or a day no longer due in Today's DUE group.
       const until = props.dueGroupUntil;

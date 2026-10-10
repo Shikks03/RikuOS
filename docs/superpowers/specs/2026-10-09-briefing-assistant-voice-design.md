@@ -406,6 +406,9 @@ moved: …`, and `ENTRY_LEFT_SENTENCE`). The frame-and-slot shape is what made t
 They become **whole sentences per case**, approved by Riku 2026-10-09. Page text uses curly
 apostrophes.
 
+> **Amended 2026-10-10 by Riku's ruling:** a failed edit that didn't change the date no longer claims
+> a new date; a failed unpin says it's still pinned.
+
 | Action | Cause | Sentence |
 |---|---|---|
 | New event | not-configured | I couldn’t add that. Google isn’t connected yet. You can set it up in Settings. |
@@ -419,13 +422,20 @@ apostrophes.
 | Pin a to-do | changed | Saved, but the to-do changed somewhere else while I was adding it, so I left it off the calendar. |
 | Pin a to-do | store | Saved, but I couldn’t keep track of the calendar entry, so I took it back off. |
 | Pin a to-do | unknown / orphaned (was `PIN_MAYBE_MADE`) | Saved. I’m not sure whether the calendar entry went through, so have a look in Google Calendar before switching it on again. |
-| Move a pinned to-do | gone | Saved the new date. Its calendar entry had already been deleted in Google, so I’ve unlinked it. |
-| Move a pinned to-do | not-configured | Saved the new date, but I couldn’t move the calendar entry. Google isn’t connected yet. |
-| Move a pinned to-do | expired | Saved the new date, but I couldn’t move the calendar entry. My Google access has expired. |
-| Move a pinned to-do | refused | Saved the new date, but Google wouldn’t move the calendar entry. |
+| Move a pinned to-do (due day changed) | gone | Saved the new date. Its calendar entry had already been deleted in Google, so I’ve unlinked it. |
+| Move a pinned to-do (due day changed) | not-configured | Saved the new date, but I couldn’t move the calendar entry. Google isn’t connected yet. |
+| Move a pinned to-do (due day changed) | expired | Saved the new date, but I couldn’t move the calendar entry. My Google access has expired. |
+| Move a pinned to-do (due day changed) | refused | Saved the new date, but Google wouldn’t move the calendar entry. |
+| Move a pinned to-do (due day changed) | changed / store | Saved the new date, but I couldn’t move the calendar entry. |
+| Update a pinned to-do (due day unchanged — e.g. a rename) | not-configured | Saved, but I couldn’t update the calendar entry. Google isn’t connected yet. |
+| Update a pinned to-do (due day unchanged — e.g. a rename) | expired | Saved, but I couldn’t update the calendar entry. My Google access has expired. |
+| Update a pinned to-do (due day unchanged — e.g. a rename) | refused | Saved, but Google wouldn’t update the calendar entry. |
+| Update a pinned to-do (due day unchanged — e.g. a rename) | gone | Saved. Its calendar entry had already been deleted in Google, so I’ve unlinked it. |
+| Update a pinned to-do (due day unchanged — e.g. a rename) | changed / store | Saved, but I couldn’t update the calendar entry. |
 | Tick a pinned to-do done | entry left behind | Done. I couldn’t remove its calendar entry, though, so you’ll want to delete it in Google Calendar. |
 | Delete a pinned to-do | entry left behind | Deleted. I couldn’t remove its calendar entry, though, so you’ll want to delete it in Google Calendar. |
-| Switch "Put on calendar" off | entry left behind | Taken off the calendar here, but I couldn’t remove the entry in Google. You’ll want to delete it there. |
+| Switch "Put on calendar" off | definitely failed — still pinned (`todoStore.ts`'s `unpinLeg` keeps the id for the retry) | I couldn’t take it off your Google calendar, so it’s still pinned. Switch it off again to retry. |
+| Switch "Put on calendar" off | unknown — may have landed either way | Couldn’t tell if that saved. |
 
 - `CALENDAR_REASONS` and `calendarReason` (TodoForm.tsx) become one closed table keyed by `(action,
   cause)`, typed so that a missing pair fails to compile. `ENTRY_LEFT_SENTENCE` (personalErrors.ts)
@@ -440,6 +450,28 @@ apostrophes.
 - The nine `PROVISIONAL (P10c)` markers are removed, because these sentences are ratified.
 - Unknown press outcomes (`Couldn’t tell if that saved.`, L7) and validation lines (`Give it a title.`)
   stay as they are. They're short and they're the facts.
+- **2026-10-10 ruling (post-build review of S21/B6).** Two of the sentences above were found false in
+  real cases and Riku ruled on both:
+  - `todoStore.ts`'s `updateTodo` runs the calendar leg whenever `calendarBehind` is already true OR
+    this save's own patch touches `title` OR `dueOn` — a rename alone takes the same server-side path
+    as a date move (`behind = before.calendarBehind === true || v.title !== undefined || v.dueOn !==
+    undefined`). The old single `move` wording ("Saved the new date…") was false for a title-only
+    edit. Fix: a fourth leg, `update`, with its own six-cause table (the `gone`/`changed`/`store` rows
+    read the same as `move`'s, by the same reasoning as deviation 5 — `changed`/`store` aren't
+    producible today but get an honest generic sentence anyway). The client chooses `move` only when
+    its own PATCH payload includes `dueOn`; otherwise `update`. This is a client-side approximation of
+    `calendarBehind` (the client cannot see that flag) and is good enough: the only false case it could
+    produce is naming a save "update" when the due day didn't change this time but an EARLIER save's
+    move is still unconfirmed — which is still an accurate description of what THIS save did.
+  - `unpinLeg` (switch "Put on calendar" off, a tick done, or a delete) keeps `calendarEventId` on a
+    failure so the retry can find the entry again — meaning a failed unpin leaves the to-do pinned,
+    not unpinned. The old wording ("Taken off the calendar here…") was false: the to-do was NOT taken
+    off. Fix: split by outcome. A **definite** failure (`kind: "failed"`) says it's still pinned,
+    naming the fix ("Switch it off again to retry"). An **unknown** outcome (no answer, or a shape the
+    door didn't spell out) must not claim either state — it reads like a move's unknown case
+    (`Couldn’t tell if that saved.`, no dot), because the entry may have come off anyway. `done` and
+    `delete` were reviewed and kept: both only run after the to-do's OWN state already changed (ticked
+    or deleted), so "Done."/"Deleted." stays true regardless of the calendar leg's outcome.
 
 ---
 
