@@ -45,6 +45,20 @@ export interface SinceThenInput {
 /** The most lines the section shows; the door bounds its response with it. */
 export const SINCE_THEN_MAX_LINES = 6;
 
+/**
+ * `title` where it ends a sentence right before that sentence's closing
+ * stop (ticked-one, new-due-one — never "X is done." or "Next up: … HH:MM.",
+ * where something always follows the title). Appends "." UNLESS `title`,
+ * once trailing whitespace is trimmed for the check only, already ends in
+ * ".", "!" or "?" — then the title's own mark closes the sentence and no
+ * second stop is added. Never strips anything from `title` itself, "…"
+ * included: an ellipsis is one character, not a ".", so it still gets a
+ * "." after it (principal review, fix round 2).
+ */
+function titleEnd(title: string): string {
+  return /[.!?]$/.test(title.trimEnd()) ? title : `${title}.`;
+}
+
 export function sinceThenLines(input: SinceThenInput, sentAt: Date, now: Date, tz: string = APP_TZ): string[] {
   const lines: string[] = [];
 
@@ -55,7 +69,7 @@ export function sinceThenLines(input: SinceThenInput, sentAt: Date, now: Date, t
     lines.push(
       input.ticked.total === 1
         ? input.ticked.titles.length === 1
-          ? `You’ve ticked off ${input.ticked.titles[0]}.`
+          ? `You’ve ticked off ${titleEnd(input.ticked.titles[0])}`
           : "You’ve ticked off one to-do."
         : `You’ve ticked off ${numberWord(input.ticked.total)} to-dos.`,
     );
@@ -64,7 +78,7 @@ export function sinceThenLines(input: SinceThenInput, sentAt: Date, now: Date, t
     lines.push(
       input.newDue.total === 1
         ? input.newDue.titles.length === 1
-          ? `One new to-do is due today: ${input.newDue.titles[0]}.`
+          ? `One new to-do is due today: ${titleEnd(input.newDue.titles[0])}`
           : "One new to-do is due today."
         : `${capWord(numberWord(input.newDue.total))} new to-dos are due today.`,
     );

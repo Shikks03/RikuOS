@@ -26,12 +26,45 @@ describe("sinceThenLines", () => {
     ]);
   });
 
+  // Principal review, fix round 2: a title that is itself a full sentence
+  // must not get a second, doubled stop.
+  it("doesn't double a title's own closing punctuation (ticked)", () => {
+    expect(sinceThenLines({ ...NOTHING, ticked: { titles: ["Renew the domain."], total: 1 } }, SENT, NOW)).toEqual([
+      "You’ve ticked off Renew the domain.",
+    ]);
+    expect(sinceThenLines({ ...NOTHING, ticked: { titles: ["Finish it!"], total: 1 } }, SENT, NOW)).toEqual([
+      "You’ve ticked off Finish it!",
+    ]);
+    expect(sinceThenLines({ ...NOTHING, ticked: { titles: ["Did it ship?"], total: 1 } }, SENT, NOW)).toEqual([
+      "You’ve ticked off Did it ship?",
+    ]);
+    // Trailing whitespace is tolerated for the check but never stripped from
+    // the title itself — the title's own period still ends the sentence.
+    expect(sinceThenLines({ ...NOTHING, ticked: { titles: ["Renew the domain. "], total: 1 } }, SENT, NOW)).toEqual([
+      "You’ve ticked off Renew the domain. ",
+    ]);
+    // An ellipsis is a single character, not a ".", and is never stripped —
+    // the closing "." still gets added after it.
+    expect(sinceThenLines({ ...NOTHING, ticked: { titles: ["Still thinking…"], total: 1 } }, SENT, NOW)).toEqual([
+      "You’ve ticked off Still thinking….",
+    ]);
+  });
+
   it("names a new to-do due today, counts several", () => {
     expect(sinceThenLines({ ...NOTHING, newDue: { titles: ["Renew the domain"], total: 1 } }, SENT, NOW)).toEqual([
       "One new to-do is due today: Renew the domain.",
     ]);
     expect(sinceThenLines({ ...NOTHING, newDue: { titles: ["a", "b"], total: 2 } }, SENT, NOW)).toEqual([
       "Two new to-dos are due today.",
+    ]);
+  });
+
+  it("doesn't double a title's own closing punctuation (new due)", () => {
+    expect(sinceThenLines({ ...NOTHING, newDue: { titles: ["Renew the domain."], total: 1 } }, SENT, NOW)).toEqual([
+      "One new to-do is due today: Renew the domain.",
+    ]);
+    expect(sinceThenLines({ ...NOTHING, newDue: { titles: ["Call the vet!"], total: 1 } }, SENT, NOW)).toEqual([
+      "One new to-do is due today: Call the vet!",
     ]);
   });
 
@@ -88,6 +121,22 @@ describe("sinceThenLines", () => {
     ];
     expect(sinceThenLines({ ...NOTHING, events: { events, partial: false } }, SENT, NOW)).toEqual([
       "A is done.",
+    ]);
+  });
+
+  // Principal review, fix round 2: unlike the ticked/new-due sentences, an
+  // event title here is never immediately followed by the sentence's closing
+  // ".", so a title ending in its own punctuation is left exactly as is.
+  it("leaves an event title's own punctuation alone — it never sits right before the closing stop", () => {
+    // Paired with an upcoming event so "done" doesn't also trigger "Nothing
+    // else on today." — the punctuation question only.
+    const events = [
+      { title: "Submit it!", allDay: false, startsAt: at("09:00"), endsAt: at("10:00") },
+      { title: "Call the vet?", allDay: false, startsAt: at("18:00"), endsAt: at("19:00") },
+    ];
+    expect(sinceThenLines({ ...NOTHING, events: { events, partial: false } }, SENT, NOW)).toEqual([
+      "Submit it! is done.",
+      "Next up: Call the vet? at 18:00.",
     ]);
   });
 
