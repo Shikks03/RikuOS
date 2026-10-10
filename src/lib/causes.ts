@@ -216,6 +216,21 @@ export function explain(p: Problem): Explained {
         explainCause(null),
       );
     case "agent-degraded": {
+      // The morning run's own degraded row (carried item 3, Briefing Plan A
+      // post-build record): an ok dispatcher run stores no per-item errors,
+      // and the only things that can fail after its push went out are saving
+      // the push record and building/saving its Briefing (route.ts's
+      // failedItems) — there is nowhere for the generic "look at that run's
+      // failed items" to point. "The last briefing", not "Yesterday's": the
+      // watchdog reads the dispatcher's latest run, which may be older than
+      // yesterday.
+      if (p.agent === "dispatcher") {
+        return row(
+          say(b("The last briefing"), " went out, but I couldn't save all of it."),
+          "Nothing to do if it doesn't happen again.",
+          fixed(say("Most likely ", b("saving it to the database failed"), " after the push had already gone out.")),
+        );
+      }
       const n = p.itemsFailed;
       return row(
         capFirst(say(b(AGENT_NAMES[p.agent]), ` had ${numberWord(n)} ${n === 1 ? "item" : "items"} that didn't go through on its last run.`)),

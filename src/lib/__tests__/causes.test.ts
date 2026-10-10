@@ -94,6 +94,7 @@ describe("explain — every catalogue row", () => {
     [{ key: "agent-stale", agent: "chaser", ageHours: 72 }, "The chaser hasn't run in 3 days.", /Crons/, "fixed"],
     [{ key: "agent-failed", agent: "chaser" }, "The chaser failed on its last run.", /last run's error/, "none"],
     [{ key: "agent-degraded", agent: "chaser", itemsFailed: 2 }, "The chaser had two items that didn't go through on its last run.", /failed items/, "fixed"],
+    [{ key: "agent-degraded", agent: "dispatcher", itemsFailed: 1 }, "The last briefing went out, but I couldn't save all of it.", /Nothing to do if it doesn't happen again\./, "fixed"],
     [{ key: "job-failed", job: "site-health", raw: "connect ETIMEDOUT" }, "The site check broke this morning.", /last run's error/, "timeout"],
     [{ key: "job-failed", job: "site-health", raw: null }, "The site check broke this morning.", /last run's error/, "none"],
     [{ key: "snapshot-unsaved" }, "I checked the sites but couldn't save the result.", /gone tomorrow/, "fixed"],
@@ -143,6 +144,43 @@ describe("explain — every catalogue row", () => {
   it("carries the raw error only where there is one", () => {
     expect(explain({ key: "job-failed", job: "watchdog", raw: "boom" }).raw).toBe("boom");
     expect(explain({ key: "snapshot-unsaved" }).raw).toBeNull();
+  });
+});
+
+describe("the morning run's own degraded row names the briefing, not 'failed items' it can't show", () => {
+  // An ok dispatcher run stores no per-item errors (route.ts's failedItems is
+  // a count, never text), so the generic "Look at that run's failed items"
+  // has nowhere to point for the morning run itself (carried item 3, Plan A
+  // post-build record).
+  it("reads the same regardless of how many items failed — there is nowhere to look either way", () => {
+    const one = explain({ key: "agent-degraded", agent: "dispatcher", itemsFailed: 1 });
+    const many = explain({ key: "agent-degraded", agent: "dispatcher", itemsFailed: 2 });
+    expect(one.sentence.text).toBe("The last briefing went out, but I couldn't save all of it.");
+    expect(many.sentence.text).toBe(one.sentence.text);
+    expect(one.nextStep).toBe("Nothing to do if it doesn't happen again.");
+    expect(one.cause.text).toBe(
+      "Most likely saving it to the database failed after the push had already gone out.",
+    );
+    expect(one.causeKey).toBe("fixed");
+  });
+
+  it("says 'The last briefing', never 'Yesterday's' — the watchdog may read an older run", () => {
+    const e = explain({ key: "agent-degraded", agent: "dispatcher", itemsFailed: 1 });
+    expect(e.sentence.text).not.toMatch(/Yesterday/);
+    expect(e.sentence.text.startsWith("The last briefing")).toBe(true);
+  });
+
+  it("stays within every BRIEFING_BOUNDS limit, like every other row", () => {
+    const e = explain({ key: "agent-degraded", agent: "dispatcher", itemsFailed: 999_999 });
+    expect(e.sentence.text.length).toBeLessThanOrEqual(BRIEFING_BOUNDS.symptomSentence);
+    expect(e.nextStep.length).toBeLessThanOrEqual(BRIEFING_BOUNDS.nextStep);
+    expect(e.cause.text.length).toBeLessThanOrEqual(BRIEFING_BOUNDS.cause);
+  });
+
+  it("leaves every other agent's agent-degraded row exactly as it was", () => {
+    const e = explain({ key: "agent-degraded", agent: "chaser", itemsFailed: 1 });
+    expect(e.sentence.text).toBe("The chaser had one item that didn't go through on its last run.");
+    expect(e.nextStep).toBe("Look at that run's failed items.");
   });
 });
 
