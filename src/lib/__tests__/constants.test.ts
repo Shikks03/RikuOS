@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { NO_DEVICE_ERROR } from "@/lib/constants";
+import { dispatcherFromRow } from "@/lib/dispatcherRun";
 
 /**
  * NO_DEVICE_ERROR is the dispatcher AgentRun's named marker for "the digest
@@ -13,8 +14,20 @@ describe("NO_DEVICE_ERROR", () => {
     expect(NO_DEVICE_ERROR).toBe("the digest reached no device");
   });
 
-  it("reproduces route.ts's message byte-for-byte when built from the constant", () => {
-    const message = `${NO_DEVICE_ERROR} (failed ${2}, removed ${1}). Re-subscribe from /freelance/queue.`;
-    expect(message).toBe("the digest reached no device (failed 2, removed 1). Re-subscribe from /freelance/queue.");
+  // B0 fix round: the old second test rebuilt route.ts's template FROM
+  // NO_DEVICE_ERROR and compared the result with itself — if the constant's
+  // text ever drifted from what route.ts actually throws, both sides of that
+  // comparison would drift together and the test would keep passing. This
+  // one instead feeds dispatcherFromRow (dispatcherRun.ts) the exact literal
+  // string route.ts produces today, written out by hand, and checks the
+  // reader still recognises it — the real regression this constant guards
+  // against.
+  it("is recognised by dispatcherFromRow from route.ts's actual literal message, not a copy rebuilt from itself", () => {
+    const row = dispatcherFromRow({
+      ok: false,
+      startedAt: new Date("2026-10-10T23:00:00Z"),
+      error: "the digest reached no device (failed 1, removed 0). Re-subscribe from /freelance/queue.",
+    });
+    expect(row?.noDevice).toBe(true);
   });
 });
