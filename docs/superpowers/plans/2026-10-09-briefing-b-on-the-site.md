@@ -51,7 +51,7 @@ The P10 method, as in Plan A: one named-role builder per task, a principal cross
 
 **Files:** Create `src/lib/briefingView.ts`, `src/lib/dispatcherRun.ts`, `src/lib/__tests__/briefingView.test.ts`. Modify `src/lib/__tests__/viewModelPurity.test.ts` (add `import "@/lib/briefingView";` beside the other pure-module imports).
 
-- [ ] **Step 1: Write the failing test** `src/lib/__tests__/briefingView.test.ts`. It ports every `buildPushTileView` case to the line's new wording, then adds the view and auto-open cases:
+- [x] **Step 1: Write the failing test** `src/lib/__tests__/briefingView.test.ts`. It ports every `buildPushTileView` case to the line's new wording, then adds the view and auto-open cases:
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -296,9 +296,9 @@ describe("parseSentAt", () => {
 });
 ```
 
-- [ ] **Step 2: Run** `npx vitest run src/lib/__tests__/briefingView.test.ts` → FAIL.
+- [x] **Step 2: Run** `npx vitest run src/lib/__tests__/briefingView.test.ts` → FAIL.
 
-- [ ] **Step 3: Write `src/lib/briefingView.ts`**
+- [x] **Step 3: Write `src/lib/briefingView.ts`**
 
 ```ts
 /**
@@ -498,7 +498,7 @@ export function parseSentAt(value: unknown, now: Date): Date | null {
 
 **Check the title test:** `"All clear · 0 to review"` contains a `·` (U+00B7), not an apostrophe. toPage leaves it alone, and the test writes it as `·`. ✓
 
-- [ ] **Step 4: Write `src/lib/dispatcherRun.ts`** — `readDispatcher` moved verbatim from `src/app/(app)/personal/page.tsx` (lines 172–188 today, with its docblock), renamed `readLatestDispatcher`, returning `GreetingInput["dispatcher"]` minus `"unavailable"`:
+- [x] **Step 4: Write `src/lib/dispatcherRun.ts`** — `readDispatcher` moved verbatim from `src/app/(app)/personal/page.tsx` (lines 172–188 today, with its docblock), renamed `readLatestDispatcher`, returning `GreetingInput["dispatcher"]` minus `"unavailable"`:
 
 ```ts
 /**
@@ -528,11 +528,11 @@ export async function readLatestDispatcher(): Promise<LatestDispatcher> {
 
 (Leave the page's own copy in place until B5 deletes it, so this commit builds.)
 
-- [ ] **Step 5: Add `import "@/lib/briefingView";`** to `viewModelPurity.test.ts` beside `import "@/lib/personalView";`.
+- [x] **Step 5: Add `import "@/lib/briefingView";`** to `viewModelPurity.test.ts` beside `import "@/lib/personalView";`.
 
-- [ ] **Step 6: Run** `npx vitest run src/lib/__tests__/briefingView.test.ts src/lib/__tests__/viewModelPurity.test.ts && npx tsc --noEmit` → PASS.
+- [x] **Step 6: Run** `npx vitest run src/lib/__tests__/briefingView.test.ts src/lib/__tests__/viewModelPurity.test.ts && npx tsc --noEmit` → PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/briefingView.ts src/lib/dispatcherRun.ts src/lib/__tests__/briefingView.test.ts src/lib/__tests__/viewModelPurity.test.ts
@@ -545,7 +545,7 @@ git commit -m "feat(briefing): the greeting line's states, the Briefing view mod
 
 **Files:** Create `src/lib/sinceThen.ts` (pure), `src/lib/sinceThenRead.ts` (reads), `src/lib/__tests__/sinceThen.test.ts`. Add `import "@/lib/sinceThen";` to `viewModelPurity.test.ts`.
 
-- [ ] **Step 1: Write the failing test** `src/lib/__tests__/sinceThen.test.ts`:
+- [x] **Step 1: Write the failing test** `src/lib/__tests__/sinceThen.test.ts`:
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -638,9 +638,9 @@ describe("sinceThenLines", () => {
 });
 ```
 
-- [ ] **Step 2: Run** → FAIL.
+- [x] **Step 2: Run** → FAIL.
 
-- [ ] **Step 3: Write `src/lib/sinceThen.ts`**
+- [x] **Step 3: Write `src/lib/sinceThen.ts`**
 
 ```ts
 /**
@@ -731,7 +731,7 @@ export function sinceThenLines(input: SinceThenInput, sentAt: Date, now: Date, t
 
 **Check the "event in progress" test:** "Long one" runs 14:00–16:00 and now is 14:30, so it isn't done and has no future start. The next line is skipped and, with no done events, so is "Nothing else on today". The result is `["Nothing new since 07:00."]`. ✓ An event that ended before 07:00 isn't "since then", hence the `> sentAt` guard.
 
-- [ ] **Step 4: Write `src/lib/sinceThenRead.ts`**
+- [x] **Step 4: Write `src/lib/sinceThenRead.ts`**
 
 ```ts
 /**
@@ -817,9 +817,9 @@ export async function readSinceThen(sentAt: Date, now: Date): Promise<SinceThenI
 }
 ```
 
-- [ ] **Step 5: Run** `npx vitest run src/lib/__tests__/sinceThen.test.ts src/lib/__tests__/viewModelPurity.test.ts && npx tsc --noEmit` → PASS.
+- [x] **Step 5: Run** `npx vitest run src/lib/__tests__/sinceThen.test.ts src/lib/__tests__/viewModelPurity.test.ts && npx tsc --noEmit` → PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/sinceThen.ts src/lib/sinceThenRead.ts src/lib/__tests__/sinceThen.test.ts src/lib/__tests__/viewModelPurity.test.ts
@@ -832,7 +832,7 @@ git commit -m "feat(briefing): since then - to-dos, today's calendar and the que
 
 **Files:** Create `src/app/api/briefing/seen/route.ts`, `src/app/api/briefing/since/route.ts`. Both are session-gated by `src/proxy.ts`'s fail-closed default and by `requireSession` as their first line. **No public-allowlist change.**
 
-- [ ] **Step 1: Write `src/app/api/briefing/seen/route.ts`**
+- [x] **Step 1: Write `src/app/api/briefing/seen/route.ts`**
 
 ```ts
 import { NextRequest, NextResponse } from "next/server";
@@ -873,7 +873,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 ```
 
-- [ ] **Step 2: Write `src/app/api/briefing/since/route.ts`**
+- [x] **Step 2: Write `src/app/api/briefing/since/route.ts`**
 
 ```ts
 import { NextRequest, NextResponse } from "next/server";
@@ -908,11 +908,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 ```
 
-- [ ] **Step 3: Verify the proxy covers both.** Read `src/proxy.ts`'s matcher and allowlist, and confirm `/api/briefing/*` is NOT in the public allowlist (it must be session-gated). Add a case to `src/lib/__tests__/proxy.test.ts` asserting an unauthenticated request to `/api/briefing/seen` is rejected, mirroring the file's existing pattern for `/api/todos`.
+- [x] **Step 3: Verify the proxy covers both.** Read `src/proxy.ts`'s matcher and allowlist, and confirm `/api/briefing/*` is NOT in the public allowlist (it must be session-gated). Add a case to `src/lib/__tests__/proxy.test.ts` asserting an unauthenticated request to `/api/briefing/seen` is rejected, mirroring the file's existing pattern for `/api/todos`.
 
-- [ ] **Step 4: Run** `npx vitest run src/lib/__tests__/proxy.test.ts && npx tsc --noEmit` → PASS.
+- [x] **Step 4: Run** `npx vitest run src/lib/__tests__/proxy.test.ts && npx tsc --noEmit` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/api/briefing src/lib/__tests__/proxy.test.ts
@@ -927,7 +927,7 @@ git commit -m "feat(briefing): the seen door (one guarded update) and the since-
 
 **Lint baseline:** the four existing `react-hooks/set-state-in-effect` errors must stay four. This island never calls a state setter synchronously in an effect body: open/close state changes in event handlers, the initial open comes from `useState`'s initialiser, effects only call DOM methods (`showModal`, `animate`, `history.replaceState`), and the since-then fetch sets state only in its async `.then`.
 
-- [ ] **Step 1: Write `src/app/(app)/_shell/flip.ts`**
+- [x] **Step 1: Write `src/app/(app)/_shell/flip.ts`**
 
 ```ts
 /**
@@ -988,7 +988,7 @@ export async function shrinkTo(el: HTMLElement, to: DOMRect | null): Promise<voi
 }
 ```
 
-- [ ] **Step 2: Write `src/app/(app)/_shell/Briefing.tsx`** — the one client island:
+- [x] **Step 2: Write `src/app/(app)/_shell/Briefing.tsx`** — the one client island:
 
 ```tsx
 "use client";
@@ -1288,7 +1288,7 @@ export default function Briefing({
 
 **The `since` "Checking…" placeholder must hold its height.** `.bf-wait` reserves a two-line minimum height (CSS below), so the section doesn't jump when the lines arrive (spec §6).
 
-- [ ] **Step 3: Write `src/app/(app)/_shell/BriefingSlot.tsx`** (server):
+- [x] **Step 3: Write `src/app/(app)/_shell/BriefingSlot.tsx`** (server):
 
 ```tsx
 import { Suspense } from "react";
@@ -1363,13 +1363,13 @@ async function BriefingRead() {
 }
 ```
 
-- [ ] **Step 4: TopBar takes the line.** In `TopBar.tsx`, change the signature to `export default function TopBar({ greeting }: { greeting?: ReactNode })` (import `type ReactNode` from "react") and render `<div className="topbar-in">{greeting}<span className="crumb">…</span></div>`. Replace the docblock's first paragraph with: `44px, one hairline bottom, and two elements: the assistant's greeting line (S21 — the one deliberate addition, which supersedes "exactly one element") and the freshness stamp.` Keep the rest of the docblock (the reasons there's no breadcrumb, pill, bell or search all still hold).
+- [x] **Step 4: TopBar takes the line.** In `TopBar.tsx`, change the signature to `export default function TopBar({ greeting }: { greeting?: ReactNode })` (import `type ReactNode` from "react") and render `<div className="topbar-in">{greeting}<span className="crumb">…</span></div>`. Replace the docblock's first paragraph with: `44px, one hairline bottom, and two elements: the assistant's greeting line (S21 — the one deliberate addition, which supersedes "exactly one element") and the freshness stamp.` Keep the rest of the docblock (the reasons there's no breadcrumb, pill, bell or search all still hold).
 
 In `src/app/(app)/layout.tsx`: `import BriefingSlot from "./_shell/BriefingSlot";` and render `<TopBar greeting={<BriefingSlot />} />`.
 
 In `components.css`, change `.crumb` to add `margin-left:auto;white-space:nowrap` and update the `.topbar` comment's first sentence to `the top bar carries the greeting line (S21) and the freshness stamp, and nothing else.`
 
-- [ ] **Step 5: Write `src/styles/briefing.css`** and import it in `src/app/layout.tsx` directly after `personal.css` (before `legacy.css`, which loads last as before).
+- [x] **Step 5: Write `src/styles/briefing.css`** and import it in `src/app/layout.tsx` directly after `personal.css` (before `legacy.css`, which loads last as before).
 
 ```css
 /* ============================================================
@@ -1452,9 +1452,9 @@ In `components.css`, change `.crumb` to add `margin-left:auto;white-space:nowrap
 
 **Phone strip check (S20):** below 439px the rail becomes a 44px top strip, and `.topbar` still renders under it, so the greeting line sits in its own 44px bar and truncates with an ellipsis. The Verification Lead measures this at 390px (B7).
 
-- [ ] **Step 6: Verify.** `npx tsc --noEmit` → clean. `npm run lint` → still exactly 4 errors / 3 warnings. `npm run build` → green.
+- [x] **Step 6: Verify.** `npx tsc --noEmit` → clean. `npm run lint` → still exactly 4 errors / 3 warnings. `npm run build` → green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add "src/app/(app)/_shell" "src/app/(app)/layout.tsx" src/app/layout.tsx src/styles/briefing.css src/styles/components.css
@@ -1467,7 +1467,7 @@ git commit -m "feat(briefing): the greeting line, the once-a-day full-screen gre
 
 **Files:** Modify `src/lib/personalLayout.ts`, `src/lib/personalView.ts`, `src/app/(app)/personal/page.tsx`, `src/styles/personal.css`; delete `src/app/(app)/personal/_blocks/Push.tsx`; update `src/lib/__tests__/{layout,layoutEdit,settings,osSettings,personalView}.test.ts`.
 
-- [ ] **Step 1: Write the failing tests** in `layout.test.ts`:
+- [x] **Step 1: Write the failing tests** in `layout.test.ts`:
 
 ```ts
 import { PERSONAL_LAYOUT_DEFAULT, PERSONAL_TILES, resolvePersonalLayout, validateLayout } from "@/lib/personalLayout";
@@ -1503,9 +1503,9 @@ describe("the retired push tile (S21)", () => {
 });
 ```
 
-- [ ] **Step 2: Run** → FAIL.
+- [x] **Step 2: Run** → FAIL.
 
-- [ ] **Step 3: Implement in `personalLayout.ts`:**
+- [x] **Step 3: Implement in `personalLayout.ts`:**
 
 ```ts
 export const PERSONAL_TILES = ["today", "todos", "layers", "week", "done"] as const;
@@ -1531,21 +1531,21 @@ function dropRetired(stored: unknown): unknown {
 
 with `PERSONAL_LAYOUT_DEFAULT` row 2 becoming `[{ tile: "layers", span: 12 }]`, and `resolvePersonalLayout` becoming `return resolveLayoutAgainst(dropRetired(stored), PERSONAL_TILES, PERSONAL_LAYOUT_DEFAULT);`. Keep `resolveLayoutAgainst` generic and unchanged.
 
-- [ ] **Step 4: Update the other tests.** Rules for the builder:
+- [x] **Step 4: Update the other tests.** Rules for the builder:
   - Tests of `resolveLayoutAgainst` that pass their **own** tile list (`TILES7` etc.) may keep `"push"` as an arbitrary tile name. Leave them.
   - Every test that goes through `PERSONAL_TILES`, `validateLayout`, `resolvePersonalLayout`, `PERSONAL_LAYOUT_DEFAULT`, `buildCells` on the default, or `layoutEdit`'s helpers on the default must be rewritten for five tiles. Replace a `push` entry by giving its span to its row neighbour, or by deleting the entry where the test is about a count. Re-derive every expected class and caption from the code, not by editing numbers until green, and say in the commit body which assertions changed meaning.
   - `layoutEdit.test.ts`'s `can("push")` case is deleted. The `isDefaultLayout(applyEdit(D, "push", "narrow"))` case becomes `"layers", "narrow"`.
   - `settings.test.ts:66` and `osSettings.test.ts:118` fixtures drop the `push` entry (give `layers` the row: `span: 12`).
 
-- [ ] **Step 5: Remove the tile from the page.** In `src/app/(app)/personal/page.tsx`: delete the `Push` import, `buildPushTileView`/`PushInput` imports, `getLastDigest`/`StoredDigest` imports, `AgentRun` import, the `Dispatcher` type and `readDispatcher`, the `digestR`/`dispatcherR` reads (phase 1 becomes three reads: settings, open, done), `pushTile`, and `push: <Push … />` from `tiles`. Update the phase-1 comment ("All five reads" → "All three reads"; drop the LastDigest sentence). Delete `src/app/(app)/personal/_blocks/Push.tsx`.
+- [x] **Step 5: Remove the tile from the page.** In `src/app/(app)/personal/page.tsx`: delete the `Push` import, `buildPushTileView`/`PushInput` imports, `getLastDigest`/`StoredDigest` imports, `AgentRun` import, the `Dispatcher` type and `readDispatcher`, the `digestR`/`dispatcherR` reads (phase 1 becomes three reads: settings, open, done), `pushTile`, and `push: <Push … />` from `tiles`. Update the phase-1 comment ("All five reads" → "All three reads"; drop the LastDigest sentence). Delete `src/app/(app)/personal/_blocks/Push.tsx`.
 
   In `src/lib/personalView.ts`: delete section 5 (`buildPushTileView` and its docblock), `PushTileView`, `PushInput`, and the now-unused imports (`StoredDigest`, and `PUSH_EXPECTED_HOUR` if nothing else uses it — check with grep). In `personalView.test.ts`, delete the `// --- Push ---` block (lines ~729–834 today) and its `buildPushTileView`/`PushInput` imports. Its cases now live in `briefingView.test.ts`.
 
   In `src/styles/personal.css`: delete `.pe-ptitle`, the `.pe-ptitle + .fl-snip` rule and its comment, `.pe-last`, and `.pe-quote` (around lines 391–410 today; read the block and delete exactly the push tile's rules, nothing shared).
 
-- [ ] **Step 6: Run** `grep -rn "push" src/app/\(app\)/personal src/lib/personalLayout.ts src/lib/personalView.ts` → only unrelated hits (e.g. `.push(` array calls). Then `npm test && npx tsc --noEmit` → PASS.
+- [x] **Step 6: Run** `grep -rn "push" src/app/\(app\)/personal src/lib/personalLayout.ts src/lib/personalView.ts` → only unrelated hits (e.g. `.push(` array calls). Then `npm test && npx tsc --noEmit` → PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A src/lib/personalLayout.ts src/lib/personalView.ts "src/app/(app)/personal" src/styles/personal.css src/lib/__tests__
@@ -1558,7 +1558,7 @@ git commit -m "feat(personal): retire the push tile; a saved layout that names i
 
 **Files:** Modify `src/lib/personalErrors.ts`, `src/app/(app)/personal/TodoForm.tsx`, `src/app/(app)/personal/TodoRow.tsx`, `src/app/(app)/personal/EventForm.tsx`. Create `src/lib/__tests__/calendarMessages.test.ts`.
 
-- [ ] **Step 1: Write the failing test** `src/lib/__tests__/calendarMessages.test.ts`:
+- [x] **Step 1: Write the failing test** `src/lib/__tests__/calendarMessages.test.ts`:
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -1616,9 +1616,9 @@ describe("the calendar messages (S21, spec §7.4)", () => {
 });
 ```
 
-- [ ] **Step 2: Run** → FAIL.
+- [x] **Step 2: Run** → FAIL.
 
-- [ ] **Step 3: Implement in `personalErrors.ts`** (still **no runtime import**: only `export type`/`import type`). Replace `ENTRY_LEFT_SENTENCE` and add:
+- [x] **Step 3: Implement in `personalErrors.ts`** (still **no runtime import**: only `export type`/`import type`). Replace `ENTRY_LEFT_SENTENCE` and add:
 
 ```ts
 import type { CalendarFailCause, CalendarOutcome } from "@/lib/todoStore";
@@ -1703,15 +1703,15 @@ export function eventFailSentence(cause: CalendarFailCause): string {
 
 **Purity check:** `SayLine` is imported with `import type` from personalView.ts (erased), and `CalendarOutcome`/`CalendarFailCause` likewise from todoStore.ts. The existing `export type { CalendarOutcome } from "@/lib/todoStore";` line stays. `viewModelPurity.test.ts` must still pass: it greps for runtime imports.
 
-- [ ] **Step 4: Rewire the three islands.**
+- [x] **Step 4: Rewire the three islands.**
   - **TodoForm.tsx:** delete `CalendarFailCause` type alias, `ReasonFor`, `CALENDAR_REASONS`, `calendarReason`, `PIN_MAYBE_MADE`, the local `Leg` type and the local `calendarLine`. Import `CALENDAR_FAIL_CAUSES, calendarLine, type CalendarLeg` from `@/lib/personalErrors`. In `calendarOf`, replace `Object.hasOwn(CALENDAR_REASONS, cause)` with `(CALENDAR_FAIL_CAUSES as readonly string[]).includes(cause)` and keep the cast to the cause type (import `type CalendarFailCause` from `@/lib/todoStore` via `import type`). The save path's `leg` variable becomes `CalendarLeg | null` (values unchanged: "pin" | "move" | "unpin"). In `remove()`, `calendarLine("unpin", …)` becomes `calendarLine("delete", …)`. Remove `ENTRY_LEFT_SENTENCE` from its imports.
   - **TodoRow.tsx:** `import { ENTRY_LEFT } from "@/lib/personalErrors";` and `page.note("done", { text: ENTRY_LEFT.done, dot: "stale" })`.
   - **EventForm.tsx:** replace `` `Google didn’t accept it: ${calendarReason(cal.cause, "event")}.` `` with `eventFailSentence(cal.cause)` (imported from `@/lib/personalErrors`) and drop the `calendarReason` import. Keep the `// deck §7` comment, amended to `// S21, spec §7.4`.
   - `grep -rn "PROVISIONAL (P10c)" src` → no output.
 
-- [ ] **Step 5: Run** `npm test && npx tsc --noEmit && npm run lint` → PASS, lint at baseline.
+- [x] **Step 5: Run** `npm test && npx tsc --noEmit && npm run lint` → PASS, lint at baseline.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/personalErrors.ts "src/app/(app)/personal/TodoForm.tsx" "src/app/(app)/personal/TodoRow.tsx" "src/app/(app)/personal/EventForm.tsx" src/lib/__tests__/calendarMessages.test.ts
@@ -1722,11 +1722,11 @@ git commit -m "feat(personal): calendar messages as whole sentences in the assis
 
 ### Task B7: Principal review, verification, record (Principal Reviewer, Verification Lead)
 
-- [ ] **Step 1: Principal cross-module review** across Plan A and Plan B together. Brief: "Read spec §5–§7, then `briefingView.ts`, `sinceThen*.ts`, both doors, `BriefingSlot.tsx`, `Briefing.tsx`, `flip.ts`, `briefing.css`, `personalLayout.ts`, `personalErrors.ts` and Plan A's `lastDigest.ts`. Look for seams: the seen door marking the wrong morning; auto-open firing on a non-today record; `?briefing=open` opening when there is nothing to open; a Said range broken by curling; a dialog that can't be closed by keyboard; focus not returning; a setState in an effect body (lint baseline); a page where the line pushes the stamp out of a 390px bar; the since door leaking an error message; the layout read falling back for a stored `push`. Report; don't edit."
+- [x] **Step 1: Principal cross-module review** across Plan A and Plan B together. Brief: "Read spec §5–§7, then `briefingView.ts`, `sinceThen*.ts`, both doors, `BriefingSlot.tsx`, `Briefing.tsx`, `flip.ts`, `briefing.css`, `personalLayout.ts`, `personalErrors.ts` and Plan A's `lastDigest.ts`. Look for seams: the seen door marking the wrong morning; auto-open firing on a non-today record; `?briefing=open` opening when there is nothing to open; a Said range broken by curling; a dialog that can't be closed by keyboard; focus not returning; a setState in an effect body (lint baseline); a page where the line pushes the stamp out of a 390px bar; the since door leaking an error message; the layout read falling back for a stored `push`. Report; don't edit."
 
-- [ ] **Step 2: The trio + lint baseline** — `npm test`, `npx tsc --noEmit`, `npm run build`, `npm run lint` (4 errors / 3 warnings, exit 1; anything more fails).
+- [x] **Step 2: The trio + lint baseline** — `npm test`, `npx tsc --noEmit`, `npm run build`, `npm run lint` (4 errors / 3 warnings, exit 1; anything more fails).
 
-- [ ] **Step 3: Verification Lead — headless Chromium against `next start -p 3021`, with every write intercepted.** Route-intercept `POST /api/briefing/seen` (record the body, answer `{ok:true, applied:true}`), `GET /api/briefing/since` (answer fixtures, including a 500 and a hang past the timeout), and every `/api/todos*`, `/api/calendar/*` and `/api/settings` mutation (abort them). Serve the shell's reads from a **seeded local MongoDB or an in-memory fixture, never Riku's Atlas.** If neither is available, verify with the Briefing component rendered in a test harness page under `/__verify` that is deleted before the commit, and say so in the record. Measure and record:
+- [x] **Step 3: Verification Lead — headless Chromium against `next start -p 3021`, with every write intercepted.** Route-intercept `POST /api/briefing/seen` (record the body, answer `{ok:true, applied:true}`), `GET /api/briefing/since` (answer fixtures, including a 500 and a hang past the timeout), and every `/api/todos*`, `/api/calendar/*` and `/api/settings` mutation (abort them). Serve the shell's reads from a **seeded local MongoDB or an in-memory fixture, never Riku's Atlas.** If neither is available, verify with the Briefing component rendered in a test harness page under `/__verify` that is deleted before the commit, and say so in the record. Measure and record:
   1. Every greeting-line state renders its text, tone colour and dot (8 states).
   2. First visit with an unseen today's Briefing: the full-screen greeting opens. "Got it", Esc and a backdrop click each close it with the shrink animation (assert `Element.animate` was called with a transform keyframe), focus lands on the line, and exactly one seen POST was sent with the right `sentAt`. A reload with `seenAt` set does not open it.
   3. `/freelance?briefing=open` opens it even when seen, and the address bar loses the parameter.
@@ -1737,10 +1737,93 @@ git commit -m "feat(personal): calendar messages as whole sentences in the assis
   8. `/personal` renders five tiles. A settings fixture whose `personalLayout` contains `push` renders without the "Couldn’t load your arrangement" notice and with Layers where it was.
   9. Calendar messages: drive the to-do and event forms against intercepted doors returning each `calendar` outcome, and assert the sentence under the tile head matches §7.4.
 
-- [ ] **Step 4: Post-build record** at the foot of this file: commits, test count, deviations taken, findings and fixes, measurements, and **Riku's hands:**
+- [x] **Step 4: Post-build record** at the foot of this file: commits, test count, deviations taken, findings and fixes, measurements, and **Riku's hands:**
   - [ ] Push master (two plans' commits).
   - [ ] The first 07:00 push after deploy arrives in the new voice. Tap it, and the Briefing opens full-screen.
   - [ ] On a second device the same day, it does **not** greet full-screen again. The line is there.
   - [ ] Tap a problem (if the morning has one) and the cause card grows out of it.
   - [ ] The Personal page shows five tiles with your arrangement intact.
   - [ ] P10's four dated observations, still owed from the go-live checklist (the push-tile one is now "the Briefing quoting the push").
+
+---
+
+## Post-build record
+
+**Commits** (`git log --oneline 4937d3c..HEAD`):
+
+```
+d5bf228 test(personal): isolate the row-over-12 fault, exercise a real reorder and row move, and tighten the model's error-path assertions
+3ce773e fix(briefing): panel blank-space closing, finally-guarded close(), and an onClose comment that said the wrong thing
+9c1de04 fix(briefing): since-then: don't double a title's own closing stop in the ticked and new-due sentences
+ac8f907 feat(personal): retire the push tile; a saved layout that names it keeps everything else
+1786f49 fix(briefing): URL bookkeeping, double-close, stale props, disabled opacity, scroll lock, focus rings
+00eb2b8 fix(briefing): a pure staleness rule for the resumed-PWA refresh, with tests
+b48eb68 test(briefing): stop NO_DEVICE_ERROR's test rebuilding and comparing itself
+96101a4 fix(briefing): widen the dispatcher degraded row's cause to cover a Briefing that couldn't be built
+f461114 fix(briefing): save the morning's Briefing even when the push reaches no device
+c39dd53 fix(briefing): a skipped run is a fact, the cron gets an hour's grace, and a reach-nobody morning still greets
+1f8f793 fix(briefing): since-then: carry calendar partiality, don't call a straddling event done-and-clear, singular grammar on a titleless count
+7005a73 feat(briefing): the greeting line, the once-a-day full-screen greeting, the panel and the cause card
+ace657f fix(personal): a failed unpin says it's still pinned; a rename alone doesn't claim a new date
+5860d1e feat(briefing): the seen door (one guarded update) and the since-then door
+f4db8bb feat(briefing): the greeting line's states, the Briefing view model and the once-a-day rule
+94558cc feat(briefing): name the zero-device error so the greeting can tell it apart from a run that never happened
+45d64e9 fix(briefing): the morning run's own degraded row names the briefing, not failed items it can't show
+7fe95e1 feat(personal): calendar messages as whole sentences in the assistant's voice
+76dec67 feat(briefing): count stories the stored Briefing omits past its bound
+ddf4718 feat(briefing): since then - to-dos, today's calendar and the queue, each failing on its own
+```
+
+One docs-free commit per build item; this record itself is the only commit after it.
+
+**Final counts:** 1267 tests, all green (`npm test`). `npx tsc --noEmit` clean. `npm run build` green (27 routes, no type errors). `npm run lint` at its recorded baseline: four `react-hooks/set-state-in-effect` errors, three warnings, exit 1 — exact count, no fifth error or fourth warning.
+
+**Method:** built by the P10 agent team under this plan's task table — Sonnet builders, Opus reviewers (Riku's call, 2026-10-10). One review per feature, not per commit. Builders ran in parallel on disjoint files, committing by pathspec. The B-II re-check (due after B4) and the B-III feature review (due after B5) were folded into the principal review to save tokens — the same precedent Plan A set with its A-III review (merged into A9). Two usage-limit interruptions during the build; each resumed agent found its own work intact on disk and picked up from there.
+
+**Lead additions (deviations 6–8, binding, taken by the lead from Plan A's "Carried to Plan B" list):** the lead inserted an extra task, B0, ahead of B1, to close three gaps Plan A had flagged and left open:
+6. **A failed morning run is not "didn't happen."** `NO_DEVICE_ERROR` was added to `constants.ts`, and the greeting line gained two new kinds, `undelivered` and `failed`, so a push that was built and sent but reached no device, or a run that broke outright, each read as their own honest state rather than collapsing into "the 07:00 run didn't happen."
+7. **`StoredBriefing` gained `omitted`** — the count of stories dropped past the stored bound of 12. An old record with no field reads as 0; the panel's story list shows "…and N more I couldn't fit here." when it is nonzero.
+8. **The dispatcher's own agent-degraded row widened.** Its sentence now also covers a Briefing that couldn't be built at all: "The last briefing went out, but I couldn't save all of it." / next step "Nothing to do if it doesn't happen again." / cause widened to "saving it, or building the full briefing, failed after the push had already gone out."
+
+**Riku's rulings during the build (2026-10-10):**
+- (a) A calendar edit that didn't change the due date gets new "update" sentences; "move" sentences fire only when the due date actually changed.
+- (b) A failed unpin says "I couldn't take it off your Google calendar, so it's still pinned. Switch it off again to retry."; an unknown unpin says "Couldn't tell if that saved." Spec §7.4 amended accordingly (ace657f).
+- (c) The line waits until 08:00 (`PUSH_LATE_HOUR`) before it alarms: 07:00–07:59 shows the muted "Your briefing is on its way."; from 08:00 it shows the red "missing" state.
+- (d) A briefing that reached no device is still SAVED (with `devices: 0`), and the run that sent it still fails. The line reads as undelivered and still opens today's Briefing, which still greets full-screen.
+- (e) For a skipped run with monitoring back on, Riku wants a manual **"Debrief" button** — run a briefing on demand (e.g. at 13:00, covering what happened since 07:00) — as its own feature, designed next. The stopgap muted line for now is "Monitoring was off at 07:00, so there's no briefing today."
+
+**Findings and their fixes, by review:**
+- **B-IV (calendar messages)** — two approved sentences were false in real cases: a rename alone claimed "the new date," and a failed unpin claimed it was off. Fixed by Riku's rulings (a) and (b) above. The calendar cause list is now proven complete at compile time; every sentence is pinned by an `it.each` table; the cause guard moved into `personalErrors.ts` and is tested against a `__proto__` key to prove it can't be fooled by prototype pollution.
+- **B-I (logic and doors)** — a partly failed calendar read was reported as a complete one; fixed to "I couldn't check every calendar just now." "Nothing else on today." was firing while an event was still running. A skipped run was shown as the red "didn't happen" state. The 07:00 alarm could fire before the run had a chance to arrive (rulings c, e). Singular grammar broke on a titleless count. A constants test compared a string with itself instead of the real value. A zero-device morning wasn't being saved at all (ruling d).
+- **B-II (shell)** — `?briefing=open` came back after a router refresh, because Next's patched `replaceState` doesn't clear state the way a plain navigation does; fixed by passing a null state explicitly. Legacy CSS faded the disabled warning line to 45% opacity by accident. The page behind the dialogs could still scroll. A tap target measured ~19px, under the 44px minimum. The greeting line only refreshed on a full page load; fixed with a keyed island plus a refresh on return after 10 minutes away, backed by a pure, tested helper `briefingRefresh.ts`. Double-close guards and `inert` were added during the shrink animation. `onClose` now actually resets state. Focus rings now inherit the app's own style instead of the browser default. A throw while building the view can no longer take down every page — it's now caught at the shell boundary.
+- **Principal review (A+B together)** — a tap on blank space inside the panel was closing it (event bubbling from a click that should have been inert). Two weakened tests were re-derived properly: the row-over-12 case is now proven to actually fail without its guard (not just pass with it), and the layout-editor script now performs a real reorder and a real row move, asserting each step is allowed rather than asserting nothing. A stale `push` fixture was found in `models.test.ts`. `close()` is now wrapped in a `finally` so it always runs. A wrong comment was corrected. A title ending in "." was producing ".." in the since-then sentences; fixed by not doubling the title's own closing stop.
+- **Lead check** — the full test suite failed once on a cold first run (cause not reproduced or named), then passed 10 cold runs out of 10 and a further 3 out of 3 in verification. Recorded here as a one-off, not reproduced, not chased further.
+
+**Verification (Verification Lead):** run against an isolated copy of the repo with `.env.local` removed, a throwaway MongoDB (`mongodb-memory-server`), every secret blanked, Playwright Chromium, and every write intercepted — nothing touched Atlas or any other external service. `next dev --webpack` stood in for `next start` (production mode demands `mongodb+srv://`, which the throwaway Mongo doesn't offer, and Turbopack refused to follow the `node_modules` junction) — environment substitutions only, same method as before.
+
+45 of 45 browser assertions passed — items 2–8 of B7 Step 3 all PASS, measured:
+- Panel box: `{16,16,358,812}` at 390px wide, `{16,16,288,812}` at 320px wide.
+- "Since then" placeholder: 43.5px tall before and after the lines arrive (no layout shift).
+- A hang on the since-door shows the failure line after the 60-second client timeout.
+- Reduced motion uses opacity-only keyframes, no scaling.
+- A double-tap on "Got it" sends exactly one seen POST.
+- `?briefing=open` stays gone from the address bar after a reload.
+- Five tiles render correctly from a settings fixture whose stored `personalLayout` still names `push`, with no fallback notice.
+
+Greeting-line states: 10 of the 13 states confirmed live in the browser; `fail`, `due` and `before` were confirmed only by unit test, because the server's clock read evening during this verification pass. Calendar messages: three confirmed live end-to-end; the event form can't be opened without Google configured (correctly refuses to), so its sentences are pinned by unit test only. The line's own box measures 43px inside its 44px bar, 1px short because of the bar's pre-existing hairline border — not a regression.
+
+**Carried forward / open for Riku:**
+1. **W3:** clearing the due date of a pinned to-do runs the unpin; if that unpin fails, the line says "Switch it off again to retry," but the switch is disabled once there's no due date, so the retry it names can't actually be done. Wording or behaviour call — Riku's.
+2. **Provisional wordings** the lead chose and that need Riku's confirmation: the undelivered, failed, skipped and due lines; the dispatcher's degraded row; the omitted-stories line.
+3. On a zero-device morning where the save also failed, the line says "reached none of your devices" but opens **yesterday's** Briefing — and that Yesterday view gives no sign that the save failed.
+4. `public/sw.js` (older than Plan B) has no `clients.claim()`, and its `client.navigate(url)` call isn't awaited — on a window the service worker doesn't yet control, tapping the push notification may only focus the app without opening the Briefing. Worth watching in the first go-live checklist step; fix separately, with real on-device testing.
+5. No test covers the morning route's save-then-throw ordering; no route-test pattern exists yet for it.
+6. **The Debrief button** (ruling e above) — next up, its own design, then spec, then plan.
+
+**What remains for Riku (his hands, left unticked above):**
+- Push master — 40 commits ahead of `origin/master` (`git rev-list --count origin/master..HEAD`), needs his say-so; Vercel deploys on push.
+- The first 07:00 push after deploy arrives in the new voice, and tapping it opens the Briefing full-screen.
+- On a second device the same day, it does not greet full-screen again.
+- Tap a problem and watch the cause card grow out of the row.
+- The Personal page shows five tiles with his arrangement intact.
+- P10's four dated observations, still owed.
