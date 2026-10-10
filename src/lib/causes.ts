@@ -223,12 +223,20 @@ export function explain(p: Problem): Explained {
       // failedItems) — there is nowhere for the generic "look at that run's
       // failed items" to point. "The last briefing", not "Yesterday's": the
       // watchdog reads the dispatcher's latest run, which may be older than
-      // yesterday.
+      // yesterday. The cause names BOTH things failedItems can count — saving
+      // the record and building the Briefing — since this row alone can't
+      // tell which one happened (B0 fix round, Riku 2026-10-10).
       if (p.agent === "dispatcher") {
         return row(
           say(b("The last briefing"), " went out, but I couldn't save all of it."),
           "Nothing to do if it doesn't happen again.",
-          fixed(say("Most likely ", b("saving it to the database failed"), " after the push had already gone out.")),
+          fixed(
+            say(
+              "Most likely ",
+              b("saving it, or building the full briefing,"),
+              " failed after the push had already gone out.",
+            ),
+          ),
         );
       }
       const n = p.itemsFailed;

@@ -158,10 +158,18 @@ describe("the morning run's own degraded row names the briefing, not 'failed ite
     expect(one.sentence.text).toBe("The last briefing went out, but I couldn't save all of it.");
     expect(many.sentence.text).toBe(one.sentence.text);
     expect(one.nextStep).toBe("Nothing to do if it doesn't happen again.");
+    // Widened (B0 fix round, Riku 2026-10-10): failedItems also counts a
+    // Briefing that couldn't be BUILT, not only one that couldn't be saved —
+    // the cause names both, since there is no way to tell which happened from
+    // this row alone.
     expect(one.cause.text).toBe(
-      "Most likely saving it to the database failed after the push had already gone out.",
+      "Most likely saving it, or building the full briefing, failed after the push had already gone out.",
     );
     expect(one.causeKey).toBe("fixed");
+    expect(one.cause.bold.length).toBeGreaterThan(0);
+    expect(one.cause.text.slice(one.cause.bold[0].start, one.cause.bold[0].end)).toBe(
+      "saving it, or building the full briefing,",
+    );
   });
 
   it("says 'The last briefing', never 'Yesterday's' — the watchdog may read an older run", () => {
