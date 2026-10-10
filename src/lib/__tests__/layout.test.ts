@@ -418,8 +418,12 @@ describe("resolvePersonalLayout — total on read", () => {
     const dup = def();
     dup[3].push({ tile: "today", span: 0 } as never);
     expect(resolvePersonalLayout(dup).fellBack).toBe(true);
+    // wide[2] empties week's own row, so "week" appears exactly once (in the
+    // 13-wide row) — otherwise it would also duplicate the untouched week row
+    // and fellBack would prove the duplicate path, not the row-width path.
     const wide = def();
     wide[1] = [{ tile: "layers", span: 5 }, { tile: "week", span: 8 }];
+    wide[2] = [];
     expect(resolvePersonalLayout(wide).fellBack).toBe(true);
   });
 

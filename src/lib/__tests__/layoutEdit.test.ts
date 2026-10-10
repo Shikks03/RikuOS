@@ -71,13 +71,22 @@ describe("the moves", () => {
     expect(sameLayout(l, D)).toBe(true);
     expect(l).not.toBe(D);
   });
+  // Every step below is a REAL move against the actual D — never a refused
+  // no-op — including one applied left/right reorder and one applied up/down
+  // row move (layers narrowed down to fit beside week, then moved into its
+  // row). The in-loop canEdit assertion is load-bearing: without it, a script
+  // that was quietly all narrows/widens (no reorder, no row move) would still
+  // make validateLayout pass and hollow out the test's own name.
   it("every reachable arrangement passes the strict write validator", () => {
     let l = copyLayout(D);
     const script: Array<[PersonalTile, EditAction]> = [
-      ["todos", "widen"], ["today", "narrow"], ["today", "narrow"], ["todos", "widen"], ["layers", "narrow"],
-      ["week", "up"], ["layers", "left"], ["week", "narrow"], ["done", "narrow"], ["done", "up"],
+      ["todos", "left"], ["today", "narrow"], ["todos", "widen"],
+      ...Array.from({ length: 6 }, (): [PersonalTile, EditAction] => ["layers", "narrow"]),
+      ...Array.from({ length: 6 }, (): [PersonalTile, EditAction] => ["week", "narrow"]),
+      ["layers", "down"], ["done", "narrow"],
     ];
     for (const [t, a] of script) {
+      expect(canEdit(l, t, a)).toBe(true);
       l = applyEdit(l, t, a);
       expect(validateLayout(l).ok).toBe(true);
     }

@@ -151,7 +151,7 @@ describe("OsSettings", () => {
 describe("OsSettings — layers and personalLayout (P10b)", () => {
   const layout = () => [
     [{ tile: "today", span: 8 }, { tile: "todos", span: 4 }],
-    [{ tile: "layers", span: 3 }, { tile: "push", span: 8 }],
+    [{ tile: "layers", span: 12 }],
     [{ tile: "week", span: 12 }],
     [{ tile: "done", span: 12 }],
   ];
@@ -211,7 +211,10 @@ describe("OsSettings — layers and personalLayout (P10b)", () => {
   it("rejects a span of 13", async () => {
     const l = layout();
     l[2][0].span = 13;
-    expect(await asyncErrorPaths(new OsSettings({ personalLayout: l }))).toContain("personalLayout.2.0.span");
+    // The fixture's other three rows are all valid now (no "push" to also
+    // trip the enum), so this is the ONLY error — toEqual, not toContain,
+    // proves nothing else is silently also failing.
+    expect(await asyncErrorPaths(new OsSettings({ personalLayout: l }))).toEqual(["personalLayout.2.0.span"]);
   });
 
   it("rejects three rows", () => {
@@ -221,7 +224,7 @@ describe("OsSettings — layers and personalLayout (P10b)", () => {
   it("rejects an unknown tile", async () => {
     const l = layout();
     l[3][0].tile = "weather";
-    expect(await asyncErrorPaths(new OsSettings({ personalLayout: l }))).toContain("personalLayout.3.0.tile");
+    expect(await asyncErrorPaths(new OsSettings({ personalLayout: l }))).toEqual(["personalLayout.3.0.tile"]);
   });
 });
 
