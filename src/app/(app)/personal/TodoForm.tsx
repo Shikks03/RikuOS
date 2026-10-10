@@ -75,57 +75,19 @@ import { useRouter } from "next/navigation";
 import { PRESS_TIMEOUT_MS, TODO_TITLE_MAX } from "@/lib/constants";
 import type { DayKey } from "@/lib/days";
 import {
-  ENTRY_LEFT_SENTENCE,
+  CALENDAR_FAIL_CAUSES,
   ERROR_SENTENCES,
   TOO_NARROW_SENTENCE,
+  calendarLine,
+  type CalendarLeg,
   type CalendarOutcome,
 } from "@/lib/personalErrors";
-import type { SayLine } from "@/lib/personalView";
+import type { CalendarFailCause } from "@/lib/todoStore";
 import { pressOutcome } from "@/lib/pressOutcome";
 import { TileBody, TileFoot, TileHead, usePersonalPage } from "./LayoutEditor";
 import { useRowEdit } from "./TodoRow";
 
 // ---- the calendar leg's words -----------------------------------------------
-
-type CalendarFailCause = Extract<CalendarOutcome, { kind: "failed" }>["cause"];
-
-/** Which deck §7 sentence a reason fills: `gone` reads differently in each. */
-export type ReasonFor = "event" | "pin" | "move";
-
-/**
- * THE ONE LIST of `<reason>` words, for deck §7's three sentences that carry
- * one: `Google didn’t accept it: <its reason>.` (Add an event), `Saved, but
- * the calendar entry failed: <reason>. …` (Add a to-do) and `Saved, but the
- * calendar entry couldn’t be moved: <reason>.` (Edit a to-do). The deck
- * names the slot and not the words, and the doors answer a cause, never
- * Google's own message. EventForm reads this through calendarReason.
- */
-const CALENDAR_REASONS: Readonly<Record<CalendarFailCause, string | Readonly<Record<ReasonFor, string>>>> =
-  Object.freeze({
-    "not-configured": "Google isn’t connected yet", // PROVISIONAL (P10c)
-    expired: "Google access has expired", // PROVISIONAL (P10c)
-    refused: "Google refused the request", // PROVISIONAL (P10c)
-    gone: Object.freeze({
-      event: "the calendar is no longer on your Google account", // PROVISIONAL (P10c)
-      pin: "the calendar is no longer on your Google account", // PROVISIONAL (P10c)
-      move: "the entry is no longer on Google", // PROVISIONAL (P10c)
-    }),
-    changed: "the to-do changed at the same moment", // PROVISIONAL (P10c)
-    store: "the app couldn’t record it", // PROVISIONAL (P10c)
-  });
-
-export function calendarReason(cause: CalendarFailCause, sentence: ReasonFor): string {
-  const r = CALENDAR_REASONS[cause];
-  return typeof r === "string" ? r : r[sentence];
-}
-
-/**
- * A pin whose entry may exist on Google with no record pointing at it (an
- * unanswered insert, or a failure whose clean-up did not take): saying `The
- * to-do is not on the calendar.` there could be false.
- */
-const PIN_MAYBE_MADE =
-  "Saved. A calendar entry may have been made anyway. Check Google Calendar before switching it on again."; // PROVISIONAL (P10c)
 
 /** The door's `calendar` field, checked before it is trusted; null when it is not the door's shape. */
 export function calendarOf(body: unknown): CalendarOutcome | null {
@@ -135,49 +97,10 @@ export function calendarOf(body: unknown): CalendarOutcome | null {
   const { kind, cause, orphaned } = c as { kind?: unknown; cause?: unknown; orphaned?: unknown };
   if (kind === "none" || kind === "ok") return { kind };
   if (kind === "unknown") return { kind, orphaned: orphaned === true };
-  if (kind === "failed" && typeof cause === "string" && Object.hasOwn(CALENDAR_REASONS, cause)) {
+  if (kind === "failed" && typeof cause === "string" && (CALENDAR_FAIL_CAUSES as readonly string[]).includes(cause)) {
     return { kind, cause: cause as CalendarFailCause, orphaned: orphaned === true };
   }
   return null;
-}
-
-/**
- * Which calendar write a save asked for: pin (switched on), move (stays on;
- * the store re-dates or re-titles the entry), unpin (switched off, due day
- * cleared, or deleted).
- */
-type Leg = "pin" | "move" | "unpin";
-
-/**
- * What a calendar leg that did not finish says, under the tile's head. The
- * to-do's own write landed (the door answered 2xx), so nothing here says the
- * save failed. An outcome the door did not spell out is treated as unknown.
- */
-function calendarLine(leg: Leg, outcome: CalendarOutcome | null): SayLine | null {
-  if (outcome !== null && (outcome.kind === "none" || outcome.kind === "ok")) return null;
-  const c: CalendarOutcome = outcome ?? { kind: "unknown", orphaned: false };
-  switch (leg) {
-    case "unpin":
-      // deck §7 (after done, switch-off, or delete) / §15: the entry may still be there.
-      return { text: ENTRY_LEFT_SENTENCE, dot: "stale" };
-    case "pin":
-      if (c.kind === "failed" && !c.orphaned) {
-        // deck §7, Add a to-do: nothing was left on Google.
-        return {
-          text: `Saved, but the calendar entry failed: ${calendarReason(c.cause, "pin")}. The to-do is not on the calendar.`,
-          dot: "stale",
-        };
-      }
-      return { text: PIN_MAYBE_MADE, dot: "stale" };
-    case "move":
-      if (c.kind === "failed") {
-        // deck §7, Edit a to-do
-        return { text: `Saved, but the calendar entry couldn’t be moved: ${calendarReason(c.cause, "move")}.`, dot: "stale" };
-      }
-      // deck §15: the move may or may not have landed; the row's own
-      // `entry on the old day` reports it after the re-read if it did not.
-      return { text: ERROR_SENTENCES["calendar-unknown"], dot: null };
-  }
 }
 
 // ---- drafts: everything lives in the tile -----------------------------------
@@ -524,7 +447,7 @@ function TodoFormView(props: ViewProps) {
     let url: string;
     let method: "POST" | "PATCH";
     let payload: Record<string, unknown>;
-    let leg: Leg | null;
+    let leg: CalendarLeg | null;
     let leaves = false;
     if (props.mode === "add") {
       url = "/api/todos";
@@ -604,12 +527,12 @@ function TodoFormView(props: ViewProps) {
       update((d) => ({ ...d, sending: false, said: out.sentence }));
       page.reveal(key);
     } else {
-      // A delete that landed reports its entry by the unpin rule; `not-found`
+      // A delete that landed reports its entry by the delete rule; `not-found`
       // means the to-do is already gone, which is what was asked; one that got
       // no answer says so. Either way the next server render decides.
       const line =
         out.kind === "ok"
-          ? calendarLine("unpin", calendarOf(out.body))
+          ? calendarLine("delete", calendarOf(out.body))
           : out.kind === "unknown"
             ? { text: out.sentence, dot: null }
             : null;

@@ -38,7 +38,7 @@ import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { PRESS_TIMEOUT_MS } from "@/lib/constants";
 import { shortLateness } from "@/lib/todos";
-import { ENTRY_LEFT_SENTENCE } from "@/lib/personalErrors";
+import { ENTRY_LEFT } from "@/lib/personalErrors";
 import { pressOutcome } from "@/lib/pressOutcome";
 import type { PersonalTile } from "@/lib/personalLayout";
 import type { DoneTileView, TodoRowView } from "@/lib/personalView";
@@ -127,7 +127,7 @@ function usePress(tile: PersonalTile, id: string, checked: boolean) {
     );
     if (out.kind === "ok") {
       page.settle(key);
-      if (entryLeftBehind(out.body)) page.note("done", { text: ENTRY_LEFT_SENTENCE, dot: "stale" });
+      if (entryLeftBehind(out.body)) page.note("done", { text: ENTRY_LEFT.done, dot: "stale" });
     } else if (out.kind === "failed") {
       page.reveal(key);
       page.sayRow(tile, key, out.sentence);

@@ -40,11 +40,11 @@ import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { EVENT_TITLE_MAX, PRESS_TIMEOUT_MS } from "@/lib/constants";
 import { addDays, formatDay, oneHourAfter } from "@/lib/days";
-import { ERROR_SENTENCES, TOO_NARROW_SENTENCE } from "@/lib/personalErrors";
+import { ERROR_SENTENCES, TOO_NARROW_SENTENCE, eventFailSentence } from "@/lib/personalErrors";
 import { pressOutcome } from "@/lib/pressOutcome";
 import { TileBody, TileFoot, TileHead, usePersonalPage } from "./LayoutEditor";
 import type { EventFormData } from "./_blocks/Today";
-import { TileFormsProvider, calendarOf, calendarReason, focusPillOrTile, focusStillIn } from "./TodoForm";
+import { TileFormsProvider, calendarOf, focusPillOrTile, focusStillIn } from "./TodoForm";
 
 /** deck §7 */
 const NO_ANSWER = "Couldn’t reach Google. Check the calendar before trying again.";
@@ -293,7 +293,7 @@ function EventFormView({
       const cal = out.code === "calendar-failed" ? calendarOf(out.body) : null;
       const said =
         cal !== null && cal.kind === "failed"
-          ? `Google didn’t accept it: ${calendarReason(cal.cause, "event")}.` // deck §7
+          ? eventFailSentence(cal.cause) // S21, spec §7.4
           : out.sentence;
       update((d) => ({ ...d, sending: false, said }));
     } else {

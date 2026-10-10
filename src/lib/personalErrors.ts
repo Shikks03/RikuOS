@@ -14,6 +14,9 @@
  * name for it.
  */
 
+import type { CalendarFailCause, CalendarOutcome } from "@/lib/todoStore";
+import type { SayLine } from "@/lib/personalView";
+
 export type { CalendarOutcome } from "@/lib/todoStore";
 
 /**
@@ -38,13 +41,81 @@ export const ERROR_SENTENCES = Object.freeze({
   "needs-due": "Needs a due date.",
 } as const);
 
+/** Every cause the doors can answer — the client checks a cause against this before trusting it. */
+export const CALENDAR_FAIL_CAUSES = ["not-configured", "expired", "refused", "gone", "changed", "store"] as const satisfies readonly CalendarFailCause[];
+
 /**
- * deck §15 (R49): a to-do saved done, deleted or unpinned whose calendar
- * entry could not be removed. A claim about Google's state, not about the
- * press, so it takes the `--stale` dot under the head where it is said.
- * One spelling for every island that can say it (TodoRow, TodoForm).
+ * S21 (spec §7.4): the calendar messages as whole sentences per action and
+ * cause, approved by Riku 2026-10-09. Replaces deck §7's frame-plus-reason
+ * shape and the nine reasons P10c had marked provisional. Every pair is
+ * filled, the ones the server can't produce today with honest generic
+ * sentences (plan B deviation 5), so the client never meets a gap.
  */
-export const ENTRY_LEFT_SENTENCE = "Done, but the calendar entry couldn’t be removed. Remove it in Google Calendar.";
+export const CALENDAR_FAIL: Readonly<Record<"event" | "pin" | "move", Readonly<Record<CalendarFailCause, string>>>> = Object.freeze({
+  event: Object.freeze({
+    "not-configured": "I couldn’t add that. Google isn’t connected yet. You can set it up in Settings.",
+    expired: "I couldn’t add that. My access to Google has expired. You can renew it in Settings.",
+    refused: "Google turned that one down, so it’s not on your calendar.",
+    gone: "I couldn’t add that. That calendar isn’t on your Google account anymore.",
+    changed: "I couldn’t add that, and I’m not sure why. Have a look in Google Calendar.",
+    store: "I couldn’t add that, and I’m not sure why. Have a look in Google Calendar.",
+  }),
+  pin: Object.freeze({
+    "not-configured": "Saved, but I couldn’t put it on your calendar. Google isn’t connected yet.",
+    expired: "Saved, but I couldn’t put it on your calendar. My Google access has expired.",
+    refused: "Saved, but Google wouldn’t take the calendar entry.",
+    gone: "Saved, but I couldn’t find your main calendar on Google, so it’s not on there.",
+    changed: "Saved, but the to-do changed somewhere else while I was adding it, so I left it off the calendar.",
+    store: "Saved, but I couldn’t keep track of the calendar entry, so I took it back off.",
+  }),
+  move: Object.freeze({
+    "not-configured": "Saved the new date, but I couldn’t move the calendar entry. Google isn’t connected yet.",
+    expired: "Saved the new date, but I couldn’t move the calendar entry. My Google access has expired.",
+    refused: "Saved the new date, but Google wouldn’t move the calendar entry.",
+    gone: "Saved the new date. Its calendar entry had already been deleted in Google, so I’ve unlinked it.",
+    changed: "Saved the new date, but I couldn’t move the calendar entry.",
+    store: "Saved the new date, but I couldn’t move the calendar entry.",
+  }),
+});
+
+/** A pin that may have left an entry on Google that nothing points at. */
+export const PIN_UNSURE =
+  "Saved. I’m not sure whether the calendar entry went through, so have a look in Google Calendar before switching it on again.";
+
+/** An entry that couldn't be removed, worded for what Riku actually did (R49's dot: --stale). */
+export const ENTRY_LEFT = Object.freeze({
+  done: "Done. I couldn’t remove its calendar entry, though, so you’ll want to delete it in Google Calendar.",
+  delete: "Deleted. I couldn’t remove its calendar entry, though, so you’ll want to delete it in Google Calendar.",
+  unpin: "Taken off the calendar here, but I couldn’t remove the entry in Google. You’ll want to delete it there.",
+} as const);
+
+export type CalendarLeg = "pin" | "move" | "unpin" | "delete";
+
+/**
+ * What a calendar leg that didn't finish says under the tile's head (moved
+ * here from TodoForm so it is testable; same rules as before). The to-do's own
+ * write landed, so nothing here says the save failed. An outcome the door
+ * didn't spell out (null) is treated as unknown.
+ */
+export function calendarLine(leg: CalendarLeg, outcome: CalendarOutcome | null): SayLine | null {
+  if (outcome !== null && (outcome.kind === "none" || outcome.kind === "ok")) return null;
+  const c: CalendarOutcome = outcome ?? { kind: "unknown", orphaned: false };
+  switch (leg) {
+    case "unpin":
+    case "delete":
+      return { text: ENTRY_LEFT[leg], dot: "stale" };
+    case "pin":
+      return c.kind === "failed" && !c.orphaned ? { text: CALENDAR_FAIL.pin[c.cause], dot: "stale" } : { text: PIN_UNSURE, dot: "stale" };
+    case "move":
+      return c.kind === "failed"
+        ? { text: CALENDAR_FAIL.move[c.cause], dot: "stale" }
+        : { text: ERROR_SENTENCES["calendar-unknown"], dot: null };
+  }
+}
+
+export function eventFailSentence(cause: CalendarFailCause): string {
+  return CALENDAR_FAIL.event[cause];
+}
 
 /**
  * deck §15: under the head of a tile too narrow for its form, where the
