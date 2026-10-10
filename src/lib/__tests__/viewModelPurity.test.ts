@@ -32,6 +32,8 @@ import "@/lib/personalView";
 import "@/lib/personalLayout";
 import "@/lib/personalErrors";
 import "@/lib/sinceThen";
+// Plan B Task B1: the greeting line and the Briefing view model.
+import "@/lib/briefingView";
 
 describe("view-model purity", () => {
   it("registers no Mongoose model when the view models load", () => {
