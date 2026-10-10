@@ -4,21 +4,30 @@ export interface IHealthSite {
   name: string;
   up: boolean;
   detail: string;
+  /** S22: why it is down; absent when up (and on readings saved before S22). */
+  failure?: "status" | "timeout" | "unreachable";
+  /** S22: the final HTTP status, when `failure` is "status". */
+  status?: number;
 }
 
+const wholeNumber = { validator: Number.isInteger, message: "must be a whole number" };
+
 /**
- * Mirrored SiteResult in src/lib/siteHealth.ts exactly once; no longer true —
- * SiteResult has since gained optional `failure`/`status` fields that this
- * schema deliberately does not store (`strict` drops them on write, and the
- * reader that builds IHealthSite copies only name/up/detail). `detail` holds
- * the strings classifyStatus/classifyError produce ("Meowchi ok", "Meowchi
- * returned HTTP 503"), which the health strip renders verbatim.
+ * Mirrors SiteResult in src/lib/siteHealth.ts. `detail` holds the strings
+ * classifyStatus/classifyError produce ("Meowchi ok", "Meowchi returned HTTP
+ * 503"), which the health strip renders verbatim. Since S22 a down site also
+ * keeps `failure` and `status` (optional, bounded, unindexed): a Debrief
+ * pressed inside "Check now"'s 60-second floor reuses this reading, and
+ * without them every reused down site would read as "can't be reached at
+ * all" (Debrief plan deviation 3).
  */
 const HealthSiteSchema = new Schema<IHealthSite>(
   {
     name: { type: String, required: true, maxlength: 60 },
     up: { type: Boolean, required: true },
     detail: { type: String, required: true, maxlength: 200 },
+    failure: { type: String, enum: ["status", "timeout", "unreachable"], required: false },
+    status: { type: Number, min: 100, max: 599, required: false, validate: wholeNumber },
   },
   { _id: false, strict: true }
 );

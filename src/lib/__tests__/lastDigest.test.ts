@@ -212,3 +212,35 @@ describe("markBriefingSeen", () => {
     expect(await markBriefingSeen(SENT_AT, new Date())).toBe(false);
   });
 });
+
+describe("getLastDigest — S22's subject", () => {
+  const symptom = {
+    key: "site-status",
+    sentence: "Meowchi's site isn't answering (error 503).",
+    bold: [],
+    nextStep: "n",
+    causeKey: "fixed",
+    cause: "c",
+    causeBold: [],
+    raw: null,
+  };
+  const withSymptom = (s: Record<string, unknown>) =>
+    query({
+      _id: "latest",
+      sentAt: SENT_AT,
+      title: "T",
+      body: "B",
+      devices: 2,
+      briefing: { ...BRIEFING, stories: [{ sentence: "s", bold: [], symptoms: [s] }] },
+    });
+
+  it("reads a symptom saved before `subject` existed as null, not undefined", async () => {
+    findOne.mockImplementation(() => withSymptom(symptom));
+    expect((await getLastDigest())?.briefing?.stories[0].symptoms[0].subject).toBeNull();
+  });
+
+  it("keeps a stored subject", async () => {
+    findOne.mockImplementation(() => withSymptom({ ...symptom, subject: "Meowchi" }));
+    expect((await getLastDigest())?.briefing?.stories[0].symptoms[0].subject).toBe("Meowchi");
+  });
+});

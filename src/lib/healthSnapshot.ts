@@ -68,7 +68,7 @@ export async function getHealthSnapshot(): Promise<StoredHealth | null> {
   const doc = await HealthSnapshot.findOne({ _id: HEALTH_SNAPSHOT_ID }, SNAPSHOT_PROJECTION).lean();
   if (!doc) return null;
 
-  const row = doc as unknown as { checkedAt?: unknown; sites?: SiteResult[] };
+  const row = doc as unknown as { checkedAt?: unknown; sites?: Array<SiteResult & { failure?: unknown; status?: unknown }> };
   // R41's rule at a harder edge: .lean() applies no schema defaults and the
   // cast below asserts the shape of a document nobody validated on the way
   // out. buildHealthStrip calls .getTime() on this field outside the page's
@@ -78,7 +78,15 @@ export async function getHealthSnapshot(): Promise<StoredHealth | null> {
 
   return {
     checkedAt: row.checkedAt,
-    sites: (row.sites ?? []).map((s) => ({ name: s.name, up: s.up, detail: s.detail })),
+    // S22: `failure`/`status` ride along when stored (a Debrief reusing this
+    // reading needs to know HOW a site is down); an unknown value is dropped.
+    sites: (row.sites ?? []).map((s) => ({
+      name: s.name,
+      up: s.up,
+      detail: s.detail,
+      ...(s.failure === "status" || s.failure === "timeout" || s.failure === "unreachable" ? { failure: s.failure } : {}),
+      ...(typeof s.status === "number" ? { status: s.status } : {}),
+    })),
   };
 }
 

@@ -48,12 +48,23 @@ const DIGEST_PROJECTION: Record<keyof StoredDigest, 1> & { _id: 0 } = {
  * validates nothing on the way out and applies no schema defaults, so a
  * record saved before `omitted` existed (Plan B) carries no such key; it
  * reads as 0 here, the same value the schema's own default would give a
- * fresh write, rather than undefined.
+ * fresh write, rather than undefined. The same holds for each symptom's
+ * `subject` (S22): absent reads as null.
  */
 function toBriefing(raw: unknown): StoredBriefing | null {
   if (typeof raw !== "object" || raw === null || !Array.isArray((raw as { stories?: unknown }).stories)) return null;
   const row = raw as StoredBriefing & { omitted?: unknown };
-  return { ...row, omitted: typeof row.omitted === "number" ? row.omitted : 0 };
+  return {
+    ...row,
+    omitted: typeof row.omitted === "number" ? row.omitted : 0,
+    stories: row.stories.map((story) => ({
+      ...story,
+      symptoms: (Array.isArray(story.symptoms) ? story.symptoms : []).map((s) => ({
+        ...s,
+        subject: typeof (s as { subject?: unknown }).subject === "string" ? s.subject : null,
+      })),
+    })),
+  };
 }
 
 /** findOne on the fixed id. NEVER upserts. null when absent (R55). */

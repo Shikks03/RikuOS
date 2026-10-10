@@ -1,7 +1,18 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
-// S21: briefingTypes.ts is import-free (see its header), so a model is allowed
-// to pull its enums and bounds in without breaking the lib-layer boundary.
-import { BRIEFING_BOUNDS as B, CAUSE_KEYS, PROBLEM_KEYS, type StoredBriefing } from "@/lib/briefingTypes";
+// Relative, with the .ts extension, on purpose — the same reason as
+// ApprovalItem.ts: scripts/sync-indexes.mts loads every model under
+// `node --experimental-strip-types`, which resolves no "@/" alias, so the old
+// "@/lib/briefingTypes" import broke `npm run migrate:indexes` (Debrief plan
+// deviation 15). briefingTypes.ts is import-free, so plain Node can load it,
+// and a model may take its enums and bounds from it without pulling in the
+// lib layer.
+import {
+  BRIEFING_BOUNDS as B,
+  CAUSE_KEYS,
+  DEBRIEF_BOUNDS,
+  PROBLEM_KEYS,
+  type StoredBriefing,
+} from "../lib/briefingTypes.ts";
 
 export interface ILastDigest extends Document<string> {
   _id: string;
@@ -13,21 +24,30 @@ export interface ILastDigest extends Document<string> {
   seenAt?: Date | null;
 }
 
-const maxItems = (n: number) => ({
+/** An array of at most `n` entries. Exported: LastDebrief caps its arrays the same way. */
+export const maxItems = (n: number) => ({
   validator: (v: unknown[]) => Array.isArray(v) && v.length <= n,
   message: `at most ${n} items`,
 });
 
 const wholeNumber = { validator: Number.isInteger, message: "must be a whole number" };
 
-const BoldSchema = new Schema(
+export const BoldSchema = new Schema(
   { start: { type: Number, required: true, min: 0 }, end: { type: Number, required: true, min: 0 } },
   { _id: false },
 );
 
-const SymptomSchema = new Schema(
-  {
+/**
+ * One stored symptom's fields, as a fresh object on every call (a definition
+ * object is never shared between two Schema instances). LastDebrief builds its
+ * row schemas from these, so a symptom is bounded the same way in both
+ * singletons. `subject` (S22) is what a Debrief matches on: optional with a
+ * null default, so every record saved before it stays valid.
+ */
+export function symptomFields() {
+  return {
     key: { type: String, required: true, enum: PROBLEM_KEYS },
+    subject: { type: String, default: null, maxlength: DEBRIEF_BOUNDS.subject },
     sentence: { type: String, required: true, maxlength: B.symptomSentence },
     bold: { type: [BoldSchema], default: [], validate: maxItems(B.bold) },
     nextStep: { type: String, required: true, maxlength: B.nextStep },
@@ -35,9 +55,10 @@ const SymptomSchema = new Schema(
     cause: { type: String, required: true, maxlength: B.cause },
     causeBold: { type: [BoldSchema], default: [], validate: maxItems(B.bold) },
     raw: { type: String, default: null, maxlength: B.raw },
-  },
-  { _id: false },
-);
+  };
+}
+
+const SymptomSchema = new Schema(symptomFields(), { _id: false });
 
 const StorySchema = new Schema(
   {
@@ -98,8 +119,8 @@ export const LAST_DIGEST_ID = "latest";
  * S21: `briefing` is the structured Briefing the site renders (typed
  * sub-schemas, every string bounded, every array capped — no Mixed); `seenAt`
  * is set once by markBriefingSeen and reset to null by each morning's save.
- * Both optional, so records saved before S21 stay valid. No index change:
- * _id is still the only index.
+ * Both optional, so records saved before S21 stay valid. S22: each symptom
+ * also carries its `subject`. No index change: _id is still the only index.
  */
 const LastDigestSchema = new Schema<ILastDigest>(
   {

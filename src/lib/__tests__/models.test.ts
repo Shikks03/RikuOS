@@ -14,6 +14,7 @@ import OsSettings from "@/models/OsSettings";
 import { PERSONAL_LAYOUT_DEFAULT } from "@/lib/personalLayout";
 import HealthSnapshot, { HEALTH_SNAPSHOT_ID } from "@/models/HealthSnapshot";
 import LastDigest from "@/models/LastDigest";
+import LastDebrief, { DEBRIEF_ID } from "@/models/LastDebrief";
 import { buildBriefing, type DigestInput, type DigestTodayInput } from "@/lib/digest";
 import type { Problem } from "@/lib/problems";
 
@@ -594,5 +595,180 @@ describe("LastDigest — S21's briefing and seenAt", () => {
 
     const doc = new LastDigest({ ...BASE, briefing });
     await expect(doc.validate()).resolves.toBeUndefined();
+  });
+});
+
+describe("AgentRun — the debrief (S22)", () => {
+  it("accepts a debrief run, and the enum change adds no index", () => {
+    const doc = new AgentRun({ agent: "debrief", startedAt: new Date(), durationMs: 1, ok: true });
+    expect(doc.validateSync()).toBeUndefined();
+    expect(AgentRun.schema.indexes()).toHaveLength(2);
+  });
+});
+
+describe("HealthSnapshot — how a site failed (S22, plan deviation 3)", () => {
+  it("stores a down site's failure and status", async () => {
+    const doc = new HealthSnapshot({
+      checkedAt: new Date(),
+      sites: [{ name: "Meowchi", up: false, detail: "Meowchi returned HTTP 503", failure: "status", status: 503 }],
+    });
+    await expect(doc.validate()).resolves.toBeUndefined();
+    expect(doc.sites[0].failure).toBe("status");
+    expect(doc.sites[0].status).toBe(503);
+  });
+
+  it("still accepts a site with neither field — an up site, or a reading from before", async () => {
+    const doc = new HealthSnapshot({ checkedAt: new Date(), sites: [{ name: "Meowchi", up: true, detail: "Meowchi ok" }] });
+    await expect(doc.validate()).resolves.toBeUndefined();
+  });
+
+  it("refuses an unknown failure and an impossible status", async () => {
+    const bad = (site: Record<string, unknown>) =>
+      new HealthSnapshot({ checkedAt: new Date(), sites: [{ name: "M", up: false, detail: "d", ...site }] }).validate();
+    await expect(bad({ failure: "nope" })).rejects.toThrow(/failure/);
+    await expect(bad({ failure: "status", status: 99 })).rejects.toThrow(/status/);
+    await expect(bad({ failure: "status", status: 600 })).rejects.toThrow(/status/);
+    await expect(bad({ failure: "status", status: 503.5 })).rejects.toThrow(/whole number/);
+  });
+
+  it("adds no index", () => {
+    expect(HealthSnapshot.schema.indexes()).toEqual([]);
+  });
+});
+
+describe("LastDigest — a symptom's subject (S22)", () => {
+  const withSymptom = (extra: Record<string, unknown>) =>
+    new LastDigest({
+      sentAt: new Date("2026-10-13T23:00:00.000Z"),
+      title: "T",
+      body: "B",
+      devices: 1,
+      briefing: {
+        stories: [
+          {
+            sentence: "s",
+            bold: [],
+            symptoms: [
+              { key: "site-status", sentence: "x", bold: [], nextStep: "y", causeKey: "fixed", cause: "z", causeBold: [], ...extra },
+            ],
+          },
+        ],
+        today: "",
+        freelance: null,
+        off: null,
+        unrecognised: 0,
+      },
+    });
+
+  it("accepts a subject, and a symptom without one defaults to null", async () => {
+    await expect(withSymptom({ subject: "Meowchi" }).validate()).resolves.toBeUndefined();
+    const old = withSymptom({});
+    await expect(old.validate()).resolves.toBeUndefined();
+    expect(old.briefing?.stories[0].symptoms[0].subject).toBeNull();
+  });
+
+  it("bounds the subject at 120", async () => {
+    await expect(withSymptom({ subject: "x".repeat(121) }).validate()).rejects.toThrow(/subject/);
+  });
+});
+
+describe("LastDebrief (S22) — R55's singleton", () => {
+  const SYMPTOM = {
+    key: "site-status",
+    subject: "Meowchi",
+    sentence: "Meowchi's site isn't answering (error 503).",
+    bold: [{ start: 0, end: 14 }],
+    nextStep: "Open the site, then check its latest deploy on Vercel.",
+    causeKey: "fixed",
+    cause: "Most likely the site's server is crashing or mid-deploy.",
+    causeBold: [],
+    raw: null,
+  };
+  const BASE = {
+    at: new Date("2026-10-13T05:04:00.000Z"),
+    baselineSentAt: new Date("2026-10-12T23:00:04.000Z"),
+    title: "Debrief at 13:04: one thing still needs you.",
+    sorted: [{ key: "site-timeout", subject: "AzeroTech", sentence: "AzeroTech's site is back up." }],
+    stillNeedsYou: [{ ...SYMPTOM, note: "I couldn't check your sites just now, so I can't say whether that's sorted." }],
+    new: [SYMPTOM],
+    now: [],
+    standaloneCouldntCheck: [{ source: "shikkstracker", sentence: "I couldn't reach ShikksTracker just now." }],
+    since: ["You’ve ticked off Essay."],
+    today: "Nothing on today, and nothing due.",
+    freelance: null,
+    off: null,
+    unrecognised: 0,
+    couldntCheck: { sites: true, watchdog: false, shikkstracker: true },
+  };
+
+  it("accepts a full Debrief", async () => {
+    await expect(new LastDebrief(BASE).validate()).resolves.toBeUndefined();
+  });
+
+  it("requires `at`, `title` and `couldntCheck`", async () => {
+    const { at, title, couldntCheck, ...rest } = BASE;
+    void at;
+    void title;
+    void couldntCheck;
+    await expect(new LastDebrief({ ...rest, title: "T", couldntCheck: BASE.couldntCheck }).validate()).rejects.toThrow(
+      /Path `at` is required/,
+    );
+    await expect(new LastDebrief({ ...rest, at: BASE.at, couldntCheck: BASE.couldntCheck }).validate()).rejects.toThrow(
+      /Path `title` is required/,
+    );
+    await expect(new LastDebrief({ ...rest, at: BASE.at, title: "T" }).validate()).rejects.toThrow(
+      /Path `couldntCheck` is required/,
+    );
+  });
+
+  it("bounds every string", async () => {
+    await expect(new LastDebrief({ ...BASE, title: "x".repeat(81) }).validate()).rejects.toThrow(/title/);
+    await expect(
+      new LastDebrief({ ...BASE, stillNeedsYou: [{ ...SYMPTOM, note: "x".repeat(121) }] }).validate(),
+    ).rejects.toThrow(/note/);
+    await expect(
+      new LastDebrief({ ...BASE, sorted: [{ key: "site-timeout", subject: "x".repeat(121), sentence: "s" }] }).validate(),
+    ).rejects.toThrow(/subject/);
+    await expect(new LastDebrief({ ...BASE, since: ["x".repeat(301)] }).validate()).rejects.toThrow(/since/);
+    await expect(new LastDebrief({ ...BASE, today: "x".repeat(601) }).validate()).rejects.toThrow(/today/);
+  });
+
+  it("caps every array", async () => {
+    const many = <T,>(n: number, x: T) => Array.from({ length: n }, () => x);
+    await expect(new LastDebrief({ ...BASE, sorted: many(13, BASE.sorted[0]) }).validate()).rejects.toThrow(/sorted/);
+    await expect(new LastDebrief({ ...BASE, stillNeedsYou: many(13, BASE.stillNeedsYou[0]) }).validate()).rejects.toThrow(/stillNeedsYou/);
+    await expect(new LastDebrief({ ...BASE, new: many(13, SYMPTOM) }).validate()).rejects.toThrow(/new/);
+    await expect(new LastDebrief({ ...BASE, now: many(13, SYMPTOM) }).validate()).rejects.toThrow(/now/);
+    await expect(
+      new LastDebrief({ ...BASE, standaloneCouldntCheck: many(4, BASE.standaloneCouldntCheck[0]) }).validate(),
+    ).rejects.toThrow(/standaloneCouldntCheck/);
+    await expect(new LastDebrief({ ...BASE, since: many(7, "x") }).validate()).rejects.toThrow(/since/);
+  });
+
+  it("refuses an unknown key, cause or source", async () => {
+    await expect(new LastDebrief({ ...BASE, new: [{ ...SYMPTOM, key: "nope" }] }).validate()).rejects.toThrow(/key/);
+    await expect(new LastDebrief({ ...BASE, new: [{ ...SYMPTOM, causeKey: "nope" }] }).validate()).rejects.toThrow(/causeKey/);
+    await expect(
+      new LastDebrief({ ...BASE, standaloneCouldntCheck: [{ source: "calendar", sentence: "s" }] }).validate(),
+    ).rejects.toThrow(/source/);
+  });
+
+  it("refuses a fractional or negative unrecognised count", async () => {
+    await expect(new LastDebrief({ ...BASE, unrecognised: 1.5 }).validate()).rejects.toThrow(/whole number/);
+    await expect(new LastDebrief({ ...BASE, unrecognised: -1 }).validate()).rejects.toThrow(/unrecognised/);
+  });
+
+  it("does not store the response-only `saved`", () => {
+    const doc = new LastDebrief({ ...BASE, saved: false });
+    expect((doc.toObject() as unknown as Record<string, unknown>).saved).toBeUndefined();
+  });
+
+  it("defaults _id to the one singleton id and refuses any other", async () => {
+    expect(new LastDebrief(BASE)._id).toBe(DEBRIEF_ID);
+    await expect(new LastDebrief({ ...BASE, _id: "other" }).validate()).rejects.toThrow(/_id/);
+  });
+
+  it("declares no index of its own and no TTL — always overwritten whole (spec §5.2)", () => {
+    expect(LastDebrief.schema.indexes()).toEqual([]);
   });
 });

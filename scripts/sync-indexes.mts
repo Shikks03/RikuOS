@@ -28,10 +28,11 @@ import LoginAttempt from "../src/models/LoginAttempt.ts";
 import HealthSnapshot from "../src/models/HealthSnapshot.ts";
 import Todo from "../src/models/Todo.ts";
 import LastDigest from "../src/models/LastDigest.ts";
+import LastDebrief from "../src/models/LastDebrief.ts";
 
 const APPLY = process.argv.includes("--apply");
 
-const MODELS = [ApprovalItem, AgentRun, PushSubscription, OsSettings, LoginAttempt, HealthSnapshot, Todo, LastDigest];
+const MODELS = [ApprovalItem, AgentRun, PushSubscription, OsSettings, LoginAttempt, HealthSnapshot, Todo, LastDigest, LastDebrief];
 
 interface IndexInfo {
   name?: string;

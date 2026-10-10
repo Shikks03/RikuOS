@@ -190,3 +190,25 @@ describe("saveHealthSnapshot", () => {
     expect(findOneAndUpdate).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("getHealthSnapshot — how a site failed (S22, plan deviation 3)", () => {
+  it("keeps a stored failure and status, so a reused reading still says how a site is down", async () => {
+    const checkedAt = new Date("2026-09-05T06:00:00.000Z");
+    findOne.mockImplementation(() =>
+      query({
+        checkedAt,
+        sites: [{ name: "Meowchi", up: false, detail: "Meowchi returned HTTP 503", failure: "status", status: 503, _id: "sub" }],
+      }),
+    );
+    expect(await getHealthSnapshot()).toStrictEqual({
+      checkedAt,
+      sites: [{ name: "Meowchi", up: false, detail: "Meowchi returned HTTP 503", failure: "status", status: 503 }],
+    });
+  });
+
+  it("drops a failure value it doesn't know rather than passing it on", async () => {
+    const checkedAt = new Date("2026-09-05T06:00:00.000Z");
+    findOne.mockImplementation(() => query({ checkedAt, sites: [{ name: "M", up: false, detail: "d", failure: "nope" }] }));
+    expect(await getHealthSnapshot()).toStrictEqual({ checkedAt, sites: [{ name: "M", up: false, detail: "d" }] });
+  });
+});
