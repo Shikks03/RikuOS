@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { requireCronSecret } from "@/lib/auth";
+import { NO_DEVICE_ERROR } from "@/lib/constants";
 import { getOsSettings } from "@/lib/osSettings";
 import { runJob } from "@/lib/jobs/runJob";
 import { runExpirySweep } from "@/lib/jobs/expirySweep";
@@ -206,7 +207,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const sentAt = new Date();
       if (delivery.sent === 0) {
         throw new Error(
-          `the digest reached no device (failed ${delivery.failed}, removed ${delivery.removed}). ` +
+          `${NO_DEVICE_ERROR} (failed ${delivery.failed}, removed ${delivery.removed}). ` +
             "Re-subscribe from /freelance/queue."
         );
       }

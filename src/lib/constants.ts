@@ -73,3 +73,12 @@ export const EVENT_TITLE_MAX = 200;
  * of it.
  */
 export const PRESS_TIMEOUT_MS = 60_000;
+
+/**
+ * The morning cron's named marker for "the push reached zero devices"
+ * (route.ts). The greeting line (built on the site) reads the dispatcher
+ * AgentRun's stored `error` to tell this run apart from one that never
+ * happened at all, so the exact text is load-bearing, not cosmetic (carried
+ * item 1, Briefing Plan A post-build record).
+ */
+export const NO_DEVICE_ERROR = "the digest reached no device";
