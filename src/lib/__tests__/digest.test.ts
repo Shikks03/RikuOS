@@ -669,3 +669,33 @@ describe("todosForDigest", () => {
     );
   });
 });
+
+import { todayProblems, toStoredSymptom } from "@/lib/digest";
+
+describe("toStoredSymptom / todayProblems (S22)", () => {
+  it("stores a problem's subject beside its explained sentence", () => {
+    expect(toStoredSymptom({ key: "site-status", site: "Meowchi", status: 503 })).toMatchObject({
+      key: "site-status",
+      subject: "Meowchi",
+      sentence: "Meowchi's site isn't answering (error 503).",
+      bold: [{ start: 0, end: 14 }],
+    });
+    expect(toStoredSymptom({ key: "todos-unavailable" }).subject).toBeNull();
+  });
+
+  it("gives every symptom buildBriefing stores its subject", () => {
+    const briefing = buildBriefing({ ...base, problems: [{ key: "agent-failed", agent: "chaser" }] });
+    expect(briefing.stories[0].symptoms[0].subject).toBe("chaser");
+  });
+
+  it("reads calendar and to-do failures exactly as the push does", () => {
+    expect(todayProblems({ ...QUIET, events: "unavailable", calendarCause: "expired", due: "unavailable" })).toEqual([
+      { key: "calendar-unavailable", cause: "expired" },
+      { key: "todos-unavailable" },
+    ]);
+    expect(todayProblems({ ...QUIET, events: "unavailable" })).toEqual([{ key: "calendar-unavailable", cause: "read-failed" }]);
+    expect(todayProblems({ ...QUIET, missedLayers: ["Work"] })).toEqual([{ key: "calendar-partial", calendars: ["Work"] }]);
+    expect(todayProblems({ ...QUIET, events: "none-enabled" })).toEqual([]);
+    expect(todayProblems(QUIET)).toEqual([]);
+  });
+});

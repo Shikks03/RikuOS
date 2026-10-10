@@ -27,11 +27,11 @@ import { daysLate, digestWindow, sortTodos, todoDueKey } from "@/lib/todos";
 import type { CalendarWindow } from "@/lib/google";
 import type { Layer } from "@/lib/osSettings";
 import type { Agent } from "@/models/AgentRun";
-import { AGENT_NAMES, boundRaw, type CalendarUnavailableCause, type Problem } from "@/lib/problems";
+import { AGENT_NAMES, boundRaw, subjectOf, type CalendarUnavailableCause, type Problem } from "@/lib/problems";
 import { explain } from "@/lib/causes";
 import { groupProblems, type Story } from "@/lib/stories";
 import { capWord, greeting, joinSaid, lowerLead, numberWord, say, type Mood, type Said } from "@/lib/voice";
-import { BRIEFING_BOUNDS, type StoredBold, type StoredBriefing } from "@/lib/briefingTypes";
+import { BRIEFING_BOUNDS, type StoredBold, type StoredBriefing, type StoredSymptom } from "@/lib/briefingTypes";
 
 export interface DigestInput {
   /** The APP_TZ day this push is for (todayKey(now)). Drives the greeting. */
@@ -51,17 +51,28 @@ export interface Digest {
   body: string;
 }
 
-/** The input's problems plus the four the digest itself detects, in report order. */
-function allProblems(input: DigestInput): Problem[] {
-  const problems = [...input.problems];
-  if (input.attention === null) problems.push({ key: "pipeline-unavailable", raw: boundRaw(input.attentionError) });
-  const { today } = input;
+/**
+ * The problems the Today sentence's own reads can raise: a calendar that
+ * couldn't be read (wholly or in part) and to-dos that couldn't be read.
+ * Shared with the Debrief (S22, spec §3.4), whose fresh list takes these
+ * exactly as the push does — a failed calendar or to-do read IS the finding.
+ */
+export function todayProblems(today: DigestTodayInput): Problem[] {
+  const problems: Problem[] = [];
   if (today.events === "unavailable") {
     problems.push({ key: "calendar-unavailable", cause: today.calendarCause ?? "read-failed" });
   } else if (today.events !== "none-enabled" && today.missedLayers.length > 0) {
     problems.push({ key: "calendar-partial", calendars: today.missedLayers });
   }
   if (today.due === "unavailable") problems.push({ key: "todos-unavailable" });
+  return problems;
+}
+
+/** The input's problems plus the four the digest itself detects, in report order. */
+function allProblems(input: DigestInput): Problem[] {
+  const problems = [...input.problems];
+  if (input.attention === null) problems.push({ key: "pipeline-unavailable", raw: boundRaw(input.attentionError) });
+  problems.push(...todayProblems(input.today));
   return problems;
 }
 
@@ -171,12 +182,35 @@ export function composeDigest(input: DigestInput): Digest {
 
 // --- The stored Briefing (S21, spec §7.1) ------------------------------------
 
-function boundText(text: string, max: number): string {
+/** `text` cut to `max` with "…" when longer. Exported for the Debrief (S22). */
+export function boundText(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
 function boundBold(bold: StoredBold[], text: string): StoredBold[] {
   return bold.filter((r) => r.start >= 0 && r.end <= text.length && r.start < r.end).slice(0, BRIEFING_BOUNDS.bold);
+}
+
+/**
+ * One problem as a stored symptom: explained, bounded, and carrying its
+ * subject (S22). The 07:00 Briefing and the Debrief both store symptoms
+ * through this one function, so a Debrief compares like with like.
+ */
+export function toStoredSymptom(p: Problem): StoredSymptom {
+  const e = explain(p);
+  const sentence = boundText(e.sentence.text, BRIEFING_BOUNDS.symptomSentence);
+  const cause = boundText(e.cause.text, BRIEFING_BOUNDS.cause);
+  return {
+    key: p.key,
+    subject: subjectOf(p),
+    sentence,
+    bold: boundBold(e.sentence.bold, sentence),
+    nextStep: boundText(e.nextStep, BRIEFING_BOUNDS.nextStep),
+    causeKey: e.causeKey,
+    cause,
+    causeBold: boundBold(e.cause.bold, cause),
+    raw: e.raw === null ? null : e.raw.slice(0, BRIEFING_BOUNDS.raw),
+  };
 }
 
 export function buildBriefing(input: DigestInput): StoredBriefing {
@@ -200,21 +234,7 @@ export function buildBriefing(input: DigestInput): StoredBriefing {
       // Symptoms past BRIEFING_BOUNDS.symptoms are left dropped with no count
       // of their own (carried item 2 only covers stories) — the story's own
       // sentence already speaks for every symptom under it.
-      symptoms: story.symptoms.slice(0, BRIEFING_BOUNDS.symptoms).map((p) => {
-        const e = explain(p);
-        const s = boundText(e.sentence.text, BRIEFING_BOUNDS.symptomSentence);
-        const cause = boundText(e.cause.text, BRIEFING_BOUNDS.cause);
-        return {
-          key: p.key,
-          sentence: s,
-          bold: boundBold(e.sentence.bold, s),
-          nextStep: boundText(e.nextStep, BRIEFING_BOUNDS.nextStep),
-          causeKey: e.causeKey,
-          cause,
-          causeBold: boundBold(e.cause.bold, cause),
-          raw: e.raw === null ? null : e.raw.slice(0, BRIEFING_BOUNDS.raw),
-        };
-      }),
+      symptoms: story.symptoms.slice(0, BRIEFING_BOUNDS.symptoms).map(toStoredSymptom),
     };
   });
   const freelance = freelanceLine(input);

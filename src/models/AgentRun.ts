@@ -3,7 +3,9 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 /**
  * Every scheduled/triggered job in the system. "expiry-sweep" is the P3 cron
  * that expires stale ApprovalItems; the rest arrive with their own phases
- * (ARCHITECTURE.md §2.3).
+ * (ARCHITECTURE.md §2.3). "debrief" (S22) is the one triggered by a press,
+ * not a schedule: the watchdog never expects it and the rail never shows it
+ * (watchdog.ts EXPECTATIONS / RAIL_AGENTS leave it out on purpose).
  */
 export const AGENTS = [
   "chaser",
@@ -15,6 +17,7 @@ export const AGENTS = [
   "retro",
   "watchdog",
   "expiry-sweep",
+  "debrief",
 ] as const;
 export type Agent = (typeof AGENTS)[number];
 

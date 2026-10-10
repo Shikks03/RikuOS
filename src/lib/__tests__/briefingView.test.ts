@@ -18,6 +18,7 @@ const BRIEFING: StoredBriefing = {
       symptoms: [
         {
           key: "site-status",
+          subject: "Meowchi",
           sentence: "Meowchi's site isn't answering (error 503).",
           bold: [{ start: 0, end: 14 }],
           nextStep: "Open the site, then check its latest deploy on Vercel.",

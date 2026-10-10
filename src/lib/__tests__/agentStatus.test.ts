@@ -245,3 +245,10 @@ describe("deriveAgentStatuses", () => {
     }
   });
 });
+
+describe("the debrief is never expected and never on the rail (S22, spec §3.7)", () => {
+  it("is absent from EXPECTATIONS and RAIL_AGENTS — it is pressed, not scheduled", () => {
+    expect(EXPECTATIONS.some((e) => e.agent === "debrief")).toBe(false);
+    expect(RAIL_AGENTS.some((e) => e.agent === "debrief")).toBe(false);
+  });
+});

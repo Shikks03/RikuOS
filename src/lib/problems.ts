@@ -18,7 +18,7 @@ import type { Anomaly } from "@/lib/watchdog";
 import type { SiteResult } from "@/lib/siteHealth";
 import type { OutreachFinding } from "@/lib/outreachHealth";
 import type { Agent } from "@/models/AgentRun";
-import { BRIEFING_BOUNDS } from "@/lib/briefingTypes";
+import { BRIEFING_BOUNDS, DEBRIEF_BOUNDS } from "@/lib/briefingTypes";
 
 export type CalendarUnavailableCause = "not-configured" | "expired" | "timeout" | "read-failed";
 
@@ -57,6 +57,7 @@ export const AGENT_NAMES: Readonly<Record<Agent, string>> = Object.freeze({
   retro: "the retro",
   watchdog: "the watchdog",
   "expiry-sweep": "the expiry sweep",
+  debrief: "the debrief",
 });
 
 /** A raw error bounded to what the Briefing stores; null stays null. */
@@ -92,7 +93,13 @@ export interface MorningOutcomes {
   outreachHealth: { ok: boolean; error?: string; findings: OutreachFinding[] };
 }
 
-function fromSite(site: SiteResult): Problem {
+/*
+ * The three per-source translators are exported for the Debrief (S22, spec
+ * §3.4), which builds its fresh problems from each source's own successful
+ * outcome and never through buildProblems: a source that fails on a press
+ * must produce no Problem at all, never this morning's job-failed.
+ */
+export function fromSite(site: SiteResult): Problem {
   if (site.failure === "status" && typeof site.status === "number") {
     return { key: "site-status", site: site.name, status: site.status };
   }
@@ -101,7 +108,7 @@ function fromSite(site: SiteResult): Problem {
   return { key: "site-unreachable", site: site.name };
 }
 
-function fromAnomaly(a: Anomaly): Problem {
+export function fromAnomaly(a: Anomaly): Problem {
   switch (a.kind) {
     case "never-ran":
       return { key: "agent-never-ran", agent: a.agent };
@@ -114,7 +121,7 @@ function fromAnomaly(a: Anomaly): Problem {
   }
 }
 
-function fromFinding(f: OutreachFinding): Problem {
+export function fromFinding(f: OutreachFinding): Problem {
   switch (f.kind) {
     case "engine-never-ran":
       return { key: "engine-never-ran" };
@@ -154,4 +161,40 @@ export function buildProblems(outcomes: MorningOutcomes): Problem[] {
   for (const finding of outreachHealth.findings) problems.push(fromFinding(finding));
 
   return problems;
+}
+
+/**
+ * What a problem is about (S22, spec §3.5): the site, the agent, the job, or
+ * the failing calendars sorted and comma-joined (so the same failing set is
+ * always the same subject), bounded to DEBRIEF_BOUNDS.subject. null for a key
+ * that is one condition with no subject. Stored on each symptom so a Debrief
+ * can match this morning's symptoms against a fresh re-check.
+ */
+export function subjectOf(p: Problem): string | null {
+  switch (p.key) {
+    case "site-status":
+    case "site-timeout":
+    case "site-unreachable":
+      return p.site;
+    case "agent-never-ran":
+    case "agent-stale":
+    case "agent-failed":
+    case "agent-degraded":
+      return p.agent;
+    case "job-failed":
+      return p.job;
+    case "calendar-partial":
+      return [...p.calendars].sort().join(", ").slice(0, DEBRIEF_BOUNDS.subject);
+    case "snapshot-unsaved":
+    case "unstuck-items":
+    case "engine-never-ran":
+    case "engine-unreadable":
+    case "engine-stale":
+    case "engine-errors":
+    case "stranded-approved":
+    case "pipeline-unavailable":
+    case "calendar-unavailable":
+    case "todos-unavailable":
+      return null;
+  }
 }

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { AGENT_NAMES, buildProblems, describeFetchError, type MorningOutcomes } from "@/lib/problems";
 import { AGENTS } from "@/models/AgentRun";
+import { fromAnomaly, fromFinding, fromSite, subjectOf, type Problem } from "@/lib/problems";
+import { DEBRIEF_BOUNDS, PROBLEM_KEYS } from "@/lib/briefingTypes";
 
 const healthy: MorningOutcomes = {
   expiry: { ok: true, unstuck: 0 },
@@ -212,5 +214,79 @@ describe("AGENT_NAMES", () => {
     }
     expect(AGENT_NAMES["site-health"]).toBe("the site check");
     expect(AGENT_NAMES.dispatcher).toBe("the morning run");
+  });
+});
+
+describe("AGENT_NAMES — the debrief (S22, spec §3.7)", () => {
+  it("names the debrief, which Record<Agent, string> forces once the enum has it", () => {
+    expect(AGENT_NAMES.debrief).toBe("the debrief");
+  });
+});
+
+describe("the per-source translators, exported for the Debrief (S22, spec §3.4)", () => {
+  it("fromSite types a down site by how it failed", () => {
+    expect(fromSite({ name: "Meowchi", up: false, detail: "x", failure: "status", status: 503 })).toEqual({
+      key: "site-status",
+      site: "Meowchi",
+      status: 503,
+    });
+    expect(fromSite({ name: "Meowchi", up: false, detail: "x", failure: "timeout" })).toEqual({ key: "site-timeout", site: "Meowchi" });
+    expect(fromSite({ name: "Meowchi", up: false, detail: "x" })).toEqual({ key: "site-unreachable", site: "Meowchi" });
+  });
+
+  it("fromAnomaly and fromFinding carry their numbers", () => {
+    expect(fromAnomaly({ agent: "chaser", kind: "stale", detail: "x", ageHours: 31 })).toEqual({
+      key: "agent-stale",
+      agent: "chaser",
+      ageHours: 31,
+    });
+    expect(fromFinding({ kind: "stranded-approved", detail: "x", count: 4 })).toEqual({ key: "stranded-approved", count: 4 });
+  });
+});
+
+describe("subjectOf (S22, spec §3.5)", () => {
+  const cases: Array<[Problem, string | null]> = [
+    [{ key: "site-status", site: "Meowchi", status: 503 }, "Meowchi"],
+    [{ key: "site-timeout", site: "AzeroTech" }, "AzeroTech"],
+    [{ key: "site-unreachable", site: "ShikksTracker" }, "ShikksTracker"],
+    [{ key: "agent-never-ran", agent: "chaser" }, "chaser"],
+    [{ key: "agent-stale", agent: "dispatcher", ageHours: 31 }, "dispatcher"],
+    [{ key: "agent-failed", agent: "expiry-sweep" }, "expiry-sweep"],
+    [{ key: "agent-degraded", agent: "chaser", itemsFailed: 2 }, "chaser"],
+    [{ key: "job-failed", job: "outreach-health", raw: null }, "outreach-health"],
+    [{ key: "snapshot-unsaved" }, null],
+    [{ key: "unstuck-items", count: 2 }, null],
+    [{ key: "engine-never-ran" }, null],
+    [{ key: "engine-unreadable" }, null],
+    [{ key: "engine-stale", ageMs: 1 }, null],
+    [{ key: "engine-errors", count: 1 }, null],
+    [{ key: "stranded-approved", count: 1 }, null],
+    [{ key: "pipeline-unavailable", raw: null }, null],
+    [{ key: "calendar-unavailable", cause: "expired" }, null],
+    [{ key: "calendar-partial", calendars: ["Work", "Classes"] }, "Classes, Work"],
+    [{ key: "todos-unavailable" }, null],
+  ];
+
+  it("has a case for every ProblemKey", () => {
+    expect(new Set(cases.map(([p]) => p.key))).toEqual(new Set(PROBLEM_KEYS));
+  });
+
+  it.each(cases)("%o → %s", (p, subject) => {
+    expect(subjectOf(p)).toBe(subject);
+  });
+
+  it("the expiry sweep's job-failed names its job", () => {
+    expect(subjectOf({ key: "job-failed", job: "expiry-sweep", raw: "x" })).toBe("expiry-sweep");
+  });
+
+  it("sorts calendar names, so the same failing set is always the same subject", () => {
+    expect(subjectOf({ key: "calendar-partial", calendars: ["Work", "Classes"] })).toBe(
+      subjectOf({ key: "calendar-partial", calendars: ["Classes", "Work"] }),
+    );
+  });
+
+  it("bounds a long calendar-name subject", () => {
+    const long = Array.from({ length: 3 }, (_, i) => `${i}${"x".repeat(119)}`);
+    expect(subjectOf({ key: "calendar-partial", calendars: long })?.length).toBe(DEBRIEF_BOUNDS.subject);
   });
 });
