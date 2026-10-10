@@ -428,6 +428,16 @@ describe("LastDigest — S21's briefing and seenAt", () => {
     devices: 2,
   };
 
+  it("accepts devices: 0 — a morning the push reached nobody is still saved (B0 fix round, Riku 2026-10-10: \"Save it\")", async () => {
+    const doc = new LastDigest({ ...BASE, devices: 0 });
+    await expect(doc.validate()).resolves.toBeUndefined();
+  });
+
+  it("still rejects a negative device count", async () => {
+    const doc = new LastDigest({ ...BASE, devices: -1 });
+    await expect(doc.validate()).rejects.toThrow(/devices/);
+  });
+
   it("rejects an over-length story sentence", async () => {
     const doc = new LastDigest({
       ...BASE,

@@ -144,6 +144,17 @@ describe("saveLastDigest", () => {
     expect(options).toMatchObject({ upsert: true, runValidators: true });
   });
 
+  it("saves devices: 0 as-is — a morning that reached no device is still saved (B0 fix round, Riku: \"Save it\")", async () => {
+    findOneAndUpdate.mockResolvedValue(null);
+
+    await saveLastDigest(SENT_AT, PAYLOAD, 0, BRIEFING);
+
+    const [, update] = findOneAndUpdate.mock.calls[0];
+    expect(update).toEqual({
+      $set: { sentAt: SENT_AT, title: PAYLOAD.title, body: PAYLOAD.body, devices: 0, seenAt: null, briefing: BRIEFING },
+    });
+  });
+
   it("unsets an old briefing when this morning has none", async () => {
     findOneAndUpdate.mockResolvedValue(null);
 

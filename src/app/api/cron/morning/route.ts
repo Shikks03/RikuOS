@@ -194,28 +194,38 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       };
       const digest = composeDigest(digestInput);
 
-      // A digest nobody received is a total failure of this run's purpose, not
-      // a partial one — so it fails the run rather than being counted (design
-      // §"Run-record counts per job"). sendPushToAll swallows per-device
-      // errors and deletes subscriptions the push service reports as gone, so
-      // without this an invalidated iPhone subscription would file a healthy
-      // run every morning while reaching nobody, and the absent push — the
-      // outer safety net this whole phase rests on — would be all that is left.
+      // A digest nobody received is a total failure of this run's purpose —
+      // but Riku still needs to be able to READ it: on the one morning the
+      // push can't reach his phone, the site is his only channel (Riku,
+      // 2026-10-10: "Save it" — B0 fix round). So the record below is always
+      // saved, with `devices: delivery.sent` (0 on this path), and only AFTER
+      // that save is attempted does this job fail the run — the throw at the
+      // bottom of this block is what tomorrow's watchdog names and what the
+      // greeting line's `undelivered` state reads from the dispatcher's own
+      // stored `error`. sendPushToAll swallows per-device errors and deletes
+      // subscriptions the push service reports as gone, so without that throw
+      // an invalidated iPhone subscription would file a healthy run every
+      // morning while reaching nobody, and the saved record would be read as
+      // a push that went out fine. `devices: 0` IS the fact that it didn't —
+      // every reader of LastDigest/getLastDigest must check it before
+      // treating a saved record as delivered.
       // A tap opens the Briefing full-screen over the landing page (S21).
       const payload = buildPushPayload(digest.title, digest.body, "/freelance?briefing=open");
       const delivery = await sendPushToAll(payload);
       const sentAt = new Date();
-      if (delivery.sent === 0) {
-        throw new Error(
-          `${NO_DEVICE_ERROR} (failed ${delivery.failed}, removed ${delivery.removed}). ` +
-            "Re-subscribe from /freelance/queue."
-        );
-      }
+      const noDeviceError =
+        delivery.sent === 0
+          ? new Error(
+              `${NO_DEVICE_ERROR} (failed ${delivery.failed}, removed ${delivery.removed}). ` +
+                "Re-subscribe from /freelance/queue."
+            )
+          : null;
 
       // The Briefing is built AFTER the send and inside its own catch: it is
       // derived from the same sentences, but a bug in it must never cost the
       // push that already went out (spec §7.2). Without it the record is saved
-      // plain and the site shows the quoted text.
+      // plain and the site shows the quoted text. Built even when the push
+      // reached no device — the saved record is what the site reads instead.
       let briefing: StoredBriefing | null = null;
       try {
         briefing = buildBriefing(digestInput);
@@ -223,13 +233,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         console.error("[cron/morning] briefing could not be built:", err);
       }
 
-      // What the Personal page's push tile quotes (R22). After the guard, so
-      // nothing is recorded as sent that was not. The PAYLOAD is stored, not
-      // the digest: it is the sliced text the devices received. Caught, so a
-      // persistence step cannot cost the push that already went out; its
-      // failure is the run's one failed item, which the rail shows as degraded
-      // this morning and tomorrow's watchdog names in the push. It cannot be
-      // named in THIS push — that has already gone.
+      // What the Personal page's push tile quotes (R22), and now also the
+      // one path to the site on a morning that reached no device — so this
+      // save is NOT gated on delivery any more. The PAYLOAD is stored, not
+      // the digest: it is the sliced text the devices received (or would
+      // have, at 0 devices). Caught, so a persistence failure can never cost
+      // the push that already went out (or the saved record, on the
+      // zero-device path); its failure is the run's one failed item, which
+      // the rail shows as degraded this morning and tomorrow's watchdog
+      // names in the push. It cannot be named in THIS push — that has
+      // already gone (or, on this path, reached nobody).
       let digestStored = true;
       try {
         await saveLastDigest(sentAt, payload, delivery.sent, briefing);
@@ -253,6 +266,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           console.error("[cron/morning] last digest write failed:", err);
         }
       }
+
+      // Thrown AFTER the save attempt above, never before: a save failure on
+      // this path is logged (above) but must never mask the no-device
+      // failure, and the no-device failure must never be skipped because the
+      // save happened to succeed. The thrown error is always the same
+      // no-device message either way.
+      if (noDeviceError !== null) throw noDeviceError;
+
       const failedItems = (digestStored ? 0 : 1) + (briefing === null ? 1 : 0);
       return {
         counts: { itemsProcessed: problems.length, itemsFailed: failedItems },
