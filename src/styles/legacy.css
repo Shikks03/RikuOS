@@ -86,3 +86,21 @@ input:-webkit-autofill{
   -webkit-box-shadow:0 0 0 1000px #101318 inset;
   caret-color:var(--ink);
 }
+
+/* ---- smooth feel (docs/superpowers/specs/2026-10-11-smooth-feel-design.md §6) ---- */
+/* A decided card leaves at once: slides and fades out over 200ms, then the
+   page removes it and the list closes over the gap (plan deviation 10).
+   base.css's reduced-motion rule stills it; the page then removes the card
+   without waiting. */
+.card.is-leaving{animation:q-leave .2s ease-in forwards;pointer-events:none}
+@keyframes q-leave{to{opacity:0;transform:translateX(24px)}}
+/* The filter's name inside the top line: a control that reads as a link.
+   It overrides the bare button pill above (L1e: text-transform none), and
+   the padding/margin pair gives it a 44px touch height without moving the
+   sentence's line. */
+.q-link{
+  font:inherit;letter-spacing:normal;text-transform:none;color:inherit;line-height:16px;
+  background:none;border:0;border-radius:0;padding:14px 0;margin:-14px 0;
+  text-decoration:underline;text-underline-offset:2px;cursor:pointer;
+}
+.q-link:hover{border:0}
