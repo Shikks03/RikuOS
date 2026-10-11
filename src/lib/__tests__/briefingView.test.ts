@@ -338,6 +338,40 @@ describe("buildGreetingLine — the Debrief's recency rule (S22, spec §3.6)", (
       expect(line({ now: new Date("2026-09-10T05:30:00Z"), digest: TODAY_PUSH, debrief: at1300 })).toMatchObject({ kind: "debrief" });
     });
   });
+
+  describe("a Debrief never hides a morning whose 07:00 run didn't happen (fix round, plan deviation 25)", () => {
+    /** 09:00 Manila, Thu 10 Sep — past PUSH_LATE_HOUR, same as AFTER_SEVEN's 10:00. */
+    const AT_0900: StoredDebrief = { ...DEBRIEF, at: new Date("2026-09-10T01:00:00Z"), title: "Debrief at 09:00: all clear." };
+    const FAILED_TODAY = { ok: false, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: false, noDevice: false };
+
+    it("no digest sent today, no run today, monitoring on, past PUSH_LATE_HOUR: the morning's own missing alarm wins", () => {
+      expect(line({ now: AFTER_SEVEN, digest: OLD_PUSH, debrief: AT_0900 })).toMatchObject({ kind: "missing" });
+    });
+
+    it("same, but monitoring off: the Debrief still takes the line", () => {
+      expect(line({ now: AFTER_SEVEN, digest: OLD_PUSH, debrief: AT_0900, monitoringEnabled: false })).toMatchObject({
+        kind: "debrief",
+      });
+    });
+
+    it("same, but now is still inside the 07–08 grace window: the Debrief still takes the line", () => {
+      expect(line({ now: new Date("2026-09-09T23:30:00Z"), digest: OLD_PUSH, debrief: AT_0900 })).toMatchObject({ kind: "debrief" });
+    });
+
+    it("same, but the digest read is unavailable (unknown, not 'none'): the Debrief still takes the line", () => {
+      expect(line({ now: AFTER_SEVEN, digest: "unavailable", debrief: AT_0900 })).toMatchObject({ kind: "debrief" });
+    });
+
+    it("same, but there IS a dispatcher run today (it failed): the Debrief still takes the line", () => {
+      expect(line({ now: AFTER_SEVEN, digest: OLD_PUSH, debrief: AT_0900, dispatcher: FAILED_TODAY })).toMatchObject({
+        kind: "debrief",
+      });
+    });
+
+    it("nothing EVER stored is the quiet 'never' state, not an alarm, so it stays behind the Debrief (D6, unaffected)", () => {
+      expect(line({ now: AFTER_SEVEN, digest: null, debrief: AT_0900 })).toMatchObject({ kind: "debrief" });
+    });
+  });
 });
 
 describe("symptomView — one stored symptom as a row and its card (shared with the Debrief)", () => {

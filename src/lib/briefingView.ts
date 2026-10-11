@@ -40,6 +40,15 @@
  * its own. Yesterday's Debrief never wins: the next 07:00 takes the line back
  * by recency alone.
  *
+ * TWO MORE WAYS THE DEBRIEF GIVES WAY (fix round, plan deviation 25; deviation
+ * 23 was the first): taken before PUSH_EXPECTED_HOUR, once `now` reaches that
+ * hour on the same day; or when this morning's own cron never fired at all
+ * (an older digest exists, nothing sent today, no run today, monitoring not
+ * explicitly off, `now` past PUSH_LATE_HOUR) — otherwise a Debrief pressed
+ * after 07:00 on such a morning would read "all clear" over what is, in
+ * fact, the `missing` alarm. Nothing was EVER stored is the quiet `never`
+ * state, not an alarm, and stays behind the Debrief as before (D6).
+ *
  * Every state that has a stored Briefing opens it — the panel, and the
  * Debrief button at its foot, are reachable unless nothing was ever stored or
  * the read failed (S22 D4; `unsaved` opens the last Briefing, Debrief plan
@@ -116,19 +125,56 @@ export function debriefOutstanding(d: Pick<StoredDebrief, "stillNeedsYou" | "new
 export function buildGreetingLine(input: GreetingInput): GreetingLine {
   const { digest, debrief, now } = input;
   const today = todayKey(now);
+  const nowHour = Number(clockHHMM(now, APP_TZ).slice(0, 2));
+
+  // The dispatcher's newest run, narrowed to one started today — read once,
+  // since the Debrief's own missing-morning guard below and the skipped/
+  // non-skipped branches further down all need it, at different points in
+  // the precedence.
+  const dispatcherToday =
+    input.dispatcher !== "unavailable" && input.dispatcher !== null && dayKey(input.dispatcher.startedAt, APP_TZ) === today
+      ? input.dispatcher
+      : null;
+
+  // Whether THIS MORNING, on its own, would read as the `missing` alarm
+  // below: an older digest exists (never stored at all is the quiet `never`
+  // state, not an alarm worth protecting), nothing was sent today, the
+  // dispatcher read succeeded and shows no run today, monitoring is not
+  // explicitly off, and `now` has reached PUSH_LATE_HOUR. Computed once and
+  // read both by the Debrief guard right below (fix round, plan deviation
+  // 25) and by the fall-through `missing` return at the foot of this
+  // function, so the two conditions can never drift apart.
+  const thisMorningMissing =
+    digest !== null &&
+    digest !== "unavailable" &&
+    dayKey(digest.sentAt, APP_TZ) !== today &&
+    input.dispatcher !== "unavailable" &&
+    dispatcherToday === null &&
+    input.monitoringEnabled !== false &&
+    nowHour >= PUSH_LATE_HOUR;
 
   // S22 recency rule (spec §3.6), checked before everything — including a
   // digest that couldn't be read, which must not hide a good, newer Debrief.
-  // Fix round: a Debrief taken before PUSH_EXPECTED_HOUR gives way, once
-  // `now` reaches that hour on the same day, to the morning's own state —
-  // otherwise a 02:00 "all clear" would silently outlive a 07:00 run that
-  // then failed, went missing, or was skipped.
+  // Fix round (plan deviation 23): a Debrief taken before PUSH_EXPECTED_HOUR
+  // gives way, once `now` reaches that hour on the same day, to the
+  // morning's own state — otherwise a 02:00 "all clear" would silently
+  // outlive a 07:00 run that then failed, went missing, or was skipped.
+  // Fix round (plan deviation 25): a Debrief ALSO gives way when this
+  // morning's own cron never fired at all (thisMorningMissing) — otherwise
+  // a Debrief pressed after 07:00 on such a morning reads "all clear" over
+  // what is, in fact, "the 07:00 run didn't happen.".
   const debriefBeforeMorning =
     debrief !== null &&
     debrief !== "unavailable" &&
     Number(clockHHMM(debrief.at, APP_TZ).slice(0, 2)) < PUSH_EXPECTED_HOUR &&
-    Number(clockHHMM(now, APP_TZ).slice(0, 2)) >= PUSH_EXPECTED_HOUR;
-  if (debrief !== null && debrief !== "unavailable" && debriefIsToday(debrief, now) && !debriefBeforeMorning) {
+    nowHour >= PUSH_EXPECTED_HOUR;
+  if (
+    debrief !== null &&
+    debrief !== "unavailable" &&
+    debriefIsToday(debrief, now) &&
+    !debriefBeforeMorning &&
+    !thisMorningMissing
+  ) {
     const digestNewer =
       digest !== null &&
       digest !== "unavailable" &&
@@ -152,14 +198,6 @@ export function buildGreetingLine(input: GreetingInput): GreetingLine {
     const problems = digest.briefing !== null && digest.briefing.stories.length > 0;
     return { kind: "today", text: toPage(digest.title), tone: problems ? "warning" : "normal", opens: "digest" };
   }
-
-  // The dispatcher's newest run, narrowed to one started today — read once,
-  // since the skipped and non-skipped branches below both need it, at
-  // different points in the precedence.
-  const dispatcherToday =
-    input.dispatcher !== "unavailable" && input.dispatcher !== null && dayKey(input.dispatcher.startedAt, APP_TZ) === today
-      ? input.dispatcher
-      : null;
 
   if (dispatcherToday !== null && !dispatcherToday.skipped) {
     if (dispatcherToday.ok) {
@@ -196,9 +234,8 @@ export function buildGreetingLine(input: GreetingInput): GreetingLine {
   if (input.dispatcher === "unavailable") return { kind: "fail", text: "I couldn’t load the briefing.", tone: "warning", opens: null };
   if (digest === null) return { kind: "never", text: "No briefing yet.", tone: "muted", opens: null };
 
-  const hour = Number(clockHHMM(now, APP_TZ).slice(0, 2));
-  if (hour < PUSH_EXPECTED_HOUR) return { kind: "before", text: "Your briefing comes at 07:00.", tone: "muted", opens: "digest" };
-  if (hour < PUSH_LATE_HOUR) return { kind: "due", text: "Your briefing is on its way.", tone: "muted", opens: "digest" };
+  if (nowHour < PUSH_EXPECTED_HOUR) return { kind: "before", text: "Your briefing comes at 07:00.", tone: "muted", opens: "digest" };
+  if (nowHour < PUSH_LATE_HOUR) return { kind: "due", text: "Your briefing is on its way.", tone: "muted", opens: "digest" };
   return { kind: "missing", text: "No briefing this morning. The 07:00 run didn’t happen.", tone: "alarm", opens: "digest" };
 }
 
