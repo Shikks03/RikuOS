@@ -152,6 +152,10 @@ export default function QueuePage() {
 
   const refresh = useCallback(
     async (quiet = false): Promise<QueueItem[] | null> => {
+      // Already out of date before it even claims a sequence number: a quiet re-read
+      // whose filter the user has since left must never bump seqRef — doing so would
+      // make the correct loud load's answer look stale and drop both of them.
+      if (quiet && filterRef.current !== statusFilter) return null;
       const seq = ++seqRef.current;
       if (!quiet) {
         setLoading(true);
