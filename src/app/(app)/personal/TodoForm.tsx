@@ -281,15 +281,26 @@ export function TodoTile({ head, body, formCapable: stored }: { head: ReactNode;
 
   /**
    * smooth-feel §4: an add closes on press; a DEFINITE failure opens the form
-   * again with the draft and its sentence. Focus moves into Title only from
-   * the pill or from nowhere — never from wherever Riku has gone since (S2).
+   * again with the draft and its sentence. F2 review W2: a LIVE read of edit
+   * mode (`page.live()`, not this render's closed-over `editEpoch`) — edit
+   * mode may have started during the flight — and the tile's own capability
+   * both decide whether the form can reopen at all; when it can't, the
+   * sentence goes under the head instead and the draft keeps it for the next
+   * open, so a failure is never silent. W1: focus moves into Title only from
+   * the pill, from nowhere, or from wherever the swap itself left it (the
+   * body it replaced may have held focus) — never from wherever Riku has
+   * gone since (S2).
    */
-  function reopen() {
-    if (!formCapable) return;
+  function reopen(sentence: string) {
+    if (page.live().editing || !formCapable) {
+      page.note("todos", { text: sentence, dot: null });
+      return;
+    }
     const at = document.activeElement;
     const take = at === null || at === document.body || at === pill.current;
-    flushSync(() => setOpenAt(page.editEpoch));
-    if (take) title.current?.focus();
+    flushSync(() => setOpenAt(page.live().epoch));
+    const fell = document.activeElement === null || document.activeElement === document.body;
+    if (take || fell) title.current?.focus();
   }
 
   return (
@@ -385,8 +396,14 @@ type ViewProps = {
       mode: "add";
       formId: string;
       titleRef: RefObject<HTMLInputElement | null>;
-      /** A definite failure after the form closed on press: open it again (smooth-feel §4). */
-      reopen: () => void;
+      /**
+       * A definite failure after the form closed on press: open it again
+       * with its sentence (smooth-feel §4; F2 review W2 — when edit mode
+       * started during the flight, or the tile can no longer hold a form,
+       * the sentence is said under the head instead, and the draft keeps it
+       * for the next open).
+       */
+      reopen: (sentence: string) => void;
     }
   | { mode: "edit"; todo: EditableTodo; focusPill: () => void; dueGroupUntil: DayKey | null }
 );
@@ -558,7 +575,7 @@ function TodoFormView(props: ViewProps) {
       update((d) => ({ ...d, sending: false, said: out.sentence }));
       if (props.mode === "add") {
         if (standIn !== null) page.dropStandIn(standIn);
-        props.reopen(); // what was typed, with the door's sentence
+        props.reopen(out.sentence); // what was typed, with the door's sentence
       }
     } else if (props.mode === "add" || leg === "pin") {
       update((d) => ({ ...d, sending: false, parked: true, said: null }));

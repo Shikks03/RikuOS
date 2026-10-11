@@ -98,7 +98,8 @@ export default async function Today({ view, eventForm: eventFormP, todoDue }: To
   const scheduled = (
     <div className="fl-group">
       <span className="pe-grp">Scheduled</span>
-      {s.kind === "empty" && <p className="fl-empty">Nothing scheduled.</p> /* deck §6 Tile 1 */}
+      {/* `is-none` (F2 review S1): the true-empty sentence a stand-in here hides. */}
+      {s.kind === "empty" && <p className="fl-empty is-none">Nothing scheduled.</p> /* deck §6 Tile 1 */}
       {s.kind === "fail" &&
         s.lines.map((line, i) => (
           <Line key={line.text} line={line} id={blocked && i === 0 ? REASON_ID : undefined} />
@@ -134,7 +135,8 @@ export default async function Today({ view, eventForm: eventFormP, todoDue }: To
   const due = (
     <div className="fl-group">
       <span className="pe-grp">Due</span>
-      {d.kind === "empty" && <p className="fl-empty">Nothing due.</p> /* deck §6 Tile 1 */}
+      {/* `is-none` (F2 review S1): the true-empty sentence a stand-in here hides. */}
+      {d.kind === "empty" && <p className="fl-empty is-none">Nothing due.</p> /* deck §6 Tile 1 */}
       {d.kind === "fail" && <Line line={d.line} />}
       {d.kind === "rows" && (
         <div className="pe-rows">

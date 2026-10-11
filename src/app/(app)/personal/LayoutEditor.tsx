@@ -163,6 +163,13 @@ interface PageState {
   dropStandIn: (key: string) => void;
   /** The editor's working copy and its one move, while editing; null otherwise. */
   editor: Editor | null;
+  /**
+   * A LIVE reading of the epoch and the editing flag — not this render's
+   * closed-over `editEpoch`/`editing` — for a handler that resumes after an
+   * await and may find edit mode changed underneath it (`reopen`, F2 review
+   * W2). Backed by refs written only in handlers, read only in handlers.
+   */
+  live: () => { epoch: number; editing: boolean };
 }
 
 interface Editor {
@@ -204,6 +211,7 @@ const PageContext = createContext<PageState>({
   settleStandIn: noop,
   dropStandIn: noop,
   editor: null,
+  live: () => ({ epoch: 0, editing: false }),
 });
 
 /** For the islands inside a tile (TodoRow; the forms and switches later). */
@@ -393,6 +401,11 @@ export default function LayoutEditor({
   const cancelButton = useRef<HTMLButtonElement>(null);
   const toolButtons = useRef(new Map<string, HTMLButtonElement>());
   const editing = working !== null;
+  // F2 review W2: `live()`'s backing refs, written only in handlers (enter,
+  // leave, save's ok branch) and read only in handlers (reopen) — never
+  // during render.
+  const epochRef = useRef(0);
+  const editingRef = useRef(false);
 
   // key -> in flight? A settled entry lives until the next server render.
   const [entries, setEntries] = useState<ReadonlyMap<HiddenKey, boolean>>(() => new Map());
@@ -439,10 +452,13 @@ export default function LayoutEditor({
 
   function enter() {
     const base = copyLayout(shown);
+    const next = epochRef.current + 1;
+    epochRef.current = next;
+    editingRef.current = true;
     flushSync(() => {
       setWorking(base);
       setSeed(base);
-      setEditEpoch((e) => e + 1);
+      setEditEpoch(next);
       setSaveSaid(null);
     });
     // R31: focus to the first tile's toolbar — its `←` when live; at a row's
@@ -452,6 +468,7 @@ export default function LayoutEditor({
   }
 
   function leave() {
+    editingRef.current = false;
     flushSync(() => {
       setWorking(null);
       setSeed(null);
@@ -497,6 +514,7 @@ export default function LayoutEditor({
       }),
     );
     if (out.kind === "ok") {
+      editingRef.current = false;
       flushSync(() => {
         setSaving(false);
         setSaved({ layout: sent, stamp: seenStamp });
@@ -583,6 +601,7 @@ export default function LayoutEditor({
     putStandIn: (s) => setStandIns((l) => putInto(l, s)),
     settleStandIn: (key, mark) => setStandIns((l) => settleIn(l, key, mark)),
     dropStandIn: (key) => setStandIns((l) => dropFrom(l, key)),
+    live: () => ({ epoch: epochRef.current, editing: editingRef.current }),
     editor:
       working === null
         ? null

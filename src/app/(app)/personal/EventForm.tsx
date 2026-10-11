@@ -163,13 +163,23 @@ export function EventTile({
     title.current?.focus();
   }
 
-  /** smooth-feel §4: a definite failure after the form closed on press opens it again (S2 for focus, as TodoTile). */
-  function reopen() {
-    if (!canOpen) return;
+  /**
+   * smooth-feel §4: a definite failure after the form closed on press opens
+   * it again with its sentence, as TodoTile's reopen (F2 review W1, W2): a
+   * LIVE read of edit mode decides whether it can, else the sentence sits
+   * under the head and the draft keeps it; focus moves into Title from the
+   * pill, from nowhere, or from wherever the swap itself left it.
+   */
+  function reopen(sentence: string) {
+    if (page.live().editing || !canOpen) {
+      page.note("today", { text: sentence, dot: null });
+      return;
+    }
     const at = document.activeElement;
     const take = at === null || at === document.body || at === pill.current;
-    flushSync(() => setOpenAt(page.editEpoch));
-    if (take) title.current?.focus();
+    flushSync(() => setOpenAt(page.live().epoch));
+    const fell = document.activeElement === null || document.activeElement === document.body;
+    if (take || fell) title.current?.focus();
   }
 
   return (
@@ -232,8 +242,11 @@ function EventFormView({
   update: (fn: (d: EventDraft) => EventDraft) => void;
   /** focus=false: an answer closed it after focus had moved on (S2). */
   close: (keep: boolean, focus?: boolean) => void;
-  /** A definite failure after the form closed on press: open it again (smooth-feel §4). */
-  reopen: () => void;
+  /**
+   * A definite failure after the form closed on press: open it again with
+   * its sentence (smooth-feel §4; F2 review W2, as TodoTile's reopen).
+   */
+  reopen: (sentence: string) => void;
 }) {
   const router = useRouter();
   const page = usePersonalPage();
@@ -335,7 +348,7 @@ function EventFormView({
           ? eventFailSentence(cal.cause) // S21, spec §7.4
           : out.sentence;
       update((d) => ({ ...d, sending: false, said }));
-      reopen(); // what was typed, with Google's reason
+      reopen(said); // what was typed, with Google's reason
     } else {
       update((d) => ({ ...d, sending: false, parked: true, said: null }));
       page.settleStandIn(standIn, "unknown");

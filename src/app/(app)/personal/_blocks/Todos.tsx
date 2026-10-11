@@ -71,8 +71,9 @@ export default function Todos({ view, todoDue, formCapable }: TodosProps) {
         <div className="fl-group" key={section.key}>
           <span className="pe-grp">{section.label}</span>
           {section.rows.length === 0 ? (
-            // deck §6 Tile 2: the label stays
-            <p className="fl-empty">nothing open</p>
+            // deck §6 Tile 2: the label stays. `is-none` (F2 review S1): the
+            // true-empty sentence a stand-in in this section hides.
+            <p className="fl-empty is-none">nothing open</p>
           ) : (
             <div className="pe-rows">
               {section.rows.map((row) => (

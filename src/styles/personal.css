@@ -607,13 +607,27 @@
 /* An add still saving: its row's own shape, faded, with its mark in
    words. Client state only — the next server render replaces it. */
 .is-standin{opacity:.55}
-/* after the group's real rows, the first stand-in keeps the hairline */
+/* the tick is aria-hidden and takes no press (F2 review nitpick) */
+.is-standin .tick{cursor:default}
+/* after the group's real rows, the first stand-in keeps the hairline;
+   the row is still .pe-standins' first child — its mark is a sibling
+   AFTER it, never inside it (F2 review W3) */
 .pe-rows + .pe-standins>.pe-row:first-child{border-top:1px solid var(--line-soft)}
-/* the group's empty sentence would contradict the row beside it */
-.fl-group:has(.pe-standins)>.fl-empty{display:none}
-.fl-empty + .pe-standins{margin-top:var(--sp-3)}
+/* the group's empty sentence would contradict the row beside it — but
+   only the three TRUE empty sentences (`nothing open`, `Nothing
+   scheduled.`, `Nothing due.`, marked `is-none`), never R42's vanished-
+   layer line, which must still show (F2 review S1) */
+.fl-group:has(.pe-standins)>.fl-empty.is-none{display:none}
+.fl-empty.is-none + .pe-standins{margin-top:var(--sp-3)}
 /* a week day: the stand-ins sit in the items' column, under the items,
-   or in the dash's place on a day that read as empty */
+   or in the dash's place on a day that read as empty, or in an UNREAD
+   day's empty cell (F2 review S2: the cell is a bare empty <span>) */
 .pe-row.is-day>.pe-standins{grid-column:2}
 .pe-row.is-day:has(>.pe-standins)>.pe-dash{display:none}
 .pe-row.is-day:has(>.pe-dash)>.pe-standins{grid-row:1}
+.pe-row.is-day:has(>.pe-daylbl + span:empty)>.pe-standins{grid-row:1}
+/* a week item's mark stays inside it (no overflow risk: the whole item
+   wraps), but wraps the mark onto its own line under the title rather
+   than stretching the row (F2 review W3) */
+.pe-it.is-standin{flex-wrap:wrap}
+.pe-it.is-standin>.pe-on{flex-basis:100%}
