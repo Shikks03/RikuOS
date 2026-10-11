@@ -21,6 +21,7 @@
 
 import { MONGO_READ_TIMEOUT_MS, withDeadline } from "@/lib/deadline";
 import { todayKey, type DayKey } from "@/lib/days";
+import { GOOGLE_TIMEOUT_MS } from "@/lib/google";
 import { readOsSettings, type OsSettingsValues } from "@/lib/osSettings";
 import { EXPECTATIONS, evaluateWatchdog, fetchLatestRuns } from "@/lib/watchdog";
 import { checkSites, type SiteResult } from "@/lib/siteHealth";
@@ -40,6 +41,24 @@ import type { SinceThenInput } from "@/lib/sinceThen";
 function bounded<T>(promise: Promise<T>, label: string): Promise<T> {
   return withDeadline(promise, MONGO_READ_TIMEOUT_MS, `debrief ${label}`);
 }
+
+/**
+ * The today leg's own deadline (fix round, principal review item 2): double
+ * Google's per-layer bound. readDigestToday's Todo queries carry no timeout
+ * of their own, so without this a stalled query could wait out the ~45s
+ * socket timeout and run the whole press past the route's maxDuration,
+ * losing the AgentRun row with it.
+ */
+const TODAY_LEG_TIMEOUT_MS = GOOGLE_TIMEOUT_MS * 2;
+
+/** The fallback when the today leg times out or otherwise fails outright: an unreadable calendar, unreadable to-dos. */
+const TODAY_UNAVAILABLE: DigestTodayInput = {
+  events: "unavailable",
+  missedLayers: [],
+  calendarCause: "timeout",
+  due: "unavailable",
+  overdue: [],
+};
 
 /**
  * Today's 07:00 Briefing, or null (D5, plan deviation 8). A read that fails
@@ -148,7 +167,12 @@ export async function readDebriefChecks(now: Date, baselineSentAt: Date | null):
     readWatchdogForDebrief(now),
     readSitesForDebrief(),
     settings.then((s) => readShikksTrackerForDebrief(now, s === null ? OS_SETTINGS_DEFAULTS.chaserNDays : s.chaserNDays)),
-    settings.then((s) => readTodayForDebrief(s, day)),
+    settings
+      .then((s) => withDeadline(readTodayForDebrief(s, day), TODAY_LEG_TIMEOUT_MS, "debrief today"))
+      .catch((err: unknown): DigestTodayInput => {
+        console.error("[debrief] today read failed:", err);
+        return TODAY_UNAVAILABLE;
+      }),
     bounded(ApprovalItem.countDocuments({ status: "pending" }), "pending count").catch((err: unknown): "unavailable" => {
       console.error("[debrief] pending count failed:", err);
       return "unavailable";

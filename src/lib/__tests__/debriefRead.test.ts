@@ -53,6 +53,7 @@ import {
 } from "@/lib/debriefRead";
 import { getHealthSnapshot, saveHealthSnapshot } from "@/lib/healthSnapshot";
 import { checkSites, type SiteResult } from "@/lib/siteHealth";
+import { GOOGLE_TIMEOUT_MS } from "@/lib/google";
 import { EXPECTATIONS, fetchLatestRuns } from "@/lib/watchdog";
 import { fetchAttention, fetchSummary, type AttentionResponse, type SummaryResponse } from "@/lib/stApi";
 import { getLastDigest } from "@/lib/lastDigest";
@@ -260,5 +261,27 @@ describe("readDebriefChecks — assembling every leg (fix round)", () => {
 
     expect(readSinceThen).not.toHaveBeenCalled();
     expect(out.since).toBeNull();
+  });
+
+  // Fix round (principal review, item 2): the today leg carried no deadline
+  // of its own — readDigestToday's Todo queries have none — so a stalled
+  // query could wait out the ~45s socket timeout and run the whole press
+  // past maxDuration, losing the AgentRun row with it. A timeout here reads
+  // as an unreadable calendar AND unreadable to-dos, never a hang.
+  it("a stuck today leg times out and reads as unavailable, not a hang", async () => {
+    vi.mocked(readOsSettings).mockResolvedValue(SETTINGS_OK);
+    vi.mocked(readDigestToday).mockImplementation(() => new Promise(() => {}));
+
+    const pending = readDebriefChecks(NOW, null);
+    await vi.advanceTimersByTimeAsync(GOOGLE_TIMEOUT_MS * 2);
+    const out = await pending;
+
+    expect(out.today).toEqual({
+      events: "unavailable",
+      missedLayers: [],
+      calendarCause: "timeout",
+      due: "unavailable",
+      overdue: [],
+    });
   });
 });

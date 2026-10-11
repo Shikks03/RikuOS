@@ -24,8 +24,9 @@
 
 import { connectDB } from "@/lib/db";
 import { runJob } from "@/lib/jobs/runJob";
-import { DEBRIEF_CACHE_MS } from "@/lib/constants";
+import { APP_TZ, DEBRIEF_CACHE_MS, PUSH_EXPECTED_HOUR } from "@/lib/constants";
 import { MONGO_READ_TIMEOUT_MS, withDeadline } from "@/lib/deadline";
+import { clockHHMM, dayKey, todayKey } from "@/lib/days";
 import { isWithinCheckFloor } from "@/lib/healthSnapshot";
 import { getLastDebrief, saveLastDebrief } from "@/lib/lastDebrief";
 import { readDebriefChecks, readTodaysBaseline } from "@/lib/debriefRead";
@@ -37,6 +38,33 @@ export type DebriefPress =
   | { status: 500; body: { error: "debrief-failed" } };
 
 const FAILED: DebriefPress = { status: 500, body: { error: "debrief-failed" } };
+
+/** Which side of PUSH_EXPECTED_HOUR (APP_TZ) a moment falls on. */
+function pushHourSide(at: Date): "before" | "after" {
+  return Number(clockHHMM(at, APP_TZ).slice(0, 2)) >= PUSH_EXPECTED_HOUR ? "after" : "before";
+}
+
+/**
+ * Whether a cached Debrief still answers for `now` (fix round, principal
+ * review item 1) — the double-press floor plus two more conditions:
+ *
+ *   - a different APP_TZ calendar day: without this, a press at 23:59:30 and
+ *     another at 00:00:10 both land inside the 60-second floor and the
+ *     second would hand back YESTERDAY's Debrief — and the panel remounting
+ *     under a document already on screen is how that reads as "it closed".
+ *   - the cached Debrief had no baseline (built before today's 07:00
+ *     Briefing existed) and `now` has crossed PUSH_EXPECTED_HOUR since: the
+ *     Briefing may have just been saved, so a comparison may now be possible
+ *     where the cached "Right now" list said there was none. Simplified to
+ *     "different sides of PUSH_EXPECTED_HOUR", which is what actually
+ *     matters within a one-minute cache window.
+ */
+function cacheStillAnswers(now: Date, existing: StoredDebrief): boolean {
+  if (!isWithinCheckFloor(now, existing.at, DEBRIEF_CACHE_MS)) return false;
+  if (dayKey(existing.at, APP_TZ) !== todayKey(now)) return false;
+  if (existing.baselineSentAt === null && pushHourSide(existing.at) !== pushHourSide(now)) return false;
+  return true;
+}
 
 export async function pressDebrief(now: Date): Promise<DebriefPress> {
   try {
@@ -53,8 +81,9 @@ export async function pressDebrief(now: Date): Promise<DebriefPress> {
     console.error("[api/briefing/debrief] cache read failed, building fresh:", err);
   }
   // The same 60-second rule as the site floor, but its own constant (spec
-  // §3.2). A future `at` (clock skew) is never "inside" it.
-  if (existing !== null && isWithinCheckFloor(now, existing.at, DEBRIEF_CACHE_MS)) {
+  // §3.2) — plus the day and 07:00 guards above. A future `at` (clock skew)
+  // is never "inside" the floor to begin with.
+  if (existing !== null && cacheStillAnswers(now, existing)) {
     return { status: 200, body: existing };
   }
 

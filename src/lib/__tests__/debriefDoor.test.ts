@@ -93,6 +93,42 @@ describe("pressDebrief (S22, spec §3.1)", () => {
     expect(readDebriefChecks).toHaveBeenCalledTimes(2);
   });
 
+  // Fix round (principal review, item 1): the floor alone ignores the day
+  // boundary. Without the dayKey guard, a press either side of midnight both
+  // land inside the 60-second floor and the second hands back YESTERDAY's
+  // Debrief — then the panel remounting under an already-on-screen document
+  // is how that reads as "it closed".
+  it("a press either side of APP_TZ midnight, inside the floor, never reuses yesterday's Debrief", async () => {
+    const beforeMidnight = new Date("2026-10-12T15:59:30.000Z"); // 23:59:30 Manila, 12 Oct
+    const afterMidnight = new Date("2026-10-12T16:00:10.000Z"); // 00:00:10 Manila, 13 Oct — 40s later
+    await pressDebrief(beforeMidnight);
+    await pressDebrief(afterMidnight);
+    expect(readDebriefChecks).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  // Fix round (principal review, item 1): a cached Debrief built before
+  // today's 07:00 Briefing existed (baselineSentAt null) must not survive
+  // past PUSH_EXPECTED_HOUR — the Briefing may have just landed, and the
+  // cached "Right now" list would otherwise outlive the baseline it was
+  // missing.
+  it("a no-baseline Debrief built before 07:00 is never reused once the press crosses 07:00", async () => {
+    const beforeSeven = new Date("2026-10-12T22:59:40.000Z"); // 06:59:40 Manila, 13 Oct
+    const afterSeven = new Date("2026-10-12T23:00:20.000Z"); // 07:00:20 Manila, 13 Oct — 40s later
+
+    vi.mocked(readTodaysBaseline).mockResolvedValue(null);
+    const first = await pressDebrief(beforeSeven);
+    expect(first).toMatchObject({ status: 200, body: { baselineSentAt: null } });
+
+    // The digest lands in between — a baseline now exists.
+    vi.mocked(readTodaysBaseline).mockResolvedValue({ sentAt: SENT_AT, symptoms: [] });
+    const second = await pressDebrief(afterSeven);
+
+    expect(readDebriefChecks).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(second).toMatchObject({ status: 200, body: { baselineSentAt: SENT_AT } });
+  });
+
   it("a failed cache read is not a failed Debrief: it builds fresh and records its run (§7.2 item 11)", async () => {
     vi.mocked(getLastDebrief).mockRejectedValue(new Error("MongoNetworkError: closed"));
     const out = await pressDebrief(NOW);
