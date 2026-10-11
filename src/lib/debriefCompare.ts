@@ -155,6 +155,13 @@ function routeOf(s: StoredSymptom): Route {
 function family(key: ProblemKey): string {
   if (key.startsWith("site-")) return "site";
   if (key.startsWith("agent-")) return "agent";
+  // evaluateOutreach returns at most one engine-* finding at a time, so
+  // errors-turned-stale (etc.) is still the same unresolved condition, never
+  // a fresh one (plan deviation 21). stranded-approved stays its own family.
+  if (key.startsWith("engine-")) return "engine";
+  // calendar-unavailable and calendar-partial are the same calendar read,
+  // reported two ways (plan deviation 21).
+  if (key === "calendar-unavailable" || key === "calendar-partial") return "calendar";
   return key;
 }
 
@@ -168,6 +175,11 @@ function leadText(text: string, bold: readonly StoredBold[]): string | null {
 /** Is this fresh problem about the same thing as this stored symptom? */
 function sameThing(stored: StoredSymptom, fresh: Problem): boolean {
   if (family(stored.key) !== family(fresh.key)) return false;
+  // calendar-unavailable carries no subject at all; it matches any fresh
+  // calendar outcome, and a fresh calendar-unavailable matches any stored
+  // calendar symptom, regardless of subject — the same read, reported
+  // differently (plan deviation 21). Partial-vs-partial still goes by subject.
+  if (stored.key === "calendar-unavailable" || fresh.key === "calendar-unavailable") return true;
   const subject = subjectOf(fresh);
   if (stored.subject !== null) return stored.subject === subject;
   // A key with no subject is one condition: the family (= the key) is enough.
@@ -257,9 +269,16 @@ export function compareToBaseline(
     const route = routeOf(s);
 
     if (route.kind === "snapshot") {
+      const savedSince = snapshot.checkedAt !== null && snapshot.checkedAt.getTime() > baseline.sentAt.getTime();
+      // The sites check itself failed wholesale this press (it never ran),
+      // so nothing was actually re-checked — that's "couldn't check", never
+      // a fresh "couldn't save the result" (plan deviation 21).
+      if (checkFailed.sites && !savedSince) {
+        stillNeedsYou.push({ kind: "couldnt-check", symptom: s, source: "sites" });
+        continue;
+      }
       // This press's own save failure (if any) is consumed here, so it is never New as well.
       const own = take((p) => p.key === "snapshot-unsaved");
-      const savedSince = snapshot.checkedAt !== null && snapshot.checkedAt.getTime() > baseline.sentAt.getTime();
       if (!snapshot.ownSaveJustFailed && savedSince) {
         sorted.push({ key: s.key, subject: s.subject, sentence: sortedSentence(s) });
       } else {
@@ -283,11 +302,29 @@ export function compareToBaseline(
     else sorted.push({ key: s.key, subject: s.subject, sentence: sortedSentence(s) });
   }
 
+  // A morning job failure's watchdog twin must never also surface (plan
+  // deviation 21): the watchdog monitors site-health and outreach-health as
+  // agents too, so its fresh scan can re-find the SAME still-failed run that
+  // job-failed already reported and is being spoken for above (Sorted or
+  // can't-say) — never a separate New row for it. A stored snapshot-unsaved
+  // is the same job's degraded outcome, so it covers a fresh
+  // agent-degraded{site-health} the same way.
+  const coveredJobAgents = new Set(
+    baseline.symptoms
+      .filter((sym) => sym.key === "job-failed" && (sym.subject === "site-health" || sym.subject === "outreach-health"))
+      .map((sym) => sym.subject as string),
+  );
+  const snapshotStoredThisMorning = baseline.symptoms.some((sym) => sym.key === "snapshot-unsaved");
+  const isJobsWatchdogTwin = (p: Problem): boolean => {
+    if ((p.key === "agent-failed" || p.key === "agent-degraded") && coveredJobAgents.has(p.agent)) return true;
+    return snapshotStoredThisMorning && p.key === "agent-degraded" && p.agent === "site-health";
+  };
+
   const covered = new Set(stillNeedsYou.flatMap((row) => (row.kind === "couldnt-check" ? [row.source] : [])));
   return {
     sorted,
     stillNeedsYou,
-    new: fresh.filter((_, j) => !used.has(j)),
+    new: fresh.filter((p, j) => !used.has(j) && !isJobsWatchdogTwin(p)),
     now: [],
     standaloneCouldntCheck: failedSources.filter((s) => !covered.has(s)),
     couldntCheck,

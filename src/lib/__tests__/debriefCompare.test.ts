@@ -320,3 +320,86 @@ describe("the approved words (spec §10 items 4, 4a)", () => {
     });
   });
 });
+
+describe("fix round (feature review D-II, plan deviation 21)", () => {
+  describe("a morning job failure's watchdog twin must never also surface", () => {
+    it("ShikksTracker back up: the job's Sorted row covers its own watchdog twin too", () => {
+      const r = cmp(base({ key: "job-failed", job: "outreach-health", raw: "boom" }), [
+        { key: "agent-failed", agent: "outreach-health" },
+      ]);
+      expect(r.sorted).toEqual([
+        { key: "job-failed", subject: "outreach-health", sentence: "The outreach check ran clean just now." },
+      ]);
+      expect(r.stillNeedsYou).toEqual([]);
+      expect(r.new).toEqual([]);
+    });
+
+    it("ShikksTracker still down: the can't-say row covers its own watchdog twin too", () => {
+      const p: Problem = { key: "job-failed", job: "outreach-health", raw: "boom" };
+      const r = cmp(base(p), [{ key: "agent-failed", agent: "outreach-health" }], { ...OK, shikkstracker: true });
+      expect(r.stillNeedsYou).toEqual([{ kind: "couldnt-check", symptom: toStoredSymptom(p), source: "shikkstracker" }]);
+      expect(r.sorted).toEqual([]);
+      expect(r.new).toEqual([]);
+    });
+
+    it("snapshot saved now: the Sorted row covers a fresh agent-degraded{site-health} twin too", () => {
+      const r = cmp(
+        base({ key: "snapshot-unsaved" }),
+        [{ key: "agent-degraded", agent: "site-health", itemsFailed: 1 }],
+        OK,
+        { checkedAt: new Date(SENT_AT.getTime() + 1), ownSaveJustFailed: false },
+      );
+      expect(r.sorted).toEqual([{ key: "snapshot-unsaved", subject: null, sentence: "Today's site check is saved now." }]);
+      expect(r.stillNeedsYou).toEqual([]);
+      expect(r.new).toEqual([]);
+    });
+  });
+
+  describe("engine-* keys are one family: a changed engine finding is never Sorted + New", () => {
+    it("errors → stale stays Still needs you", () => {
+      const fresh: Problem = { key: "engine-stale", ageMs: 40 * 3_600_000 };
+      const r = cmp(base({ key: "engine-errors", count: 3 }), [fresh]);
+      expect(r.stillNeedsYou).toEqual([{ kind: "fresh", problem: fresh }]);
+      expect(r.sorted).toEqual([]);
+      expect(r.new).toEqual([]);
+    });
+
+    it("unreadable → stale stays Still needs you", () => {
+      const fresh: Problem = { key: "engine-stale", ageMs: 10 * 3_600_000 };
+      const r = cmp(base({ key: "engine-unreadable" }), [fresh]);
+      expect(r.stillNeedsYou).toEqual([{ kind: "fresh", problem: fresh }]);
+      expect(r.sorted).toEqual([]);
+      expect(r.new).toEqual([]);
+    });
+  });
+
+  describe("calendar-unavailable and calendar-partial are the same read, two shapes", () => {
+    it("unavailable → partial stays Still needs you", () => {
+      const fresh: Problem = { key: "calendar-partial", calendars: ["Work"] };
+      const r = cmp(base({ key: "calendar-unavailable", cause: "expired" }), [fresh]);
+      expect(r.stillNeedsYou).toEqual([{ kind: "fresh", problem: fresh }]);
+      expect(r.sorted).toEqual([]);
+      expect(r.new).toEqual([]);
+    });
+
+    it("partial → unavailable stays Still needs you", () => {
+      const fresh: Problem = { key: "calendar-unavailable", cause: "timeout" };
+      const r = cmp(base({ key: "calendar-partial", calendars: ["Work"] }), [fresh]);
+      expect(r.stillNeedsYou).toEqual([{ kind: "fresh", problem: fresh }]);
+      expect(r.sorted).toEqual([]);
+      expect(r.new).toEqual([]);
+    });
+  });
+
+  describe("the sites check itself failing on this press is 'couldn't check', never a fresh 'couldn't save'", () => {
+    it("snapshot-unsaved at 07:00, sites check throws now, nothing saved since → couldn't-check, and covers the standalone sites line", () => {
+      const r = cmp(base({ key: "snapshot-unsaved" }), [], { ...OK, sites: true }, { checkedAt: null, ownSaveJustFailed: false });
+      expect(r.stillNeedsYou).toEqual([
+        { kind: "couldnt-check", symptom: toStoredSymptom({ key: "snapshot-unsaved" }), source: "sites" },
+      ]);
+      expect(r.sorted).toEqual([]);
+      expect(r.new).toEqual([]);
+      expect(r.standaloneCouldntCheck).toEqual([]);
+    });
+  });
+});
