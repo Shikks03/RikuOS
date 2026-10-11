@@ -1,6 +1,6 @@
 # Smooth feel — loading outlines, instant presses
 
-**Date:** 2026-10-11 · **Status:** design agreed with Riku in conversation ("yes"); this document awaits his review.
+**Date:** 2026-10-11 · **Status:** APPROVED by Riku 2026-10-11 ("alright continue"), including §6's queue wordings and the §3.1 / §4 / §9 details added in writing.
 **What it is:** the first queued sub-project from the Briefing work (`rikuos-assistant-voice`, queued item 1): pages that load smoothly, and presses that show at once while the server works. **It changes how the app feels, not what it says or stores.**
 **Not in scope:** restyling the queue page (still the plain v0 version; its redesign belongs to P12), the Academics page (P11 gets its own outline when it is built, under this document's rules), voice commands, drag-and-drop tiles.
 
@@ -106,7 +106,7 @@ Switches that save on press: the **Personal page's layer switches**, **Settings'
 
 - **The queue's own load** gets the outline treatment from §3 in place of its `Loading…` line.
 - The queue page currently reads its answers ad hoc (`res.ok` and `body.error`). **It moves onto `pressOutcome`** so the same honesty rule governs it as every other press. A queue answer that is not the door's own JSON is unknown, never a claimed failure.
-- The wording in this section is **provisional**, for Riku's nod at review.
+- Riku approved the wording in this section on 2026-10-11.
 
 **The Debrief button is unchanged.** It honestly takes 10–20 s and already says `Checking your sites and ShikksTracker…`.
 
