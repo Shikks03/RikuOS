@@ -53,25 +53,25 @@ async function BriefingRead() {
     bounded(getLastDebrief, "last-debrief read"),
   ]);
   const digest: StoredDigest | null | "unavailable" = settled(digestR, "last-digest read");
-  const debraw: StoredDebrief | null | "unavailable" = settled(debriefR, "last-debrief read");
+  const debriefRead: StoredDebrief | null | "unavailable" = settled(debriefR, "last-debrief read");
   const settings = settled(settingsR, "settings read");
 
   // Today's Debrief only (S22): yesterday's is never shown. Built BEFORE the
-  // greeting line and in its own try/catch (fix round item 2): a Debrief
+  // greeting line and in its own try/catch (S22 fix round item 2): a Debrief
   // whose view throws, or that isn't today's, must never leave the line
   // saying "Debrief at …" with nothing underneath it for the panel to open.
   // A throw here is kept out of the morning `view` build below by using a
   // separate try of its own.
   let debriefView: DebriefView | null = null;
-  if (debraw !== null && debraw !== "unavailable" && debriefIsToday(debraw, now)) {
+  if (debriefRead !== null && debriefRead !== "unavailable" && debriefIsToday(debriefRead, now)) {
     try {
-      debriefView = buildDebriefView(debraw);
+      debriefView = buildDebriefView(debriefRead);
     } catch (err) {
       console.error("[briefing] debrief view build failed:", err);
     }
   }
   // The greeting line only ever sees a Debrief that will actually render.
-  const debriefForLine: typeof debraw = debriefView === null ? null : debraw;
+  const debriefForLine: typeof debriefRead = debriefView === null ? null : debriefRead;
 
   const input: GreetingInput = {
     now,
@@ -116,7 +116,7 @@ async function BriefingRead() {
           yesterday's state (fix round item 5a). The day key alone covers a
           monitoring-off morning with no new digest: without it, an
           overnight in-memory PWA resume could still show yesterday's
-          `localDebrief` through "← Debrief" (fix round item 1) — the
+          `localDebrief` through "← Debrief" (S22 fix round item 1) — the
           accepted side effect is that a panel left open across midnight
           closes on its next refresh. A new Debrief does NOT change the key,
           so a press's refresh never closes the panel it was pressed in. */}
