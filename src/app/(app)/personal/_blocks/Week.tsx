@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { dayShape, type DayItemView, type DayRowView, type DayShape, type WeekView } from "@/lib/personalView";
+import { LoadingSignal } from "../../_shell/NavProgress";
+import { OutlineBars } from "../../_shell/Outline";
 import { TileBody, TileFoot, TileHead } from "../LayoutEditor";
 import TodoRow from "../TodoRow";
 import { SettingsLine } from "./SettingsLine";
@@ -155,7 +157,8 @@ export default async function Week({ view }: WeekProps) {
 
 /**
  * The Suspense fallback (§7.4): border, ground and eyebrow — no day rows,
- * because a day not yet read cannot say `—`.
+ * because a day not yet read cannot say `—`, and bars (smooth-feel §3.1) —
+ * no rows, no `—`, nothing a measurement could say.
  */
 export function WeekFallback() {
   return (
@@ -165,6 +168,10 @@ export function WeekFallback() {
           <span className="eyebrow">Next 7 days</span>
         </div>
       </TileHead>
+      <div className="pe-body">
+        <OutlineBars />
+      </div>
+      <LoadingSignal />
     </section>
   );
 }

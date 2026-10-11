@@ -30,6 +30,7 @@ import {
 import { doneWindowStart, todoDueKey } from "@/lib/todos";
 import Todo, { TODO_SECTIONS, type TodoSection } from "@/models/Todo";
 import LayoutEditor from "./LayoutEditor";
+import RememberLayout from "./RememberLayout";
 import Done from "./_blocks/Done";
 import Layers, { LayersFallback } from "./_blocks/Layers";
 import Today, { TodayFallback, type EventFormData } from "./_blocks/Today";
@@ -280,38 +281,42 @@ export default async function PersonalPage() {
   });
 
   return (
-    <LayoutEditor
-      layout={layout}
-      // New on every server render: a hidden row's own re-read has landed (TodoRow).
-      stamp={crypto.randomUUID()}
-      notice={
-        fellBack ? (
-          // deck §15 — the ninth dot of the whole-database outage render (R55).
-          <div className="pe-fail">
-            <i />
-            <span className="said">Couldn’t load your arrangement, so this is the default.</span>
-          </div>
-        ) : null
-      }
-      tiles={{
-        today: (
-          <Suspense fallback={<TodayFallback dateLabel={formatDay(today)} heroTint={buildTodayDue(todos, now).heroTint} />}>
-            <Today view={todayView} eventForm={eventForm} todoDue={todoDue} />
-          </Suspense>
-        ),
-        todos: <Todos view={todoTile} todoDue={todoDue} formCapable={formCapableFor(layout, "todos")} />,
-        layers: (
-          <Suspense fallback={<LayersFallback />}>
-            <Layers view={layersView} />
-          </Suspense>
-        ),
-        week: (
-          <Suspense fallback={<WeekFallback />}>
-            <Week view={weekView} />
-          </Suspense>
-        ),
-        done: <Done view={doneTile} />,
-      }}
-    />
+    <>
+      {/* smooth-feel §3.1: only an arrangement that was READ is remembered. */}
+      {!fellBack && <RememberLayout layout={layout} />}
+      <LayoutEditor
+        layout={layout}
+        // New on every server render: a hidden row's own re-read has landed (TodoRow).
+        stamp={crypto.randomUUID()}
+        notice={
+          fellBack ? (
+            // deck §15 — the ninth dot of the whole-database outage render (R55).
+            <div className="pe-fail">
+              <i />
+              <span className="said">Couldn’t load your arrangement, so this is the default.</span>
+            </div>
+          ) : null
+        }
+        tiles={{
+          today: (
+            <Suspense fallback={<TodayFallback dateLabel={formatDay(today)} heroTint={buildTodayDue(todos, now).heroTint} />}>
+              <Today view={todayView} eventForm={eventForm} todoDue={todoDue} />
+            </Suspense>
+          ),
+          todos: <Todos view={todoTile} todoDue={todoDue} formCapable={formCapableFor(layout, "todos")} />,
+          layers: (
+            <Suspense fallback={<LayersFallback />}>
+              <Layers view={layersView} />
+            </Suspense>
+          ),
+          week: (
+            <Suspense fallback={<WeekFallback />}>
+              <Week view={weekView} />
+            </Suspense>
+          ),
+          done: <Done view={doneTile} />,
+        }}
+      />
+    </>
   );
 }

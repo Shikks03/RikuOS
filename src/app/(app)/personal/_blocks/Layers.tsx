@@ -1,4 +1,6 @@
 import type { LayersTileView } from "@/lib/personalView";
+import { LoadingSignal } from "../../_shell/NavProgress";
+import { OutlineBars } from "../../_shell/Outline";
 import { TileBody, TileFoot, TileHead } from "../LayoutEditor";
 import LayerSwitches from "../LayerSwitches";
 import { SettingsLine, withSettingsLink } from "./SettingsLine";
@@ -53,7 +55,7 @@ export default async function Layers({ view }: LayersProps) {
   );
 }
 
-/** The Suspense fallback: border, ground and eyebrow, nothing else (§7.4). */
+/** The Suspense fallback: border, ground and eyebrow, nothing else (§7.4), and bars (smooth-feel §3.1) — no rows, no `—`, nothing a measurement could say. */
 export function LayersFallback() {
   return (
     <section className="pe-tile">
@@ -62,6 +64,10 @@ export function LayersFallback() {
           <span className="eyebrow">Layers</span>
         </div>
       </TileHead>
+      <div className="pe-body">
+        <OutlineBars lines={2} />
+      </div>
+      <LoadingSignal />
     </section>
   );
 }

@@ -1,5 +1,7 @@
 import type { DayKey } from "@/lib/days";
 import type { SayLine, TodayView } from "@/lib/personalView";
+import { LoadingSignal } from "../../_shell/NavProgress";
+import { OutlineBars } from "../../_shell/Outline";
 import { EventTile } from "../EventForm";
 import { TileHead } from "../LayoutEditor";
 import TodoForm from "../TodoForm";
@@ -181,6 +183,10 @@ export default async function Today({ view, eventForm: eventFormP, todoDue }: To
  * It carries the tint (R83): the to-do read has answered before the calendar
  * has, and an untinted hero would say it had not. The page hands it
  * buildTodayDue's tint — the same derivation buildTodayView uses.
+ *
+ * Bars where the groups will be, and a silent LoadingSignal so the top bar
+ * runs until the calendar lands (smooth-feel §3.1) — still no sentence,
+ * count or control.
  */
 export function TodayFallback({ dateLabel, heroTint }: { dateLabel: string; heroTint: TodayView["heroTint"] }) {
   return (
@@ -191,6 +197,10 @@ export function TodayFallback({ dateLabel, heroTint }: { dateLabel: string; hero
           <h2 className="fl-h">{dateLabel}</h2>
         </div>
       </TileHead>
+      <div className="pe-body">
+        <OutlineBars />
+      </div>
+      <LoadingSignal />
     </section>
   );
 }
