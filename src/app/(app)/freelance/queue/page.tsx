@@ -130,6 +130,19 @@ function TopLine({ line, onFilter }: { line: QueueTopLine; onFilter: (f: Approve
  * `leaving` and `cardSaid` for the new filter, and cancel every pending exit
  * timer so none can re-add an id to `gone` afterwards.
  *
+ * PRINCIPAL REVIEW. `loudRef` (separate from `seqRef`) is bumped only for a
+ * loud load, so a superseded loud load's `finally` can never clear `loading`
+ * out from under the loud load that replaced it (W1) — reusing `seqRef`
+ * would let a same-filter quiet re-read claim a later number and leave
+ * `loading` stuck. The list GET carries PRESS_TIMEOUT_MS too, so a hung read
+ * can't hold the outline and the top bar up forever (W2). `busy` is a PER-CARD
+ * set, not one shared slot, so a decide on one card can never re-enable
+ * another's in-flight Retry (S3); Retry refuses via a guard and
+ * `aria-disabled`, never `disabled`, so pressing a busy one can't send focus
+ * to `<body>` (S2). A retry's definite failure is that card's own words in
+ * `cardSaid`, like a refused decision — not the page-level `error`, which a
+ * later quiet re-read's success would otherwise silently clear (S1).
+ *
  * The mount-time load in an effect is one of the four baseline lint errors
  * and keeps its shape on purpose.
  */
@@ -138,7 +151,7 @@ export default function QueuePage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<ReadonlySet<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBodies, setEditBodies] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(() => new Set());
@@ -149,6 +162,8 @@ export default function QueuePage() {
   const seqRef = useRef(0);
   /** The filter actually chosen, written only by the filter buttons and the q-link, before setStatusFilter (F4 re-review). */
   const filterRef = useRef<StatusFilter>("pending");
+  /** Bumped only for a loud (`!quiet`) load, so a superseded one's `finally` can never clear `loading` out from under the load that replaced it (principal review W1). */
+  const loudRef = useRef(0);
 
   const refresh = useCallback(
     async (quiet = false): Promise<QueueItem[] | null> => {
@@ -157,7 +172,9 @@ export default function QueuePage() {
       // make the correct loud load's answer look stale and drop both of them.
       if (quiet && filterRef.current !== statusFilter) return null;
       const seq = ++seqRef.current;
+      let loud = 0;
       if (!quiet) {
+        loud = ++loudRef.current;
         setLoading(true);
         setError(null);
         setTop(null);
@@ -168,7 +185,9 @@ export default function QueuePage() {
         setCardSaid(() => new Map());
       }
       try {
-        const res = await fetch(`/api/queue?status=${statusFilter}`);
+        const res = await fetch(`/api/queue?status=${statusFilter}`, {
+          signal: AbortSignal.timeout(PRESS_TIMEOUT_MS),
+        });
         if (res.status === 401) {
           window.location.href = "/login?from=/freelance/queue";
           return null;
@@ -182,11 +201,15 @@ export default function QueuePage() {
         if (quiet) setError(null); // cleared only after a successful read
         return body.items;
       } catch {
+        // Includes a timed-out GET (PRESS_TIMEOUT_MS): a hung read must not hold the
+        // outline and the top bar up forever.
         if (seqRef.current !== seq || filterRef.current !== statusFilter) return null;
         setError("Could not load the queue.");
         return null;
       } finally {
-        if (!quiet) setLoading(false);
+        // A superseded loud load must never clear `loading` out from under the one that
+        // replaced it: only the MOST RECENT loud load may (principal review W1).
+        if (!quiet && loudRef.current === loud) setLoading(false);
       }
     },
     [statusFilter],
@@ -249,9 +272,9 @@ export default function QueuePage() {
   }
 
   async function decide(id: string, payload: Record<string, unknown>) {
-    if (busyId === id) return;
+    if (busy.has(id)) return;
     const wasEditing = editingId === id;
-    setBusyId(id);
+    setBusy((s) => withId(s, id));
     setCardSaid((m) => withoutKey(m, id));
     leave(id);
     if (wasEditing) setEditingId(null);
@@ -291,24 +314,30 @@ export default function QueuePage() {
     }
     // else (not restore, fresh === null): the re-read was dropped or failed — the card
     // stays hidden until the next loud load (a filter change or reload).
-    setBusyId(null);
+    setBusy((s) => withoutId(s, id));
   }
 
   async function retry(id: string) {
-    setBusyId(id);
+    // A guard instead of `disabled`, so pressing a busy Retry never sends focus to
+    // <body> (principal review S2).
+    if (busy.has(id)) return;
+    setBusy((s) => withId(s, id));
     setError(null);
+    setCardSaid((m) => withoutKey(m, id));
     try {
       const out = await pressOutcome(
         fetch(`/api/queue/${id}/retry`, { method: "POST", signal: AbortSignal.timeout(PRESS_TIMEOUT_MS) }),
       );
       if (out.kind === "failed") {
-        setError(doorSentence(out));
+        // The card's own words, like a refused decision — not the page-level `error`,
+        // which a later quiet re-read's success would otherwise silently clear (S1).
+        setCardSaid((m) => new Map(m).set(id, doorSentence(out)));
         return;
       }
       if (out.kind === "unknown") setTop({ kind: "unknown" });
       await refresh(true);
     } finally {
-      setBusyId(null);
+      setBusy((s) => withoutId(s, id));
     }
   }
 
@@ -390,7 +419,11 @@ export default function QueuePage() {
 
               {item.actionStatus === "failed" && (
                 <div className="row">
-                  <button className="secondary" disabled={busyId === item._id} onClick={() => void retry(item._id)}>
+                  <button
+                    className="secondary"
+                    aria-disabled={busy.has(item._id) || undefined}
+                    onClick={() => void retry(item._id)}
+                  >
                     Retry action
                   </button>
                 </div>
@@ -407,14 +440,14 @@ export default function QueuePage() {
               {item.status === "pending" && editingId !== item._id && (
                 <div className="row">
                   <button
-                    disabled={busyId === item._id}
+                    disabled={busy.has(item._id)}
                     onClick={() => void decide(item._id, { decision: "approve" })}
                   >
                     Approve
                   </button>
                   <button
                     className="secondary"
-                    disabled={busyId === item._id}
+                    disabled={busy.has(item._id)}
                     onClick={() => {
                       setEditingId(item._id);
                       setEditBodies((m) => new Map(m).set(item._id, effective?.draftBody ?? ""));
@@ -424,7 +457,7 @@ export default function QueuePage() {
                   </button>
                   <button
                     className="danger"
-                    disabled={busyId === item._id}
+                    disabled={busy.has(item._id)}
                     onClick={() => void decide(item._id, { decision: "reject" })}
                   >
                     Reject
@@ -443,7 +476,7 @@ export default function QueuePage() {
                   </div>
                   <div className="row">
                     <button
-                      disabled={busyId === item._id || (editBodies.get(item._id) ?? "").trim().length === 0}
+                      disabled={busy.has(item._id) || (editBodies.get(item._id) ?? "").trim().length === 0}
                       onClick={() =>
                         void decide(item._id, { decision: "edit", draftBody: editBodies.get(item._id) ?? "" })
                       }
