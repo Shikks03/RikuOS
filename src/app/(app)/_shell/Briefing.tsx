@@ -2,18 +2,29 @@
 
 /**
  * Briefing — the assistant's greeting line, the full-screen greeting, the
- * panel and the cause card (S21, spec §5). One island in the shell.
+ * panel and the cause card (S21, spec §5), and the Debrief inside the panel
+ * (S22). One island in the shell.
  *
  * Native <dialog> + showModal() gives the focus trap, Esc, and an inert page
  * behind it for free; Esc (`cancel`) and a backdrop click are routed through
  * close() so the shrink animation always runs. Focus returns to the line.
  *
- * STATE: `open` changes only in handlers (or the dialog's own `onClose`, fix
- * round item 7 — see below); the first value comes from the initialiser
- * (today's unseen Briefing, or ?briefing=open from the push). Effects only
- * touch the DOM, write a ref, or add/remove a listener. "Since then" is
- * fetched on every open and set only in the fetch's async callback (the lint
- * baseline holds).
+ * STATE: `open`, `pane`, `press` and the local Debrief change only in
+ * handlers (or the dialog's own `onClose`, fix round item 7 — see below); the
+ * first `open` comes from the initialiser (today's unseen Briefing, or
+ * ?briefing=open from the push). Effects only touch the DOM, write a ref, or
+ * add/remove a listener. "Since then" is fetched on every open and set only in
+ * the fetch's async callback (the lint baseline holds).
+ *
+ * THE DEBRIEF (S22). "Debrief now" sits at the foot of the PANEL only — never
+ * the once-a-day full-screen greeting, which stays the 07:00 Briefing's (D4).
+ * A press is one POST; the button is disabled while it runs and a ref guards
+ * a double click inside one render. The answer is shown from the response
+ * itself (so a Debrief whose save failed is still seen, with the note), then
+ * router.refresh() asks the server for the greeting line again — also after a
+ * failure, since a press the browser gave up on may still have finished and
+ * saved (D7). Closing the panel never aborts the request. The panel swaps
+ * between the Debrief and this morning's Briefing in place, without closing.
  *
  * STALENESS (fix round item 5). BriefingSlot sits in the (app) layout, which
  * Next does not re-render on a soft navigation, and an installed PWA can be
@@ -36,11 +47,22 @@ import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PRESS_TIMEOUT_MS } from "@/lib/constants";
 import { shouldRefreshOnVisible } from "@/lib/briefingRefresh";
+import { buildDebriefView, parseDebriefResponse, type DebriefRow, type DebriefView } from "@/lib/debriefView";
 import type { BriefingView, GreetingLine, Segment, SymptomView } from "@/lib/briefingView";
 import { growFrom, shrinkTo } from "./flip";
 
 type Open = null | "full" | "panel";
+type Pane = "morning" | "debrief";
 type Since = { kind: "loading" } | { kind: "lines"; lines: string[] } | { kind: "failed" };
+type Press = { kind: "idle" } | { kind: "waiting" } | { kind: "failed" };
+type OpenCard = (e: MouseEvent<HTMLButtonElement>, symptom: SymptomView) => void;
+
+/** The newer of two Debrief views; ISO instants compare correctly as strings. */
+function newer(a: DebriefView | null, b: DebriefView | null): DebriefView | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a.atIso >= b.atIso ? a : b;
+}
 
 function Said({ segments }: { segments: Segment[] }) {
   return (
@@ -50,30 +72,143 @@ function Said({ segments }: { segments: Segment[] }) {
   );
 }
 
+function Row({ row, onCard }: { row: DebriefRow; onCard: OpenCard }) {
+  return (
+    <li>
+      <button type="button" className="bf-row" onClick={(e) => onCard(e, row.symptom)}>
+        <span className="bf-said">
+          <Said segments={row.symptom.sentence} />
+        </span>
+        {row.note !== null && <span className="bf-note">{row.note}</span>}
+        <span className="bf-next">{row.symptom.nextStep}</span>
+      </button>
+    </li>
+  );
+}
+
+function DebriefBody({ d, onCard }: { d: DebriefView; onCard: OpenCard }) {
+  const c = d.comparison;
+  return (
+    <>
+      {c.kind === "since" ? (
+        <section className="bf-sec">
+          <h3 className="bf-h">{c.heading}</h3>
+          {c.allClear !== null && <p className="bf-p">{c.allClear}</p>}
+          {c.sorted.length > 0 && (
+            <div className="bf-group">
+              <h4 className="bf-g">Sorted</h4>
+              <ul className="bf-stories">
+                {c.sorted.map((s, i) => (
+                  <li key={i} className="bf-sorted">
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {c.still.length > 0 && (
+            <div className="bf-group">
+              <h4 className="bf-g">Still needs you</h4>
+              <ul className="bf-stories">
+                {c.still.map((r) => (
+                  <Row key={r.symptom.id} row={r} onCard={onCard} />
+                ))}
+              </ul>
+            </div>
+          )}
+          {(c.fresh.length > 0 || c.standalone.length > 0) && (
+            <div className="bf-group">
+              <h4 className="bf-g">New</h4>
+              <ul className="bf-stories">
+                {c.fresh.map((r) => (
+                  <Row key={r.symptom.id} row={r} onCard={onCard} />
+                ))}
+                {c.standalone.map((s, i) => (
+                  <li key={`standalone-${i}`} className="bf-sorted is-blind">
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="bf-sec">
+          <h3 className="bf-h">{c.heading}</h3>
+          {c.empty !== null && <p className="bf-p">{c.empty}</p>}
+          {(c.rows.length > 0 || c.standalone.length > 0) && (
+            <ul className="bf-stories">
+              {c.rows.map((r) => (
+                <Row key={r.symptom.id} row={r} onCard={onCard} />
+              ))}
+              {c.standalone.map((s, i) => (
+                <li key={`standalone-${i}`} className="bf-sorted is-blind">
+                  {s}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+      {d.done.length > 0 && (
+        <section className="bf-sec">
+          <h3 className="bf-h">What you’ve done</h3>
+          {d.done.map((l, i) => (
+            <p key={i} className="bf-p">
+              {l}
+            </p>
+          ))}
+        </section>
+      )}
+      {(d.today !== "" || d.freelance !== null || d.off !== null) && (
+        <section className="bf-sec">
+          <h3 className="bf-h">Rest of today</h3>
+          {d.today !== "" && <p className="bf-p">{d.today}</p>}
+          {d.freelance !== null && <p className="bf-p">{d.freelance}</p>}
+          {d.off !== null && <p className="bf-p">{d.off}</p>}
+        </section>
+      )}
+    </>
+  );
+}
+
 export default function Briefing({
   line,
   view,
+  debrief,
   autoOpen,
 }: {
   line: GreetingLine;
   view: BriefingView | null;
+  /** Today's saved Debrief, from the server (S22); null when there is none today. */
+  debrief: DebriefView | null;
   autoOpen: boolean;
 }) {
   const router = useRouter();
   const params = useSearchParams();
   const pathname = usePathname();
   const forced = params.get("briefing") === "open";
-  const canOpen = line.opens === "digest" && view !== null;
-  const [open, setOpen] = useState<Open>(() => (canOpen && (forced || autoOpen) ? "full" : null));
+  // A Debrief this island pressed for itself. Kept even when its save failed —
+  // then it is the only copy (spec §6).
+  const [localDebrief, setLocalDebrief] = useState<DebriefView | null>(null);
+  const shownDebrief = newer(localDebrief, debrief);
+  const canOpen = (line.opens === "digest" && view !== null) || (line.opens === "debrief" && shownDebrief !== null);
+  // The full-screen greeting is the 07:00 Briefing's alone (D4): it needs a view.
+  const [open, setOpen] = useState<Open>(() => (view !== null && line.opens !== null && (forced || autoOpen) ? "full" : null));
+  const [pane, setPane] = useState<Pane>("morning");
   const [since, setSince] = useState<Since>({ kind: "loading" });
   const [card, setCard] = useState<SymptomView | null>(null);
+  const [press, setPress] = useState<Press>({ kind: "idle" });
+  const [unsavedAt, setUnsavedAt] = useState<string | null>(null);
   const lineRef = useRef<HTMLButtonElement>(null);
   const dlgRef = useRef<HTMLDialogElement>(null);
   const cardRef = useRef<HTMLDialogElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const cardFrom = useRef<HTMLButtonElement | null>(null);
   const seenSent = useRef(false);
   const closingMain = useRef(false);
   const closingCard = useRef(false);
+  const pressing = useRef(false);
   // null until the mount effect below sets it — Date.now() is impure and
   // must not run during render (react-hooks/purity), so the initial value
   // comes from the effect, which also runs once on mount.
@@ -81,12 +216,19 @@ export default function Briefing({
   const titleId = useId();
   const cardTitleId = useId();
 
-  // DOM/ref only: remembers when `line`/`view` last arrived fresh from the
+  // What the panel shows. The full-screen greeting is always the morning; the
+  // morning needs a view; the Debrief needs one to show.
+  const showing: Pane =
+    open === "full" || shownDebrief === null ? "morning" : pane === "debrief" || view === null ? "debrief" : "morning";
+  const debriefShown = showing === "debrief" ? shownDebrief : null;
+  const morningShown = showing === "morning" ? view : null;
+
+  // DOM/ref only: remembers when the props last arrived fresh from the
   // server, so a later visibilitychange can judge staleness (fix round
   // item 5b). Writes a ref, never state.
   useEffect(() => {
     lastPropsAt.current = Date.now();
-  }, [line, view]);
+  }, [line, view, debrief]);
 
   // Resuming an installed PWA fires visibilitychange, not a navigation —
   // the shell's props can be hours stale. Ask the server again only past the
@@ -156,7 +298,46 @@ export default function Briefing({
   function openPanel() {
     if (!canOpen) return;
     setSince({ kind: "loading" });
+    setPane(line.opens === "debrief" ? "debrief" : "morning");
+    if (press.kind === "failed") setPress({ kind: "idle" });
     setOpen("panel");
+  }
+
+  /** Swap the panel's content in place (spec §3.6), focus to the new heading. */
+  function swapTo(next: Pane) {
+    setPane(next);
+    requestAnimationFrame(() => titleRef.current?.focus());
+  }
+
+  async function pressDebrief() {
+    // The ref, not `press`, is the guard: two clicks inside one render both read press.kind as "idle".
+    if (pressing.current) return;
+    pressing.current = true;
+    setPress({ kind: "waiting" });
+    let next: Press = { kind: "failed" };
+    try {
+      const r = await fetch("/api/briefing/debrief", {
+        method: "POST",
+        signal: AbortSignal.timeout(PRESS_TIMEOUT_MS),
+        cache: "no-store",
+      });
+      const parsed = r.ok ? parseDebriefResponse(await r.json()) : null;
+      if (parsed !== null) {
+        const v = buildDebriefView(parsed.debrief);
+        setLocalDebrief(v);
+        setUnsavedAt(parsed.saved ? null : v.atIso);
+        setPane("debrief");
+        next = { kind: "idle" };
+      }
+    } catch {
+      // A timeout, a network error, a body that isn't a Debrief, or a view
+      // that wouldn't build: all of them read "didn't finish" (spec §6).
+    } finally {
+      pressing.current = false;
+      setPress(next);
+      // The line is server-rendered: ask for it again (spec §7.2 item 5).
+      router.refresh();
+    }
   }
 
   async function close() {
@@ -240,7 +421,7 @@ export default function Briefing({
           this event too, so setOpen(null) there is a harmless repeat of
           what close() already does a few lines later (principal review,
           round 2, item 3). */}
-      {view !== null && (
+      {(view !== null || shownDebrief !== null) && (
         <dialog
           ref={dlgRef}
           className={`bf-dialog ${open === "full" ? "is-full" : "is-panel"}`}
@@ -257,82 +438,131 @@ export default function Briefing({
           <div className="bf-in">
             <header className="bf-head">
               <p className="bf-when">
-                {view.label} · {view.stamp}
+                {debriefShown !== null
+                  ? `Debrief · ${debriefShown.stamp}`
+                  : morningShown !== null
+                    ? `${morningShown.label} · ${morningShown.stamp}`
+                    : ""}
               </p>
-              <h2 id={titleId} className="bf-title">
-                {view.title}
+              <h2 id={titleId} ref={titleRef} tabIndex={-1} className="bf-title">
+                {debriefShown !== null ? debriefShown.heading : (morningShown?.title ?? "")}
               </h2>
               <button type="button" className="bf-x" aria-label="Close" onClick={() => void close()}>
                 ✕
               </button>
             </header>
 
-            {view.kind === "full" ? (
+            {debriefShown !== null && (
               <>
-                {view.stories.length > 0 && (
-                  <section className="bf-sec">
-                    <h3 className="bf-h">As of {view.stamp}</h3>
-                    <ul className="bf-stories">
-                      {view.stories.map((story) =>
-                        story.symptoms.length === 1 ? (
-                          <li key={story.id}>
-                            <button type="button" className="bf-row" onClick={(e) => openCard(e, story.symptoms[0])}>
-                              <span className="bf-said">
-                                <Said segments={story.sentence} />
-                              </span>
-                              <span className="bf-next">{story.symptoms[0].nextStep}</span>
-                            </button>
-                          </li>
-                        ) : (
-                          <li key={story.id}>
-                            <p className="bf-story">
-                              <Said segments={story.sentence} />
-                            </p>
-                            <ul className="bf-symptoms">
-                              {story.symptoms.map((s) => (
-                                <li key={s.id}>
-                                  <button type="button" className="bf-row" onClick={(e) => openCard(e, s)}>
-                                    <span className="bf-said">
-                                      <Said segments={s.sentence} />
-                                    </span>
-                                    <span className="bf-next">{s.nextStep}</span>
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          </li>
-                        ),
-                      )}
-                      {view.omitted > 0 && <li className="bf-omitted">…and {view.omitted} more I couldn’t fit here.</li>}
-                    </ul>
-                  </section>
+                {unsavedAt === debriefShown.atIso && (
+                  <p className="bf-p bf-warn">I couldn’t save this one, so other devices won’t see it.</p>
                 )}
-                <section className="bf-sec">
-                  <h3 className="bf-h">The day, as of {view.stamp}</h3>
-                  {view.today !== "" && <p className="bf-p">{view.today}</p>}
-                  {view.freelance !== null && <p className="bf-p">{view.freelance}</p>}
-                  {view.off !== null && <p className="bf-p">{view.off}</p>}
-                </section>
+                <DebriefBody d={debriefShown} onCard={openCard} />
+                {view !== null && view.isToday && (
+                  <button type="button" className="bf-swap" onClick={() => swapTo("morning")}>
+                    This morning’s briefing →
+                  </button>
+                )}
               </>
-            ) : (
-              <section className="bf-sec">
-                <p className="bf-p bf-quote">{view.body}</p>
-              </section>
             )}
 
-            {view.isToday && (
-              <section className="bf-sec" aria-live="polite">
-                <h3 className="bf-h">Since {view.stamp}</h3>
-                {since.kind === "loading" && <p className="bf-p bf-wait">Checking…</p>}
-                {since.kind === "failed" && <p className="bf-p">I couldn’t check what’s changed just now.</p>}
-                {since.kind === "lines" && since.lines.map((l, i) => <p key={i} className="bf-p">{l}</p>)}
-              </section>
+            {morningShown !== null && (
+              <>
+                {open === "panel" && shownDebrief !== null && (
+                  <button type="button" className="bf-swap" onClick={() => swapTo("debrief")}>
+                    ← Debrief
+                  </button>
+                )}
+                {morningShown.kind === "full" ? (
+                  <>
+                    {morningShown.stories.length > 0 && (
+                      <section className="bf-sec">
+                        <h3 className="bf-h">As of {morningShown.stamp}</h3>
+                        <ul className="bf-stories">
+                          {morningShown.stories.map((story) =>
+                            story.symptoms.length === 1 ? (
+                              <li key={story.id}>
+                                <button type="button" className="bf-row" onClick={(e) => openCard(e, story.symptoms[0])}>
+                                  <span className="bf-said">
+                                    <Said segments={story.sentence} />
+                                  </span>
+                                  <span className="bf-next">{story.symptoms[0].nextStep}</span>
+                                </button>
+                              </li>
+                            ) : (
+                              <li key={story.id}>
+                                <p className="bf-story">
+                                  <Said segments={story.sentence} />
+                                </p>
+                                <ul className="bf-symptoms">
+                                  {story.symptoms.map((s) => (
+                                    <li key={s.id}>
+                                      <button type="button" className="bf-row" onClick={(e) => openCard(e, s)}>
+                                        <span className="bf-said">
+                                          <Said segments={s.sentence} />
+                                        </span>
+                                        <span className="bf-next">{s.nextStep}</span>
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </li>
+                            ),
+                          )}
+                          {morningShown.omitted > 0 && (
+                            <li className="bf-omitted">…and {morningShown.omitted} more I couldn’t fit here.</li>
+                          )}
+                        </ul>
+                      </section>
+                    )}
+                    <section className="bf-sec">
+                      <h3 className="bf-h">The day, as of {morningShown.stamp}</h3>
+                      {morningShown.today !== "" && <p className="bf-p">{morningShown.today}</p>}
+                      {morningShown.freelance !== null && <p className="bf-p">{morningShown.freelance}</p>}
+                      {morningShown.off !== null && <p className="bf-p">{morningShown.off}</p>}
+                    </section>
+                  </>
+                ) : (
+                  <section className="bf-sec">
+                    <p className="bf-p bf-quote">{morningShown.body}</p>
+                  </section>
+                )}
+
+                {morningShown.isToday && (
+                  <section className="bf-sec" aria-live="polite">
+                    <h3 className="bf-h">Since {morningShown.stamp}</h3>
+                    {since.kind === "loading" && <p className="bf-p bf-wait">Checking…</p>}
+                    {since.kind === "failed" && <p className="bf-p">I couldn’t check what’s changed just now.</p>}
+                    {since.kind === "lines" && since.lines.map((l, i) => <p key={i} className="bf-p">{l}</p>)}
+                  </section>
+                )}
+              </>
             )}
 
             {open === "full" && (
               <div className="bf-foot">
                 <button type="button" className="bf-got" onClick={() => void close()}>
                   Got it
+                </button>
+              </div>
+            )}
+
+            {open === "panel" && (
+              <div className="bf-foot is-press">
+                <p className={`bf-status${press.kind === "failed" ? " is-failed" : ""}`} aria-live="polite">
+                  {press.kind === "waiting"
+                    ? "Checking your sites and ShikksTracker…"
+                    : press.kind === "failed"
+                      ? "The Debrief didn’t finish. Try again."
+                      : ""}
+                </p>
+                <button
+                  type="button"
+                  className="bf-got bf-press"
+                  onClick={() => void pressDebrief()}
+                  disabled={press.kind === "waiting"}
+                >
+                  Debrief now
                 </button>
               </div>
             )}

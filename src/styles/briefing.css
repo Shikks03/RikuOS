@@ -104,3 +104,30 @@ html:has(dialog.bf-dialog[open],dialog.bf-card[open]){overflow:hidden}
   background:var(--ink);color:var(--void);border:0;border-radius:var(--r-pill);
   padding:0 var(--sp-5);min-height:44px;cursor:pointer;
 }
+
+/* ---- the Debrief (S22) ------------------------------------------------------
+   Same tokens, no new hue, no new @media. Every button sets
+   text-transform:none (L1e) and meets the 44px tap target: .bf-swap here,
+   .bf-press by riding on .bf-got. */
+/* The heading takes programmatic focus when the panel swaps between the
+   Debrief and this morning's Briefing; a mouse swap shows no ring, a keyboard
+   one keeps base.css's :focus-visible ring. */
+.bf-title:focus:not(:focus-visible){outline:none}
+.bf-group{display:grid;gap:var(--sp-2)}
+.bf-g{margin:0;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+/* Sorted lines and couldn't-check lines open nothing: plain list items. */
+.bf-sorted{font-size:14px;line-height:1.5;color:var(--ink-2);padding:var(--sp-2) 0;overflow-wrap:anywhere}
+.bf-sorted.is-blind{color:var(--stale)}
+.bf-note{font-size:12.5px;line-height:1.45;color:var(--stale)}
+.bf-warn{color:var(--stale)}
+.bf-swap{
+  justify-self:start;font:inherit;text-transform:none;letter-spacing:normal;font-size:13px;
+  background:none;border:1px solid var(--line);border-radius:var(--r-pill);color:var(--ink-2);
+  padding:0 var(--sp-4);min-height:44px;cursor:pointer;
+}
+.bf-swap:hover{color:var(--ink)}
+.bf-foot.is-press{justify-content:space-between;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
+.bf-status{margin:0;flex:1 1 160px;min-height:1.5em;font-size:12.5px;line-height:1.45;color:var(--ink-3)}
+.bf-status.is-failed{color:var(--missing)}
+.bf-press{flex:0 0 auto}
+.bf-press:disabled{cursor:progress}

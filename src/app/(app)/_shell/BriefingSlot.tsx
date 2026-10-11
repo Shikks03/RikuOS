@@ -2,23 +2,28 @@ import { Suspense } from "react";
 import { connectDB } from "@/lib/db";
 import { MONGO_READ_TIMEOUT_MS, withDeadline } from "@/lib/deadline";
 import { getLastDigest, type StoredDigest } from "@/lib/lastDigest";
+import { getLastDebrief } from "@/lib/lastDebrief";
 import { readOsSettings } from "@/lib/osSettings";
 import { readLatestDispatcher } from "@/lib/dispatcherRun";
 import {
   buildBriefingView,
   buildGreetingLine,
+  debriefIsToday,
   shouldAutoOpen,
   type BriefingView,
   type GreetingInput,
   type GreetingLine,
 } from "@/lib/briefingView";
+import { buildDebriefView, type DebriefView } from "@/lib/debriefView";
+import type { StoredDebrief } from "@/lib/briefingTypes";
 import Briefing from "./Briefing";
 
 /**
- * The greeting line's server half (S21, spec §5.1). Three read-only reads,
- * each bounded and settled on its own — the rail's discipline (R37: settings
- * through readOsSettings, never the upsert; R55: getLastDigest never writes).
- * A failure becomes the line's honest "couldn't load" state; the page always
+ * The greeting line's server half (S21, spec §5.1; S22). Four read-only
+ * reads, each bounded and settled on its own — the rail's discipline (R37:
+ * settings through readOsSettings, never the upsert; R55: getLastDigest and
+ * getLastDebrief never write). A failure becomes the line's honest "couldn't
+ * load" state (a failed Debrief read is simply "no Debrief"); the page always
  * renders. Suspense keeps the reads off the shell's critical path.
  */
 export default function BriefingSlot() {
@@ -40,18 +45,19 @@ async function BriefingRead() {
   const connected = connectDB();
   const bounded = <T,>(read: () => Promise<T>, label: string) =>
     withDeadline(connected.then(read), MONGO_READ_TIMEOUT_MS, `briefing ${label}`);
-  const [digestR, dispatcherR, settingsR] = await Promise.allSettled([
+  const [digestR, dispatcherR, settingsR, debriefR] = await Promise.allSettled([
     bounded(getLastDigest, "last-digest read"),
     bounded(readLatestDispatcher, "dispatcher read"),
     bounded(readOsSettings, "settings read"),
+    bounded(getLastDebrief, "last-debrief read"),
   ]);
   const digest: StoredDigest | null | "unavailable" = settled(digestR, "last-digest read");
+  const debrief: StoredDebrief | null | "unavailable" = settled(debriefR, "last-debrief read");
   const settings = settled(settingsR, "settings read");
   const input: GreetingInput = {
     now,
     digest,
-    // Bridge until D8 reads getLastDebrief: no Debrief, so the line is exactly S21's.
-    debrief: null,
+    debrief,
     dispatcher: settled(dispatcherR, "dispatcher read"),
     monitoringEnabled: settings === "unavailable" ? "unavailable" : settings.monitoringEnabled,
   };
@@ -74,6 +80,17 @@ async function BriefingRead() {
     autoOpen = false;
   }
 
+  // Today's Debrief only (S22): yesterday's is never shown. Built on its own,
+  // so a malformed Debrief costs only the Debrief, never the morning view.
+  let debriefView: DebriefView | null = null;
+  if (debrief !== null && debrief !== "unavailable" && debriefIsToday(debrief, now)) {
+    try {
+      debriefView = buildDebriefView(debrief);
+    } catch (err) {
+      console.error("[briefing] debrief view build failed:", err);
+    }
+  }
+
   // useSearchParams (inside Briefing) needs its own boundary.
   return (
     <Suspense
@@ -87,8 +104,10 @@ async function BriefingRead() {
       {/* Keyed on the Briefing's own sentAt, not just mounted once per page
           load: a new morning's digest (or router.refresh() finding one)
           remounts the island so its `open` initialiser re-decides auto-open
-          fresh, rather than carrying yesterday's state (fix round item 5a). */}
-      <Briefing key={view?.sentAtIso ?? "none"} line={line} view={view} autoOpen={autoOpen} />
+          fresh, rather than carrying yesterday's state (fix round item 5a).
+          A new Debrief does NOT change the key, so a press's refresh never
+          closes the panel it was pressed in. */}
+      <Briefing key={view?.sentAtIso ?? "none"} line={line} view={view} debrief={debriefView} autoOpen={autoOpen} />
     </Suspense>
   );
 }
