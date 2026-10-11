@@ -57,6 +57,14 @@ import {
 } from "@/lib/personalLayout";
 import type { SayLine } from "@/lib/personalView";
 import { pressOutcome } from "@/lib/pressOutcome";
+import {
+  afterServerRender,
+  dropStandIn as dropFrom,
+  putStandIn as putInto,
+  settleStandIn as settleIn,
+  type StandIn,
+  type StandInMark,
+} from "@/lib/standIns";
 import type { TodoDraft } from "./TodoForm";
 
 /** The six rendered tiles, by tile id. Every id present: the grid places all six. */
@@ -143,6 +151,16 @@ interface PageState {
   /** Functional update of one draft, starting from `init` when there is none. */
   updateTodoDraft: (id: string, init: TodoDraft, fn: (d: TodoDraft) => TodoDraft) => void;
   forgetTodoDraft: (id: string) => void;
+  /**
+   * The adds still showing as faded stand-ins (smooth-feel spec §4,
+   * standIns.ts). The hidden set's rule: put in flight on the press,
+   * settled or dropped when the door answers, removed by the first server
+   * render after settling.
+   */
+  standIns: readonly StandIn[];
+  putStandIn: (s: StandIn) => void;
+  settleStandIn: (key: string, mark: StandInMark) => void;
+  dropStandIn: (key: string) => void;
   /** The editor's working copy and its one move, while editing; null otherwise. */
   editor: Editor | null;
 }
@@ -181,6 +199,10 @@ const PageContext = createContext<PageState>({
   todoDrafts: new Map(),
   updateTodoDraft: noop,
   forgetTodoDraft: noop,
+  standIns: [],
+  putStandIn: noop,
+  settleStandIn: noop,
+  dropStandIn: noop,
   editor: null,
 });
 
@@ -374,10 +396,12 @@ export default function LayoutEditor({
 
   // key -> in flight? A settled entry lives until the next server render.
   const [entries, setEntries] = useState<ReadonlyMap<HiddenKey, boolean>>(() => new Map());
+  const [standIns, setStandIns] = useState<readonly StandIn[]>([]);
   // Adjusting state to a new prop during render (React's documented pattern,
   // no effect): a new stamp is a new server render. It ends every settled
   // hide (in-flight entries survive it) and retires a just-saved layout,
-  // which the server now renders itself.
+  // which the server now renders itself. It also retires every settled
+  // stand-in (smooth-feel §4).
   const [seenStamp, setSeenStamp] = useState(stamp);
   if (seenStamp !== stamp) {
     setSeenStamp(stamp);
@@ -385,6 +409,7 @@ export default function LayoutEditor({
       if (![...m.values()].some((inFlight) => !inFlight)) return m;
       return new Map([...m].filter(([, inFlight]) => inFlight));
     });
+    setStandIns((l) => afterServerRender(l)); // the same list when nothing settled, so no extra render
     if (saved !== null && saved.stamp !== stamp) setSaved(null);
   }
   const hidden: ReadonlySet<HiddenKey> = new Set(entries.keys());
@@ -554,6 +579,10 @@ export default function LayoutEditor({
         next.delete(id);
         return next;
       }),
+    standIns,
+    putStandIn: (s) => setStandIns((l) => putInto(l, s)),
+    settleStandIn: (key, mark) => setStandIns((l) => settleIn(l, key, mark)),
+    dropStandIn: (key) => setStandIns((l) => dropFrom(l, key)),
     editor:
       working === null
         ? null
