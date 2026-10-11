@@ -29,11 +29,26 @@ export default function NavProgress() {
 
 export function LoadingSignal({ announce = false }: { announce?: boolean }) {
   useEffect(() => beginLoading(), []);
-  return announce ? (
-    <span className="ol-sr" role="status">
-      Loading…
-    </span>
-  ) : null;
+  return (
+    <>
+      {/*
+       * A dehydrated Suspense fallback's server HTML never mounts on the
+       * client until its boundary resolves, so the effect above — and
+       * NavProgress's own useSyncExternalStore — never run on first open.
+       * This static bar is already "on" in the server HTML itself, so the
+       * top bar runs on a hard load with no client code involved. Several
+       * fallbacks may each render one; they are identical and fixed-position,
+       * so several read as one. feel.css hides it once the live bar (a
+       * direct child of .app) is itself "on" (principal review W4).
+       */}
+      <span className="navbar ol-navbar" data-on="true" aria-hidden="true" />
+      {announce && (
+        <span className="ol-sr" role="status">
+          Loading…
+        </span>
+      )}
+    </>
+  );
 }
 
 export function LinkPending() {

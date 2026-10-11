@@ -23,6 +23,12 @@
 @keyframes navbar-grow{from{width:0}to{width:80%}}
 /* invisible for the first 150ms, so a fast navigation never flashes it */
 @keyframes navbar-in{from{opacity:0}to{opacity:1}}
+/* a dehydrated Suspense fallback's server HTML never mounts on the client,
+   so its own static bar (.ol-navbar, always data-on="true") is what runs on
+   a hard load. Once the live bar (NavProgress, a direct child of .app) is
+   itself on, hide every static one so a soft navigation never shows two
+   (principal review W4). */
+.app:has(> .navbar[data-on="true"]) .ol-navbar{display:none}
 
 /* ---- outlines (spec §3.1) -------------------------------------- */
 /* grey bars where text will go — never a number, a word of content or

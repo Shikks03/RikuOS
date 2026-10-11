@@ -77,6 +77,16 @@ export default function PersonalOutline() {
                               </div>
                             )}
                           </div>
+                          {cell.tile === "today" && (
+                            <span className="btn ol-ghost" aria-hidden="true">
+                              + Event
+                            </span>
+                          )}
+                          {cell.tile === "todos" && (
+                            <span className="btn ol-ghost" aria-hidden="true">
+                              + To-do
+                            </span>
+                          )}
                         </div>
                         <div className="pe-body">
                           <OutlineBars lines={cell.tile === "today" || cell.tile === "week" ? 3 : 2} />
