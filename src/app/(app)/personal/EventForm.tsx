@@ -22,17 +22,22 @@
  *
  * THE OUTCOMES — and the asymmetry is the point (CLAUDE.md: failed after the
  * side effect, or unknown, parks for a human; never guess):
- *   ok        the form closes and the page re-reads (Today and Next 7 days).
- *             A day the page cannot show says `Added. It’s on Fri 24 Oct,
- *             outside this week.` under the head (deck §15).
+ *   ok        the form closed on the press (smooth-feel §4), the faded
+ *             stand-in shows in Today or the day's row until the re-read
+ *             replaces it; the page re-reads (Today and Next 7 days). A day
+ *             the page cannot show says `Added. It’s on Fri 24 Oct, outside
+ *             this week.` under the head (deck §15).
  *   refused   `Google didn’t accept it: <its reason>.` above the buttons; the
- *             form keeps everything and `Add` re-enables.
+ *             form keeps everything and `Add` re-enables. The stand-in leaves
+ *             and the form opens again.
  *   no answer `Couldn’t reach Google. Check the calendar before trying
  *             again.` — `Add` STAYS refused and `Cancel` is the only live
  *             control, because the event may already exist and a second
  *             press would duplicate it. The page re-reads, so an event that
  *             landed shows itself. The refusal is part of the draft: a close
- *             and a reopen do not lift it; only Cancel does.
+ *             and a reopen do not lift it; only Cancel does. The form is
+ *             closed by then, so the sentence also sits under the tile's
+ *             head; the stand-in says it couldn’t tell.
  */
 
 import { useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
@@ -42,9 +47,10 @@ import { EVENT_TITLE_MAX, PRESS_TIMEOUT_MS } from "@/lib/constants";
 import { addDays, formatDay, oneHourAfter } from "@/lib/days";
 import { ERROR_SENTENCES, TOO_NARROW_SENTENCE, eventFailSentence } from "@/lib/personalErrors";
 import { pressOutcome } from "@/lib/pressOutcome";
+import { nextStandInKey } from "@/lib/standIns";
 import { TileBody, TileFoot, TileHead, usePersonalPage } from "./LayoutEditor";
 import type { EventFormData } from "./_blocks/Today";
-import { TileFormsProvider, calendarOf, focusPillOrTile, focusStillIn } from "./TodoForm";
+import { TileFormsProvider, calendarOf, focusPillOrTile } from "./TodoForm";
 
 /** deck §7 */
 const NO_ANSWER = "Couldn’t reach Google. Check the calendar before trying again.";
@@ -157,6 +163,15 @@ export function EventTile({
     title.current?.focus();
   }
 
+  /** smooth-feel §4: a definite failure after the form closed on press opens it again (S2 for focus, as TodoTile). */
+  function reopen() {
+    if (!canOpen) return;
+    const at = document.activeElement;
+    const take = at === null || at === document.body || at === pill.current;
+    flushSync(() => setOpenAt(page.editEpoch));
+    if (take) title.current?.focus();
+  }
+
   return (
     <TileFormsProvider value={forms}>
       <TileHead tile="today">
@@ -190,6 +205,7 @@ export function EventTile({
             draft={draft}
             update={setDraft}
             close={close}
+            reopen={reopen}
           />
         ) : (
           body
@@ -207,6 +223,7 @@ function EventFormView({
   draft,
   update,
   close,
+  reopen,
 }: {
   formId: string;
   titleRef: RefObject<HTMLInputElement | null>;
@@ -215,6 +232,8 @@ function EventFormView({
   update: (fn: (d: EventDraft) => EventDraft) => void;
   /** focus=false: an answer closed it after focus had moved on (S2). */
   close: (keep: boolean, focus?: boolean) => void;
+  /** A definite failure after the form closed on press: open it again (smooth-feel §4). */
+  reopen: () => void;
 }) {
   const router = useRouter();
   const page = usePersonalPage();
@@ -270,6 +289,24 @@ function EventFormView({
     const dayKey = draft.dayKey;
     page.press("today");
     update((d) => ({ ...d, sending: true, said: null }));
+    // smooth-feel §4: the form closes at once and the event shows faded
+    // where the page shows that day (Today, or its row in Next 7 days; a day
+    // outside the week has no place, plan deviation 6). The draft keeps
+    // `sending`, so the pill refuses a second send until the door answers.
+    const standIn = nextStandInKey();
+    page.putStandIn({
+      kind: "event",
+      key: standIn,
+      title,
+      calendarName: form.calendars.find((c) => c.calendarId === calendarId)?.name ?? "",
+      dayKey,
+      allDay: draft.allDay,
+      start: draft.start,
+      end: draft.end,
+      mark: "saving",
+      inFlight: true,
+    });
+    close(true);
     const out = await pressOutcome(
       fetch("/api/calendar/events", {
         method: "POST",
@@ -284,20 +321,25 @@ function EventFormView({
     );
 
     if (out.kind === "ok") {
-      close(false, focusStillIn(formRef.current));
+      page.settleStandIn(standIn, "saving");
+      close(false, false); // forgets the draft; the form closed on press
       // The page shows today (Tile 1) and today+1 … today+7 (Tile 5); anything else would vanish silently.
       if (dayKey < form.today || dayKey > addDays(form.today, 7)) {
         page.note("today", { text: `Added. It’s on ${formatDay(dayKey)}, outside this week.`, dot: null }); // deck §15
       }
     } else if (out.kind === "failed") {
+      page.dropStandIn(standIn);
       const cal = out.code === "calendar-failed" ? calendarOf(out.body) : null;
       const said =
         cal !== null && cal.kind === "failed"
           ? eventFailSentence(cal.cause) // S21, spec §7.4
           : out.sentence;
       update((d) => ({ ...d, sending: false, said }));
+      reopen(); // what was typed, with Google's reason
     } else {
       update((d) => ({ ...d, sending: false, parked: true, said: null }));
+      page.settleStandIn(standIn, "unknown");
+      page.note("today", { text: NO_ANSWER, dot: null }); // plan deviation 4: the form's own words, under the head
     }
     router.refresh();
   }

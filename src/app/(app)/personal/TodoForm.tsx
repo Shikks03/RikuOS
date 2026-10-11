@@ -43,16 +43,20 @@
  * `disabled`. The switch keeps `disabled`: pressing it never submits.
  *
  * OUTCOMES (L7: pressOutcome decides, and nothing here re-derives it).
- *   ok       the form closes, the draft is forgotten, the page re-reads. A
- *            calendar leg that did not finish says so under the tile's head
- *            with the `--stale` dot (R49: a claim about Google).
+ *   ok       the form closes, the draft is forgotten, the page re-reads. An
+ *            ADD closed already, on the press (smooth-feel §4): its faded
+ *            stand-in shows wherever the to-do belongs until the re-read
+ *            replaces it. A calendar leg that did not finish says so under
+ *            the tile's head with the `--stale` dot (R49: a claim about Google).
  *   failed   the sentence sits above the buttons; the form keeps everything.
+ *            An add's stand-in leaves and its form opens again.
  *   unknown  `Couldn’t tell if that saved.` — never a claimed failure. An
  *            ADD parks: `Add` stays refused and `Cancel` is the only live
  *            control, so a to-do that may already exist is never added
  *            twice. So does an edit that switched the calendar ON — a
  *            re-send could make a second Google entry. Any other edit
  *            re-sends the same values harmlessly, so `Save` stays live.
+ *            An add's stand-in says it couldn’t tell, and so does the tile's head.
  *   delete   the row is hidden BEFORE the request (TodoRow's tick rule,
  *            LayoutEditor's hide/settle/reveal): a definite failure reveals
  *            it again with `Couldn’t delete.`; ok or no answer settles it,
@@ -73,7 +77,7 @@ import {
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { PRESS_TIMEOUT_MS, TODO_TITLE_MAX } from "@/lib/constants";
-import type { DayKey } from "@/lib/days";
+import { todayKey, type DayKey } from "@/lib/days";
 import {
   ERROR_SENTENCES,
   TOO_NARROW_SENTENCE,
@@ -83,6 +87,8 @@ import {
   type CalendarOutcome,
 } from "@/lib/personalErrors";
 import { pressOutcome } from "@/lib/pressOutcome";
+import { nextStandInKey } from "@/lib/standIns";
+import { dueChip } from "@/lib/todos";
 import { TileBody, TileFoot, TileHead, usePersonalPage } from "./LayoutEditor";
 import { useRowEdit } from "./TodoRow";
 
@@ -273,6 +279,19 @@ export function TodoTile({ head, body, formCapable: stored }: { head: ReactNode;
     title.current?.focus();
   }
 
+  /**
+   * smooth-feel §4: an add closes on press; a DEFINITE failure opens the form
+   * again with the draft and its sentence. Focus moves into Title only from
+   * the pill or from nowhere — never from wherever Riku has gone since (S2).
+   */
+  function reopen() {
+    if (!formCapable) return;
+    const at = document.activeElement;
+    const take = at === null || at === document.body || at === pill.current;
+    flushSync(() => setOpenAt(page.editEpoch));
+    if (take) title.current?.focus();
+  }
+
   return (
     <TileFormsProvider value={forms}>
       <TileHead tile="todos">
@@ -307,6 +326,7 @@ export function TodoTile({ head, body, formCapable: stored }: { head: ReactNode;
             draft={draft}
             update={setDraft}
             close={close}
+            reopen={reopen}
           />
         ) : (
           body
@@ -361,7 +381,13 @@ type ViewProps = {
    */
   close: (keep: boolean, focus?: boolean) => void;
 } & (
-  | { mode: "add"; formId: string; titleRef: RefObject<HTMLInputElement | null> }
+  | {
+      mode: "add";
+      formId: string;
+      titleRef: RefObject<HTMLInputElement | null>;
+      /** A definite failure after the form closed on press: open it again (smooth-feel §4). */
+      reopen: () => void;
+    }
   | { mode: "edit"; todo: EditableTodo; focusPill: () => void; dueGroupUntil: DayKey | null }
 );
 
@@ -488,6 +514,26 @@ function TodoFormView(props: ViewProps) {
     page.press(tile);
     const kind: Sending = props.mode === "add" ? "add" : "save";
     update((d) => ({ ...d, sending: kind, said: null }));
+    // smooth-feel §4: an ADD closes at once and shows a faded stand-in
+    // wherever the to-do belongs. The draft keeps `sending`, so the pill
+    // refuses to reopen the form, and no second send can start, until the
+    // door answers.
+    let standIn: string | null = null;
+    if (props.mode === "add") {
+      standIn = nextStandInKey();
+      const dueOn = hasDue ? values.due : null;
+      page.putStandIn({
+        kind: "todo",
+        key: standIn,
+        title,
+        section: values.section,
+        dueOn,
+        due: dueChip(dueOn, todayKey(new Date())),
+        mark: "saving",
+        inFlight: true,
+      });
+      close(true);
+    }
     const out = await pressOutcome(
       fetch(url, {
         method,
@@ -499,14 +545,27 @@ function TodoFormView(props: ViewProps) {
 
     if (out.kind === "ok") {
       const line = leg === null ? null : calendarLine(leg, calendarOf(out.body));
-      const focus = focusStillIn(formRef.current);
-      close(false, focus && !leaves);
-      if (focus && leaves && props.mode === "edit") props.focusPill();
+      if (props.mode === "add") {
+        if (standIn !== null) page.settleStandIn(standIn, "saving");
+        close(false, false); // forgets the draft; the form closed on press
+      } else {
+        const focus = focusStillIn(formRef.current);
+        close(false, focus && !leaves);
+        if (focus && leaves) props.focusPill();
+      }
       if (line !== null) page.note(tile, line);
     } else if (out.kind === "failed") {
       update((d) => ({ ...d, sending: false, said: out.sentence }));
+      if (props.mode === "add") {
+        if (standIn !== null) page.dropStandIn(standIn);
+        props.reopen(); // what was typed, with the door's sentence
+      }
     } else if (props.mode === "add" || leg === "pin") {
       update((d) => ({ ...d, sending: false, parked: true, said: null }));
+      if (standIn !== null) {
+        page.settleStandIn(standIn, "unknown");
+        page.note(tile, { text: ERROR_SENTENCES["calendar-unknown"], dot: null }); // the form is closed: say it under the head
+      }
     } else {
       update((d) => ({ ...d, sending: false, said: out.sentence }));
     }
