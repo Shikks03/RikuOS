@@ -138,8 +138,9 @@ export default function AgentSwitches() {
           and queues each one here for approval. It never sends anything by itself.
         </p>
         <div className="row">
+          {/* L9: the focused switch goes busy through aria-disabled, so focus stays on it (principal review). */}
           <button
-            disabled={busy}
+            aria-disabled={busy || undefined}
             className={chaserOn ? "danger" : ""}
             onClick={() => void patch({ chaserEnabled: !chaserOn }, { key: "chaserEnabled", on: !chaserOn })}
           >
@@ -162,7 +163,8 @@ export default function AgentSwitches() {
           />
           <div className="row">
             <button
-              disabled={busy || days === String(settings.chaserNDays)}
+              disabled={days === String(settings.chaserNDays)}
+              aria-disabled={busy || undefined}
               onClick={() => void patch({ chaserNDays: Number(days) })}
             >
               Save threshold
@@ -183,7 +185,7 @@ export default function AgentSwitches() {
         </p>
         <div className="row">
           <button
-            disabled={busy}
+            aria-disabled={busy || undefined}
             className={monitoringOn ? "danger" : ""}
             onClick={() =>
               void patch({ monitoringEnabled: !monitoringOn }, { key: "monitoringEnabled", on: !monitoringOn })

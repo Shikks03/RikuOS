@@ -50,7 +50,7 @@ button.secondary:hover{border-color:var(--ink-4);color:var(--ink-2)}
 /* the same pill in red — never a solid fill */
 button.danger{border-color:rgba(248,113,113,.4);color:#F5A5A5;background:none}
 button.danger:hover{border-color:rgba(248,113,113,.6)}
-button:disabled{opacity:.45;cursor:not-allowed}
+button:disabled,button[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 .card{
   background:var(--raised);border:1px solid var(--line);border-radius:var(--r-card);
   padding:var(--sp-4);margin-bottom:var(--sp-4);
