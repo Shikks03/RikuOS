@@ -1,5 +1,6 @@
 import type { DayKey } from "@/lib/days";
 import type { TodoRowView, TodoTileView } from "@/lib/personalView";
+import StandInRows from "../StandInRows";
 import TodoForm, { TodoTile, type EditableTodo } from "../TodoForm";
 import TodoRow from "../TodoRow";
 
@@ -86,6 +87,8 @@ export default function Todos({ view, todoDue, formCapable }: TodosProps) {
               ))}
             </div>
           )}
+          {/* smooth-feel §4: an add still saving, in its section */}
+          <StandInRows place={{ tile: "todos", section: section.key }} />
           {/* deck §6 Tile 2: `Showing 20 of 34.` — the section's own bound, under
               its own rows. A recorded deviation from R16's foot (lead ruling
               N3): three sections' identical lines in one foot could not be

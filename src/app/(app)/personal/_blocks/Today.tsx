@@ -4,6 +4,7 @@ import { LoadingSignal } from "../../_shell/NavProgress";
 import { OutlineBars } from "../../_shell/Outline";
 import { EventTile } from "../EventForm";
 import { TileHead } from "../LayoutEditor";
+import StandInRows from "../StandInRows";
 import TodoForm from "../TodoForm";
 import TodoRow from "../TodoRow";
 import { withSettingsLink } from "./SettingsLine";
@@ -125,6 +126,7 @@ export default async function Today({ view, eventForm: eventFormP, todoDue }: To
           ))}
         </>
       )}
+      <StandInRows place={{ tile: "today", group: "scheduled", today: eventForm.today }} />
     </div>
   );
 
@@ -148,6 +150,7 @@ export default async function Today({ view, eventForm: eventFormP, todoDue }: To
           ))}
         </div>
       )}
+      <StandInRows place={{ tile: "today", group: "due", today: eventForm.today }} />
     </div>
   );
 

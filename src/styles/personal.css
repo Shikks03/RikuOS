@@ -602,3 +602,18 @@
 /* DIFFERENCE 3 (§5.8): no prefers-reduced-motion rule here. base.css
    carries the one global rule, which also stills the shared chevron's
    transition; a second copy would be a second place to keep in step. */
+
+/* ---- stand-ins (smooth-feel spec §4; plan deviation 3) ----------- */
+/* An add still saving: its row's own shape, faded, with its mark in
+   words. Client state only — the next server render replaces it. */
+.is-standin{opacity:.55}
+/* after the group's real rows, the first stand-in keeps the hairline */
+.pe-rows + .pe-standins>.pe-row:first-child{border-top:1px solid var(--line-soft)}
+/* the group's empty sentence would contradict the row beside it */
+.fl-group:has(.pe-standins)>.fl-empty{display:none}
+.fl-empty + .pe-standins{margin-top:var(--sp-3)}
+/* a week day: the stand-ins sit in the items' column, under the items,
+   or in the dash's place on a day that read as empty */
+.pe-row.is-day>.pe-standins{grid-column:2}
+.pe-row.is-day:has(>.pe-standins)>.pe-dash{display:none}
+.pe-row.is-day:has(>.pe-dash)>.pe-standins{grid-row:1}

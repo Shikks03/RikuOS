@@ -3,6 +3,7 @@ import { dayShape, type DayItemView, type DayRowView, type DayShape, type WeekVi
 import { LoadingSignal } from "../../_shell/NavProgress";
 import { OutlineBars } from "../../_shell/Outline";
 import { TileBody, TileFoot, TileHead } from "../LayoutEditor";
+import StandInRows from "../StandInRows";
 import TodoRow from "../TodoRow";
 import { SettingsLine } from "./SettingsLine";
 
@@ -66,6 +67,7 @@ function Items({ row, items }: { row: DayRowView; items: DayItemView[] }) {
  *               title, bare (R58), and `2 items` (deck §15, R90).
  * The shape is decided here at render only; a tick inside an open day does
  * not collapse it until the next refresh (R67).
+ * An add still saving (smooth-feel §4) sits after the cell, in its column (personal.css).
  */
 function Day({ row }: { row: DayRowView }) {
   const labelId = `pe-day-${row.key}`;
@@ -75,6 +77,7 @@ function Day({ row }: { row: DayRowView }) {
         {row.label}
       </span>
       {cellFor(dayShape(row), row, labelId)}
+      <StandInRows place={{ tile: "week", day: row.key }} />
     </div>
   );
 }
