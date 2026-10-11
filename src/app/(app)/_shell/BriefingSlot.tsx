@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { connectDB } from "@/lib/db";
 import { MONGO_READ_TIMEOUT_MS, withDeadline } from "@/lib/deadline";
+import { todayKey } from "@/lib/days";
 import { getLastDigest, type StoredDigest } from "@/lib/lastDigest";
 import { getLastDebrief } from "@/lib/lastDebrief";
 import { readOsSettings } from "@/lib/osSettings";
@@ -52,12 +53,30 @@ async function BriefingRead() {
     bounded(getLastDebrief, "last-debrief read"),
   ]);
   const digest: StoredDigest | null | "unavailable" = settled(digestR, "last-digest read");
-  const debrief: StoredDebrief | null | "unavailable" = settled(debriefR, "last-debrief read");
+  const debraw: StoredDebrief | null | "unavailable" = settled(debriefR, "last-debrief read");
   const settings = settled(settingsR, "settings read");
+
+  // Today's Debrief only (S22): yesterday's is never shown. Built BEFORE the
+  // greeting line and in its own try/catch (fix round item 2): a Debrief
+  // whose view throws, or that isn't today's, must never leave the line
+  // saying "Debrief at …" with nothing underneath it for the panel to open.
+  // A throw here is kept out of the morning `view` build below by using a
+  // separate try of its own.
+  let debriefView: DebriefView | null = null;
+  if (debraw !== null && debraw !== "unavailable" && debriefIsToday(debraw, now)) {
+    try {
+      debriefView = buildDebriefView(debraw);
+    } catch (err) {
+      console.error("[briefing] debrief view build failed:", err);
+    }
+  }
+  // The greeting line only ever sees a Debrief that will actually render.
+  const debriefForLine: typeof debraw = debriefView === null ? null : debraw;
+
   const input: GreetingInput = {
     now,
     digest,
-    debrief,
+    debrief: debriefForLine,
     dispatcher: settled(dispatcherR, "dispatcher read"),
     monitoringEnabled: settings === "unavailable" ? "unavailable" : settings.monitoringEnabled,
   };
@@ -80,17 +99,6 @@ async function BriefingRead() {
     autoOpen = false;
   }
 
-  // Today's Debrief only (S22): yesterday's is never shown. Built on its own,
-  // so a malformed Debrief costs only the Debrief, never the morning view.
-  let debriefView: DebriefView | null = null;
-  if (debrief !== null && debrief !== "unavailable" && debriefIsToday(debrief, now)) {
-    try {
-      debriefView = buildDebriefView(debrief);
-    } catch (err) {
-      console.error("[briefing] debrief view build failed:", err);
-    }
-  }
-
   // useSearchParams (inside Briefing) needs its own boundary.
   return (
     <Suspense
@@ -101,13 +109,24 @@ async function BriefingRead() {
         </span>
       }
     >
-      {/* Keyed on the Briefing's own sentAt, not just mounted once per page
-          load: a new morning's digest (or router.refresh() finding one)
-          remounts the island so its `open` initialiser re-decides auto-open
-          fresh, rather than carrying yesterday's state (fix round item 5a).
-          A new Debrief does NOT change the key, so a press's refresh never
-          closes the panel it was pressed in. */}
-      <Briefing key={view?.sentAtIso ?? "none"} line={line} view={view} debrief={debriefView} autoOpen={autoOpen} />
+      {/* Keyed on the Briefing's own sentAt AND today's day key, not just
+          mounted once per page load: a new morning's digest (or
+          router.refresh() finding one) remounts the island so its `open`
+          initialiser re-decides auto-open fresh, rather than carrying
+          yesterday's state (fix round item 5a). The day key alone covers a
+          monitoring-off morning with no new digest: without it, an
+          overnight in-memory PWA resume could still show yesterday's
+          `localDebrief` through "← Debrief" (fix round item 1) — the
+          accepted side effect is that a panel left open across midnight
+          closes on its next refresh. A new Debrief does NOT change the key,
+          so a press's refresh never closes the panel it was pressed in. */}
+      <Briefing
+        key={`${view?.sentAtIso ?? "none"}|${todayKey(now)}`}
+        line={line}
+        view={view}
+        debrief={debriefView}
+        autoOpen={autoOpen}
+      />
     </Suspense>
   );
 }

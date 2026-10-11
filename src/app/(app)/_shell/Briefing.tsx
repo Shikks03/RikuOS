@@ -193,8 +193,15 @@ export default function Briefing({
   const [localDebrief, setLocalDebrief] = useState<DebriefView | null>(null);
   const shownDebrief = newer(localDebrief, debrief);
   const canOpen = (line.opens === "digest" && view !== null) || (line.opens === "debrief" && shownDebrief !== null);
-  // The full-screen greeting is the 07:00 Briefing's alone (D4): it needs a view.
-  const [open, setOpen] = useState<Open>(() => (view !== null && line.opens !== null && (forced || autoOpen) ? "full" : null));
+  // The full-screen greeting is the 07:00 Briefing's alone (D4): it needs a
+  // view, and `unsaved` restores S21's exact rule (fix round item 3) — a
+  // briefing that went out but couldn't be saved has nothing of today's to
+  // greet with full-screen; `opens: "digest"` on that state exists only so
+  // tapping the LINE can still reach the panel and the older Briefing (and
+  // the Debrief button) inside it, per deviation 7.
+  const [open, setOpen] = useState<Open>(
+    () => (view !== null && line.kind !== "unsaved" && line.opens !== null && (forced || autoOpen) ? "full" : null),
+  );
   const [pane, setPane] = useState<Pane>("morning");
   const [since, setSince] = useState<Since>({ kind: "loading" });
   const [card, setCard] = useState<SymptomView | null>(null);
@@ -327,6 +334,10 @@ export default function Briefing({
         setLocalDebrief(v);
         setUnsavedAt(parsed.saved ? null : v.atIso);
         setPane("debrief");
+        // A successful press swaps the panel's content silently otherwise,
+        // leaving focus stranded on "Debrief now" (fix round item 4) — the
+        // same announcement swapTo() gives a manual swap.
+        if (dlgRef.current?.open) requestAnimationFrame(() => titleRef.current?.focus());
         next = { kind: "idle" };
       }
     } catch {
