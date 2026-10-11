@@ -12,6 +12,7 @@ import "../styles/base.css";
 import "../styles/components.css";
 import "../styles/personal.css";
 import "../styles/briefing.css";
+import "../styles/feel.css";
 import "../styles/legacy.css";
 
 /**

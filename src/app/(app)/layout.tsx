@@ -4,6 +4,7 @@ import { COOKIE_NAME, assertSessionSecret, verifySessionToken } from "@/lib/sess
 import Rail from "./_shell/Rail";
 import TopBar from "./_shell/TopBar";
 import BriefingSlot from "./_shell/BriefingSlot";
+import NavProgress from "./_shell/NavProgress";
 
 /**
  * Defence in depth. src/proxy.ts already guarantees a session on every path in
@@ -40,12 +41,16 @@ async function requireSessionOrRedirect(): Promise<void> {
  * pages bring the rest.
  *
  * /login sits outside this group and gets no shell.
+ *
+ * NavProgress is the top bar (smooth-feel spec §3.2): fixed, outside the
+ * flow, so it adds no box to the shell's layout.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   await requireSessionOrRedirect();
 
   return (
     <div className="app">
+      <NavProgress />
       <div className="app-body">
         <Rail />
         <div className="app-main">

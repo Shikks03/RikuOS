@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { IconFreelance, IconPersonal, IconSettings } from "@/components/icons";
+import { LinkPending } from "./NavProgress";
 
 /**
  * One of the shell's client islands, each for exactly one reason:
@@ -65,6 +66,7 @@ export default function NavList() {
           >
             <Icon />
             {label}
+            <LinkPending />
           </Link>
         );
       })}

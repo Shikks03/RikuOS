@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { SayLine } from "@/lib/personalView";
+import { LinkPending } from "../../_shell/NavProgress";
 
 /**
  * The deck's sentences that hand over a lever end `… Settings.` and link to
@@ -13,7 +14,12 @@ export function withSettingsLink(text: string): ReactNode {
   if (!text.endsWith(tail)) return text;
   return (
     <>
-      {text.slice(0, -tail.length)} <Link href="/settings">Settings</Link>.
+      {text.slice(0, -tail.length)}{" "}
+      <Link href="/settings">
+        Settings
+        <LinkPending />
+      </Link>
+      .
     </>
   );
 }

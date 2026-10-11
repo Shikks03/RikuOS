@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LinkPending } from "../_shell/NavProgress";
 
 /**
  * The design system's view switch (DESIGN-INSPO §5.3, components.html
@@ -54,6 +55,7 @@ export default function ViewSwitch() {
             aria-current={active ? "page" : undefined}
           >
             {label}
+            <LinkPending />
           </Link>
         );
       })}
