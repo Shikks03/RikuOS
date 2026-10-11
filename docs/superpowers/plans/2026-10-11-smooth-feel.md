@@ -77,6 +77,15 @@ F2, F3 and F4 touch disjoint files, so they can run at once. **Inside F2 the ord
     - **(a)** The Freelance dashboard moves into a route group, `src/app/(app)/freelance/(dashboard)/`, holding `page.tsx`, `loading.tsx` and `_blocks/`. Without PPR, Next stops prefetching at the first `loading.tsx` on a path, and a boundary on the `freelance` segment swallowed `/freelance/queue`: its outline never showed and the dashboard's flashed instead. The URL is unchanged. The queue outline gains the filter row as invisible placeholders, the state-of-play box draws one bar, and the Personal outline holds the Today date line's room (F1 review).
     - **(b)** `doorSentence` prefers the door's `error` whenever it's a non-empty, non-code-shaped string, **even beside a code**. Settings' 500 `{error: "Could not save.", code: "save-failed"}` keeps saying `Could not save.` (spec §7: every existing string unchanged). This supersedes deviation 8's last sentence.
     - **(c)** In Settings' agent cards, `load` is guarded (try/catch, timeout) and `patch` releases `busy` in a `finally`. An unknown press always ends showing `Couldn’t tell if that saved.`, followed by `Could not load settings.` when the re-read also failed (F3 review).
+    - **(d)** The queue (F4 review):
+      - A refused decision whose card the re-read no longer lists (a 409 for an expired item, or a 404) moves its reason to a top line, `{kind:"refused", reason}`, so a refusal can never look like a success.
+      - The re-read reports whether it landed; a card is settled only by a re-read that landed.
+      - Edit text is kept per card.
+      - A top line is replaced only by a newer non-null line.
+      - A load-sequence guard drops stale re-reads.
+      - An unknown retry shows the `Couldn’t tell if that went through.` line.
+      - The q-link hands focus to its filter button.
+      - **Safety:** after a card leaves, focus goes to the next *card* (`tabIndex=-1`), not its Approve button, so a repeated Enter can never approve another draft. This refines spec §6's "the next card's first button".
 
 ---
 
