@@ -73,6 +73,10 @@ F2, F3 and F4 touch disjoint files, so they can run at once. **Inside F2 the ord
 9. **`LayerSwitches` already flips at once** with exactly the spec's semantics (P10c). It changes only to share `instantSwitch.ts`, with no behaviour change. **Settings' agent cards' `Loading…` becomes their outline** (spec §3.1's rule, applied to the one client-fetched block left on the page).
 10. **A re-read after a decision is quiet:** no outline over a list that is already on screen. Initial loads and filter changes show the outline. The queue's exit is slide-and-fade (200 ms), after which the list closes over the gap. That gap isn't animated, because a height animation needs a measured height (a ref read).
 11. **The Freelance outline omits the health strip.** It is one short line at the foot of the page, so its arrival moves nothing above it. The Personal outline holds the `Edit layout` button's room with a hidden, non-interactive copy (`.ol-ghost`).
+12. **Build amendments (lead rulings, 2026-10-11):**
+    - **(a)** The Freelance dashboard moves into a route group, `src/app/(app)/freelance/(dashboard)/`, holding `page.tsx`, `loading.tsx` and `_blocks/`. Without PPR, Next stops prefetching at the first `loading.tsx` on a path, and a boundary on the `freelance` segment swallowed `/freelance/queue`: its outline never showed and the dashboard's flashed instead. The URL is unchanged. The queue outline gains the filter row as invisible placeholders, the state-of-play box draws one bar, and the Personal outline holds the Today date line's room (F1 review).
+    - **(b)** `doorSentence` prefers the door's `error` whenever it's a non-empty, non-code-shaped string, **even beside a code**. Settings' 500 `{error: "Could not save.", code: "save-failed"}` keeps saying `Could not save.` (spec §7: every existing string unchanged). This supersedes deviation 8's last sentence.
+    - **(c)** In Settings' agent cards, `load` is guarded (try/catch, timeout) and `patch` releases `busy` in a `finally`. An unknown press always ends showing `Couldn’t tell if that saved.`, followed by `Could not load settings.` when the re-read also failed (F3 review).
 
 ---
 
