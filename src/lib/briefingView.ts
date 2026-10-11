@@ -7,8 +7,12 @@
  * P10b), moved here unchanged in its precedence and re-voiced (spec §5.1), with
  * states two rounds of lead review have added since — a dispatcher run that
  * ran and failed is NOT "a run that didn't happen", and a run that was
- * skipped is a fact about this morning, not nothing:
+ * skipped is a fact about this morning, not nothing — and, first of all, the
+ * Debrief (S22, spec §3.6):
  *
+ *   a Debrief from today, newer than any digest
+ *   sent today (a digest that couldn't be read
+ *   doesn't hide it)                             → debrief (its stored title)
  *   digest unreadable                            → fail
  *   a digest sent today (APP_TZ):
  *     reached zero devices (devices === 0)       → undelivered
@@ -26,11 +30,20 @@
  *     PUSH_EXPECTED_HOUR..PUSH_LATE_HOUR (grace)    → due
  *     from PUSH_LATE_HOUR                           → missing
  *
- * SKIPPED IS A STOPGAP. It reports "monitoring was off this morning" as a
- * fact, which is strictly better than the `missing` alarm it used to read as
- * (CLAUDE.md: no silent failure, never guess). Riku wants a manual "Debrief"
- * button here later, to catch up on what happened while monitoring was off —
- * a separate feature, not built here.
+ * SKIPPED reports "monitoring was off this morning" as a fact, which is
+ * strictly better than the `missing` alarm it used to read as (CLAUDE.md: no
+ * silent failure, never guess). The catch-up Riku asked for is the Debrief
+ * (S22): it works with monitoring off, and once pressed its line wins.
+ *
+ * A Debrief READ that failed is treated as no Debrief: the digest's own line
+ * is still a true answer, so the Debrief never surfaces a "couldn't load" of
+ * its own. Yesterday's Debrief never wins: the next 07:00 takes the line back
+ * by recency alone.
+ *
+ * Every state that has a stored Briefing opens it — the panel, and the
+ * Debrief button at its foot, are reachable unless nothing was ever stored or
+ * the read failed (S22 D4; `unsaved` opens the last Briefing, Debrief plan
+ * deviation 7).
  *
  * Tone is colour AND a leading dot (spec §5.1), never colour alone.
  *
@@ -44,12 +57,14 @@ import { APP_TZ, PUSH_EXPECTED_HOUR, PUSH_LATE_HOUR } from "@/lib/constants";
 import { addDays, clockHHMM, dayKey, formatDay, todayKey } from "@/lib/days";
 import { toPage } from "@/lib/voice";
 import type { StoredDigest } from "@/lib/lastDigest";
-import type { StoredBold, StoredBriefing } from "@/lib/briefingTypes";
+import type { StoredBold, StoredBriefing, StoredDebrief, StoredSymptom } from "@/lib/briefingTypes";
 
 export interface GreetingInput {
   now: Date;
   /** getLastDigest(): null = never stored (R55); "unavailable" = the read threw. */
   digest: StoredDigest | null | "unavailable";
+  /** getLastDebrief() (S22): null = never taken; "unavailable" = the read threw (treated as none). */
+  debrief: StoredDebrief | null | "unavailable";
   /**
    * The dispatcher's newest run. `skipped` = monitoring was off for it.
    * `noDevice` = the run finished but the push reached zero devices
@@ -64,6 +79,7 @@ export type GreetingTone = "normal" | "warning" | "alarm" | "muted";
 
 export interface GreetingLine {
   kind:
+    | "debrief"
     | "today"
     | "unsaved"
     | "undelivered"
@@ -77,13 +93,47 @@ export interface GreetingLine {
     | "before";
   text: string;
   tone: GreetingTone;
-  /** "digest" = tapping opens the stored digest's Briefing; null = nothing to open. */
-  opens: "digest" | null;
+  /**
+   * "digest" = tapping opens the stored digest's Briefing; "debrief" = it
+   * opens the panel on today's Debrief (S22); null = nothing to open.
+   */
+  opens: "digest" | "debrief" | null;
+}
+
+/** A Debrief taken on today's APP_TZ day (S22). */
+export function debriefIsToday(d: StoredDebrief, now: Date): boolean {
+  return dayKey(d.at, APP_TZ) === todayKey(now);
+}
+
+/**
+ * Rows that still want Riku: Still needs you, New, Right now and the
+ * couldn't-check lines (Debrief plan deviation 5). Drives the line's tone.
+ */
+export function debriefOutstanding(d: Pick<StoredDebrief, "stillNeedsYou" | "new" | "now" | "standaloneCouldntCheck">): number {
+  return d.stillNeedsYou.length + d.new.length + d.now.length + d.standaloneCouldntCheck.length;
 }
 
 export function buildGreetingLine(input: GreetingInput): GreetingLine {
-  const { digest, now } = input;
+  const { digest, debrief, now } = input;
   const today = todayKey(now);
+
+  // S22 recency rule (spec §3.6), checked before everything — including a
+  // digest that couldn't be read, which must not hide a good, newer Debrief.
+  if (debrief !== null && debrief !== "unavailable" && debriefIsToday(debrief, now)) {
+    const digestNewer =
+      digest !== null &&
+      digest !== "unavailable" &&
+      dayKey(digest.sentAt, APP_TZ) === today &&
+      digest.sentAt.getTime() >= debrief.at.getTime();
+    if (!digestNewer) {
+      return {
+        kind: "debrief",
+        text: toPage(debrief.title),
+        tone: debriefOutstanding(debrief) > 0 ? "warning" : "normal",
+        opens: "debrief",
+      };
+    }
+  }
 
   if (digest === "unavailable") return { kind: "fail", text: "I couldn’t load the briefing.", tone: "warning", opens: null };
   if (digest !== null && dayKey(digest.sentAt, APP_TZ) === today) {
@@ -104,7 +154,14 @@ export function buildGreetingLine(input: GreetingInput): GreetingLine {
 
   if (dispatcherToday !== null && !dispatcherToday.skipped) {
     if (dispatcherToday.ok) {
-      return { kind: "unsaved", text: "A briefing went out, but I couldn’t save it.", tone: "warning", opens: null };
+      // Opens the last stored Briefing, as failed/monitoring-off/skipped do,
+      // so the Debrief button stays reachable (S22 D4, plan deviation 7).
+      return {
+        kind: "unsaved",
+        text: "A briefing went out, but I couldn’t save it.",
+        tone: "warning",
+        opens: digest === null ? null : "digest",
+      };
     }
     const opens = digest === null ? null : "digest";
     return dispatcherToday.noDevice
@@ -200,18 +257,23 @@ export type BriefingView =
     })
   | (ViewBase & { kind: "quote"; body: string });
 
+/** One stored symptom as a tappable row's view (and its cause card). Shared with the Debrief (S22). */
+export function symptomView(m: StoredSymptom, id: string): SymptomView {
+  return {
+    id,
+    sentence: segments(m.sentence, m.bold),
+    nextStep: toPage(m.nextStep),
+    causeHeading: m.causeKey === "unrecognised" || m.causeKey === "none" ? "Cause" : "Likely cause",
+    cause: segments(m.cause, m.causeBold),
+    raw: m.raw,
+  };
+}
+
 function storyViews(b: StoredBriefing): StoryView[] {
   return b.stories.map((s, i) => ({
     id: String(i),
     sentence: segments(s.sentence, s.bold),
-    symptoms: s.symptoms.map((m, j) => ({
-      id: `${i}.${j}`,
-      sentence: segments(m.sentence, m.bold),
-      nextStep: toPage(m.nextStep),
-      causeHeading: m.causeKey === "unrecognised" || m.causeKey === "none" ? "Cause" : "Likely cause",
-      cause: segments(m.cause, m.causeBold),
-      raw: m.raw,
-    })),
+    symptoms: s.symptoms.map((m, j) => symptomView(m, `${i}.${j}`)),
   }));
 }
 

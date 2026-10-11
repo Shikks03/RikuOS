@@ -2,13 +2,16 @@ import { describe, it, expect } from "vitest";
 import {
   buildBriefingView,
   buildGreetingLine,
+  debriefIsToday,
+  debriefOutstanding,
   parseSentAt,
   segments,
   shouldAutoOpen,
+  symptomView,
   type GreetingInput,
 } from "@/lib/briefingView";
 import type { StoredDigest } from "@/lib/lastDigest";
-import type { StoredBriefing } from "@/lib/briefingTypes";
+import type { StoredBriefing, StoredDebrief } from "@/lib/briefingTypes";
 
 const BRIEFING: StoredBriefing = {
   stories: [
@@ -54,7 +57,7 @@ const AFTER_SEVEN = new Date("2026-09-10T02:00:00Z"); // 10:00 Manila
 const BEFORE_SEVEN = new Date("2026-09-09T16:30:00Z"); // 00:30 Manila, Thu 10
 
 function line(over: Partial<GreetingInput>) {
-  return buildGreetingLine({ now: AFTER_SEVEN, digest: null, dispatcher: null, monitoringEnabled: true, ...over });
+  return buildGreetingLine({ now: AFTER_SEVEN, digest: null, debrief: null, dispatcher: null, monitoringEnabled: true, ...over });
 }
 
 describe("buildGreetingLine — the push tile's states, moved and re-voiced", () => {
@@ -92,7 +95,17 @@ describe("buildGreetingLine — the push tile's states, moved and re-voiced", ()
       digest: OLD_PUSH,
       dispatcher: { ok: true, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: false, noDevice: false },
     });
-    expect(v).toEqual({ kind: "unsaved", text: "A briefing went out, but I couldn’t save it.", tone: "warning", opens: null });
+    // S22 D4 (plan deviation 7): the last stored Briefing opens, so the
+    // panel — and the Debrief button at its foot — stays reachable.
+    expect(v).toEqual({ kind: "unsaved", text: "A briefing went out, but I couldn’t save it.", tone: "warning", opens: "digest" });
+  });
+
+  it("went out but not saved, with nothing ever stored: nothing to open", () => {
+    const v = line({
+      digest: null,
+      dispatcher: { ok: true, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: false, noDevice: false },
+    });
+    expect(v).toMatchObject({ kind: "unsaved", opens: null });
   });
 
   it("past 07:00, nothing today: the alarm, and the last one opens", () => {
@@ -216,6 +229,96 @@ describe("buildGreetingLine — the push tile's states, moved and re-voiced", ()
       const earlierSkip = { ...skippedToday, startedAt: new Date("2026-08-08T23:00:00Z") };
       expect(line({ digest: OLD_PUSH, dispatcher: earlierSkip, now: AFTER_SEVEN }).kind).toBe("missing");
     });
+  });
+});
+
+describe("buildGreetingLine — the Debrief's recency rule (S22, spec §3.6)", () => {
+  /** 09:30 Manila, Thu 10 Sep — after TODAY_PUSH (07:00) and before AFTER_SEVEN's 10:00. */
+  const DEBRIEF: StoredDebrief = {
+    at: new Date("2026-09-10T01:30:00Z"),
+    baselineSentAt: TODAY_PUSH.sentAt,
+    title: "Debrief at 09:30: one thing still needs you.",
+    sorted: [],
+    stillNeedsYou: [{ ...BRIEFING.stories[0].symptoms[0], note: null }],
+    new: [],
+    now: [],
+    standaloneCouldntCheck: [],
+    since: ["You’ve ticked off Essay."],
+    today: "",
+    freelance: null,
+    off: null,
+    unrecognised: 0,
+    couldntCheck: { sites: false, watchdog: false, shikkstracker: false },
+    saved: true,
+  };
+  const CLEAR: StoredDebrief = { ...DEBRIEF, title: "Debrief at 09:30: all clear.", stillNeedsYou: [] };
+
+  it("digest only: unchanged from S21", () => {
+    expect(line({ digest: TODAY_PUSH, debrief: null })).toMatchObject({ kind: "today", opens: "digest" });
+  });
+
+  it("a Debrief newer than this morning's digest takes the line, in the warning tone while anything needs him", () => {
+    expect(line({ digest: TODAY_PUSH, debrief: DEBRIEF })).toEqual({
+      kind: "debrief",
+      text: "Debrief at 09:30: one thing still needs you.",
+      tone: "warning",
+      opens: "debrief",
+    });
+  });
+
+  it("an all-clear Debrief reads in the normal tone", () => {
+    expect(line({ digest: TODAY_PUSH, debrief: CLEAR })).toMatchObject({ kind: "debrief", tone: "normal" });
+  });
+
+  it("a couldn't-check line keeps the warning tone (plan deviation 5)", () => {
+    const blind: StoredDebrief = {
+      ...CLEAR,
+      title: "Debrief at 09:30: one thing still needs you.",
+      standaloneCouldntCheck: [{ source: "shikkstracker", sentence: "I couldn't reach ShikksTracker just now." }],
+    };
+    expect(line({ digest: TODAY_PUSH, debrief: blind }).tone).toBe("warning");
+  });
+
+  it("works with monitoring off and no digest today: the Debrief still takes the line (D6)", () => {
+    expect(line({ digest: OLD_PUSH, debrief: DEBRIEF, monitoringEnabled: false })).toMatchObject({ kind: "debrief", opens: "debrief" });
+    expect(line({ digest: null, debrief: DEBRIEF })).toMatchObject({ kind: "debrief", opens: "debrief" });
+  });
+
+  it("a digest at or after the Debrief keeps the line — deterministic either way", () => {
+    expect(line({ digest: { ...TODAY_PUSH, sentAt: new Date("2026-09-10T01:45:00Z") }, debrief: DEBRIEF }).kind).toBe("today");
+    expect(line({ digest: { ...TODAY_PUSH, sentAt: DEBRIEF.at }, debrief: DEBRIEF }).kind).toBe("today");
+  });
+
+  it("yesterday's Debrief never wins today's line — 07:00 takes it back by recency", () => {
+    expect(line({ digest: TODAY_PUSH, debrief: { ...DEBRIEF, at: new Date("2026-09-09T05:00:00Z") } }).kind).toBe("today");
+  });
+
+  it("a Debrief that couldn't be read falls through silently to the digest's own line", () => {
+    expect(line({ digest: TODAY_PUSH, debrief: "unavailable" })).toEqual(line({ digest: TODAY_PUSH, debrief: null }));
+  });
+
+  it("a good Debrief outranks a digest that couldn't be read", () => {
+    expect(line({ digest: "unavailable", debrief: DEBRIEF }).kind).toBe("debrief");
+  });
+
+  it("debriefIsToday and debriefOutstanding", () => {
+    expect(debriefIsToday(DEBRIEF, AFTER_SEVEN)).toBe(true);
+    expect(debriefIsToday({ ...DEBRIEF, at: new Date("2026-09-09T05:00:00Z") }, AFTER_SEVEN)).toBe(false);
+    expect(debriefOutstanding(DEBRIEF)).toBe(1);
+    expect(debriefOutstanding(CLEAR)).toBe(0);
+  });
+});
+
+describe("symptomView — one stored symptom as a row and its card (shared with the Debrief)", () => {
+  it("curls the page text, keeps the raw error as quoted evidence, and names the cause heading", () => {
+    const m = { ...BRIEFING.stories[0].symptoms[0], causeKey: "unrecognised" as const, raw: "it's broken" };
+    expect(symptomView(m, "x.1")).toMatchObject({
+      id: "x.1",
+      nextStep: "Open the site, then check its latest deploy on Vercel.",
+      causeHeading: "Cause",
+      raw: "it's broken",
+    });
+    expect(symptomView(BRIEFING.stories[0].symptoms[0], "y").causeHeading).toBe("Likely cause");
   });
 });
 

@@ -34,6 +34,11 @@ import "@/lib/personalErrors";
 import "@/lib/sinceThen";
 // Plan B Task B1: the greeting line and the Briefing view model.
 import "@/lib/briefingView";
+// S22: the Debrief's pure modules — the comparison, the composition and the
+// view model (the island imports debriefView.ts, so it must stay client-safe).
+import "@/lib/debriefCompare";
+import "@/lib/debrief";
+import "@/lib/debriefView";
 
 describe("view-model purity", () => {
   it("registers no Mongoose model when the view models load", () => {

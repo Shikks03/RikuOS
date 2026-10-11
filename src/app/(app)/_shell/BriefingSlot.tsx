@@ -50,6 +50,8 @@ async function BriefingRead() {
   const input: GreetingInput = {
     now,
     digest,
+    // Bridge until D8 reads getLastDebrief: no Debrief, so the line is exactly S21's.
+    debrief: null,
     dispatcher: settled(dispatcherR, "dispatcher read"),
     monitoringEnabled: settings === "unavailable" ? "unavailable" : settings.monitoringEnabled,
   };
