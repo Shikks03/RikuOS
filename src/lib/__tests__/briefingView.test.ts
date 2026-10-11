@@ -307,6 +307,37 @@ describe("buildGreetingLine — the Debrief's recency rule (S22, spec §3.6)", (
     expect(debriefOutstanding(DEBRIEF)).toBe(1);
     expect(debriefOutstanding(CLEAR)).toBe(0);
   });
+
+  describe("a Debrief taken before 07:00 gives way to the morning's own state (fix round)", () => {
+    /** 02:00 Manila, Thu 10 Sep. */
+    const BEFORE_MORNING: StoredDebrief = { ...DEBRIEF, at: new Date("2026-09-09T18:00:00Z") };
+    const FAILED_TODAY = { ok: false, startedAt: new Date("2026-09-09T23:00:00Z"), skipped: false, noDevice: false };
+
+    it("now past 07:00, nothing sent today: the morning's own alarm wins, not the stale Debrief", () => {
+      expect(line({ now: AFTER_SEVEN, digest: OLD_PUSH, debrief: BEFORE_MORNING })).toMatchObject({ kind: "missing" });
+    });
+
+    it("same, with a failed dispatcher run today: the morning's own failure wins", () => {
+      expect(line({ now: AFTER_SEVEN, digest: OLD_PUSH, debrief: BEFORE_MORNING, dispatcher: FAILED_TODAY })).toMatchObject({
+        kind: "failed",
+      });
+    });
+
+    it("now still before 07:00: the Debrief still takes the line", () => {
+      expect(line({ now: new Date("2026-09-09T19:00:00Z"), digest: OLD_PUSH, debrief: BEFORE_MORNING })).toMatchObject({
+        kind: "debrief",
+      });
+    });
+
+    it("now in the 07–08 grace window: the morning's own 'on its way' state, not the Debrief", () => {
+      expect(line({ now: new Date("2026-09-09T23:30:00Z"), digest: OLD_PUSH, debrief: BEFORE_MORNING })).toMatchObject({ kind: "due" });
+    });
+
+    it("a Debrief taken at or after 07:00 is unaffected, even against a 07:00 digest", () => {
+      const at1300: StoredDebrief = { ...DEBRIEF, at: new Date("2026-09-10T05:00:00Z"), title: "Debrief at 13:00: all clear." };
+      expect(line({ now: new Date("2026-09-10T05:30:00Z"), digest: TODAY_PUSH, debrief: at1300 })).toMatchObject({ kind: "debrief" });
+    });
+  });
 });
 
 describe("symptomView — one stored symptom as a row and its card (shared with the Debrief)", () => {

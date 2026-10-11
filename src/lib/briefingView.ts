@@ -119,7 +119,16 @@ export function buildGreetingLine(input: GreetingInput): GreetingLine {
 
   // S22 recency rule (spec §3.6), checked before everything — including a
   // digest that couldn't be read, which must not hide a good, newer Debrief.
-  if (debrief !== null && debrief !== "unavailable" && debriefIsToday(debrief, now)) {
+  // Fix round: a Debrief taken before PUSH_EXPECTED_HOUR gives way, once
+  // `now` reaches that hour on the same day, to the morning's own state —
+  // otherwise a 02:00 "all clear" would silently outlive a 07:00 run that
+  // then failed, went missing, or was skipped.
+  const debriefBeforeMorning =
+    debrief !== null &&
+    debrief !== "unavailable" &&
+    Number(clockHHMM(debrief.at, APP_TZ).slice(0, 2)) < PUSH_EXPECTED_HOUR &&
+    Number(clockHHMM(now, APP_TZ).slice(0, 2)) >= PUSH_EXPECTED_HOUR;
+  if (debrief !== null && debrief !== "unavailable" && debriefIsToday(debrief, now) && !debriefBeforeMorning) {
     const digestNewer =
       digest !== null &&
       digest !== "unavailable" &&
