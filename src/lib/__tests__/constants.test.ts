@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NO_DEVICE_ERROR } from "@/lib/constants";
+import { DEBRIEF_CACHE_MS, NO_DEVICE_ERROR } from "@/lib/constants";
 import { dispatcherFromRow } from "@/lib/dispatcherRun";
 
 /**
@@ -29,5 +29,11 @@ describe("NO_DEVICE_ERROR", () => {
       error: "the digest reached no device (failed 1, removed 0). Re-subscribe from /freelance/queue.",
     });
     expect(row?.noDevice).toBe(true);
+  });
+});
+
+describe("DEBRIEF_CACHE_MS (S22, spec §3.2)", () => {
+  it("is one minute — its own constant, not the site floor's", () => {
+    expect(DEBRIEF_CACHE_MS).toBe(60_000);
   });
 });

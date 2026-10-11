@@ -85,3 +85,13 @@ export const PRESS_TIMEOUT_MS = 60_000;
  * item 1, Briefing Plan A post-build record).
  */
 export const NO_DEVICE_ERROR = "the digest reached no device";
+
+/**
+ * The Debrief's double-press floor (S22, spec §3.2): a press within this long
+ * of the last saved Debrief gets that same document back — no re-check, no
+ * new run row. The same value as healthSnapshot.ts's CHECK_FLOOR_MS but a
+ * SEPARATE floor for a separate purpose (this one gates the whole Debrief;
+ * that one gates site pings). Never unify them: a change to one must not
+ * silently change the other's meaning.
+ */
+export const DEBRIEF_CACHE_MS = 60_000;

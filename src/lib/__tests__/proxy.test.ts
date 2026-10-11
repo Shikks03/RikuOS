@@ -25,6 +25,7 @@ describe("isPublicPath", () => {
     "/api/auth/logout",
     "/api/briefing/seen",
     "/api/briefing/since",
+    "/api/briefing/debrief",
   ])("protects %s", (p) => {
     expect(isPublicPath(p)).toBe(false);
   });
