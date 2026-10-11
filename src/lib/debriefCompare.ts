@@ -303,15 +303,20 @@ export function compareToBaseline(
   }
 
   // A morning job failure's watchdog twin must never also surface (plan
-  // deviation 21): the watchdog monitors site-health and outreach-health as
-  // agents too, so its fresh scan can re-find the SAME still-failed run that
-  // job-failed already reported and is being spoken for above (Sorted or
-  // can't-say) — never a separate New row for it. A stored snapshot-unsaved
-  // is the same job's degraded outcome, so it covers a fresh
-  // agent-degraded{site-health} the same way.
+  // deviation 21): the watchdog monitors site-health, outreach-health and
+  // expiry-sweep as agents too, so its fresh scan can re-find the SAME
+  // still-failed run that job-failed already reported and is being spoken
+  // for above (Sorted, can't-say, or — for expiry-sweep — verbatim) — never
+  // a separate New row for it. A stored snapshot-unsaved is the same job's
+  // degraded outcome, so it covers a fresh agent-degraded{site-health} the
+  // same way.
   const coveredJobAgents = new Set(
     baseline.symptoms
-      .filter((sym) => sym.key === "job-failed" && (sym.subject === "site-health" || sym.subject === "outreach-health"))
+      .filter(
+        (sym) =>
+          sym.key === "job-failed" &&
+          (sym.subject === "site-health" || sym.subject === "outreach-health" || sym.subject === "expiry-sweep"),
+      )
       .map((sym) => sym.subject as string),
   );
   const snapshotStoredThisMorning = baseline.symptoms.some((sym) => sym.key === "snapshot-unsaved");

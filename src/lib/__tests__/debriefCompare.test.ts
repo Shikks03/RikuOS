@@ -353,6 +353,22 @@ describe("fix round (feature review D-II, plan deviation 21)", () => {
       expect(r.stillNeedsYou).toEqual([]);
       expect(r.new).toEqual([]);
     });
+
+    it("the expiry sweep's watchdog twin must never also surface: stored job-failed stays verbatim, no New", () => {
+      const p: Problem = { key: "job-failed", job: "expiry-sweep", raw: "MongoNetworkError: closed" };
+      const r = cmp(base(p), [{ key: "agent-failed", agent: "expiry-sweep" }]);
+      expect(r.stillNeedsYou).toEqual([{ kind: "verbatim", symptom: toStoredSymptom(p) }]);
+      expect(r.sorted).toEqual([]);
+      expect(r.new).toEqual([]);
+    });
+
+    it("an unrelated fresh agent-failed still lands in New", () => {
+      const p: Problem = { key: "job-failed", job: "expiry-sweep", raw: null };
+      const unrelated: Problem = { key: "agent-failed", agent: "chaser" };
+      const r = cmp(base(p), [unrelated]);
+      expect(r.new).toEqual([unrelated]);
+      expect(r.stillNeedsYou).toEqual([{ kind: "verbatim", symptom: toStoredSymptom(p) }]);
+    });
   });
 
   describe("engine-* keys are one family: a changed engine finding is never Sorted + New", () => {
