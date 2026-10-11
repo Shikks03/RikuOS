@@ -1,6 +1,6 @@
 # P11 — The Academics page: content
 
-**Date:** 2026-10-11 · **Status:** content settled with Riku, awaiting his review of this document.
+**Date:** 2026-10-11 · **Status:** APPROVED by Riku 2026-10-11 ("looks good to me"), including the five defaults marked *(default)* below and the §5 school-line wordings. S23 recorded in `ARCHITECTURE.md` §7.
 **Satisfies:** S11 for this page. Held 2026-10-11, thirteen questions answered by Riku; each decision below cites his choice. **Nothing here was inferred from another page's discussion.**
 **Not in scope:** visual design (a design step follows once this is approved, S12/S17), the planner, the modules/reviewers area, timetable entry (§9).
 
@@ -142,7 +142,7 @@ Empty: `No unread announcements.`
 
 ## 5. The 07:00 Briefing gains a school line (answer 9)
 
-The morning push and the Briefing panel get one more sentence, placed after the Today sentence and in the same voice (S21). **All wording below is PROVISIONAL**, for Riku's nod:
+The morning push and the Briefing panel get one more sentence, placed after the Today sentence and in the same voice (S21). **Riku approved the wording below on 2026-10-11:**
 
 - `For school: Quiz 4 for Math Methods is due tonight at 23:59, and Essay draft tomorrow.`
 - `Lab report 2 is missing.` / `Two pieces of work are missing: Lab report 2 and Worksheet 3.`
@@ -179,7 +179,7 @@ This changes push wording that S21 ratified, so it needs a new decision recorded
 
 ---
 
-## 8. Proposed decision S23 (to record in `ARCHITECTURE.md` §7 once this document is approved)
+## 8. Decision S23 (recorded in `ARCHITECTURE.md` §7, 2026-10-11)
 
 > **S23 — P11 Academics is Canvas-only: the modules/reviewers area is dropped, the planner is parked, and the timetable is Riku's to enter. The morning push gains a school line.** Riku's call, 2026-10-11, in the page's content discussion (S11). The page reads Canvas live (due list, unread announcements, grades) plus the Classes calendar and his Academics to-dos. **Dropped:** the manual modules/reviewers area with per-course counters (concept §2.2, architecture §2.2, ROADMAP P11). He didn't pick it when asked, and Canvas already carries his coursework, so D11's example supplement simply has no job here. **Parked:** the sentence-to-schedule planner, to be reconsidered after he has used the page. It stays the only calendar writer meant to go through the queue, whenever it returns. **Not built:** automatic Classes-calendar population. He adds the timetable himself each term. **Push:** a school line after the Today sentence, and an unreadable Canvas is a counted problem (R23's meaning). This extends S21's push wording and supersedes nothing else. **Unchanged:** D5 (nothing from Canvas or the calendar is stored), D11 (Canvas is the live feed), the approval rule (nothing outward happens), Canvas read-only.
 
