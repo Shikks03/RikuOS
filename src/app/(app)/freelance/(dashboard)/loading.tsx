@@ -1,7 +1,11 @@
-import { LoadingSignal } from "../_shell/NavProgress";
-import { OutlineBars } from "../_shell/Outline";
+import { LoadingSignal } from "../../_shell/NavProgress";
+import { OutlineBars } from "../../_shell/Outline";
 
 /**
+ * the (dashboard) group keeps this boundary off the queue's path — Next
+ * stops prefetching at the first loading.tsx, so a boundary on the
+ * freelance segment would swallow /freelance/queue (F1 review)
+ *
  * /freelance's outline (smooth-feel spec §3.1): the hero row's three cards
  * with their fixed labels, the state-of-play box, and the four sections'
  * eyebrows and headings — the page's frame, with bars where every figure,
@@ -35,7 +39,7 @@ export default function Loading() {
             ))}
           </div>
           <div className="fl-say">
-            <OutlineBars />
+            <OutlineBars lines={1} />
           </div>
         </div>
         {SECTIONS.map(([eyebrow, heading]) => (
