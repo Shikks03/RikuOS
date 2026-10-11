@@ -29,6 +29,12 @@
    itself on, hide every static one so a soft navigation never shows two
    (principal review W4). */
 .app:has(> .navbar[data-on="true"]) .ol-navbar{display:none}
+/* Never inside the Personal grid: .pe-wrap and .pe-cell are inline-size
+   containers, and layout containment makes them the containing block of a
+   position:fixed descendant, so a tile fallback's static bar would draw
+   across the tile instead of the viewport. A hard load's calendar wait
+   says "loading" through the tiles' own bars instead (amendment 12(f)). */
+.pe-wrap .ol-navbar{display:none}
 
 /* ---- outlines (spec §3.1) -------------------------------------- */
 /* grey bars where text will go — never a number, a word of content or

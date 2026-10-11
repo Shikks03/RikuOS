@@ -94,7 +94,7 @@ F2, F3 and F4 touch disjoint files, so they can run at once. **Inside F2 the ord
       - **Hiding:** only the three true empty sentences (`nothing open`, `Nothing scheduled.`, `Nothing due.`, marked `.is-none`) are hidden beside a stand-in, never a real `.fl-empty` line.
       - **Unread day:** on an unread day the stand-in stays on the label's row.
     - **(f)** Principal review:
-      - **First open:** the outline carries a static, CSS-only copy of the bar (`.ol-navbar`), hidden while the live bar is on. Dehydrated Suspense fallbacks never mount on the client, so `LoadingSignal`'s effect can't run on first open. This makes deviation 2's "also runs on first open" true.
+      - **First open:** the outline carries a static, CSS-only copy of the bar (`.ol-navbar`), hidden while the live bar is on. Dehydrated Suspense fallbacks never mount on the client, so `LoadingSignal`'s effect can't run on first open. This makes deviation 2's "also runs on first open" true, with one limit: inside the Personal grid, whose tiles are inline-size containers (pinning a fixed element to the tile), the static bar is hidden. So on a hard load's calendar wait, the tiles' own bars say "loading" and no top bar shows.
       - **Queue loads:** a loud load clears `loading` only if it's the latest loud load. The list GET has a timeout. A retry's failure sits on its card. Busy state is per card. Retry is refused through `aria-disabled`.
       - **Agent switches:** they go busy through `aria-disabled` (L9). `legacy.css`'s disabled dim also matches `[aria-disabled="true"]`.
       - **Personal outline:** it holds the head pills' room.
