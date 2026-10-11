@@ -3,6 +3,7 @@
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PRESS_TIMEOUT_MS } from "@/lib/constants";
+import { movedAfter, shownOn, type Moved } from "@/lib/instantSwitch";
 import { pressOutcome } from "@/lib/pressOutcome";
 import type { LayersTileView } from "@/lib/personalView";
 
@@ -41,11 +42,13 @@ type LayerRow = LayersTileView["rows"][number];
  * The outcome stands until the next press and does not survive a reload.
  *
  * ZERO effects (R33).
+ *
+ * The knob's rule is instantSwitch.ts's, shared with Settings (smooth-feel §5).
  */
 export default function LayerSwitches({ rows }: { rows: LayerRow[] }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
-  const [moved, setMoved] = useState<{ calendarId: string; enabled: boolean } | null>(null);
+  const [moved, setMoved] = useState<Moved | null>(null);
   const [said, setSaid] = useState<{ calendarId: string; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const busy = saving || isPending;
@@ -60,7 +63,7 @@ export default function LayerSwitches({ rows }: { rows: LayerRow[] }) {
     }));
     setSaving(true);
     setSaid(null);
-    setMoved({ calendarId: row.calendarId, enabled });
+    setMoved({ key: row.calendarId, on: enabled });
     const out = await pressOutcome(
       fetch("/api/settings", {
         method: "PATCH",
@@ -69,7 +72,7 @@ export default function LayerSwitches({ rows }: { rows: LayerRow[] }) {
         signal: AbortSignal.timeout(PRESS_TIMEOUT_MS),
       }),
     );
-    if (out.kind === "failed") setMoved(null); // the knob returns (deck §6 Tile 3)
+    setMoved((m) => movedAfter(out.kind, m)); // a definite failure returns the knob (deck §6 Tile 3)
     if (out.kind !== "ok") setSaid({ calendarId: row.calendarId, text: out.sentence }); // deck §6 Tile 3, §15
     setSaving(false);
     startTransition(() => {
@@ -80,7 +83,7 @@ export default function LayerSwitches({ rows }: { rows: LayerRow[] }) {
   return (
     <div className="pe-layers">
       {rows.map((row) => {
-        const on = busy && moved?.calendarId === row.calendarId ? moved.enabled : row.enabled;
+        const on = shownOn(row.calendarId, row.enabled, moved, busy);
         return (
           <Fragment key={row.calendarId}>
             <button
