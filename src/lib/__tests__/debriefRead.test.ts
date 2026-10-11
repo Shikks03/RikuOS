@@ -27,8 +27,25 @@ vi.mock("@/lib/lastDigest", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/lastDigest")>();
   return { ...actual, getLastDigest: vi.fn() };
 });
+vi.mock("@/lib/osSettings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/osSettings")>();
+  return { ...actual, readOsSettings: vi.fn() };
+});
+vi.mock("@/lib/digestToday", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/digestToday")>();
+  return { ...actual, readDigestToday: vi.fn() };
+});
+vi.mock("@/lib/sinceThenRead", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/sinceThenRead")>();
+  return { ...actual, readSinceThen: vi.fn() };
+});
+vi.mock("@/models/ApprovalItem", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/models/ApprovalItem")>();
+  return { ...actual, default: { countDocuments: vi.fn() } };
+});
 
 import {
+  readDebriefChecks,
   readShikksTrackerForDebrief,
   readSitesForDebrief,
   readTodaysBaseline,
@@ -39,14 +56,24 @@ import { checkSites, type SiteResult } from "@/lib/siteHealth";
 import { EXPECTATIONS, fetchLatestRuns } from "@/lib/watchdog";
 import { fetchAttention, fetchSummary, type AttentionResponse, type SummaryResponse } from "@/lib/stApi";
 import { getLastDigest } from "@/lib/lastDigest";
+import { readOsSettings, type OsSettingsValues } from "@/lib/osSettings";
+import { readDigestToday } from "@/lib/digestToday";
+import { readSinceThen } from "@/lib/sinceThenRead";
+import ApprovalItem from "@/models/ApprovalItem";
+import { OS_SETTINGS_DEFAULTS } from "@/models/OsSettings";
 import { toStoredSymptom } from "@/lib/digest";
 
 const NOW = new Date("2026-10-13T05:04:00.000Z"); // 13:04 Manila
 const SENT_AT = new Date("2026-10-12T23:00:04.000Z"); // 07:00 Manila
 const DOWN: SiteResult[] = [{ name: "Meowchi", up: false, detail: "Meowchi returned HTTP 503", failure: "status", status: 503 }];
+const countDocuments = ApprovalItem.countDocuments as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ["Date"] });
+  // setTimeout/clearTimeout are faked alongside Date (fix round) so a write's
+  // withDeadline bound can be driven deterministically; every existing test
+  // below never advances them, so a mocked promise that settles immediately
+  // still wins its race on the microtask queue exactly as before.
+  vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
   vi.setSystemTime(NOW);
   vi.mocked(getHealthSnapshot).mockReset();
   vi.mocked(saveHealthSnapshot).mockReset();
@@ -55,6 +82,10 @@ beforeEach(() => {
   vi.mocked(fetchSummary).mockReset();
   vi.mocked(fetchAttention).mockReset();
   vi.mocked(getLastDigest).mockReset();
+  vi.mocked(readOsSettings).mockReset();
+  vi.mocked(readDigestToday).mockReset();
+  vi.mocked(readSinceThen).mockReset();
+  countDocuments.mockReset();
 });
 
 afterEach(() => {
@@ -98,6 +129,21 @@ describe("readSitesForDebrief — the site floor shared with Check now (spec §3
     vi.mocked(getHealthSnapshot).mockResolvedValue({ checkedAt: previous, sites: [] });
     vi.mocked(checkSites).mockRejectedValue(new Error("boom"));
     expect(await readSitesForDebrief()).toEqual({ ok: false, savedAt: previous });
+  });
+
+  // Fix round (feature review, item 1): the write has no deadline of its own
+  // otherwise, and a stuck save could hold the press open past maxDuration,
+  // losing the AgentRun row with it. A timeout here must read exactly like a
+  // save that threw: ownSaveJustFailed, the last good savedAt kept.
+  it("a stuck snapshot save times out and is treated as a failed save", async () => {
+    const previous = new Date(NOW.getTime() - 3_600_000);
+    vi.mocked(getHealthSnapshot).mockResolvedValue({ checkedAt: previous, sites: [] });
+    vi.mocked(checkSites).mockResolvedValue(DOWN);
+    vi.mocked(saveHealthSnapshot).mockImplementation(() => new Promise(() => {}));
+
+    const pending = readSitesForDebrief();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(await pending).toEqual({ ok: true, results: DOWN, savedAt: previous, ownSaveJustFailed: true });
   });
 });
 
@@ -159,5 +205,60 @@ describe("readTodaysBaseline (D5)", () => {
   it("a failed read compares against nothing rather than failing the Debrief", async () => {
     vi.mocked(getLastDigest).mockRejectedValue(new Error("MongoNetworkError"));
     expect(await readTodaysBaseline(NOW)).toBeNull();
+  });
+});
+
+// Fix round (feature review, item 2): readDebriefChecks itself had no test —
+// every leg was proven alone but never assembled. Every sub-read not under
+// test is given a healthy mock so each test isolates the one leg it names.
+describe("readDebriefChecks — assembling every leg (fix round)", () => {
+  const SUMMARY = { engine: { lastRunAt: NOW.toISOString(), lastRunErrors: 0 }, queue: { drafts: 0, approved: 0 } } as unknown as SummaryResponse;
+  const ATTENTION = { repliedUnanswered: [], overdueActions: [] } as unknown as AttentionResponse;
+  const SETTINGS_OK: OsSettingsValues = {
+    chaserEnabled: true,
+    chaserNDays: 9,
+    monitoringEnabled: true,
+    layers: [],
+    personalLayout: [],
+  };
+  const TODAY_STUB = { events: [], missedLayers: [], due: [], overdue: [] };
+
+  beforeEach(() => {
+    vi.mocked(fetchLatestRuns).mockResolvedValue([]);
+    vi.mocked(getHealthSnapshot).mockResolvedValue({ checkedAt: new Date(NOW.getTime() - 10_000), sites: [] });
+    vi.mocked(fetchSummary).mockResolvedValue(SUMMARY);
+    vi.mocked(fetchAttention).mockResolvedValue(ATTENTION);
+    vi.mocked(readDigestToday).mockResolvedValue(TODAY_STUB);
+    countDocuments.mockResolvedValue(0);
+  });
+
+  it("a failed settings read: the calendar reads as failed, the default chaserNDays is used, chaserEnabled is unavailable", async () => {
+    vi.mocked(readOsSettings).mockRejectedValue(new Error("MongoNetworkError"));
+
+    const out = await readDebriefChecks(NOW, null);
+
+    expect(out.chaserEnabled).toBe("unavailable");
+    expect(out.today).toEqual({ ...TODAY_STUB, events: "unavailable", missedLayers: [], calendarCause: "read-failed" });
+    expect(fetchAttention).toHaveBeenCalledWith(OS_SETTINGS_DEFAULTS.chaserNDays, 50);
+    // No layers to read without settings — only the to-do half is read.
+    expect(readDigestToday).toHaveBeenCalledWith([], expect.any(String));
+  });
+
+  it("a failed pending-count read reads as unavailable", async () => {
+    vi.mocked(readOsSettings).mockResolvedValue(SETTINGS_OK);
+    countDocuments.mockRejectedValue(new Error("MongoNetworkError"));
+
+    const out = await readDebriefChecks(NOW, null);
+
+    expect(out.pending).toBe("unavailable");
+  });
+
+  it("baselineSentAt === null makes no since-then read", async () => {
+    vi.mocked(readOsSettings).mockResolvedValue(SETTINGS_OK);
+
+    const out = await readDebriefChecks(NOW, null);
+
+    expect(readSinceThen).not.toHaveBeenCalled();
+    expect(out.since).toBeNull();
   });
 });

@@ -114,6 +114,25 @@ describe("pressDebrief (S22, spec §3.1)", () => {
     expect(create.mock.calls[0][0]).toMatchObject({ ok: true, counts: { itemsProcessed: 1, itemsFailed: 1 } });
   });
 
+  // Fix round (feature review, item 1): the save had no deadline of its own —
+  // a stuck write could wait out the socket timeout and run past this
+  // route's maxDuration, with Vercel killing the function before the
+  // AgentRun row lands. A timeout here must read exactly like a save that
+  // threw: saved: false, the same failed-item count.
+  it("a stuck save times out and is read as a failed save, same as a save that threw", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      vi.mocked(saveLastDebrief).mockImplementation(() => new Promise(() => {}));
+      const pending = pressDebrief(NOW);
+      await vi.advanceTimersByTimeAsync(5_000);
+      const out = await pending;
+      expect(out).toMatchObject({ status: 200, body: { saved: false } });
+      expect(create.mock.calls[0][0]).toMatchObject({ ok: true, counts: { itemsProcessed: 1, itemsFailed: 1 } });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("each source it couldn't check is a failed item on the run", async () => {
     vi.mocked(readDebriefChecks).mockResolvedValue({ ...HEALTHY, watchdog: { ok: false }, shikkstracker: { ok: false } });
     await pressDebrief(NOW);

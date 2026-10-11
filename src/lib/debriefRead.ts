@@ -97,7 +97,11 @@ export async function readSitesForDebrief(): Promise<DebriefOutcomes["sites"]> {
   // The moment the reading was taken — after the checks resolve (saveHealthSnapshot's contract).
   const checkedAt = new Date();
   try {
-    await saveHealthSnapshot(checkedAt, results);
+    // Bounded (fix round, feature review): an unbounded write could wait out
+    // the socket timeout and run past the route's maxDuration, losing the
+    // AgentRun row along with it. A timeout here is read exactly like any
+    // other failed save — ownSaveJustFailed, the last good savedAt kept.
+    await bounded(saveHealthSnapshot(checkedAt, results), "snapshot write");
     return { ok: true, results, savedAt: checkedAt, ownSaveJustFailed: false };
   } catch (err) {
     console.error("[debrief] snapshot write failed:", err);

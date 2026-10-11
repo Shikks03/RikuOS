@@ -66,7 +66,12 @@ export async function pressDebrief(now: Date): Promise<DebriefPress> {
     // line leaves nothing half-saved (spec §6).
     let saved = true;
     try {
-      await saveLastDebrief(debrief);
+      // Bounded (fix round, feature review): an unbounded write could wait
+      // out the socket timeout and run past this route's maxDuration, with
+      // Vercel killing the function before the AgentRun row is written — a
+      // silent failure. A timeout here is read exactly like a save that
+      // threw: saved: false, counted as a failed item below.
+      await withDeadline(saveLastDebrief(debrief), MONGO_READ_TIMEOUT_MS, "debrief save");
     } catch (err) {
       saved = false;
       console.error("[api/briefing/debrief] save failed:", err);
