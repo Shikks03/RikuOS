@@ -6,8 +6,8 @@ const STATUS_LABELS = ["pending", "approved", "edited approved", "rejected", "ex
  * The queue's outline (smooth-feel spec §3.1, §6): the filter row's six
  * buttons, held in place as invisible, unfocusable placeholders (F1 review
  * — the real row sits above the cards, so an outline without it left the
- * filter row out), then two unlabelled cards. Overrides the dashboard's
- * outline above it.
+ * filter row out), then two unlabelled cards. The first loading boundary on
+ * this path: the dashboard's sits inside the (dashboard) route group, off it.
  */
 export default function Loading() {
   return (
