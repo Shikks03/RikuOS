@@ -118,11 +118,17 @@ function TopLine({ line, onFilter }: { line: QueueTopLine; onFilter: (f: Approve
  * Every re-read after a decision is QUIET (no outline over a list already on
  * screen, deviation 10) and reports whether it landed: a card is only ever
  * settled (removed from `gone`) once a landed re-read has decided its fate,
- * never on a re-read that failed. A load-sequence guard drops a stale
- * response — one a newer request (a filter change) has already overtaken —
- * so a quiet re-read can never repaint the list with the wrong filter's
- * items. Initial loads and filter changes draw the outline (spec §3.1) and
- * clear `top`, `gone` and `cardSaid` for the new filter.
+ * never on a re-read that failed or was dropped — it then stays hidden until
+ * the next loud load (a filter change or reload), and a dropped or failed
+ * re-read after a restore still says the refusal at the top, so its reason
+ * can never vanish either way. A load-sequence guard AND a filter guard
+ * (`filterRef`, written only by the filter buttons and the q-link) drop a
+ * stale response — one a newer request, or a filter change the response's
+ * own filter no longer matches, has already overtaken — so a quiet re-read
+ * can never repaint the list with the wrong filter's items. Initial loads
+ * and filter changes draw the outline (spec §3.1), clear `top`, `gone`,
+ * `leaving` and `cardSaid` for the new filter, and cancel every pending exit
+ * timer so none can re-add an id to `gone` afterwards.
  *
  * The mount-time load in an effect is one of the four baseline lint errors
  * and keeps its shape on purpose.
@@ -141,6 +147,8 @@ export default function QueuePage() {
   const [cardSaid, setCardSaid] = useState<ReadonlyMap<string, string>>(() => new Map());
   const exits = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const seqRef = useRef(0);
+  /** The filter actually chosen, written only by the filter buttons and the q-link, before setStatusFilter (F4 re-review). */
+  const filterRef = useRef<StatusFilter>("pending");
 
   const refresh = useCallback(
     async (quiet = false): Promise<QueueItem[] | null> => {
@@ -149,6 +157,9 @@ export default function QueuePage() {
         setLoading(true);
         setError(null);
         setTop(null);
+        for (const t of exits.current.values()) clearTimeout(t);
+        exits.current.clear();
+        setLeaving(() => new Set());
         setGone(() => new Set());
         setCardSaid(() => new Map());
       }
@@ -160,12 +171,14 @@ export default function QueuePage() {
         }
         if (!res.ok) throw new Error();
         const body = (await res.json()) as { items: QueueItem[] };
-        if (seqRef.current !== seq) return null; // a newer request has already answered
+        // A newer request has already answered, or this one's filter (the closure's
+        // `statusFilter`) is no longer the one chosen (a filter change overtook it).
+        if (seqRef.current !== seq || filterRef.current !== statusFilter) return null;
         setItems(body.items);
         if (quiet) setError(null); // cleared only after a successful read
         return body.items;
       } catch {
-        if (seqRef.current !== seq) return null;
+        if (seqRef.current !== seq || filterRef.current !== statusFilter) return null;
         setError("Could not load the queue.");
         return null;
       } finally {
@@ -267,7 +280,13 @@ export default function QueuePage() {
       } else {
         settleCard(id); // the re-read landed: it decides from here
       }
-    } // else: the re-read failed — the card (or its restore) stays exactly as it is until the next good load
+    } else if (result.restore) {
+      // The re-read was dropped (a filter change overtook it) or failed outright: say the
+      // refusal at the top too, so its reason can't vanish either way.
+      setTop({ kind: "refused", reason: result.reason });
+    }
+    // else (not restore, fresh === null): the re-read was dropped or failed — the card
+    // stays hidden until the next loud load (a filter change or reload).
     setBusyId(null);
   }
 
@@ -300,7 +319,10 @@ export default function QueuePage() {
             data-filter={s}
             className={s === statusFilter ? "" : "secondary"}
             aria-pressed={s === statusFilter}
-            onClick={() => setStatusFilter(s)}
+            onClick={() => {
+              filterRef.current = s;
+              setStatusFilter(s);
+            }}
           >
             {s.replace("_", " ")}
           </button>
@@ -311,6 +333,7 @@ export default function QueuePage() {
         <TopLine
           line={top}
           onFilter={(f) => {
+            filterRef.current = f;
             flushSync(() => {
               setTop(null);
               setStatusFilter(f);
@@ -334,6 +357,7 @@ export default function QueuePage() {
               key={item._id}
               data-card={item._id}
               tabIndex={-1}
+              role="group"
               aria-label={item.title}
               className={leaving.has(item._id) ? "card is-leaving" : "card"}
             >
