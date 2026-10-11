@@ -1,6 +1,7 @@
 /**
  * doorSentence.test.ts — a definite failure's words: the door's own
- * sentence when it wrote one, else pressOutcome's (plan deviation 8).
+ * sentence when it wrote one, else pressOutcome's (plan deviation 8, F3
+ * review).
  */
 import { describe, it, expect } from "vitest";
 import { doorSentence } from "@/lib/doorSentence";
@@ -13,11 +14,17 @@ describe("doorSentence", () => {
     );
   });
 
-  it("a body with a code says pressOutcome's sentence for it", () => {
+  it("a body with a code still says the door's own sentence when its error isn't code-shaped", () => {
     const body = { error: "Could not save.", code: "save-failed" };
     expect(doorSentence({ kind: "failed", code: "save-failed", sentence: "Couldn’t save.", body })).toBe(
-      "Couldn’t save.",
+      "Could not save.",
     );
+  });
+
+  it("a code-shaped error with no code says pressOutcome's fallback", () => {
+    expect(
+      doorSentence({ kind: "failed", code: null, sentence: "Couldn’t save.", body: { error: "weird-code" } }),
+    ).toBe("Couldn’t save.");
   });
 
   it("an unknown code says pressOutcome's fallback", () => {

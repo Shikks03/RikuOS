@@ -51,19 +51,24 @@ export default function AgentSwitches() {
   /** true when the read landed. */
   const load = useCallback(async (): Promise<boolean> => {
     setError(null);
-    const res = await fetch("/api/settings");
-    if (res.status === 401) {
-      window.location.href = "/login?from=/settings";
-      return false;
-    }
-    if (!res.ok) {
+    try {
+      const res = await fetch("/api/settings", { signal: AbortSignal.timeout(PRESS_TIMEOUT_MS) });
+      if (res.status === 401) {
+        window.location.href = "/login?from=/settings";
+        return false;
+      }
+      if (!res.ok) {
+        setError("Could not load settings.");
+        return false;
+      }
+      const body = (await res.json()) as { settings: Settings };
+      setSettings(body.settings);
+      setDays(String(body.settings.chaserNDays));
+      return true;
+    } catch {
       setError("Could not load settings.");
       return false;
     }
-    const body = (await res.json()) as { settings: Settings };
-    setSettings(body.settings);
-    setDays(String(body.settings.chaserNDays));
-    return true;
   }, []);
 
   useEffect(() => {
@@ -76,33 +81,36 @@ export default function AgentSwitches() {
     setError(null);
     setSaved(null);
     setMoved(flip);
-    const out = await pressOutcome(
-      fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(PRESS_TIMEOUT_MS),
-      }),
-    );
-    setMoved((m) => movedAfter(out.kind, m));
-    if (out.kind === "ok") {
-      const next = settingsOf(out.body);
-      if (next !== null) {
-        setSettings(next);
-        setDays(String(next.chaserNDays));
-        setSaved("Saved.");
+    try {
+      const out = await pressOutcome(
+        fetch("/api/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(PRESS_TIMEOUT_MS),
+        }),
+      );
+      setMoved((m) => movedAfter(out.kind, m));
+      if (out.kind === "ok") {
+        const next = settingsOf(out.body);
+        if (next !== null) {
+          setSettings(next);
+          setDays(String(next.chaserNDays));
+          setSaved("Saved.");
+        } else {
+          await load(); // a success body this card can't read: re-read rather than guess
+        }
+      } else if (out.kind === "failed") {
+        setError(doorSentence(out));
       } else {
-        await load(); // a success body this card can't read: re-read rather than guess
+        // No answer: the press may have landed. The re-read decides the switch.
+        const read = await load();
+        setError(read ? out.sentence : `${out.sentence} Could not load settings.`);
       }
-    } else if (out.kind === "failed") {
-      setError(doorSentence(out));
-    } else {
-      // No answer: the press may have landed. The re-read decides the switch.
-      const read = await load();
-      if (read) setError(out.sentence);
+    } finally {
+      setMoved(null);
+      setBusy(false);
     }
-    setMoved(null);
-    setBusy(false);
   }
 
   if (!settings) {
