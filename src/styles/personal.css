@@ -621,11 +621,12 @@
 .fl-empty.is-none + .pe-standins{margin-top:var(--sp-3)}
 /* a week day: the stand-ins sit in the items' column, under the items,
    or in the dash's place on a day that read as empty, or in an UNREAD
-   day's empty cell (F2 review S2: the cell is a bare empty <span>) */
+   day's empty cell (F2 review S2/N2: the cell is a bare empty <span>,
+   hidden like the dash so it can't wrap to a second, empty row) */
 .pe-row.is-day>.pe-standins{grid-column:2}
-.pe-row.is-day:has(>.pe-standins)>.pe-dash{display:none}
+.pe-row.is-day:has(>.pe-standins)>.pe-dash,
+.pe-row.is-day:has(>.pe-standins)>.pe-daylbl + span:empty{display:none}
 .pe-row.is-day:has(>.pe-dash)>.pe-standins{grid-row:1}
-.pe-row.is-day:has(>.pe-daylbl + span:empty)>.pe-standins{grid-row:1}
 /* a week item's mark stays inside it (no overflow risk: the whole item
    wraps), but wraps the mark onto its own line under the title rather
    than stretching the row (F2 review W3) */
