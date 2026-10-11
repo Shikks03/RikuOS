@@ -86,6 +86,13 @@ F2, F3 and F4 touch disjoint files, so they can run at once. **Inside F2 the ord
       - An unknown retry shows the `Couldn’t tell if that went through.` line.
       - The q-link hands focus to its filter button.
       - **Safety:** after a card leaves, focus goes to the next *card* (`tabIndex=-1`), not its Approve button, so a repeated Enter can never approve another draft. This refines spec §6's "the next card's first button".
+      - A stale quiet re-read (one whose filter was left) is dropped before it claims a sequence number.
+    - **(e)** Adds (F2 review):
+      - **Focus:** `reopen` focuses Title whenever focus would otherwise fall to `<body>`.
+      - **Never silent:** `reopen` reads LayoutEditor's live epoch and editing state (refs written in handlers). When the form can't open (edit mode, or too narrow), the failure sentence goes under the tile's head instead, and the draft keeps it.
+      - **The mark** sits on its own line, in a `.pe-said` under the row, the way row sentences already sit; in a week item it wraps under the title.
+      - **Hiding:** only the three true empty sentences (`nothing open`, `Nothing scheduled.`, `Nothing due.`, marked `.is-none`) are hidden beside a stand-in, never a real `.fl-empty` line.
+      - **Unread day:** on an unread day the stand-in stays on the label's row.
 
 ---
 
