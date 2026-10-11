@@ -68,9 +68,14 @@ export default function PersonalOutline() {
                   cell.tile === null ? null : (
                     <div key={cell.tile} className={`pe-cell ${cell.rowClass} ${cell.spanClass} ${cell.collapsedClass}`}>
                       <section className={cell.tile === "today" ? "pe-tile is-hero" : "pe-tile"}>
-                        <div className="pe-head">
+                        <div className={cell.tile === "done" ? "pe-head is-inline" : "pe-head"}>
                           <div>
                             <span className="eyebrow">{LABELS[cell.tile]}</span>
+                            {cell.tile === "today" && (
+                              <div className="fl-h ol-ghost" aria-hidden="true">
+                                &nbsp;
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="pe-body">
