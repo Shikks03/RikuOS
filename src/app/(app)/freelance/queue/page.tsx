@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { PRESS_TIMEOUT_MS } from "@/lib/constants";
 import { doorSentence } from "@/lib/doorSentence";
 import { pressOutcome } from "@/lib/pressOutcome";
@@ -60,12 +61,27 @@ function withoutId(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
   return next;
 }
 
-/** The line at the top of the queue after a press (spec §6). */
+function withoutKey<V>(map: ReadonlyMap<string, V>, id: string): ReadonlyMap<string, V> {
+  if (!map.has(id)) return map;
+  const next = new Map(map);
+  next.delete(id);
+  return next;
+}
+
+/** The line at the top of the queue after a press (smooth-feel spec §6; F4 review, amendment 12(d)). */
 function TopLine({ line, onFilter }: { line: QueueTopLine; onFilter: (f: ApprovedFilter) => void }) {
   if (line.kind === "unknown") {
     return (
       <p className="meta" role="status">
         {QUEUE_LINES.unknown}
+      </p>
+    );
+  }
+  if (line.kind === "refused") {
+    // The door's own words, nothing added — the refused card may no longer be on screen to say them.
+    return (
+      <p className="error" role="status">
+        {line.reason}
       </p>
     );
   }
@@ -84,18 +100,29 @@ function TopLine({ line, onFilter }: { line: QueueTopLine; onFilter: (f: Approve
 /**
  * The approval queue (still P3's plain view; its redesign is P12's).
  *
- * SMOOTH FEEL (spec §6). Approve, Approve edited and Reject take the card
- * off at once: it slides out (EXIT_MS, or at once under reduced motion) and
- * focus moves to the next card's first button, else the previous card's,
- * else the active filter (S1). pressOutcome (L7) classifies the answer and
- * queueOutcome.ts decides: a refused decision brings the card back with the
- * door's words (an edit reopens with its text); a saved approval whose draft
- * didn't reach ShikksTracker, or can't be told, says so at the top with the
- * filter it sits under; no answer says it couldn't tell. Then the list
- * re-reads QUIETLY (no outline over a list already on screen, deviation 10)
- * and the server decides: a card no longer pending is not in the list; one
- * that still is (a press that never landed) comes back. Initial loads and
- * filter changes draw the outline (spec §3.1).
+ * SMOOTH FEEL (spec §6; F4 review, amendment 12(d)). Approve, Approve edited
+ * and Reject take the card off at once: it slides out (EXIT_MS, or at once
+ * under reduced motion) and focus moves to the next card (not its Approve
+ * button: a repeated Enter must never approve another draft), else the
+ * previous card's, else the active filter. pressOutcome (L7) classifies the
+ * answer and queueOutcome.ts decides: a refused decision brings the card back
+ * with the door's words (an edit reopens with its own saved text); a saved
+ * approval whose draft didn't reach ShikksTracker, or can't be told, says so
+ * at the top with the filter it sits under; no answer says it couldn't tell.
+ * A top line is only ever replaced by a newer non-null one — a later press
+ * never silently clears an earlier warning — and is cleared only by the
+ * q-link or a filter change. If a refused card's re-read then shows the
+ * server no longer lists it (expired, or already decided), the refusal's
+ * words move to the top line so they can't vanish along with the card.
+ *
+ * Every re-read after a decision is QUIET (no outline over a list already on
+ * screen, deviation 10) and reports whether it landed: a card is only ever
+ * settled (removed from `gone`) once a landed re-read has decided its fate,
+ * never on a re-read that failed. A load-sequence guard drops a stale
+ * response — one a newer request (a filter change) has already overtaken —
+ * so a quiet re-read can never repaint the list with the wrong filter's
+ * items. Initial loads and filter changes draw the outline (spec §3.1) and
+ * clear `top`, `gone` and `cardSaid` for the new filter.
  *
  * The mount-time load in an effect is one of the four baseline lint errors
  * and keeps its shape on purpose.
@@ -107,28 +134,40 @@ export default function QueuePage() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editBody, setEditBody] = useState("");
+  const [editBodies, setEditBodies] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(() => new Set());
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
   const [top, setTop] = useState<QueueTopLine | null>(null);
   const [cardSaid, setCardSaid] = useState<ReadonlyMap<string, string>>(() => new Map());
   const exits = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const seqRef = useRef(0);
 
   const refresh = useCallback(
-    async (quiet = false) => {
-      if (!quiet) setLoading(true);
-      setError(null);
+    async (quiet = false): Promise<QueueItem[] | null> => {
+      const seq = ++seqRef.current;
+      if (!quiet) {
+        setLoading(true);
+        setError(null);
+        setTop(null);
+        setGone(() => new Set());
+        setCardSaid(() => new Map());
+      }
       try {
         const res = await fetch(`/api/queue?status=${statusFilter}`);
         if (res.status === 401) {
           window.location.href = "/login?from=/freelance/queue";
-          return;
+          return null;
         }
         if (!res.ok) throw new Error();
         const body = (await res.json()) as { items: QueueItem[] };
+        if (seqRef.current !== seq) return null; // a newer request has already answered
         setItems(body.items);
+        if (quiet) setError(null); // cleared only after a successful read
+        return body.items;
       } catch {
+        if (seqRef.current !== seq) return null;
         setError("Could not load the queue.");
+        return null;
       } finally {
         if (!quiet) setLoading(false);
       }
@@ -140,7 +179,14 @@ export default function QueuePage() {
     void refresh();
   }, [refresh]);
 
-  /** S1: only when focus was in the leaving card, or nowhere. */
+  useEffect(
+    () => () => {
+      for (const t of exits.current.values()) clearTimeout(t);
+    },
+    [],
+  );
+
+  /** Focus the next card itself, else the previous card's, else the active filter — never a button inside one (S1, F4 safety ruling). */
   function focusAway(id: string) {
     const card = document.querySelector<HTMLElement>(`[data-card="${CSS.escape(id)}"]`);
     const at = document.activeElement;
@@ -149,12 +195,10 @@ export default function QueuePage() {
       (c) => c === card || !c.classList.contains("is-leaving"),
     );
     const i = cards.findIndex((c) => c.dataset.card === id);
-    for (const c of [cards[i + 1], cards[i - 1]]) {
-      const b = c?.querySelector<HTMLButtonElement>("button:not(:disabled)");
-      if (b) {
-        b.focus();
-        return;
-      }
+    const next = cards[i + 1] ?? cards[i - 1];
+    if (next !== undefined) {
+      next.focus();
+      return;
     }
     document.querySelector<HTMLButtonElement>(".q-filters button[aria-pressed='true']")?.focus();
   }
@@ -191,13 +235,7 @@ export default function QueuePage() {
     if (busyId === id) return;
     const wasEditing = editingId === id;
     setBusyId(id);
-    setTop(null);
-    setCardSaid((m) => {
-      if (!m.has(id)) return m;
-      const next = new Map(m);
-      next.delete(id);
-      return next;
-    });
+    setCardSaid((m) => withoutKey(m, id));
     leave(id);
     if (wasEditing) setEditingId(null);
     const out = await pressOutcome(
@@ -212,12 +250,24 @@ export default function QueuePage() {
     if (result.restore) {
       settleCard(id); // the card comes back, in its place
       setCardSaid((m) => new Map(m).set(id, result.reason));
-      if (wasEditing) setEditingId(id); // the edited text is still in editBody
+      if (wasEditing) setEditingId(id); // its editBodies entry still holds the submitted text
     } else {
-      setTop(result.top);
+      if (result.top !== null) setTop(result.top); // never clear with null — a later press leaves an earlier warning up
+      setEditBodies((m) => withoutKey(m, id)); // a decision that lands without restore needs its text no more
     }
-    await refresh(true);
-    if (!result.restore) settleCard(id); // the re-read decides from here
+    const fresh = await refresh(true);
+    if (fresh !== null) {
+      if (result.restore) {
+        if (!fresh.some((item) => item._id === id)) {
+          // The server no longer lists it (expired, or already decided elsewhere): the
+          // refusal's reason moves to the top line so it can't vanish with the card.
+          setTop({ kind: "refused", reason: result.reason });
+          setCardSaid((m) => withoutKey(m, id));
+        }
+      } else {
+        settleCard(id); // the re-read landed: it decides from here
+      }
+    } // else: the re-read failed — the card (or its restore) stays exactly as it is until the next good load
     setBusyId(null);
   }
 
@@ -232,7 +282,7 @@ export default function QueuePage() {
         setError(doorSentence(out));
         return;
       }
-      if (out.kind === "unknown") setError(out.sentence);
+      if (out.kind === "unknown") setTop({ kind: "unknown" });
       await refresh(true);
     } finally {
       setBusyId(null);
@@ -247,6 +297,7 @@ export default function QueuePage() {
         {STATUS_FILTERS.map((s) => (
           <button
             key={s}
+            data-filter={s}
             className={s === statusFilter ? "" : "secondary"}
             aria-pressed={s === statusFilter}
             onClick={() => setStatusFilter(s)}
@@ -260,8 +311,11 @@ export default function QueuePage() {
         <TopLine
           line={top}
           onFilter={(f) => {
-            setTop(null);
-            setStatusFilter(f);
+            flushSync(() => {
+              setTop(null);
+              setStatusFilter(f);
+            });
+            document.querySelector<HTMLButtonElement>(`.q-filters [data-filter="${f}"]`)?.focus();
           }}
         />
       )}
@@ -276,7 +330,13 @@ export default function QueuePage() {
           const effective = item.editedPayload ?? item.payload;
           const said = cardSaid.get(item._id);
           return (
-            <div key={item._id} data-card={item._id} className={leaving.has(item._id) ? "card is-leaving" : "card"}>
+            <div
+              key={item._id}
+              data-card={item._id}
+              tabIndex={-1}
+              aria-label={item.title}
+              className={leaving.has(item._id) ? "card is-leaving" : "card"}
+            >
               <div className="row" style={{ justifyContent: "space-between", marginTop: 0 }}>
                 <strong>{item.title}</strong>
                 <span className="badge">
@@ -329,7 +389,7 @@ export default function QueuePage() {
                     disabled={busyId === item._id}
                     onClick={() => {
                       setEditingId(item._id);
-                      setEditBody(effective?.draftBody ?? "");
+                      setEditBodies((m) => new Map(m).set(item._id, effective?.draftBody ?? ""));
                     }}
                   >
                     Edit
@@ -347,16 +407,28 @@ export default function QueuePage() {
               {item.status === "pending" && editingId === item._id && (
                 <div>
                   <div className="row">
-                    <textarea rows={6} value={editBody} onChange={(e) => setEditBody(e.target.value)} />
+                    <textarea
+                      rows={6}
+                      value={editBodies.get(item._id) ?? ""}
+                      onChange={(e) => setEditBodies((m) => new Map(m).set(item._id, e.target.value))}
+                    />
                   </div>
                   <div className="row">
                     <button
-                      disabled={busyId === item._id || editBody.trim().length === 0}
-                      onClick={() => void decide(item._id, { decision: "edit", draftBody: editBody })}
+                      disabled={busyId === item._id || (editBodies.get(item._id) ?? "").trim().length === 0}
+                      onClick={() =>
+                        void decide(item._id, { decision: "edit", draftBody: editBodies.get(item._id) ?? "" })
+                      }
                     >
                       Approve edited
                     </button>
-                    <button className="secondary" onClick={() => setEditingId(null)}>
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        setEditingId(null);
+                        setEditBodies((m) => withoutKey(m, item._id));
+                      }}
+                    >
                       Cancel
                     </button>
                   </div>

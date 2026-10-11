@@ -10,6 +10,11 @@
  *   ok, "needs_verification"       the line: can't tell — check there first (no retry)
  *   failed (the door refused)      the card comes back with the door's words (deviation 8)
  *   unknown                        the line: couldn't tell; the quiet re-read decides
+ *
+ * `{kind: "refused"}` (F4 review, amendment 12(d)) is not produced here: the
+ * page sets it itself when a refused decision's re-read lands and no longer
+ * lists the card (a 409 for an expired item, or a 404), so the door's words
+ * move to the top line instead of vanishing with the card.
  */
 import type { PressOutcome } from "@/lib/pressOutcome";
 import { doorSentence } from "@/lib/doorSentence";
@@ -19,7 +24,8 @@ export type ApprovedFilter = "approved" | "edited_approved";
 export type QueueTopLine =
   | { kind: "action-failed"; filter: ApprovedFilter }
   | { kind: "needs-verification"; filter: ApprovedFilter }
-  | { kind: "unknown" };
+  | { kind: "unknown" }
+  | { kind: "refused"; reason: string };
 
 export type DecideResult = { restore: false; top: QueueTopLine | null } | { restore: true; reason: string };
 
