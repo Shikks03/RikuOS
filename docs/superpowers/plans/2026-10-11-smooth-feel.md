@@ -2886,3 +2886,60 @@ git commit -m "feat(feel): queue card leaves at once; answers through pressOutco
   - [ ] a layer switch and a Settings calendar tick flip at once;
   - [ ] when a real draft is waiting, Approve slides the card away.
 - [ ] **The cold-open measurement (spec §3.3):** open the app after it has sat unused for 30+ minutes, and say roughly how long the screen was blank before the outline appeared. Then do it again straight away (warm). The lead also records `curl -s -o /dev/null -w "%{time_starttransfer}\n" https://riku-os.vercel.app/login`, cold and warm, three times each. Whether it earns more work is decided from these numbers.
+
+---
+
+## Interim build record (2026-10-12): code complete, browser verification pending
+
+**Where it stopped.** Every task through T15 Step 2 is done. The T15 Step 3 Verification Lead was cut off by the account usage limit while writing its seed/server script, before measuring anything. It left no server running and no repo change; its scratch files were in the old session's scratchpad and are gone with that session. **The next session starts at T15 Step 3**: run the Verification Lead exactly as Step 3 says, with the adjustments listed in its brief below. Then write the final post-build record (Step 4) here.
+
+**Commits:** `git log --oneline 33b7217..HEAD` gives 28 commits, the last being `2601cdc`. Nothing is pushed: master is ahead of origin, and pushing needs Riku's say-so.
+
+**Trio at `2601cdc`:**
+- `npm test`: 63 files, 1588 tests, all pass.
+- `npx tsc --noEmit`: clean.
+- `npm run build`: clean; `/freelance` and `/freelance/queue` are each one route.
+- `npm run lint`: 4 errors and 3 warnings, which is the baseline exactly.
+
+**Reviews** (all Opus, one per feature plus the principal review). Every finding was ruled on and recorded as amendment 12(a)–(f).
+- **F1, outlines and bar.** CHANGES, then APPROVED.
+  - Next stops prefetching at the first `loading.tsx` on a path, so `freelance/loading.tsx` swallowed `/freelance/queue`. The dashboard moved into a `(dashboard)` route group.
+  - Also fixed: the queue outline's filter row, the state-of-play height, and the Today date room.
+- **F3, switches.** CHANGES, then APPROVED.
+  - AgentSwitches could freeze (an unguarded re-read with no `finally`). Now fixed.
+  - An unknown press always says `Couldn’t tell if that saved.`.
+  - `doorSentence` prefers the door's own words, so `Could not save.` is unchanged.
+- **F4, queue.** Three CHANGES rounds, then APPROVED.
+  - A refused approve (409/404) used to vanish after the re-read and look like a success. It now moves to a `refused` top line.
+  - The re-read reports whether it landed. Edit text is kept per card. The top line is replaced only by non-null lines.
+  - A sequence guard and a filter guard drop stale re-reads; a stale quiet re-read never claims a sequence number.
+  - **Safety:** focus after a card leaves goes to the next card, not its Approve button.
+- **F2, adds.** CHANGES, then APPROVED.
+  - `reopen` can't drop focus to `<body>`, and it reads LayoutEditor's live epoch and editing state, so a failure is never silent.
+  - The stand-in's mark sits on its own `.pe-said` line.
+  - Only the `.is-none` empty sentences are hidden beside a stand-in.
+  - An unread day's empty cell is hidden beside a stand-in.
+- **Principal (cross-module).** CHANGES, then APPROVED.
+  - The queue's overlapping loud loads are fixed (`loudRef`), the list GET has a timeout, a retry's failure sits on its card, and busy state is per card.
+  - The agent switches use L9 (`aria-disabled`), and `legacy.css` dims `[aria-disabled="true"]`.
+  - First open: the outline carries a static `.ol-navbar`, because dehydrated Suspense fallbacks never mount on the client. It is hidden inside `.pe-wrap`, because container queries pin fixed elements to the tile.
+
+**Recorded edge cases, accepted, not fixed:**
+- A settled-ok stand-in reads `saving` until the next render lands.
+- `reopen`'s note can repeat the sentence once if the form couldn't open and the pill is pressed before another press.
+- Stale `formCapable` during an edit-mode save within one add's flight.
+- An A→B→A filter round-trip during a decide can briefly show the decided card (a press gets the server's 409).
+- AgentSwitches' Save threshold becomes `disabled` after a successful save, so focus drops (this predates the build).
+- `decide` has no `try/finally` around its busy set (nothing in it can throw today).
+
+**Verification Lead brief adjustments** (on top of Step 3's 22 items):
+- On a hard load, a static `.ol-navbar` shows at the top of the viewport, and none shows inside `.pe-wrap`.
+- `/freelance/queue` shows the queue outline, never the dashboard's, when reached from `/personal` and from `/freelance`.
+- A settings 500 `{error:"Could not save.",code:"save-failed"}` shows `Could not save.`.
+- Agent switches keep focus with `aria-disabled` while saving.
+- After an approve, focus is on the next `[data-card]` (`role="group"`).
+- The stand-in's mark is a separate `.pe-said.is-standin` line; there is no horizontal scroll at 390px or 320px.
+- If Edit layout was entered during an add's flight, a failure goes under the tile's head.
+- An R42 `.fl-empty` line stays visible beside a stand-in.
+
+**Riku's hands:** the list above ("Riku's hands (at the end)"), unchanged, all unticked.
