@@ -2943,3 +2943,136 @@ git commit -m "feat(feel): queue card leaves at once; answers through pressOutco
 - An R42 `.fl-empty` line stays visible beside a stand-in.
 
 **Riku's hands:** the list above ("Riku's hands (at the end)"), unchanged, all unticked.
+
+---
+
+## Post-build record (2026-10-12): T15 complete
+
+**Status.** T1–T15 are done. The code is unchanged since `2601cdc`; this record is the only change after it. Nothing is pushed: master is ahead of origin, and pushing needs Riku's say-so.
+
+**Commits:** `git log --oneline 33b7217..HEAD` gives 29 commits, from `b45e5ae` (the plan) to `a67f1cb` (the interim record), plus this record's commit. In order:
+- `a9453bf`, `c06fe6d`, `54984ea`, `5d9a371`: F1 (navProgress and doorSentence; bar, signals and outline pieces; the Freelance, queue and Settings outlines; the Personal outline).
+- `4910bba`: F3, the switches.
+- `4802439`, `2186048`, `3b27105`, `2efee14`: F2, the stand-ins.
+- `df48029`: F4, the queue.
+- Then the review fix rounds and plan amendments: `72907e7` to `2601cdc`.
+
+**Trio, re-run 2026-10-12 on `a67f1cb`:**
+- **`npm test`:** 63 files, 1588 tests. All pass on an idle machine.
+  - One pre-existing test is flaky under CPU load. `voice.test.ts › pickLine › never picks the same line on two consecutive days…` takes 1.7 s alone, but timed out at Vitest's 5 s default in 2 of 5 full runs. Both runs overlapped other heavy work: Riku's dev server, tsc, and an `npm ci`.
+  - It came in with the Debrief build (`224f09e`), not this one, and the logic itself is not in doubt.
+  - Suggested follow-up, not done here: give that test (and its 2.1 s sibling) an explicit timeout.
+- **`npx tsc --noEmit`:** clean.
+- **`npm run build`:** clean. `/freelance` and `/freelance/queue` are each one route.
+  - It was run in the isolated `git archive` copy, with the repo's own `node_modules` copied in, because Riku's `next dev -p 3001` was running from the repo, and a build there would rewrite the `.next` directory under it.
+  - Turbopack refuses a junctioned `node_modules` ("points out of the filesystem root"), so the build needs a real copy. The junction is only fine for `next dev --webpack`.
+- **`npm run lint`:** 4 errors and 3 warnings, exit 1. That is the baseline exactly.
+- **Found on the way:** `npm ci` refuses the repo's lock file as out of sync with `package.json`. It is missing `@emnapi/runtime@1.11.3` and `@emnapi/core@1.11.3`/`1.10.0`, and `@emnapi/wasi-threads` doesn't match. `npm install` tolerates this. It is unrelated to this build; it's worth an `npm install` and a lock-file commit some time.
+
+**Deviations taken:** the plan's 1–11, plus amendments 12(a)–(f) from the reviews (above, and in the interim record). Nothing new was added in T15.
+
+**Review findings and fixes:** as listed in the interim record (F1, F3, F4, F2, principal), all APPROVED. Its six recorded edge cases are accepted, not fixed.
+
+### The Verification Lead's measurements
+
+**Method.** As Step 3 says, unchanged, with these additions:
+- **An isolated copy,** made with `git archive HEAD`. It had no `.env.local` of Riku's, only a throwaway one: `MONGODB_URI` pointed at a `mongodb-memory-server` mongod on 27117, `SESSION_SECRET` and `DASHBOARD_PASSWORD` were throwaway, and the ShikksTracker, Google, VAPID and cron values were all blank.
+- **Tooling:** Playwright 1.64 and mongodb-memory-server 10.4 were installed in the scratch directory's own `package.json`.
+- **Server:** `next dev --webpack -p 3021`. Riku's port 3001 was never touched.
+- **Login** went through the real `POST /api/auth/login` via `context.request`.
+- **Seeding** used the app's own models.
+
+**Round 1** was run by a Sonnet Verification Lead.
+
+**Round 2** was run by the lead after the Sonnet agent hit the weekly usage limit. It re-measured items 1, 4 and 5, adj1 and adj2, and ran the three adjustments round 1 hadn't reported (adj3, adj4, adj6).
+
+**Three method findings, worth keeping for the next browser pass:**
+1. **Use `http://localhost:3021`, never `127.0.0.1`.** Next 16's dev server rejects the HMR websocket for a non-allowed `Origin`. With that socket stuck, nothing hydrates: no `onClick` fires and no effect runs.
+2. **Don't measure a loading outline in dev by delaying the RSC request.**
+   - Dev mode never prefetches: every run counted 0 requests with `next-router-prefetch`. So the `loading.tsx` outline reaches the browser only in the server's first streamed chunk.
+   - A route that holds the whole RSC response therefore holds the outline too. In round 2's "mode A" (navigation RSC held 1.5 s), the outline appeared at ~1.7 s, together with the content.
+   - That artifact is why round 1 recorded item 1 and item 4 as FAIL in its final run.
+   - The faithful way is to **slow the data, not the delivery.** Round 2 used a small TCP proxy between `next dev` and mongod that holds each client→server chunk 300 ms, standing in for Atlas latency.
+   - In production the outline comes from the prefetch cache instead, so it is no slower than this.
+3. **Item 5 (first open) needs the same latency.** Against a bare local mongod, with every outside call failing synchronously because the secrets are blank, the page resolves before React flushes the Suspense fallback. Round 1 caught it once in five tries; under the latency proxy it showed every time.
+
+**F1**
+1. **PASS** (round 2, latency proxy at 300 ms, 3 runs per target).
+   - On a rail tap `/freelance` → `/personal`, the outline was up at 119, 124 and 127 ms after the click, and the content arrived at 489, 507 and 495 ms.
+   - Every animation frame between those two showed the outline.
+   - `.navbar` went `data-on="true"` at 6–15 ms and back to `false` on the content frame.
+2. **PASS.** In the outline's `main`:
+   - The text is `Loading… / TODAY / TO-DO / LAYERS / NEXT 7 DAYS / DONE THIS WEEK`, with 12 `.ol-bar`s and 0 `button`, `a` or `.tick`.
+   - The one digit is the fixed `Next 7 days` label, not data.
+3. **PASS** (round 1).
+   - Remembered custom layout: the first cell is `Next 7 days`.
+   - `"{"` in storage: the default grid.
+   - Storage getter throwing: the default grid, and no page error.
+4. **PASS** (round 2, 3 runs each; outline up within 96–132 ms on every run, continuous until content):
+   - **`/freelance`:** three `.stat` cards labelled Drafts, Contacts and Needs you, and four `.fl-sect` with the headings Your pipeline, Your campaigns, Your approaches and Waiting on you. No digits, no controls. Content at ~440 ms.
+   - **`/settings`:** four cards labelled Follow-up chaser, Monitoring, Google Calendar and Calendar layers. Content at ~775 ms.
+   - **`/freelance/queue`:** never the dashboard's outline (0 `.stats .stat` on every frame).
+     - Its server render is quick (no Mongo read), so what holds the screen is the page's own loud load: the real filter row, then two bar cards and its `Loading…`. Content arrived at ~1,080 ms.
+     - `loading.tsx`'s ghost-button version shows only while the server render itself is slow. Round 1 saw it then: 6 `aria-hidden` ghost buttons and 2 unlabelled cards.
+5. **PASS, 3 of 3** (round 2, latency proxy). On a hard load of `/personal`:
+   - The raw HTML (49 KB) has `ol-navbar` at byte 4,221 and `ol-sr` at 4,286. The first Suspense swap script `$RC` comes at ~45,000.
+   - In the browser, 20 consecutive frames showed the outline before the content.
+6. **PASS.** Under reduced motion, the live `.navbar[data-on="true"]` and `.ol-bar` have computed `animation-name: none` and `opacity: 1`. The bar still shows while loading.
+
+**F3**
+7. **NOT RUN:** the calendar picker doesn't mount without Google. The press mechanism is shared with item 8 and pinned by `instantSwitch.test.ts`. It is on Riku's phone list.
+8. **PASS**, all three parts, on the agent cards:
+   - (a) The label and the `Currently on/off` sentence flipped while the PATCH was held.
+   - (b) A 400 with the chaserNDays sentence flipped back and showed that sentence verbatim.
+   - (c) An abort kept the flip while busy, then said `Couldn’t tell if that saved.`, and the GET count went up by exactly 1.
+9. **NOT RUN:** the layer switches don't render without Google (the `buildLayersView` sentence branch). The mechanism is shared and pinned by tests. **Added to Riku's phone list.**
+
+**F2**
+10. **PASS.** The door was held 1.5 s:
+    - The form closed at once, and focus was on `+ To-do`.
+    - The stand-in showed in both the Academics section and Today's Due group.
+    - After the refresh, 0 `.is-standin` remained, and the real `.pe-row.is-todo` was there.
+11. **PASS.** For a day that read `—`:
+    - The stand-in showed in that day's row.
+    - The `.pe-dash` stayed in the DOM but was not visible (`personal.css`, the `:has(>.pe-standins)` rule).
+    - After the refresh, the stand-in was gone and the real item was there.
+12. **PASS.** On a 400 `no-title`:
+    - The stand-in left, and the form reopened with the typed title.
+    - `Give it a title.` showed, and focus was in Title.
+13. **PASS.** On an abort:
+    - The pill was `aria-disabled="true"` in flight.
+    - The mark read `couldn’t tell if that saved`, and the head read `Couldn’t tell if that saved.`.
+    - Reopening showed `Add` as `aria-disabled` (parked), with Cancel live.
+    - After the refresh, the stand-in was gone.
+14. **PASS.** No `button` or `a` inside `.is-standin`. At 390 px and 320 px, `scrollWidth` equals the viewport.
+15. **NOT RUN by design:** `+ Event` is blocked with Google blank. It is covered by `standIns.test.ts` and the F2 review, and it is on Riku's phone list.
+
+**F4** (the decide door ran for real; with `ST_API_SECRET` blank, `readStConfig()` throws before any `fetch`, so no outward call could leave)
+16. **PASS.** The door was held 1.5 s:
+    - The card had `is-leaving` at once and was detached at ~220–280 ms.
+    - With items still pending, `No pending items.` did not show. Once all three were decided, it did.
+17. **PASS.** The top line read exactly `Approved, but the draft didn’t reach ShikksTracker. It’s under Approved, with a retry.`. Its `Approved` control switched the filter.
+18. **PASS.** The top line read exactly `Approved, but I can’t tell if the draft reached ShikksTracker. It’s under Approved. Check there before doing anything else.`.
+19. **PASS.** On a 409, the card came back with `Item is no longer pending (already decided or expired).`, and the edit box reopened with the edited text unchanged.
+20. **PASS.** On an abort, the top line read `Couldn’t tell if that went through.`, and no `.ol-bar` appeared during the quiet re-read.
+21. **PASS.** Under reduced motion, the card was detached at ~70–90 ms, with no 200 ms wait.
+22. **PASS.** `.q-link` has `text-transform: none` and a 44 px box.
+
+**Brief adjustments**
+- **adj1 PASS, 3 of 3** (round 2). On a hard load, a static `.ol-navbar` sat at the viewport top on every outline frame, none was ever visible inside `.pe-wrap`, and none remained once the content arrived.
+- **adj2 PASS** (round 2). The queue was reached from `/freelance` and, via `/freelance`, from `/personal` (there is no direct rail link). It showed 0 dashboard `.stat`s on every frame.
+- **adj3 PASS** (round 2). A settings 500 `{"error":"Could not save.","code":"save-failed"}` showed `Could not save.`, and the label flipped back.
+- **adj4 PASS** (round 2). While the PATCH was held 1 s, `document.activeElement` was still the chaser button, with `aria-disabled="true"` and not `disabled`. Focus was still on it after the save.
+- **adj5 PASS** (round 1). After an approve, focus was on the next `[data-card]` (`role="group"`), not its Approve button.
+- **adj6 PASS** at 390 px and 320 px (round 2).
+  - The stand-in renders as `<div class="pe-rows pe-standins"><div class="pe-row is-item is-standin">…<span class="pe-nm">…</span></div><p class="pe-said is-standin">saving</p></div>`.
+  - So the mark is its own line, below the title and outside `.pe-nm`.
+  - There is no horizontal scroll. Screenshots: `adj6-390.png`, `adj6-320.png`.
+- **adj7 PASS** (round 1). With Edit layout entered mid-flight, the failure sentence `Give it a title.` went under the To-do tile's head.
+- **adj8 NOT RUN:** the R42 `.fl-empty` line needs Google. By the CSS, `personal.css`'s hiding rule targets only `.fl-empty.is-none`, and R42's line has no `.is-none`.
+
+**Clean-up:** the dev server, the proxy and mongod were stopped, the ports are free, and the junction was removed with `rmdir` only. The repo was untouched by the pass: `git status --short` was empty before this record.
+
+### Riku's hands
+
+The list above ("Riku's hands (at the end)") stands unchanged, all unticked. Its line "a layer switch and a Settings calendar tick flip at once" is now the only real-browser evidence for items 7 and 9. Its event line is the only evidence for item 15.
